@@ -15,12 +15,13 @@ make install
 make DESTDIR=/output install
 git clone -c http.sslVerify=false --single-branch https://github.com/eudev-project/eudev.git /tmp/eudev
 cd /tmp/eudev
-git checkout v3.2.12-pre3
+git checkout v3.2.11
 ./autogen.sh
 ./configure --prefix=/usr --sysconfdir=/etc --disable-manpages --disable-selinux --disable-mtd_probe --enable-kmod
 make -i all
 make -i DESTDIR=/output install
 rm -Rf /output/usr/share /output/usr/include /output/usr/lib/pkgconfig /output/usr/lib/libudev.*
 rm /output/usr/lib/udev/rules.d/80-net-name-slot.rules
+rm /output/usr/lib/udev/rules.d/60-block.rules
 ln -sf /usr/bin/kmod /output/usr/sbin/depmod
 chown 1000.1000 -R /output
