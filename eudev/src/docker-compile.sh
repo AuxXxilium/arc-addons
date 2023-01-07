@@ -15,7 +15,7 @@ make install
 make DESTDIR=/output install
 git clone -c http.sslVerify=false --single-branch https://github.com/eudev-project/eudev.git /tmp/eudev
 cd /tmp/eudev
-git checkout v3.2.11
+git checkout v3.2.12-pre3
 ./autogen.sh
 ./configure --prefix=/usr --sysconfdir=/etc --disable-manpages --disable-selinux --disable-mtd_probe --enable-kmod
 make -i all
