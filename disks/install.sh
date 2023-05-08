@@ -275,6 +275,8 @@ function nondtModel() {
 #
 if [ "${1}" = "patches" ]; then
   echo "Adjust disks related configs automatically - patches"
+  # fix mount error
+  cp -vf /proc/mounts /etc/mtab
   [ "${2}" = "true" ] && dtModel ${3} || nondtModel
 
 elif [ "${1}" = "late" ]; then
@@ -284,6 +286,7 @@ elif [ "${1}" = "late" ]; then
     # copy file
     cp -vf /etc/model.dtb /tmpRoot/etc/model.dtb
     cp -vf /etc/model.dtb /tmpRoot/etc.defaults/model.dtb
+    cp -vf /proc/mounts /tmpRoot/etc/mtab
   else
     echo "Adjust maxdisks and internalportcfg automatically"
     # sysfs is unpopulated here, get the values from junior synoinfo.conf
