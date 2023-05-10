@@ -271,19 +271,14 @@ function nondtModel() {
     COUNT=$((${COUNT}+1))
   done
   # Memory: Check Memory installed
-  IFS=$'\n' read -r -d '' -a array < <(dmidecode -t memory | grep -i 'size')
-  if [[ ${#array[@]} -gt "0" ]]; then
-      num="0"
-      while [[ $num -lt "${#array[@]}" ]]; do
-          ramsize=$(printf %s "${array[num]}" | cut -d" " -f2)
+  while IFS= read -r line; do
+          ramsize=$line
           if [[ $ramtotal ]]; then
               ramtotal=$((ramtotal +ramsize))
           else
               ramtotal="$ramsize"
           fi
-          num=$((num +1))
-      done
-  fi
+  done <<< $(dmidecode -t memory | grep -i 'Size' | grep -i 'MB' | cut -d" " -f2)
   # Memory: Set mem_max_mb to the amount of installed memory
   setting=`_get_conf_kv mem_max_mb`
   if [[ $ramtotal -gt $setting ]]; then
@@ -326,7 +321,7 @@ elif [ "${1}" = "late" ]; then
     echo "maxdisks=${NUMPORTS}"
     echo "internalportcfg=${INTPORTCFG}"
     echo "usbportcfg=${USBPORTCFG}"
-    echo "ram_max_mb=${RAMCFG}"
+    echo "mem_max_mb=${RAMCFG}"
     cp -vf /etc/extensionPorts /tmpRoot/etc/extensionPorts
     cp -vf /etc/extensionPorts /tmpRoot/etc.defaults/extensionPorts
   fi
