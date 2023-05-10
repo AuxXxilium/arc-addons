@@ -270,13 +270,40 @@ function nondtModel() {
     echo "pci${COUNT}=\"${P}\"" >> /etc/extensionPorts
     COUNT=$((${COUNT}+1))
   done
+  # Memory: Check Memory installed
+  IFS=$'\n' read -r -d '' -a array < <(dmidecode -t memory | grep -i 'size')
+  if [[ ${#array[@]} -gt "0" ]]; then
+      num="0"
+      while [[ $num -lt "${#array[@]}" ]]; do
+          ramsize=$(printf %s "${array[num]}" | cut -d" " -f2)
+          if [[ $ramtotal ]]; then
+              ramtotal=$((ramtotal +ramsize))
+          else
+              ramtotal="$ramsize"
+          fi
+          num=$((num +1))
+      done
+  fi
+  # Memory: Set mem_max_mb to the amount of installed memory
+  setting=`_get_conf_kv mem_max_mb`
+  if [[ $ramtotal -gt $setting ]]; then
+      _set_conf_kv rd "mem_max_mb" "$ramtotal"
+      # Check we changed mem_max_mb
+      setting=`_get_conf_kv mem_max_mb`
+      if [[ $setting == "$ramtotal" ]]; then
+          echo -e "\nSet max memory to $ramtotal MB."
+      else
+          echo -e "\n${Error}ERROR${Off} Failed to change max memory!"
+      fi
+  elif [[ $setting == "$ramtotal" ]]; then
+      echo -e "\nMax memory already set to $ramtotal MB."
+  fi
 }
 
 #
 if [ "${1}" = "patches" ]; then
   echo "Adjust disks related configs automatically - patches"
   [ "${2}" = "true" ] && dtModel ${3} || nondtModel
-
 elif [ "${1}" = "late" ]; then
   echo "Adjust disks related configs automatically - late"
   if [ "${2}" = "true" ]; then
@@ -285,18 +312,21 @@ elif [ "${1}" = "late" ]; then
     cp -vf /etc/model.dtb /tmpRoot/etc/model.dtb
     cp -vf /etc/model.dtb /tmpRoot/etc.defaults/model.dtb
   else
-    echo "Adjust maxdisks and internalportcfg automatically"
+    echo "Adjust maxdisks, internalportcfg and ram_max_mb automatically"
     # sysfs is unpopulated here, get the values from junior synoinfo.conf
     NUMPORTS=`_get_conf_kv maxdisks`
     INTPORTCFG=`_get_conf_kv internalportcfg`
     USBPORTCFG=`_get_conf_kv usbportcfg`
+    RAMCFG=`_get_conf_kv usbportcfg`
     _set_conf_kv hd "maxdisks" "${NUMPORTS}"
     _set_conf_kv hd "internalportcfg" "${INTPORTCFG}"
     _set_conf_kv hd "usbportcfg" "${USBPORTCFG}"
+    _set_conf_kv hd "mem_max_mb" "${RAMCFG}"
     # log
     echo "maxdisks=${NUMPORTS}"
     echo "internalportcfg=${INTPORTCFG}"
     echo "usbportcfg=${USBPORTCFG}"
+    echo "ram_max_mb=${RAMCFG}"
     cp -vf /etc/extensionPorts /tmpRoot/etc/extensionPorts
     cp -vf /etc/extensionPorts /tmpRoot/etc.defaults/extensionPorts
   fi
