@@ -271,14 +271,15 @@ function nondtModel() {
     COUNT=$((${COUNT}+1))
   done
   # Memory: Check Memory installed
+  memoryconf=`dmidecode -t memory | grep -i 'Size' | grep -i 'MB' | cut -d" " -f2`
   while IFS= read -r line; do
-          ramsize=$line
-          if [[ $ramtotal ]]; then
-              ramtotal=$((ramtotal +ramsize))
-          else
-              ramtotal="$ramsize"
-          fi
-  done <<< $(dmidecode -t memory | grep -i 'Size' | grep -i 'MB' | cut -d" " -f2)
+    ramsize=$line
+    if [[ $ramtotal ]]; then
+        ramtotal=$((ramtotal +ramsize))
+    else
+        ramtotal="$ramsize"
+    fi
+  done < "$memoryconf"
   # Memory: Set mem_max_mb to the amount of installed memory
   setting=`_get_conf_kv mem_max_mb`
   if [[ $ramtotal -gt $setting ]]; then
