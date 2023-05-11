@@ -22,7 +22,7 @@ if [ "${1}" = "late" ]; then
 
   file="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [[ ! -f ${file} ]] && file="/usr/lib/libhwcontrol.so.1"
-  
+
   if [[ ! -f ${file} ]]; then
       ding
       echo -e "${Error}ERROR ${Off} File not found!"
@@ -43,7 +43,7 @@ findbytes(){
     bc)
 
     # Convert decimal position of matching hex string to hex
-    array=("$match")
+    array="$match"
     if [[ ${#array[@]} -gt "1" ]]; then
         num="0"
         while [[ $num -lt "${#array[@]}" ]]; do
