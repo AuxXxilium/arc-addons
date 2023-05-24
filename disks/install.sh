@@ -223,6 +223,8 @@ function dtModel() {
 
 # Portconfig for nonDT Model
 function nondtModel() {
+  local SATA_PORTS=0
+  local SAS_PORTS=0
   local SCSI_PORTS=0
   local NVME_PORTS=0
   local NUMPORTS=0
@@ -235,13 +237,15 @@ function nondtModel() {
     echo "get maxdisks=${NUMPORTS}"
   else
     # sysfs is populated here
+    SATA_PORTS=`ls /sys/class/ata_port | wc -w`
+    [ -d '/sys/class/sas_phy' ] && SAS_PORTS=`ls /sys/class/sas_phy | wc -w`
     [ -d '/sys/class/scsi_disk' ] && SCSI_PORTS=`ls /sys/class/scsi_disk | wc -w`
     [ -d '/sys/class/nvme' ] && NVME_PORTS=`ls /sys/class/nvme | wc -w`
-    NUMPORTS=$((${SCSI_PORTS}+${NVME_PORTS}))
-    # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
-    if [ ${NUMPORTS} -gt 26 ]; then
-      _set_conf_kv rd "maxdisks" "26"
-      echo "set maxdisks=26"
+    NUMPORTS=$((${SATA_PORTS}+${SAS_PORTS}+${SCSI_PORTS}+${NVME_PORTS}))
+    # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%. >>> Set to 24 to get USB Storage working.
+    if [ ${NUMPORTS} -gt 24 ]; then
+      _set_conf_kv rd "maxdisks" "24"
+      echo "set maxdisks=24"
     else
       _set_conf_kv rd "maxdisks" "${NUMPORTS}"
       echo "set maxdisks=${NUMPORTS}"
