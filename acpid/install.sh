@@ -10,7 +10,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p /tmpRoot/etc/acpi/events/
   cp -vf /etc/acpi/events/power /tmpRoot/etc/acpi/events/power
   cp -vf /etc/acpi/power.sh /tmpRoot/etc/acpi/power.sh
-  DEST="/tmpRoot/lib/systemd/system/acpi.service"
+  DEST="/tmpRoot/lib/systemd/system/acpid.service"
   echo "[Unit]"                                                                >${DEST}
   echo "Description=ACPI Daemon"                                              >>${DEST}
   echo "DefaultDependencies=no"                                               >>${DEST}
