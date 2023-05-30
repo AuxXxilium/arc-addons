@@ -1,7 +1,7 @@
 #!/usr/bin/env ash
 
-#if [ "${1}" = "early" ]; then
-#  /usr/bin/nvmeenable.sh 2>/dev/null
+if [ "${1}" = "early" ]; then
+  /usr/bin/nvmeenable.sh 2>/dev/null
 if [ "${1}" = "late" ]; then
   echo "Creating service to exec Enable NVMe"
   cp -vf /usr/bin/nvmeenable.sh /tmpRoot/usr/bin/nvmeenable.sh
@@ -17,11 +17,10 @@ if [ "${1}" = "late" ]; then
   echo "Type=oneshot"                                                         >>${DEST}
   echo "RemainAfterExit=true"                                                 >>${DEST}
   echo "ExecStart=/usr/bin/nvmeenable.sh"                                     >>${DEST}
-  echo "ExecStop=/usr/bin/nvmeenable.sh"                                      >>${DEST}
   echo                                                                        >>${DEST}
   echo "[Install]"                                                            >>${DEST}
   echo "WantedBy=multi-user.target"                                           >>${DEST}
 
   mkdir -p /tmpRoot/lib/systemd/system/multi-user.target.wants
-  ln -sf /lib/systemd/system/nvmeenable.service /tmpRoot/lib/systemd/system/multi-user.target.wants/nvmeenable.service
+  ln -sf /tmpRoot/lib/systemd/system/nvmeenable.service /tmpRoot/lib/systemd/system/multi-user.target.wants/nvmeenable.service
 fi

@@ -24,5 +24,5 @@ if [ "${1}" = "late" ]; then
   echo "Author=Virtualization Team"          >>${DEST}
 
   mkdir -vp /tmpRoot/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/acpid.service /tmpRoot/lib/systemd/system/multi-user.target.wants/acpid.service
+  ln -sf /tmpRoot/usr/lib/systemd/system/acpid.service /tmpRoot/lib/systemd/system/multi-user.target.wants/acpid.service
 fi

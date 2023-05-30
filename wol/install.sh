@@ -19,5 +19,5 @@ elif [ "${1}" = "late" ]; then
   echo "WantedBy=multi-user.target"                                           >>${DEST}
 
   mkdir -p /tmpRoot/lib/systemd/system/multi-user.target.wants
-  ln -sf /lib/systemd/system/ethtool.service /tmpRoot/lib/systemd/system/multi-user.target.wants/ethtool.service
+  ln -sf /tmpRoot/lib/systemd/system/ethtool.service /tmpRoot/lib/systemd/system/multi-user.target.wants/ethtool.service
 fi
