@@ -1,8 +1,8 @@
 #!/usr/bin/env ash
 
-#if [ "${1}" = "early" ]; then
-#  /usr/bin/codecpatch.sh 2>/dev/null
-if [ "${1}" = "late" ]; then
+if [ "${1}" = "early" ]; then
+  /usr/bin/codecpatch.sh 2>/dev/null
+elif [ "${1}" = "late" ]; then
   echo "Creating service to exec Codecpatch"
   cp -vf /usr/bin/codecpatch.sh /tmpRoot/usr/bin/codecpatch.sh
   DEST="/tmpRoot/lib/systemd/system/codecpatch.service"

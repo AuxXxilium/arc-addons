@@ -91,39 +91,6 @@ patch () {
     fi
 }
 
-# Get updated patches
-
-curl -L "https://raw.githubusercontent.com/wjz304/arpl-addons/main/codecpatch/patches" -o /tmp/patches
-source /tmp/patches
-
-source "/etc/VERSION"
-dsm_version="$productversion $buildnumber-$smallfixnumber"
-if [[ ! "$dsm_version" ]] ; then
-    echo "Something went wrong. Could not fetch DSM version"
-    exit 1
-fi
-
-echo "Detected DSM version: $dsm_version"
-
-if ! check_version "$dsm_version" ; then
-    echo "Patch for DSM Version ($dsm_version) not found."
-    exit 1
-fi
-
-echo "Patch for DSM Version ($dsm_version) AVAILABLE!"
-for i in "${path_list[@]}"; do
-    if [ -e "$i/$bin_file" ]; then
-        binpath_list+=( "$i/$bin_file" )
-    fi
-done
-
-if  ! (( ${#binpath_list[@]} )) ; then
-    echo "Something went wrong. Could not find synocodectool"
-    exit 1
-fi
-
 for file in "${binpath_list[@]}"; do
     patch "${file}"
 done
-
-exit 0

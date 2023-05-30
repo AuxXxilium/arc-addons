@@ -13,7 +13,6 @@ elif [ "${1}" = "late" ]; then
   echo "Type=oneshot"                                                         >>${DEST}
   echo "RemainAfterExit=true"                                                 >>${DEST}
   echo "ExecStart=/usr/sbin/ethtool -s eth0 wol g"                            >>${DEST}
-  echo "ExecStop=/usr/sbin/ethtool -s eth0 wol g"                             >>${DEST}
   echo                                                                        >>${DEST}
   echo "[Install]"                                                            >>${DEST}
   echo "WantedBy=multi-user.target"                                           >>${DEST}

@@ -1,8 +1,8 @@
 #!/usr/bin/env ash
 
-#if [ "${1}" = "early" ]; then
-#  /usr/bin/nvmeenable.sh 2>/dev/null
-if [ "${1}" = "late" ]; then
+if [ "${1}" = "early" ]; then
+  /usr/bin/nvmeenable.sh 2>/dev/null
+elif [ "${1}" = "late" ]; then
   echo "Creating service to exec Enable NVMe"
   cp -vf /usr/bin/nvmeenable.sh /tmpRoot/usr/bin/nvmeenable.sh
   cp -vf /usr/bin/bc /tmpRoot/usr/bin/bc

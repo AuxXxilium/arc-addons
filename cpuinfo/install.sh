@@ -1,8 +1,8 @@
 #!/usr/bin/env ash
 
-#if [ "${1}" = "early" ]; then
-#  /usr/bin/cpuinfo.sh 2>/dev/null
-if [ "${1}" = "late" ]; then
+if [ "${1}" = "early" ]; then
+  /usr/bin/cpuinfo.sh 2>/dev/null
+elif [ "${1}" = "late" ]; then
   echo "Creating service to exec CPU Info"
   cp -vf /usr/bin/cpuinfo.sh /tmpRoot/usr/bin/cpuinfo.sh
   DEST="/tmpRoot/lib/systemd/system/cpuinfo.service"

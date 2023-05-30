@@ -1,8 +1,8 @@
 #!/usr/bin/env ash
 
-#if [ "${1}" = "early" ]; then
-#  /usr/bin/surveillance.sh 2>/dev/null
-if [ "${1}" = "late" ]; then
+if [ "${1}" = "early" ]; then
+  /usr/bin/surveillance.sh 2>/dev/null
+elif [ "${1}" = "late" ]; then
   echo "Creating service to exec Surveillance Patch"
   cp -vf /usr/bin/surveillance.sh /tmpRoot/usr/bin/surveillance.sh
   cp -vf /usr/lib/libssutils.so /tmpRoot/usr/lib/libssutils.so

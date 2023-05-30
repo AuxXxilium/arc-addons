@@ -1,8 +1,8 @@
 #!/usr/bin/env ash
 
-#if [ "${1}" = "early" ]; then
-#  /usr/bin/deduplication.sh 2>/dev/null
-if [ "${1}" = "late" ]; then
+if [ "${1}" = "early" ]; then
+  /usr/bin/deduplication.sh 2>/dev/null
+elif [ "${1}" = "late" ]; then
   echo "Creating service to exec Deduplication"
   cp -vf /usr/bin/diskdbpatch.sh /tmpRoot/usr/bin/deduplication.sh
   DEST="/tmpRoot/lib/systemd/system/deduplication.service"

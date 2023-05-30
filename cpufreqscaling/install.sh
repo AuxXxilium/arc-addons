@@ -1,8 +1,8 @@
 #!/usr/bin/env ash
 
-#if [ "${1}" = "early" ]; then
-#  /usr/bin/cpufreqscaling.sh 2>/dev/null
-if [ "${1}" = "late" ]; then
+if [ "${1}" = "early" ]; then
+  /usr/bin/cpufreqscaling.sh 2>/dev/null
+elif [ "${1}" = "late" ]; then
   echo "Creating service to exec CPU Freq Scaling"
   cp -vf /usr/bin/cpufreqscaling.sh /tmpRoot/usr/bin/cpufreqscaling.sh
   DEST="/tmpRoot/lib/systemd/system/cpufreqscaling.service"

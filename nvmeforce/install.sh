@@ -1,8 +1,8 @@
 #!/usr/bin/env ash
 
-#if [ "${1}" = "early" ]; then
-#  /usr/bin/nvmeforce.sh 2>/dev/null
-if [ "${1}" = "late" ]; then
+if [ "${1}" = "early" ]; then
+  /usr/bin/nvmeforce.sh 2>/dev/null
+elif [ "${1}" = "late" ]; then
   echo "Creating service to exec Force NVMe"
   cp -vf /usr/bin/nvmeforce.sh /tmpRoot/usr/bin/nvmeforce.sh
   DEST="/tmpRoot/lib/systemd/system/nvmeforce.service"
