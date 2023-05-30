@@ -1,6 +1,6 @@
 version: 1
 name: codecpatch
-description: "Patch synocodectool (can break surveillance)"
+description: "Patch Synocodectool (Don't need this - We have Arc Patch)"
 all:
   install-script: "install.sh"
   copy: "all"
