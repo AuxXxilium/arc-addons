@@ -56,7 +56,7 @@ elif [ "${1}" = "late" ]; then
   echo "WantedBy=multi-user.target"                                           >>${DEST}
 
   mkdir -p /tmpRoot/lib/systemd/system/multi-user.target.wants
-  ln -sf /tmpRoot/lib/systemd/system/keymap.service /tmpRoot/lib/systemd/system/multi-user.target.wants/keymap.service
+  ln -sf /lib/systemd/system/keymap.service /tmpRoot/lib/systemd/system/multi-user.target.wants/keymap.service
   # Workaround for DVA1622
   if [ "${MODEL}" = "DVA1622" ]; then
     echo > /dev/tty2
