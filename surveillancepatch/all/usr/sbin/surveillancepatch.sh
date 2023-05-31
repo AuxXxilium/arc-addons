@@ -6,17 +6,8 @@ repo="AuxXxilium/arc-addons"
 
 PATH1="/var/packages/SurveillanceStation/target/lib"
 PATH2="/var/packages/SurveillanceStation/target/scripts"
-if [ -f "/usr/lib/libssutils.so" ]; then
-    SPATCH="/usr/lib"
-    surveillancepatch
-elif [ -f "/tmpRoot/usr/lib/libssutils.so" ]; then
-    SPATCH="/tmpRoot/usr/lib"
-    surveillancepatch
-else
-    echo -e "Surveillance Patch: Files not found!"
-fi
+SPATCH="/usr/lib"
 
-function surveillancepatch () {
 /usr/syno/bin/synopkg stop SurveillanceStation
 sleep 15
 
@@ -41,4 +32,3 @@ echo -e "Surveillance Patch: Successfull!"
 
 sleep 5
 /usr/syno/bin/synopkg start SurveillanceStation
-}

@@ -9,6 +9,6 @@ EOF
 else
 echo "copy RebootToArpl task db"
 mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-cp -f /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+cp -f /usr/lib/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
 fi
 fi
