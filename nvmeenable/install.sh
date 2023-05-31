@@ -1,14 +1,17 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "early" ]; then
-  /usr/bin/nvmeenable.sh 2>/dev/null
-elif [ "${1}" = "late" ]; then
+if [ "${1}" = "late" ]; then
   echo "Creating service to exec Enable NVMe"
-  cp -vf /usr/bin/nvmeenable.sh /tmpRoot/usr/bin/nvmeenable.sh
-  cp -vf /usr/bin/bc /tmpRoot/usr/bin/bc
-  cp -vf /usr/bin/od /tmpRoot/usr/bin/od
-  cp -vf /usr/bin/tr /tmpRoot/usr/bin/tr
-  cp -vf /usr/bin/xxd /tmpRoot/usr/bin/xxs
+  cp -vf /usr/sbin/nvmeenable.sh /tmpRoot/usr/sbin/nvmeenable.sh
+  cp -vf /usr/sbin/bc /tmpRoot/usr/sbin/bc
+  cp -vf /usr/sbin/od /tmpRoot/usr/sbin/od
+  cp -vf /usr/sbin/tr /tmpRoot/usr/sbin/tr
+  cp -vf /usr/sbin/xxd /tmpRoot/usr/sbin/xxs
+  chmod 755 /tmpRoot/usr/sbin/bc
+  chmod 755 /tmpRoot/usr/sbin/od
+  chmod 755 /tmpRoot/usr/sbin/tr
+  chmod 755 /tmpRoot/usr/sbin/xxs
+
   DEST="/tmpRoot/lib/systemd/system/nvmeenable.service"
   echo "[Unit]"                                                                >${DEST}
   echo "Description=Enable NVMe as Storage"                                   >>${DEST}
@@ -16,8 +19,7 @@ elif [ "${1}" = "late" ]; then
   echo "[Service]"                                                            >>${DEST}
   echo "Type=oneshot"                                                         >>${DEST}
   echo "RemainAfterExit=true"                                                 >>${DEST}
-  echo "ExecStart=/usr/bin/nvmeenable.sh"                                     >>${DEST}
-  echo "ExecStop=/usr/bin/nvmeenable.sh"                                      >>${DEST}
+  echo "ExecStart=/usr/sbin/nvmeenable.sh"                                    >>${DEST}
   echo                                                                        >>${DEST}
   echo "[Install]"                                                            >>${DEST}
   echo "WantedBy=multi-user.target"                                           >>${DEST}

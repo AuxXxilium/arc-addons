@@ -1,7 +1,9 @@
-#!/bin/sh
-# Updated 2023.05.18
-# htttps://github.com/AuxXxilium/arc-addons
-ver="23.5.1"
+#!/usr/bin/env ash
+
+scriptver="23.6.1"
+script=CPUInfo
+repo="AuxXxilium/arc-addons"
+
 # ==============================================================================
 # Location Check
 # ==============================================================================
@@ -415,7 +417,7 @@ MWORK_DIR="/usr/syno/synoman/mobile/ui"
 BKUP_DIR="/root/Xpenology_backup"
 VER_DIR="/etc.defaults"
  
-cecho c "DSM CPU Information Change Tool ver. \033[0;31m"$ver"\033[00m\n"
+cecho c "DSM CPU Information Change Tool ver. \033[0;31m"$scriptver"\033[00m\n"
 
 if [ -d "$VER_DIR" ]
 then

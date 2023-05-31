@@ -1,13 +1,8 @@
-#!/usr/bin/env bash
-#------------------------------------------------------------------------------
-# Enables data deduplication with non-Synology SSDs and unsupported NAS models
-#------------------------------------------------------------------------------
+#!/usr/bin/env ash
 
-scriptver="v23.5.1"
+scriptver="23.6.1"
 script=Deduplication
 repo="AuxXxilium/arc-addons"
-
-#echo -e "bash version: $(bash --version | head -1 | cut -d' ' -f4)\n"  # debug
 
 # Shell Colors
 #Black='\e[0;30m'   # ${Black}

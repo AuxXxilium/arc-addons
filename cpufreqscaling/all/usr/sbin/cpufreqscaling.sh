@@ -1,20 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env ash
+
+scriptver="23.6.1"
+script=CPUFreqScaling
+repo="AuxXxilium/arc-addons"
 
 # Make things safer
 set -euo pipefail
-
-# Ensure root user
-#if [ "$EUID" -ne 0 ]; then
-#  echo "Please run as root"
-#  exit
-#fi
-
-# Ensure acpi-cpufreq kernel module is loaded
-#if ! modprobe acpi-cpufreq; then
-#  pushd /lib/modules
-#  insmod acpi-cpufreq.ko
-#  popd
-#fi
 
 # Frequency scaling function
 function main {

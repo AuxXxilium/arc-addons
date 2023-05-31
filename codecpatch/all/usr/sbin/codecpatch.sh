@@ -1,7 +1,8 @@
-#!/bin/ash
+#!/usr/bin/env ash
 
-# Adapted by Fabio Belavenuto for ARPL project
-# 01/2023
+scriptver="23.6.1"
+script=Codecpatch
+repo="AuxXxilium/arc-addons"
 
 set -eo pipefail;
 shopt -s nullglob;

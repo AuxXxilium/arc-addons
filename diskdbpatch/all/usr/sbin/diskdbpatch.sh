@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+#!/usr/bin/env ash
 # shellcheck disable=SC1083,SC2054,SC2121,SC2207
 
-scriptver="v23.5.1"
+scriptver="23.6.1"
 script=DiskDBPatch
 repo="AuxXxilium/arc-addons"
 

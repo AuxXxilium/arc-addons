@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env ash
 
-scriptver="v23.5.1"
+scriptver="23.6.1"
 script=NVMeEnable
 repo="AuxXxilium/arc-addons"
 
