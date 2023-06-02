@@ -1,0 +1,8 @@
+version: 1
+name: qemu-ga
+description: "The Qemu guset agent"
+all:
+  install-script: "install.sh"
+  copy: "all"
+available-for:
+  epyc7002-5.10.55:

@@ -109,7 +109,7 @@ jobs:
 
           git clone -c http.sslVerify=false --single-branch https://github.com/kmod-project/kmod.git /tmp/kmod
           cd /tmp/kmod
-          git checkout v30
+          git checkout master
           patch -p1 < /source/input/kmod.patch
           ./autogen.sh
           ./configure CC=${CC} CFLAGS='-O2' --host=${HOST} --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib --enable-tools --disable-manpages --disable-python --without-zstd --without-xz --without-zlib --without-openssl
@@ -119,7 +119,7 @@ jobs:
           make DESTDIR=/source/output install
           git clone -c http.sslVerify=false --single-branch https://github.com/eudev-project/eudev.git /tmp/eudev
           cd /tmp/eudev
-          git checkout v3.2.11
+          git checkout master
           ./autogen.sh
           ./configure CC=${CC} --host=${HOST} --prefix=/usr --sysconfdir=/etc --disable-manpages --disable-selinux --disable-mtd_probe --enable-kmod
           [ -z "`grep 'env.mak' Makefile`" ] && sed -i '1 i include /env.mak' Makefile

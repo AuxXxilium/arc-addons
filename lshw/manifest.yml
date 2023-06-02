@@ -1,0 +1,8 @@
+version: 1
+name: lshw
+description: "The lshw Utility"
+all:
+  install-script: "install.sh"
+  copy: "all"
+available-for:
+  epyc7002-5.10.55:
