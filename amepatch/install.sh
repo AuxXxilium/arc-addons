@@ -2,7 +2,7 @@
 
 if [ "${1}" = "late" ]; then
   echo "Creating service to exec Enable AME Patch"
-  cp -vf /usr/sbin/ame.sh /tmpRoot/usr/sbin/ame.sh
+  cp -vf /usr/sbin/amepatch.sh /tmpRoot/usr/sbin/amepatch.sh
 
   DEST="/tmpRoot/lib/systemd/system/amepatch.service"
   echo "[Unit]"                                                                >${DEST}
