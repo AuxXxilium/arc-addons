@@ -8,6 +8,7 @@ ModuleUnique=`/bin/get_key_value /etc.defaults/VERSION unique` # Avoid confusion
 if [ "${1}" = "modules" ]; then
   echo "Starting eudev daemon - modules"
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' > /proc/sys/kernel/hotplug
+  chmod 755 /usr/sbin/udevd /usr/bin/kmod /usr/bin/udevadm /usr/lib/udev/*
   ln -s /lib/libkmod.so.2.4.0 /lib/libkmod.so.2
   ln -s /usr/bin/udevadm /usr/sbin/udevadm
   /usr/sbin/udevd -d || { echo "FAIL"; exit 1; }
