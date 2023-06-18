@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "jrExit" ]; then
+if [ "${1}" = "early" ]; then
   wait_time=20 # maximum wait time in seconds
 
   dump_all_partitions()
