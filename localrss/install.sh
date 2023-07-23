@@ -6,21 +6,10 @@ if [[ -z ${MLINK} || -z ${MCHECKSUM} ]]; then
   return
 fi
 
-if [[ ${1} = late ]]; then
-echo "make localrss - late"
+if [[ ${1} = modules ]]; then
+echo "make localrss - module"
 
 . /etc.defaults/VERSION
-
-echo "update localrss - late"
-# Update RSS Feed
-PAT_MODEL="$(echo "${MODEL}" | sed -e 's/\./%2E/g' -e 's/+/%2B/g')"
-PAT_MAJOR="${major}"
-PAT_MINOR="${minor}"
-PAT_URL="$(curl -skL "https://www.synology.com/api/support/findDownloadInfo?lang=en-us&product=${PAT_MODEL}&major=${PAT_MAJOR}&minor=${PAT_MINOR}" | jq -r '.info.system.detail[0].items[0].files[0].url')"
-PAT_HASH="$(curl -skL "https://www.synology.com/api/support/findDownloadInfo?lang=en-us&product=${PAT_MODEL}&major=${PAT_MAJOR}&minor=${PAT_MINOR}" | jq -r '.info.system.detail[0].items[0].files[0].checksum')"
-PAT_URL="${PAT_URL%%\?*}"
-MLINK="${PAT_URL}"
-MCHECKSUM="${PAT_HASH}"
 
 cat > /usr/syno/web/localrss.json << EOF
 {
