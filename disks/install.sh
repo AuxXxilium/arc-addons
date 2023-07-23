@@ -58,7 +58,7 @@ function _check_rootraidstatus() {
 function getNum0Bits() {
   local VALUE=$1
   local NUM=0
-  while [[ $((${VALUE}%2)) = 0 && ${VALUE} != 0 ]}; do
+  while [[ $((${VALUE}%2)) = 0 && ${VALUE} != 0 ]]; do
     NUM=$((${NUM}+1))
     VALUE=$((${VALUE}/2))
   done
@@ -183,7 +183,7 @@ function dtModel() {
       I=$((${I}+1))
     done
     NUMPORTS=$((${I}-1))
-    if [[ $NUMPORTS = 1 ]}; then
+    if [[ $NUMPORTS = 1 ]]; then
       # fix isSingleBay issue:
       #   if maxdisks is 1, there is no create button in the storage panel
       NUMPORTS=2
@@ -241,7 +241,7 @@ function nondtModel() {
     [[ -d /sys/class/scsi_disk ]] && SCSI_PORTS=$(ls /sys/class/scsi_disk | wc -w)
     NUMPORTS=$((${SATA_PORTS}+${SAS_PORTS}+${SCSI_PORTS}))
     # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
-    if ! _check_rootraidstatus && [[ ${NUMPORTS} > 24 ] 9; then
+    if ! _check_rootraidstatus && [[ ${NUMPORTS} > 24 ]]; then
       _set_conf_kv rd "maxdisks" "24"
       echo "set maxdisks=24"
     else
