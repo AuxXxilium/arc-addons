@@ -12,7 +12,7 @@ function _get_conf_kv() {
 function _set_conf_kv() {
   local ROOT
   local FILE
-  [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
+  [[ $1 = rd ]] && ROOT="" || ROOT="/tmpRoot"
   for SD in etc etc.defaults; do
     FILE="${ROOT}/${SD}/synoinfo.conf"
     # Replace
