@@ -8,7 +8,7 @@ if [[ ${1} = modules ]]; then
     /usr/sbin/modprobe ${2}
   else
     for M in i915 efifb vesafb vga16fb; do
-      [[ -e /sys/class/graphics/fb0 ]] && break
+      [ -e /sys/class/graphics/fb0 ] && break
       /usr/sbin/modprobe ${M}
     done
   fi
