@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "late" ]; then
+if [[ ${1} = late ]]; then
   echo "Creating service to exec DiskDBPatch"
   cp -vf /usr/sbin/diskdbpatch.sh /tmpRoot/usr/sbin/diskdbpatch.sh
   chmod 755 /tmpRoot/usr/sbin/diskdbpatch.sh

@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "late" ]; then
+if [[ ${1} = late ]]; then
   echo "Creating service to exec Enable NVMe"
   cp -vf /usr/sbin/nvmeenable.sh /tmpRoot/usr/sbin/nvmeenable.sh
   cp -v /usr/bin/bc /tmpRoot/usr/bin/bc

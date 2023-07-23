@@ -29,7 +29,7 @@ function _set_conf_kv() {
 # Args: $1 rd|hd, $2 key
 function _check_post_k() {
   local ROOT
-  [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
+  [[ $1 = rd ]] && ROOT="" || ROOT="/tmpRoot"
   if grep -q -r "^_set_conf_kv.*${2}.*" "${ROOT}/sbin/init.post"; then
     return 0  # true
   else
@@ -39,10 +39,10 @@ function _check_post_k() {
 
 # Check if the raid has been completed currently
 function _check_rootraidstatus() {
-  if [ "$(_get_conf_kv supportraid)" != "yes" ]; then
+  if [[ $(_get_conf_kv supportraid) != yes ]]; then
     return 0
   fi
-  State=$(cat /sys/block/md0/md/array_state) 2>/dev/null
+  State=$(</sys/block/md0/md/array_state) 2>/dev/null
   if [ $? != 0 ]; then
     return 1
   fi
@@ -58,7 +58,7 @@ function _check_rootraidstatus() {
 function getNum0Bits() {
   local VALUE=$1
   local NUM=0
-  while [ $((${VALUE}%2)) -eq 0 ] && [ ${VALUE} -ne 0 ]; do
+  while [[ $((${VALUE}%2)) = 0 && ${VALUE} != 0 ]}; do
     NUM=$((${NUM}+1))
     VALUE=$((${VALUE}/2))
   done
@@ -69,28 +69,28 @@ function getNum0Bits() {
 function getUsbPorts() {
   for I in $(ls -d /sys/bus/usb/devices/usb*); do
     # ROOT
-    DCLASS=$(cat ${I}/bDeviceClass)
-    [ "${DCLASS}" != "09" ] && continue
-    SPEED=$(cat ${I}/speed)
-    [ ${SPEED} -lt 480 ] && continue
-    RBUS=$(cat ${I}/busnum)
-    RCHILDS=$(cat ${I}/maxchild)
+    DCLASS=$(<${I}/bDeviceClass)
+    [[ ${DCLASS} != 09 ]] && continue
+    SPEED=$(<${I}/speed)
+    [[ ${SPEED} < 480 ]] && continue
+    RBUS=$(<${I}/busnum)
+    RCHILDS=$(<${I}/maxchild)
     HAVE_CHILD=0
     for C in $(seq 1 ${RCHILDS}); do
       SUB="${RBUS}-${C}"
-      if [ -d "${I}/${SUB}" ]; then
-        DCLASS=$(cat ${I}/${SUB}/bDeviceClass)
-        [ "${DCLASS}" != "09" ] && continue
-        SPEED=$(cat ${I}/${SUB}/speed)
-        [ ${SPEED} -lt 480 ] && continue
-        CHILDS=$(cat ${I}/${SUB}/maxchild)
+      if [[ -d ${I}/${SUB} ]]; then
+        DCLASS=$(<${I}/${SUB}/bDeviceClass)
+        [[ ${DCLASS} != 09 ]] && continue
+        SPEED=$(<${I}/${SUB}/speed)
+        [[ ${SPEED} < 480 ]] && continue
+        CHILDS=$(<${I}/${SUB}/maxchild)
         HAVE_CHILD=1
         for N in $(seq 1 ${CHILDS}); do
           echo -n "${RBUS}-${C}.${N} "
         done
       fi
     done
-    if [ ${HAVE_CHILD} -eq 0 ]; then
+    if [[ ${HAVE_CHILD} = 0 ]]; then
       for N in $(seq 1 ${RCHILDS}); do
         echo -n "${RBUS}-${N} "
       done
@@ -107,22 +107,22 @@ function getSataPorts() {
   for I in $(seq 1 ${SATA_PORTS}); do
     DUMMY=$((1-`cat /sys/class/ata_port/ata${I}/device/host*/scsi_host/host*/syno_port_thaw`))
     # Is DT
-    if [ "${1}" = "true" ]; then
-      [ ${DUMMY} -eq 1 ] && continue
+    if [[ ${1} = true ]]; then
+      [[ ${DUMMY} = 1 ]] && continue
       PORTNO=$(cat /sys/class/ata_port/ata${I}/port_no)
       _PATH=$(readlink /sys/class/ata_port/ata${I} | sed 's|^.*\(pci.*\)|\1|' | cut -d'/' -f2-)
       DSMPATH=""
       while true; do
         FIRST=$(echo "${_PATH}" | cut -d'/' -f1)
         echo "${FIRST}" | grep -qE "${PCI_ER}" || break
-        [ -z "${DSMPATH}" ] && \
+        [[ -z ${DSMPATH} ]] && \
           DSMPATH="$(echo "${FIRST}" | cut -d':' -f2-)" || \
           DSMPATH="${DSMPATH},$(echo "${FIRST}" | cut -d':' -f3)"
         _PATH=$(echo ${_PATH} | cut -d'/' -f2-)
       done
       echo -n "${DSMPATH}:${PORTNO} "
     else
-      if [ ${DUMMY} -eq 1 ]; then
+      if [[ ${DUMMY} = 1 ]]; then
         OUTPUT="0${OUTPUT}"
       else
         OUTPUT="1${OUTPUT}"
@@ -138,13 +138,13 @@ function nvmePorts() {
   local NVME_PORTS=$(ls /sys/class/nvme | wc -w)
   for I in $(seq 0 $((${NVME_PORTS}-1))); do
     _PATH=$(readlink /sys/class/nvme/nvme${I} | sed 's|^.*\(pci.*\)|\1|' | cut -d'/' -f2-)
-    if [ "${1}" = "true" ]; then
+    if [[ ${1} = true ]]; then
       # Device-tree: assemble complete path in DSM format
       DSMPATH=""
       while true; do
         FIRST=$(echo "${_PATH}" | cut -d'/' -f1)
         echo "${FIRST}" | grep -qE "${PCI_ER}" || break
-        [ -z "${DSMPATH}" ] && \
+        [[ -z ${DSMPATH} ]] && \
           DSMPATH="$(echo "${FIRST}" | cut -d':' -f2-)" || \
           DSMPATH="${DSMPATH},$(echo "${FIRST}" | cut -d':' -f3)"
         _PATH=$(echo ${_PATH} | cut -d'/' -f2-)
@@ -161,7 +161,7 @@ function nvmePorts() {
 #
 function dtModel() {
   DEST="/addons/model.dts"
-  if [ ! -f "${DEST}" ]; then  # Users can put their own dts.
+  if [[ ! -f ${DEST} ]]; then  # Users can put their own dts.
     echo "/dts-v1/;"                                                 >${DEST}
     echo "/ {"                                                      >>${DEST}
     echo "    compatible = \"Synology\";"                           >>${DEST}
@@ -170,7 +170,7 @@ function dtModel() {
     # SATA ports
     I=1
     while true; do
-      [ ! -d /sys/block/sata${I} ] && break
+      [[ ! -d /sys/block/sata${I} ]] && break
       PCIEPATH=$(grep 'pciepath' /sys/block/sata${I}/device/syno_block_info | cut -d'=' -f2)
       ATAPORT=$(grep 'ata_port_no' /sys/block/sata${I}/device/syno_block_info | cut -d'=' -f2)
       echo "    internal_slot@${I} {"                               >>${DEST}
@@ -183,7 +183,7 @@ function dtModel() {
       I=$((${I}+1))
     done
     NUMPORTS=$((${I}-1))
-    if [ $NUMPORTS -eq 1 ]; then
+    if [[ $NUMPORTS = 1 ]}; then
       # fix isSingleBay issue:
       #   if maxdisks is 1, there is no create button in the storage panel
       NUMPORTS=2
@@ -237,11 +237,11 @@ function nondtModel() {
   else
     # sysfs is populated here
     SATA_PORTS=$(ls /sys/class/ata_port | wc -w)
-    [ -d '/sys/class/sas_phy' ] && SAS_PORTS=$(ls /sys/class/sas_phy | wc -w)
-    [ -d '/sys/class/scsi_disk' ] && SCSI_PORTS=$(ls /sys/class/scsi_disk | wc -w)
+    [[ -d /sys/class/sas_phy ]] && SAS_PORTS=$(ls /sys/class/sas_phy | wc -w)
+    [[ -d /sys/class/scsi_disk ]] && SCSI_PORTS=$(ls /sys/class/scsi_disk | wc -w)
     NUMPORTS=$((${SATA_PORTS}+${SAS_PORTS}+${SCSI_PORTS}))
     # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
-    if ! _check_rootraidstatus && [ ${NUMPORTS} -gt 24 ]; then
+    if ! _check_rootraidstatus && [[ ${NUMPORTS} > 24 ] 9; then
       _set_conf_kv rd "maxdisks" "24"
       echo "set maxdisks=24"
     else
@@ -258,7 +258,7 @@ function nondtModel() {
   if ! _check_post_k "rd" "internalportcfg"; then
     # USB ports static, always 4 ports
     USBPORT_IDX=$(getNum0Bits ${USBPORTCFG})
-    [ ${USBPORT_IDX} -lt ${NUMPORTS} ] && USBPORT_IDX=${NUMPORTS}
+    [[ ${USBPORT_IDX} < ${NUMPORTS} ]] && USBPORT_IDX=${NUMPORTS}
     USBPORTCFG="0x$(printf '%x' $((15*2**${USBPORT_IDX})))"
     _set_conf_kv rd "usbportcfg" "${USBPORTCFG}"
     echo "set usbportcfg=${USBPORTCFG}"
@@ -274,13 +274,13 @@ function nondtModel() {
 }
 
 #
-if [ "${1}" = "patches" ]; then
+if [[ ${1} = patches ]]; then
   echo "Adjust disks related configs automatically - patches"
-  [ "${2}" = "true" ] && dtModel ${3} || nondtModel
+  [[ ${2} = true ]] && dtModel ${3} || nondtModel
 
-elif [ "${1}" = "late" ]; then
+elif [[ ${1} = late ]]; then
   echo "Adjust disks related configs automatically - late"
-  if [ "${2}" = "true" ]; then
+  if [[ ${2} = true ]]; then
     echo "Copying /etc.defaults/model.dtb"
     # copy file
     cp -vf /etc/model.dtb /tmpRoot/etc/model.dtb

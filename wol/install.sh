@@ -1,8 +1,8 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "jrExit" ]; then
+if [[ ${1} = jrExit ]]; then
   /usr/sbin/ethtool -s eth0 wol g 2>/dev/null
-elif [ "${1}" = "late" ]; then
+elif [[ ${1} = late ]]; then
   echo "Creating service to exec ethtool"
   cp -vf /usr/sbin/ethtool /tmpRoot/usr/sbin/ethtool
   

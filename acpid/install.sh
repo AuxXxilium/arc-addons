@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "late" ]; then
+if [[ ${1} = late ]]; then
   echo "Installing daemon for ACPI button"
   mkdir -p /tmpRoot/etc/acpi/events/
   cp -v /etc/acpi/events/power /tmpRoot/etc/acpi/events/power

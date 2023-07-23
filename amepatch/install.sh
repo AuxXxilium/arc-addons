@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "late" ]; then
+if [[ ${1} = late ]]; then
   echo "Creating service to exec Enable AME Patch"
   cp -vf /usr/sbin/amepatch.sh /tmpRoot/usr/sbin/amepatch.sh
   chmod 755 /tmpRoot/usr/sbin/amepatch.sh

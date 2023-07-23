@@ -2,37 +2,37 @@
 
 SED_PATH='/tmpRoot/usr/bin/sed'
 
-if [ "${1}" = "modules" ]; then
+if [[ ${1} = modules ]]; then
   echo "Loading FB and console modules..."
-  if [ -n "${2}" ]; then
+  if [[ -n ${2} ]]; then
     /usr/sbin/modprobe ${2}
   else
     for M in i915 efifb vesafb vga16fb; do
-      [ -e /sys/class/graphics/fb0 ] && break
+      [[ -e /sys/class/graphics/fb0 ]] && break
       /usr/sbin/modprobe ${M}
     done
   fi
   /usr/sbin/modprobe fbcon
   echo "Arc console - wait..." > /dev/tty1
   # Workaround for DVA1622
-  if [ "${MODEL}" = "DVA1622" ]; then
+  if [[ ${MODEL} = DVA1622 ]]; then
     echo > /dev/tty2
     /usr/sbin/ioctl /dev/tty0 22022 -v 2
     /usr/sbin/ioctl /dev/tty0 22022 -v 1
   fi
-elif [ "${1}" = "rcExit" ]; then
+elif [[ ${1} = rcExit ]]; then
   # Run only in junior mode (DSM not installed)
   echo -e "Junior mode\n" > /etc/issue
   echo "Starting getty..."
   /usr/sbin/getty -L 0 tty1 &
   /usr/sbin/loadkeys /usr/share/keymaps/i386/qwertz/de.map.gz
   # Workaround for DVA1622
-  if [ "${MODEL}" = "DVA1622" ]; then
+  if [[ ${MODEL} = DVA1622 ]]; then
     echo > /dev/tty2
     /usr/sbin/ioctl /dev/tty0 22022 -v 2
     /usr/sbin/ioctl /dev/tty0 22022 -v 1
   fi
-elif [ "${1}" = "late" ]; then
+elif [[ ${1} = late ]]; then
   # run when boot installed DSM
   cp -vf /tmpRoot/lib/systemd/system/serial-getty\@.service /tmpRoot/lib/systemd/system/getty\@.service
   ${SED_PATH} -i 's|^ExecStart=.*|ExecStart=-/sbin/agetty %I 115200 linux|' /tmpRoot/lib/systemd/system/getty\@.service
@@ -59,7 +59,7 @@ elif [ "${1}" = "late" ]; then
   mkdir -p /tmpRoot/lib/systemd/system/multi-user.target.wants
   ln -sf /lib/systemd/system/keymap.service /tmpRoot/lib/systemd/system/multi-user.target.wants/keymap.service
   # Workaround for DVA1622
-  if [ "${MODEL}" = "DVA1622" ]; then
+  if [[ ${MODEL} = DVA1622 ]]; then
     echo > /dev/tty2
     /usr/bin/ioctl /dev/tty0 22022 -v 2
     /usr/bin/ioctl /dev/tty0 22022 -v 1

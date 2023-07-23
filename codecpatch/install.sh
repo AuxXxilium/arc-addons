@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "late" ]; then
+if [[ ${1} = late ]]; then
   echo "Creating service to exec Codecpatch"
   cp -vf /usr/sbin/codecpatch.sh /tmpRoot/usr/sbin/codecpatch.sh
   chmod 755 /tmpRoot/usr/sbin/codecpatch.sh

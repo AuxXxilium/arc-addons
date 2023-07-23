@@ -1,17 +1,26 @@
 #!/usr/bin/env ash
 
 # External incoming required ${MLINK} and ${MCHECKSUM}
-if [ -z "${MLINK}" ] || [ -z "${MCHECKSUM}" ]; then
+if [[ -z ${MLINK} || -z ${MCHECKSUM} ]]; then
   echo "MLINK or MCHECKSUM is not set"
   return
 fi
 
-if [ "${1}" = "modules" ]; then
-echo "make localrss - modules"
+if [[ ${1} = late ]]; then
+echo "make localrss - late"
 
-# MajorVersion=`/bin/get_key_value /etc.defaults/VERSION majorversion`
-# MinorVersion=`/bin/get_key_value /etc.defaults/VERSION minorversion`
 . /etc.defaults/VERSION
+
+echo "update localrss - late"
+# Update RSS Feed
+PAT_MODEL="$(echo "${MODEL}" | sed -e 's/\./%2E/g' -e 's/+/%2B/g')"
+PAT_MAJOR="${major}"
+PAT_MINOR="${minor}"
+PAT_URL="$(curl -skL "https://www.synology.com/api/support/findDownloadInfo?lang=en-us&product=${PAT_MODEL}&major=${PAT_MAJOR}&minor=${PAT_MINOR}" | jq -r '.info.system.detail[0].items[0].files[0].url')"
+PAT_HASH="$(curl -skL "https://www.synology.com/api/support/findDownloadInfo?lang=en-us&product=${PAT_MODEL}&major=${PAT_MAJOR}&minor=${PAT_MINOR}" | jq -r '.info.system.detail[0].items[0].files[0].checksum')"
+PAT_URL="${PAT_URL%%\?*}"
+MLINK="${PAT_URL}"
+MCHECKSUM="${PAT_HASH}"
 
 cat > /usr/syno/web/localrss.json << EOF
 {
@@ -79,12 +88,12 @@ cat > /usr/syno/web/localrss.xml << EOF
 </rss>
 EOF
 
-if [ -f /usr/syno/web/localrss.xml ]; then 
+if [[ -f /usr/syno/web/localrss.xml ]]; then 
   cat /usr/syno/web/localrss.xml
   sed -i "s|rss_server=.*$|rss_server=\"http://localhost:5000/localrss.xml\"|g" "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"
   sed -i "s|rss_server_ssl=.*$|rss_server_ssl=\"http://localhost:5000/localrss.xml\"|g" "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"
 fi
-if [ -f /usr/syno/web/localrss.json ]; then 
+if [[ -f /usr/syno/web/localrss.json ]]; then 
   cat /usr/syno/web/localrss.json
   sed -i "s|rss_server_v2=.*$|rss_server_v2=\"http://localhost:5000/localrss.json\"|g" "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"
 fi

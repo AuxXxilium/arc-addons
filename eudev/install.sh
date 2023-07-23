@@ -1,8 +1,8 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "modules" ]; then
+if [[ ${1} = modules ]]; then
   echo "Starting eudev daemon"
-  [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' > /proc/sys/kernel/hotplug
+  [[ -e /proc/sys/kernel/hotplug ]] && printf '\000\000\000\000' > /proc/sys/kernel/hotplug
   chmod 755 /usr/sbin/udevd /usr/bin/kmod /usr/bin/udevadm /usr/lib/udev/*
   /usr/sbin/depmod -a
   /usr/sbin/udevd -d || { echo "FAIL"; exit 1; }
@@ -15,7 +15,7 @@ if [ "${1}" = "modules" ]; then
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
   /usr/bin/killall udevd
-elif [ "${1}" = "late" ]; then
+elif [[ ${1} = late ]]; then
   echo "copy modules"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib; /tmpRoot/bin/cp -rnf /usr/lib/modules/* /tmpRoot/usr/lib/modules/
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib; /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/

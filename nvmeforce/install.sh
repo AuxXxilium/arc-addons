@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "late" ]; then
+if [[ ${1} = late ]]; then
   echo "Creating service to exec Force NVMe"
   cp -vf /usr/sbin/nvmeforce.sh /tmpRoot/usr/sbin/nvmeforce.sh
   chmod 755 /tmpRoot/usr/sbin/nvmeforce.sh

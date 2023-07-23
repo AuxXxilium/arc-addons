@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "late" ]; then
+if [[ ${1} = late ]]; then
   echo "Creating service to exec Surveillance Patch"
   cp -vf /usr/sbin/surveillancepatch.sh /tmpRoot/usr/sbin/surveillancepatch.sh
   cp -vf /usr/lib/libssutils.so /tmpRoot/usr/lib/libssutils.so

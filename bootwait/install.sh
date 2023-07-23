@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 
-if [ "${1}" = "early" ]; then
+if [[ ${1} = early ]]; then
   wait_time=20 # maximum wait time in seconds
 
   dump_all_partitions()
@@ -12,12 +12,12 @@ if [ "${1}" = "early" ]; then
   }
 
   time_counter=0
-  while [ ! -b /dev/synoboot ] && [ $time_counter -lt $wait_time ]; do
+  while [[ ! -b /dev/synoboot && $time_counter -lt $wait_time ]]; do
     sleep 1
     echo "Still waiting for boot device (waited $((time_counter=time_counter+1)) of ${wait_time} seconds)"
   done
 
-  if [ ! -b /dev/synoboot ]; then
+  if [[ ! -b /dev/synoboot ]]; then
     touch /.no_synoboot
     echo "ERROR: Timeout waiting for /dev/synoboot device to appear."
     echo "Most likely your vid/pid configuration is not correct, or you don't have drivers needed for your USB/SATA controller"
@@ -25,8 +25,8 @@ if [ "${1}" = "early" ]; then
     exit 1
   fi
 
-  [ -b /dev/synoboot3 ] || sleep 1 # sometimes we can hit synoboot but before partscan
-  if [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
+  [[ -b /dev/synoboot3 ]] || sleep 1 # sometimes we can hit synoboot but before partscan
+  if [[ ! -b /dev/synoboot1 || ! -b /dev/synoboot2 || ! -b /dev/synoboot3 ]]; then
     echo "The /dev/synoboot device exists but it does not contain expected partitions (>=3 partitions)"
     dump_all_partitions
     exit 1
