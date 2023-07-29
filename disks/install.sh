@@ -105,7 +105,7 @@ function getSataPorts() {
   local SATA_PORTS=$(ls /sys/class/ata_port | wc -w)
   local OUTPUT=""
   for I in $(seq 1 ${SATA_PORTS}); do
-    DUMMY=$((1-`cat /sys/class/ata_port/ata${I}/device/host*/scsi_host/host*/syno_port_thaw`))
+    DUMMY=$((1-$(cat /sys/class/ata_port/ata${I}/device/host*/scsi_host/host*/syno_port_thaw)))
     # Is DT
     if [ "${1}" = "true" ]; then
       [ ${DUMMY} -eq 1 ] && continue
@@ -169,17 +169,34 @@ function dtModel() {
     echo "    version = <0x01>;"                                    >>${DEST}
     # SATA ports
     I=1
+    idx=0
     while true; do
-      [ ! -d /sys/block/sata${I} ] && break
+      if [ ! -d /sys/block/sata${I} ]; then
+        if [ "$I" -eq 1 ]; then
+          # for fake sata synoboot, if redpill lkm is loaded after init
+          # sata1 is been relocated to synoboot
+          I=$((${I}+1))
+          bias=1
+          continue
+        else
+          break
+        fi
+      fi
+
+      idx=$((${idx}+1))
+      echo "Add sata internal_slot@${idx}"
+      
       PCIEPATH=$(grep 'pciepath' /sys/block/sata${I}/device/syno_block_info | cut -d'=' -f2)
       ATAPORT=$(grep 'ata_port_no' /sys/block/sata${I}/device/syno_block_info | cut -d'=' -f2)
-      echo "    internal_slot@${I} {"                               >>${DEST}
+
+      echo "    internal_slot@${idx} {"                             >>${DEST}
       echo "        protocol_type = \"sata\";"                      >>${DEST}
       echo "        ahci {"                                         >>${DEST}
       echo "            pcie_root = \"${PCIEPATH}\";"               >>${DEST}
       echo "            ata_port = <0x$(printf '%02X' ${ATAPORT})>;" >>${DEST}
       echo "        };"                                             >>${DEST}
       echo "    };"                                                 >>${DEST}
+
       I=$((${I}+1))
     done
     NUMPORTS=$((${I}-1))
@@ -194,16 +211,28 @@ function dtModel() {
     # NVME ports
     COUNT=1
     for P in $(nvmePorts true); do
+      echo "Add nvme_slot@${COUNT}"
+
       echo "    nvme_slot@${COUNT} {"                               >>${DEST}
       echo "        pcie_root = \"${P}\";"                          >>${DEST}
       echo "        port_type = \"ssdcache\";"                      >>${DEST}
       echo "    };"                                                 >>${DEST}
       COUNT=$((${COUNT}+1))
     done
+    
+    # for there are only NVME disks in system
+    if [ $NUMPORTS -eq 0 ]; then
+      MAXDISKS=$((${COUNT}-1))
+      _set_conf_kv rd "maxdisks" "${MAXDISKS}"
+      echo "in NVMe only mode"
+      echo "maxdisks=${MAXDISKS}"
+    fi
 
     # USB ports
     COUNT=1
     for I in $(getUsbPorts); do
+      echo "Add usb_slot@${COUNT}"
+
       echo "    usb_slot@${COUNT} {"                                >>${DEST}
       echo "      usb2 {"                                           >>${DEST}
       echo "        usb_port =\"${I}\";"                            >>${DEST}
@@ -227,12 +256,12 @@ function nondtModel() {
   local SAS_PORTS=0
   local SCSI_PORTS=0
   local NUMPORTS=0
-  local ESATAPORTCFG=$((`_get_conf_kv esataportcfg`))
-  local INTPORTCFG
-  local USBPORTCFG=$((`_get_conf_kv usbportcfg`))
+  local ESATAPORTCFG=$(_get_conf_kv esataportcfg)
+  local INTPORTCFG=$(_get_conf_kv internalportcfg)
+  local USBPORTCFG=$(_get_conf_kv usbportcfg)
   local COUNT=1
   if _check_post_k "rd" "maxdisks"; then
-    NUMPORTS=$((`_get_conf_kv maxdisks`))
+    NUMPORTS=$(_get_conf_kv maxdisks)
     echo "get maxdisks=${NUMPORTS}"
   else
     # sysfs is populated here
