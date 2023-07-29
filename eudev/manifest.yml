@@ -1,6 +1,7 @@
 version: 1
 name: eudev
 system: true
+beta: false
 description: "eudev project + kmod modified"
 all:
   install-script: "install.sh"

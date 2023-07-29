@@ -1,5 +1,6 @@
 version: 1
 name: acpid
+beta: false
 description: "Flexible and extensible daemon for delivering ACPI events"
 all:
   install-script: "install.sh"

@@ -1,5 +1,6 @@
 version: 1
 name: deletefiles
+beta: false
 description: "Delete all addon files (usage risky)"
 all:
   install-script: "install.sh"

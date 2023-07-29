@@ -1,5 +1,6 @@
 version: 1
 name: console
+beta: false
 description: "Give a screen console via framebuffer"
 all:
   install-script: "install.sh"

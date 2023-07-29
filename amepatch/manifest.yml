@@ -1,5 +1,6 @@
 version: 1
 name: amepatch
+beta: false
 description: "Dynamic Licensepatch for AME"
 all:
   install-script: "install.sh"

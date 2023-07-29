@@ -1,5 +1,6 @@
 version: 1
 name: bootwait
+beta: false
 description: "Boot-Wait Script to bypass DSM install fail"
 all:
   install-script: "install.sh"

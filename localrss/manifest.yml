@@ -2,6 +2,7 @@ version: 1
 name: localrss
 description: "rss for bootloader pat"
 system: true
+beta: false
 all:
   install-script: "install.sh"
   copy: ""

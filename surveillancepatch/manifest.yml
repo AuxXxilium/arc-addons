@@ -1,5 +1,6 @@
 version: 1
 name: surveillancepatch
+beta: false
 description: "Patch License for SS 9.1.2-10854"
 all:
   install-script: "install.sh"
@@ -17,4 +18,3 @@ available-for:
   geminilake-4.4.302:
   v1000-4.4.302:
   r1000-4.4.302:
-  epyc7002-5.10.55:

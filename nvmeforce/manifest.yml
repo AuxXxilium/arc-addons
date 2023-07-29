@@ -1,5 +1,6 @@
 version: 1
 name: nvmeforce
+beta: true
 description: "Force formate NVMe as Storage Device (Beta)"
 all:
   install-script: "install.sh"

@@ -1,5 +1,6 @@
 version: 1
 name: reboot
+beta: false
 description: "Add Restart to arc in the DSM scheduled task. (Beta)"
 all:
   install-script: "install.sh"

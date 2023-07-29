@@ -1,5 +1,6 @@
 version: 1
 name: lsiutil
+beta: false
 description: "A tool for working with some LSI RAID controllers"
 all:
   install-script: "install.sh"
