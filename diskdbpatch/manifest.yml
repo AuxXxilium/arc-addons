@@ -1,7 +1,7 @@
 version: 1
 name: diskdbpatch
 beta: true
-description: "Add your Drives to DSM DiskDB (Beta)"
+description: "Add your Drives to DSM DiskDB"
 all:
   install-script: "install.sh"
   copy: "all"
