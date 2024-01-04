@@ -127,8 +127,8 @@ jobs:
           ln -sf /usr/bin/kmod /source/output/usr/sbin/depmod
           cp -f /source/input/62-nut-usbups.rules /source/output/usr/lib/udev/rules.d/62-nut-usbups.rules
           cp -f /source/input/99-usb-realtek-net.rules /source/output/usr/lib/udev/rules.d/99-usb-realtek-net.rules
-          cp -f /source/input/99-qed.rules /source/output/usr/lib/udev/rules.d/99-qed.rules
-          cp -f /source/input/99-qedstor.rules /source/output/usr/lib/udev/rules.d/99-qedstor.rules
+          #cp -f /source/input/99-qed.rules /source/output/usr/lib/udev/rules.d/99-qed.rules
+          #cp -f /source/input/99-qedstor.rules /source/output/usr/lib/udev/rules.d/99-qedstor.rules
           #rm -f /source/output/usr/lib/udev/rules.d/60-persistent-storage.rules
           #rm -f /source/output/usr/lib/udev/rules.d/60-persistent-storage-tape.rules
           #rm -f /source/output/usr/lib/udev/rules.d/80-net-name-slot.rules
