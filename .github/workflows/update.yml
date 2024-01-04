@@ -126,9 +126,9 @@ jobs:
           cp -f ${ToolChainSysRoot}/usr/lib/libblkid.so.1 /source/output/usr/lib/libblkid.so.1
           ln -sf /usr/bin/kmod /source/output/usr/sbin/depmod
           cp -f /source/input/99-usb-realtek-net.rules /source/output/usr/lib/udev/rules.d/99-usb-realtek-net.rules
-          rm -f /source/output/usr/lib/udev/rules.d/60-persistent-storage.rules
-          rm -f /source/output/usr/lib/udev/rules.d/60-persistent-storage-tape.rules
-          rm -f /source/output/usr/lib/udev/rules.d/80-net-name-slot.rules
+          #rm -f /source/output/usr/lib/udev/rules.d/60-persistent-storage.rules
+          #rm -f /source/output/usr/lib/udev/rules.d/60-persistent-storage-tape.rules
+          #rm -f /source/output/usr/lib/udev/rules.d/80-net-name-slot.rules
           chown 1000.1000 -R /source/output
           EOF
 
