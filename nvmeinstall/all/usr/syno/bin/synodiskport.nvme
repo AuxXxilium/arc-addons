@@ -1,0 +1,28 @@
+#!/bin/sh
+case "$1" in
+    -installable_disk_list)
+        list=" "
+        for nvme in $(ls -d /sys/block/nvme* 2>/dev/null); do
+            disk=$(basename "${nvme}")
+            list="${list} ${disk}"
+        done
+        if [ ${list} = " " ]; then
+            exec -a "$0" /usr/syno/bin/scemd "$@"
+        else
+            echo "${list}"
+        fi
+        ;;
+    -portcheck)
+        case "$2" in
+            nvme*)
+                echo "SATA"
+                ;;
+            *)
+                exec -a "$0" /usr/syno/bin/scemd "$@"
+                ;;
+        esac
+        ;;
+    *)
+        exec -a "$0" /usr/syno/bin/scemd "$@"
+        ;;
+esac
