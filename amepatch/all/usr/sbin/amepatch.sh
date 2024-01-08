@@ -43,6 +43,8 @@ if [ -d "/var/packages/CodecPack" ]; then
     echo "${content}" >"${lic}"
 
 	if "${cp_usr_path}/bin/synoame-bin-check-license"; then
+        [ -d "/var/packages/CodecPack/target/apparmor" ] && apparmor="/var/packages/CodecPack/target/apparmor"
+        [ -d "/volume1/@appstore/CodecPack/apparmor" ] && apparmor="/volume1/@appstore/CodecPack/apparmor"
         /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
         # disable apparmor check for AME
         if [ -e "${apparmor}" ]; then

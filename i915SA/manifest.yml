@@ -1,7 +1,7 @@
 version: 1
 name: i915SA
-description: "Force add Intel iGPU Driver to SA6400"
-beta: true
+description: "Force load Intel iGPU Driver at SA6400"
+beta: false
 all:
   install-script: "install.sh"
   copy: "all"

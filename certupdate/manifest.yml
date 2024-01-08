@@ -1,7 +1,7 @@
 version: 1
-name: addincards
-description: "Remove the Modelrestrictions for official Addin Cards."
-beta: false
+name: certupdate
+description: "Update Certificate for DSM."
+beta: true
 all:
   install-script: "install.sh"
   copy: "all"
