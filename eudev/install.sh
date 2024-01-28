@@ -18,7 +18,7 @@ if [ "${1}" = "modules" ]; then
   chmod 755 /usr/sbin/udevd /usr/bin/kmod /usr/bin/udevadm /usr/lib/udev/*
   /usr/sbin/depmod -a
   /usr/sbin/udevd -d || {
-    echo "FAIL"
+    echo "eudev: FAILED"
     exit 1
   }
   echo "eudev: Triggering add events to udev"
