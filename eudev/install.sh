@@ -36,15 +36,9 @@ elif [ "${1}" = "late" ]; then
 
   echo "eudev: copy Modules and Firmware"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-<<DISABLED
-  if [ ! "${ModuleUnique}" = "synology_epyc7002_sa6400" ]; then
-    /tmpRoot/bin/cp -vrf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-    /tmpRoot/bin/cp -vrf /usr/lib/modules/* /tmpRoot/usr/lib/modules/
-    /usr/sbin/depmod -a -b /tmpRoot/
-  elif [ "${ModuleUnique}" = "synology_epyc7002_sa6400" ]; then
-    /tmpRoot/bin/cp -vrf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-  fi
-DISABLED
+  /tmpRoot/bin/cp -vrf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
+  /tmpRoot/bin/cp -vrf /usr/lib/modules/* /tmpRoot/usr/lib/modules/
+  /usr/sbin/depmod -a -b /tmpRoot/
 
   echo "eudev: copy Rules"
   cp -vf /usr/lib/udev/rules.d/* /tmpRoot/usr/lib/udev/rules.d/
