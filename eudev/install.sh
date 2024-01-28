@@ -44,6 +44,10 @@ elif [ "${1}" = "late" ]; then
 
   echo "eudev: copy Rules"
   cp -vf /usr/lib/udev/rules.d/* /tmpRoot/usr/lib/udev/rules.d/
+  echo "eudev: copy HWDB"
+  mkdir -p /tmpRoot/etc/udev/hwdb.d
+  cp -vf /etc/udev/hwdb.d/* /tmpRoot/etc/udev/hwdb.d/
+
   DEST="/tmpRoot/lib/systemd/system/udevrules.service"
   echo "[Unit]"                                                                  >${DEST}
   echo "Description=Reload udev Rules"                                          >>${DEST}
