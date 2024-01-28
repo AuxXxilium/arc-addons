@@ -6,6 +6,7 @@ if [ "${1}" = "late" ]; then
   cp -vf /etc/acpi/events/power /tmpRoot/etc/acpi/events/power
   cp -vf /usr/sbin/acpid /tmpRoot/usr/sbin/acpid
   cp -vf /etc/acpi/power.sh /tmpRoot/etc/acpi/power.sh
+
   DEST=/tmpRoot/lib/systemd/system/acpid.service
   echo "[Unit]"                                  >${DEST}
   echo "Description=ACPI Daemon"                >>${DEST}
@@ -16,9 +17,8 @@ if [ "${1}" = "late" ]; then
   echo "[Service]"                              >>${DEST}
   echo "Restart=always"                         >>${DEST}
   echo "RestartSec=30"                          >>${DEST}
-  echo "ExecStartPre=-/sbin/modprobe button"    >>${DEST}
+  echo "ExecStartPre=/usr/sbin/modprobe button" >>${DEST}
   echo "ExecStart=/usr/sbin/acpid -f"           >>${DEST}
-  echo "ExecStopPost=-/sbin/modprobe -r button" >>${DEST}
   echo                                          >>${DEST}
   echo "[X-Synology]"                           >>${DEST}
   echo "Author=Virtualization Team"             >>${DEST}
