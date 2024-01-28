@@ -33,7 +33,7 @@
 HDD_BAY="${1:-RACK_24_Bay}"
 SSD_BAY="${2:-1X8}"
 
-echo "storagepanel set to ${HDD_BAY} ${SSD_BAY}"
+echo "storagepanel setting ${HDD_BAY} ${SSD_BAY}"
 
 _UNIQUE="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique)"
 _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
