@@ -36,19 +36,19 @@ elif [ "${1}" = "late" ]; then
   echo "eudev: copy Modules and Firmware for ${ModuleUnique}"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   # Copy Firmware to System
-  /usr/bin/cp -rf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
+  /tmpRoot/bin/cp -rf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
 <<EOF
-  # List loaded Modules and copy them to System
-  /usr/sbin/lsmod | /usr/bin/awk '{if (NR != 1) print $1}' | /usr/bin/xargs -I{} /usr/bin/cp -f /usr/lib/modules/{}.ko  /tmpRoot/usr/lib/modules 2>/dev/null
+  # Copy Modules to System
+  /tmpRoot/bin/cp -rf /usr/lib/modules/*  /tmpRoot/usr/lib/modules/
   # Load Modules from System
   /usr/sbin/depmod -a -b /tmpRoot/
+  echo "eudev: copy HWDB"
+  mkdir -p /tmpRoot/etc/udev/hwdb.d
+  cp -rf /etc/udev/hwdb.d/* /tmpRoot/etc/udev/hwdb.d/
 EOF
 
   echo "eudev: copy Rules"
   cp -rf /usr/lib/udev/rules.d/* /tmpRoot/usr/lib/udev/rules.d/
-  echo "eudev: copy HWDB"
-  mkdir -p /tmpRoot/etc/udev/hwdb.d
-  cp -rf /etc/udev/hwdb.d/* /tmpRoot/etc/udev/hwdb.d/
 
   DEST="/tmpRoot/lib/systemd/system/udevrules.service"
   echo "[Unit]"                                                                  >${DEST}
