@@ -1,6 +1,6 @@
 version: 1
-name: nvmeinstall
-description: "Enable installation to (only) NVMe M.2 SSDs (No StoragePool on M.2 possible, use at own risk!)"
+name: nvmesystem
+description: "Enable installation to NVMe M.2 SSDs. (Use at own risk!)"
 beta: true
 all:
   install-script: "install.sh"
