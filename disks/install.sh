@@ -416,8 +416,8 @@ function nondtModel() {
 if [ "${1}" = "patches" ]; then
   echo "Installing addon disks - ${1}"
   # 2 = hddsort / 3 = usbmount
-  HDDSORT="${2:false}"
-  USBMOUNT="${3:false}"
+  HDDSORT="${2:-false}"
+  USBMOUNT="${3:-false}"
   BOOTDISK=""
   BOOTDISK_PART3=$(blkid -L ARC3 | sed 's/\/dev\///')
   [ -n "${BOOTDISK_PART3}" ] && BOOTDISK=$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4)
