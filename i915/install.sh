@@ -7,9 +7,7 @@ if [ "${1}" = "patches" ]; then
     GPU="$(echo "${2}" | sed 's/://g' | tr '[:upper:]' '[:lower:]')"
   else
     GPU="$(lspci -n | grep 0300 | grep 8086 | cut -d " " -f 3 | sed 's/://g')"
-    if [ -z "${GPU}" ]; then
-      GPU="$(lspci -n | grep 0380 | grep 8086 | cut -d " " -f 3 | sed -e 's/://g')"
-    fi
+    [ -z "${GPU}" ] && GPU="$(lspci -n | grep 0380 | grep 8086 | cut -d " " -f 3 | sed -e 's/://g')"
   fi
   [ -z "${GPU}" -o $(echo -n "${GPU}" | wc -c) -ne 8 ] && echo "GPU is not detected" && exit 0
 
