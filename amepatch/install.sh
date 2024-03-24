@@ -15,7 +15,7 @@ if [ "${1}" = "late" ]; then
   echo                                                                        >>${DEST}
   echo "[Service]"                                                            >>${DEST}
   echo "Type=oneshot"                                                         >>${DEST}
-  echo "RemainAfterExit=true"                                                 >>${DEST}
+  echo "RemainAfterExit=yes"                                                  >>${DEST}
   echo "ExecStart=/usr/bin/amepatch.sh"                                       >>${DEST}
   echo                                                                        >>${DEST}
   echo "[Install]"                                                            >>${DEST}

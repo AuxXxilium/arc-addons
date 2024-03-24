@@ -1,7 +1,7 @@
 version: 1
 name: nvmesystem
-description: "Enable installation to NVMe M.2 SSDs. (Use at own risk!)"
-beta: true
+description: "Enable installation to NVMe M.2 SSDs."
+beta: false
 all:
   install-script: "install.sh"
   copy: "all"

@@ -1,3 +1,5 @@
+#!/usr/bin/env ash
+
 MODELS="SA6400"
 MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
 

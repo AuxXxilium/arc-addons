@@ -54,7 +54,7 @@ case "${1}" in
   echo                                              >>${DEST}
   echo "[Service]"                                  >>${DEST}
   echo "Type=oneshot"                               >>${DEST}
-  echo "RemainAfterExit=true"                       >>${DEST}
+  echo "RemainAfterExit=yes"                        >>${DEST}
   echo "ExecStop=/bin/loader-logs.sh dsm"           >>${DEST}
   echo                                              >>${DEST}
   echo "[Install]"                                  >>${DEST}

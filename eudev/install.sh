@@ -106,7 +106,7 @@ elif [ "${1}" = "late" ]; then
   echo                                                                          >>${DEST}
   echo "[Service]"                                                              >>${DEST}
   echo "Type=oneshot"                                                           >>${DEST}
-  echo "RemainAfterExit=true"                                                   >>${DEST}
+  echo "RemainAfterExit=yes"                                                    >>${DEST}
   echo "ExecStart=/usr/bin/udevadm hwdb --update"                               >>${DEST}
   echo "ExecStart=/usr/bin/udevadm control --reload-rules"                      >>${DEST}
   echo                                                                          >>${DEST}
