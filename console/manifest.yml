@@ -1,8 +1,8 @@
 version: 1
 name: console
-description: "Give a screen console via framebuffer"
+description: "Give a screen console via framebuffer (can cause Kernel Panic)"
 system: false
-beta: false
+beta: true
 all:
   install-script: "install.sh"
   copy: "all"
