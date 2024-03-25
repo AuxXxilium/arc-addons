@@ -13,6 +13,9 @@ if [ "${1}" = "modules" ]; then
   else
     tar zxf /addons/eudev-7.2.tgz -C /
   fi
+  # mv -f /usr/lib/udev/rules.d/60-persistent-storage.rules /usr/lib/udev/rules.d/60-persistent-storage.rules.bak
+  # mv -f /usr/lib/udev/rules.d/60-persistent-storage-tape.rules /usr/lib/udev/rules.d/60-persistent-storage-tape.rules.bak
+  # mv -f /usr/lib/udev/rules.d/80-net-name-slot.rules /usr/lib/udev/rules.d/80-net-name-slot.rules.bak
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
   /usr/sbin/depmod -a
   /usr/sbin/udevd -d || {
@@ -28,17 +31,17 @@ if [ "${1}" = "modules" ]; then
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
   /usr/bin/killall udevd
-  # Remove KVM Module
-  /usr/sbin/lsmod | grep -q ^kvm_intel && /usr/sbin/rmmod kvm_intel || true  # kvm-intel.ko
-  /usr/sbin/lsmod | grep -q ^kvm_amd && /usr/sbin/rmmod kvm_amd || true  # kvm-amd.ko
-  /usr/sbin/lsmod | grep -q ^kvm && /usr/sbin/rmmod kvm || true
-  /usr/sbin/lsmod | grep -q ^irqbypass && /usr/sbin/rmmod irqbypass || true
+  # Remove kvm module
+  /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_intel && /usr/sbin/rmmod kvm_intel || true # kvm-intel.ko
+  /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_amd && /usr/sbin/rmmod kvm_amd || true     # kvm-amd.ko
+  /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm && /usr/sbin/rmmod kvm || true
+  /usr/sbin/lsmod 2>/dev/null | grep -q ^irqbypass && /usr/sbin/rmmod irqbypass || true
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon eudev - ${1}"
-  MODULESCOPY="${2:false}"
+  MODULESCOPY="${2:-false}"
   echo "eudev: modulescopy is ${MODULESCOPY}"
-  KVMSUPPORT="${3:false}"
+  KVMSUPPORT="${3:-false}"
   echo "eudev: kvmsupport is ${KVMSUPPORT}"
   echo "eudev: copy modules"
   isChange="false"
@@ -84,7 +87,7 @@ elif [ "${1}" = "late" ]; then
   fi
   isChange="$(cat /tmp/modulesChange 2>/dev/null || echo "false")"
   echo "isChange: ${isChange}"
-  [ "${isChange}" = "true" ] && /usr/sbin/depmod -a -b /tmpRoot/
+  [ "${isChange}" = "true" ] && /usr/sbin/depmod -a -b /tmpRoot
   
   # Restore KVM Module if CPU support it
   if [ "${KVMSUPPORT}" = "true" ]; then
@@ -95,10 +98,10 @@ elif [ "${1}" = "late" ]; then
   fi
 
   echo "eudev: copy Rules"
-  cp -vf /usr/lib/udev/rules.d/* /tmpRoot/usr/lib/udev/rules.d/
-  #echo "eudev: copy HWDB"
-  #mkdir -p /tmpRoot/etc/udev/hwdb.d
-  #cp -rf /etc/udev/hwdb.d/* /tmpRoot/etc/udev/hwdb.d/
+  cp -rf /usr/lib/udev/rules.d/* /tmpRoot/usr/lib/udev/rules.d
+  echo "eudev: copy HWDB"
+  mkdir -p /tmpRoot/etc/udev/hwdb.d
+  cp -rf /etc/udev/hwdb.d/* /tmpRoot/etc/udev/hwdb.d
   
   DEST="/tmpRoot/lib/systemd/system/udevrules.service"
   echo "[Unit]"                                                                  >${DEST}

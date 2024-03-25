@@ -7,9 +7,6 @@ if [ "${1}" = "modules" ]; then
   else
     for M in i915 efifb vesafb vga16fb; do
       [ -e /sys/class/graphics/fb0 ] && break
-      GPU="$(lspci -n | grep 0300 | grep 8086 | cut -d " " -f 3 | sed 's/://g')"
-      [ -z "${GPU}" ] && GPU="$(lspci -n | grep 0380 | grep 8086 | cut -d " " -f 3 | sed -e 's/://g')"
-      [[ -z "${GPU}" && "${M}" = "i915" ]] && continue
       /usr/sbin/modprobe ${M}
     done
   fi
@@ -38,7 +35,7 @@ elif [ "${1}" = "late" ]; then
   echo "Installing addon console - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
-  
+
   SED_PATH='/tmpRoot/usr/bin/sed'
   # run when boot installed DSM
   cp -fv /tmpRoot/lib/systemd/system/serial-getty\@.service /tmpRoot/lib/systemd/system/getty\@.service

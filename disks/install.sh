@@ -259,7 +259,7 @@ function dtModel() {
       J=1
       while true; do
         [ ! -d /sys/block/sata${J} ] && break
-        if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat /sys/block/sata${J}/uevent 2>/dev/null  | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
+        if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
           echo "bootloader: /sys/block/sata${J}"
         else
           PCIEPATH=$(grep 'pciepath' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
@@ -289,7 +289,7 @@ function dtModel() {
     # NVME ports
     COUNT=1
     for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
-      if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null  | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
+      if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
         echo "bootloader: ${P}"
         continue
       fi
@@ -318,7 +318,6 @@ function dtModel() {
     done
     echo "};" >>${DEST}
   fi
-  rm -f /etc/model.dtb
   dtc -I dts -O dtb ${DEST} >/etc/model.dtb
   cp -vf /etc/model.dtb /run/model.dtb
   /usr/syno/bin/syno_slot_mapping
@@ -329,6 +328,7 @@ function nondtModel() {
   USBPORTCFG=0
   ESATAPORTCFG=0
   INTERNALPORTCFG=0
+  HBA_NUMBER=$(($(lspci -d ::107 2>/dev/null | wc -l) + $(lspci -d ::104 2>/dev/null | wc -l) + $(lspci -d ::100 2>/dev/null | wc -l)))
   
   for I in $(ls -d /sys/block/sd* 2>/dev/null); do
     IDX=$(_atoi ${I/\/sys\/block\/sd/})
@@ -391,7 +391,7 @@ function nondtModel() {
   COUNT=1
   echo "[pci]" >/etc/extensionPorts
   for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
-    if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
+    if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
       echo "bootloader: ${P}"
       continue
     fi
@@ -419,7 +419,7 @@ if [ "${1}" = "patches" ]; then
   HDDSORT="${2:-false}"
   USBMOUNT="${3:-false}"
   BOOTDISK=""
-  BOOTDISK_PART3=$(blkid -L ARC3 | sed 's/\/dev\///')
+  BOOTDISK_PART3=$(blkid -L ARC3 2>/dev/null | sed 's/\/dev\///')
   [ -n "${BOOTDISK_PART3}" ] && BOOTDISK=$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4)
   [ -n "${BOOTDISK}" ] && BOOTDISK_PHYSDEVPATH="$(cat /sys/block/${BOOTDISK}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" || BOOTDISK_PHYSDEVPATH=""
   echo "BOOTDISK=${BOOTDISK}"
@@ -429,6 +429,9 @@ if [ "${1}" = "patches" ]; then
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon disks - ${1}"
+  # 2 = hddsort / 3 = usbmount
+  HDDSORT="${2:-false}"
+  USBMOUNT="${3:-false}"
   if [ "$(_get_conf_kv supportportmappingv2)" = "yes" ]; then
     echo "Copying /etc.defaults/model.dtb"
     # copy file
@@ -436,27 +439,23 @@ elif [ "${1}" = "late" ]; then
     cp -vf /etc/model.dtb /tmpRoot/etc.defaults/model.dtb
   else
     # Check USB Mount Option
-    if [ "${3}" = "force" ]; then
+    if [ "${USBMOUNT}" = "force" ]; then
       echo "Adjust maxdisks and internalportcfg to force USB Mount Option"
-      MAXDISKS=26
       USBPORTCFG=0x00
       ESATAPORTCFG=0x00
       INTERNALPORTCFG=0x3ffffff
     else
       echo "Adjust maxdisks and internalportcfg automatically"
       # sysfs is unpopulated here, get the values from junior synoinfo.conf
-      MAXDISKS=$(_get_conf_kv maxdisks)
       USBPORTCFG=$(_get_conf_kv usbportcfg)
       ESATAPORTCFG=$(_get_conf_kv esataportcfg)
       INTERNALPORTCFG=$(_get_conf_kv internalportcfg)
     fi
     # log
-    echo "maxdisks=${MAXDISKS}"
     echo "usbportcfg=${USBPORTCFG}"
     echo "esataportcfg=${ESATAPORTCFG}"
     echo "internalportcfg=${INTERNALPORTCFG}"
     # set
-    _set_conf_kv hd "maxdisks" "${MAXDISKS}"
     _set_conf_kv hd "usbportcfg" "${USBPORTCFG}"
     _set_conf_kv hd "esataportcfg" "${ESATAPORTCFG}"
     _set_conf_kv hd "internalportcfg" "${INTERNALPORTCFG}"
@@ -464,6 +463,13 @@ elif [ "${1}" = "late" ]; then
     cp -vf /etc/extensionPorts /tmpRoot/etc/extensionPorts
     cp -vf /etc/extensionPorts /tmpRoot/etc.defaults/extensionPorts
   fi
+
+  MAXDISKS=$(_get_conf_kv maxdisks)
+  if [ "${USBMOUNT}" = "force" ]; then
+    MAXDISKS=26
+  fi
+  echo "maxdisks=${MAXDISKS}"
+  _set_conf_kv hd "maxdisks" "${MAXDISKS}"
 
   SUPPORTNVME=$(_get_conf_kv supportnvme)
   SUPPORT_M2_POOL=$(_get_conf_kv support_m2_pool)

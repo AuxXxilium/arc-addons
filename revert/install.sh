@@ -35,4 +35,16 @@ if [ "${1}" = "late" ]; then
     rm -f "/tmpRoot/usr/lib/systemd/system/revert.service"
     rm -f "/tmpRoot/lib/systemd/system/multi-user.target.wants/revert.service"
   fi
+
+  # backup current loader configs
+  rm -rf "/tmpRoot/usr/arc/backup"
+  if [ -d "/usr/arc/backup" ]; then
+    mkdir -p "/tmpRoot/usr/arc/backup"
+    cp -rf /usr/arc/backup/* "/tmpRoot/usr/arc/backup/"
+  fi
+
+  # Version
+  echo "LOADERLABEL=${LOADERLABEL}"      >"/tmpRoot/usr/arc/VERSION"
+  echo "LOADERVERSION=${LOADERVERSION}" >>"/tmpRoot/usr/arc/VERSION"
+
 fi

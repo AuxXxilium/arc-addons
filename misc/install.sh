@@ -1,8 +1,10 @@
 #!/usr/bin/env ash
 
 if [ "${1}" = "rcExit" ]; then
-  # clear system disk space
+  echo "Installing addon misc - ${1}"
+
   mkdir -p /usr/syno/web/webman
+  # clear system disk space
   cat >/usr/syno/web/webman/clean_system_disk.cgi <<EOF
 #!/bin/sh
 
@@ -22,34 +24,93 @@ fi
 EOF
   chmod +x /usr/syno/web/webman/clean_system_disk.cgi
 
-  if [ -n "$(grep force_junior /proc/cmdline)" ] && [ -n "$(grep recovery /proc/cmdline)" ]; then
-    echo "Starting ttyd ..."
-    if /usr/bin/lsof -Pi :7681 -sTCP:LISTEN -t >/dev/null; then
-      echo "Port 7681 is already in use. Terminating the existing process..."
-      /usr/bin/lsof -i :7681
-    fi
-    MSG=""
-    MSG="${MSG}Arc Recovery Mode\n"
-    MSG="${MSG}To 'Force re-install DSM': please visit http://<ip>:5000/web_install.html\n" 
-    MSG="${MSG}To 'Modify system files' : please mount /dev/md0\n" 
-    /usr/sbin/ttyd /usr/bin/ash -c "echo -e \"${MSG}\"; ash" -l &
-    echo "Starting dufs ..."
-    if /usr/bin/lsof -Pi :7304 -sTCP:LISTEN -t >/dev/null; then
-      echo "Port 7304 is already in use. Terminating the existing process..."
-      /usr/bin/lsof -i :7304
-    fi
-    /usr/sbin/dufs -A -p 7304 / &
+  # reboot to loader
+  cat >/usr/syno/web/webman/reboot_to_loader.cgi <<EOF
+#!/bin/sh
 
-    cp -f /usr/syno/web/web_index.html /usr/syno/web/web_install.html
-    cp -f /addons/web_index.html /usr/syno/web/web_index.html
+echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
+if [ -f /usr/bin/loader-reboot.sh ]; then
+  /usr/bin/loader-reboot.sh config
+  echo '{"success": true}'
+else
+  echo '{"success": false}'
+fi
+EOF
+  chmod +x /usr/syno/web/webman/reboot_to_loader.cgi
+
+  # get logs
+  cat >/usr/syno/web/webman/get_logs.cgi <<EOF
+#!/bin/sh
+
+echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
+echo "==== proc cmdline ===="
+cat /proc/cmdline 
+echo "==== SynoBoot log ===="
+cat /var/log/linuxrc.syno.log
+echo "==== Installerlog ===="
+cat /tmp/installer_sh.log
+echo "==== Messages log ===="
+cat /var/log/messages
+EOF
+  chmod +x /usr/syno/web/webman/get_logs.cgi
+
+  # error message
+  if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
+    sed -i 's/c("welcome","desc_install")/"Error: The bootloader disk is not successfully mounted, the installation will fail."/' /usr/syno/web/main.js
   fi
 
-elif [ "${1}" = "late" ]; then
-  echo "Script for fixing missing HW features dependencies and another functions"
+  # recovery.cgi
+  cat >/usr/syno/web/webman/recovery.cgi <<EOF
+#!/bin/sh
 
-  # Copy Utilities
-  cp -vf /usr/sbin/loader-reboot.sh /tmpRoot/usr/sbin/loader-reboot.sh
-  cp -vf /usr/sbin/grub-editenv /tmpRoot/usr/sbin/grub-editenv
+echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
+if /usr/bin/lsof -Pi :7681 -sTCP:LISTEN -t >/dev/null; then
+  echo "Port 7681 is already in use. Terminating the existing process..."
+  /usr/bin/lsof -i :7681
+else
+  echo "Starting ttyd ..."
+  MSG=""
+  MSG="\${MSG}RR Recovery Mode\n"
+  MSG="\${MSG}To 'Force re-install DSM': please visit http://<ip>:5000/web_install.html\n"
+  MSG="\${MSG}To 'Modify system files' : please mount /dev/md0\n"
+  /usr/sbin/ttyd /usr/bin/ash -c "echo -e \"\${MSG}\"; ash" -l >/dev/null 2>&1 &
+fi
+if /usr/bin/lsof -Pi :7304 -sTCP:LISTEN -t >/dev/null; then
+  echo "Port 7304 is already in use. Terminating the existing process..."
+  /usr/bin/lsof -i :7304
+else
+  echo "Starting dufs ..."
+  /usr/sbin/dufs -A -p 7304 / >/dev/null 2>&1 &
+fi
+cp -f /usr/syno/web/web_index.html /usr/syno/web/web_install.html
+cp -f /addons/web_index.html /usr/syno/web/web_index.html
+echo "Recovery mode is ready"
+EOF
+  chmod +x /usr/syno/web/webman/recovery.cgi
+
+  # recovery
+  if [ -n "$(grep force_junior /proc/cmdline 2>/dev/null)" ] && [ -n "$(grep recovery /proc/cmdline 2>/dev/null)" ]; then
+    /usr/syno/web/webman/recovery.cgi
+  fi
+  
+  # rndis
+  for I in $(ls -d /sys/class/net/usb* 2>/dev/null); do
+    ETH=$(basename ${I})
+    /sbin/ifconfig ${ETH} up
+    /sbin/udhcpc -i ${ETH} -p /etc/dhcpc/dhcpcd-${ETH}.pid -b -x hostname:$(hostname)
+  done
+
+elif [ "${1}" = "late" ]; then
+  echo "Installing addon misc - ${1}"
+
+  if /usr/bin/lsof -Pi :7681 -sTCP:LISTEN -t >/dev/null; then
+    echo "Killing ttyd ..."
+    /usr/bin/killall ttyd
+  fi
+  if /usr/bin/lsof -Pi :7304 -sTCP:LISTEN -t >/dev/null; then
+    echo "Killing dufs ..."
+    /usr/bin/killall dufs
+  fi
 
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
@@ -70,7 +131,7 @@ elif [ "${1}" = "late" ]; then
   # crypto-kernel
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf ]; then
     # crc32c-intel
-    CPUFLAGS=$(cat /proc/cpuinfo | grep flags | grep sse4_2 | wc -l)
+    CPUFLAGS=$(cat /proc/cpuinfo 2>/dev/null | grep flags | grep sse4_2 | wc -l)
     if [ ${CPUFLAGS} -gt 0 ]; then
       echo "CPU Supports SSE4.2, crc32c-intel should load"
     else
@@ -79,19 +140,19 @@ elif [ "${1}" = "late" ]; then
     fi
 
     # aesni-intel
-    CPUFLAGS=$(cat /proc/cpuinfo | grep flags | grep aes | wc -l)
+    CPUFLAGS=$(cat /proc/cpuinfo 2>/dev/null | grep flags | grep aes | wc -l)
     if [ ${CPUFLAGS} -gt 0 ]; then
       echo "CPU Supports AES, aesni-intel should load"
     else
       echo "CPU does NOT support AES, aesni-intel will not load, disabling"
-      sed -i 's/support_aesni_intel="yes"/support_aesni_intel="no"/g' /tmpRoot/etc.defaults/synoinfo.conf
+      sed -i 's/support_aesni_intel="yes"/support_aesni_intel="no"/' /tmpRoot/etc.defaults/synoinfo.conf
       sed -i 's/^aesni-intel/# aesni-intel/g' /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf
     fi
   fi
 
   # Nvidia GPU
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf ]; then
-    NVIDIADEV=$(cat /proc/bus/pci/devices | grep -i 10de | wc -l)
+    NVIDIADEV=$(cat /proc/bus/pci/devices 2>/dev/null | grep -i 10de | wc -l)
     if [ ${NVIDIADEV} -eq 0 ]; then
       echo "NVIDIA GPU is not detected, disabling "
       sed -i 's/^nvidia/# nvidia/g' /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf
