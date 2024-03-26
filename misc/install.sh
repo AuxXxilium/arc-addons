@@ -70,7 +70,7 @@ if /usr/bin/lsof -Pi :7681 -sTCP:LISTEN -t >/dev/null; then
 else
   echo "Starting ttyd ..."
   MSG=""
-  MSG="\${MSG}RR Recovery Mode\n"
+  MSG="\${MSG}Arc Recovery Mode\n"
   MSG="\${MSG}To 'Force re-install DSM': please visit http://<ip>:5000/web_install.html\n"
   MSG="\${MSG}To 'Modify system files' : please mount /dev/md0\n"
   /usr/sbin/ttyd /usr/bin/ash -c "echo -e \"\${MSG}\"; ash" -l >/dev/null 2>&1 &
