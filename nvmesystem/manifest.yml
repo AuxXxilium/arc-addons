@@ -1,6 +1,7 @@
 version: 1
 name: nvmesystem
-description: "Enable installation to NVMe M.2 SSDs."
+description: "Enable DSM installation to NVMe M.2 SSDs. (Only use if you have only NVMe M.2 SSDs installed)"
+system: false
 beta: false
 all:
   install-script: "install.sh"
