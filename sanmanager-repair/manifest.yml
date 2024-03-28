@@ -1,6 +1,6 @@
 version: 1
 name: sanmanager-repair
-description: "Repair SAN Manager in DSM"
+description: "Repair SAN Manager in DSM (Only use if you have a broken SAN Manager)"
 system: false
 beta: true
 all:
