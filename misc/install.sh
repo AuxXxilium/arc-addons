@@ -105,6 +105,10 @@ elif [ "${1}" = "late" ]; then
     /usr/bin/killall dufs
   fi
 
+  # Copy Utilities
+  cp -vf /usr/sbin/loader-reboot.sh /tmpRoot/usr/sbin/loader-reboot.sh
+  cp -vf /usr/sbin/grub-editenv /tmpRoot/usr/sbin/grub-editenv
+
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
   # CPU performance scaling
