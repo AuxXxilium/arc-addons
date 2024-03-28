@@ -92,13 +92,6 @@ EOF
   if [ -n "$(grep force_junior /proc/cmdline 2>/dev/null)" ] && [ -n "$(grep recovery /proc/cmdline 2>/dev/null)" ]; then
     /usr/syno/web/webman/recovery.cgi
   fi
-  
-  # rndis
-  for I in $(ls -d /sys/class/net/usb* 2>/dev/null); do
-    ETH=$(basename ${I})
-    /sbin/ifconfig ${ETH} up
-    /sbin/udhcpc -i ${ETH} -p /etc/dhcpc/dhcpcd-${ETH}.pid -b -x hostname:$(hostname)
-  done
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon misc - ${1}"
