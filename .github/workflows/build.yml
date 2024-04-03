@@ -81,7 +81,8 @@ jobs:
           zip -9 addons.zip -j *.addon VERSION
 
       - name: Upload to Artifacts
-        uses: actions/upload-artifact@v3
+        if: success() && env.VERSION == ''
+        uses: actions/upload-artifact@v4
         with:
           name: addons
           path: |
@@ -89,7 +90,7 @@ jobs:
 
       - name: Release
         uses: softprops/action-gh-release@v1
-        if: env.VERSION != ''
+        if: success() && env.VERSION != ''
         with:
           tag_name: ${{ env.VERSION }}
           prerelease: ${{ inputs.prerelease }}

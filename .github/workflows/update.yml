@@ -162,14 +162,14 @@ jobs:
 
       - name: Tar to Artifacts
         run: |
-          tar caf ${{ github.workspace }}/source/eudev-${{ matrix.version }}.tgz -C ${{ github.workspace }}/source/output .
+          tar -zcf ${{ github.workspace }}/source/eudev-${{ matrix.version }}.tgz -C ${{ github.workspace }}/source/output .
 
       - name: Upload to Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: addons
+          name: eudev-${{ matrix.version }}
           path: |
-            ${{ github.workspace }}/source/*.tgz
+            ${{ github.workspace }}/source/eudev-*.tgz
 
       - name: clean
         run: |
@@ -190,17 +190,24 @@ jobs:
           sudo timedatectl set-timezone "Europe/Berlin"
 
       - name: download to artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: addons
-          path: ./artifacts
+          path: output
+          pattern: eudev-*
+          merge-multiple: true
+
+      - name: delete-artifact
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: |
+            eudev-*
 
       - name: Check and Push
         run: |
           if [ $(ls artifacts/*.tgz 2> /dev/null | wc -l) -gt 0 ]; then
             echo "Copy eudev ..."
             rm -f eudev/all/addons/eudev*.tgz
-            mv -f artifacts/*.tgz eudev/all/addons/
+            mv -f output/eudev-*.tgz rr-addons/eudev/all/addons/
 
             echo "Git push ..."
             git pull
