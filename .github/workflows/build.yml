@@ -94,6 +94,7 @@ jobs:
         with:
           tag: ${{ env.VERSION }}
           prerelease: ${{ inputs.prerelease }}
+          allowUpdates: true
           body: |
             ${{ steps.Changelog.outputs.changelog }}
           artifacts: |
