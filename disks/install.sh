@@ -174,7 +174,6 @@ function getUsbPorts() {
 #
 function dtModel() {
   DEST="/addons/model.dts"
-  rm -f ${DEST}
   UNIQUE=$(_get_conf_kv unique)
   if [ ! -f "${DEST}" ]; then # Users can put their own dts.
     echo "/dts-v1/;" >${DEST}
@@ -184,23 +183,24 @@ function dtModel() {
     echo "    version = <0x01>;" >>${DEST}
 
     # NVME power_limit
-    POWER_LIMIT=""
-    NVME_PORTS=$(ls /sys/class/nvme 2>/dev/null | wc -w)
-    for I in $(seq 0 $((${NVME_PORTS} - 1))); do
-      [ ${I} -eq 0 ] && POWER_LIMIT="100" || POWER_LIMIT="${POWER_LIMIT},100"
-    done
-    if [ -n "${POWER_LIMIT}" ]; then
-      echo "    power_limit = \"${POWER_LIMIT}\";" >>${DEST}
-    fi
+    NVME_PORTS=$(($(ls /sys/class/nvme 2>/dev/null | wc -w) - 1))
     if [ ${NVME_PORTS} -gt 0 ]; then
+      POWER_LIMIT=""
+      for I in $(seq 0 ${NVME_PORTS}); do
+        [ ${I} -eq 0 ] && POWER_LIMIT="100" || POWER_LIMIT="${POWER_LIMIT},100"
+      done
+      if [ -n "${POWER_LIMIT}" ]; then
+        echo "    power_limit = \"${POWER_LIMIT}\";" >>${DEST}
+      fi
       _set_conf_kv rd "supportnvme" "yes"
       _set_conf_kv rd "support_m2_pool" "yes"
     fi
     # SATA ports
     if [ "${HDDSORT}" = "true" ]; then
-      I=1
+      I=0
+      # 106 = SATA
       for P in $(lspci -d ::106 2>/dev/null | cut -d' ' -f1); do
-        HOSTNUM=$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l)
+        HOSTNUM=$(($(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l) - 1))
         PCIPATH=""
         for Q in $(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | head -1 | grep -oE ":..\.."); do PCIPATH="${PCIPATH},${Q//:/}"; done
         [ -z "${PCIPATH}" ] && continue
@@ -217,7 +217,7 @@ function dtModel() {
           echo "bootloader: PCIPATH:${PCIPATH}; IDX:${IDX}"
         fi
 
-        for J in $(seq 0 $((${HOSTNUM} - 1))); do
+        for J in $(seq 0 ${HOSTNUM}); do
           [ "${J}" = "${IDX}" ] && continue
           echo "    internal_slot@${I} {" >>${DEST}
           echo "        protocol_type = \"sata\";" >>${DEST}
@@ -256,7 +256,7 @@ function dtModel() {
         done
       done
     else
-      I=1
+      I=0
       J=1
       while true; do
         [ ! -d /sys/block/sata${J} ] && break
@@ -333,9 +333,9 @@ function dtModel() {
     _set_conf_kv rd "maxdisks" "${MAXDISKS}"
     echo "maxdisks=${MAXDISKS}"
   fi
-  rm -f /etc/model.dtb
   dtc -I dts -O dtb ${DEST} >/etc/model.dtb
   cp -vf /etc/model.dtb /run/model.dtb
+  rm -f ${DEST} # Clean old dts file if it isn't customized by user
   /usr/syno/bin/syno_slot_mapping
 }
 
@@ -344,18 +344,19 @@ function nondtModel() {
   USBPORTCFG=0
   ESATAPORTCFG=0
   INTERNALPORTCFG=0
-  HBA_NUMBER=$(($(lspci -d ::107 2>/dev/null | wc -l) + $(lspci -d ::104 2>/dev/null | wc -l) + $(lspci -d ::100 2>/dev/null | wc -l)))
   
   for I in $(ls -d /sys/block/sd* 2>/dev/null); do
     IDX=$(_atoi ${I/\/sys\/block\/sd/})
     ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
     [ -n "${ISUSB}" ] && USBPORTCFG=$((${USBPORTCFG} | $((1 << ${IDX}))))
     if [ -z "${ISUSB}" ] || [ "${USBMOUNT}" = "true"]; then
-      [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
+      if [ $((${IDX} + 1)) -gt ${MAXDISKS} ]; then
+        MAXDISKS=$((${IDX} + 1))
+      fi
     fi
   done
 
-  if [ "${1}" = "true" ]; then
+  if [ "${HDDSORT}" = "true" ]; then
     echo "TODO: no-DT's sort!!!"
   fi
 
@@ -381,32 +382,32 @@ function nondtModel() {
       _set_conf_kv rd "supportnvme" "yes"
       _set_conf_kv rd "support_m2_pool" "yes"
     fi
-
-    # Count NVMe
-    NVMECOUNT=$((${COUNT} - 1))
-
-    # Set maxdisks
-    if [ ${NVMECOUNT} -gt 0 ]; then
-      MAXDISKS=$((${MAXDISKS} + ${NVMECOUNT}))
-    fi
-    if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
-      MAXDISKS=26
-      echo "set maxdisks=26 [${MAXDISKS}]"
-    fi
-    _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
-    echo "set usbportcfg=${USBPORTCFG}"
-    _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
-    echo "set esataportcfg=${ESATAPORTCFG}"
-    if [ "${USBMOUNT}" = "true" ]; then
-      INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
-    else
-      INTERNALPORTCFG=$((2 ** ${MAXDISKS} - 1))
-    fi
-    _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
-    echo "set internalportcfg=${INTERNALPORTCFG}"
-    _set_conf_kv rd "maxdisks" "${MAXDISKS}"
-    echo "maxdisks=${MAXDISKS}"
   done
+
+  # Count NVMe
+  NVMECOUNT=$((${COUNT} - 1))
+
+  # Set maxdisks
+  if [ ${NVMECOUNT} -gt 0 ]; then
+    MAXDISKS=$((${MAXDISKS} + ${NVMECOUNT}))
+  fi
+  if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
+    MAXDISKS=26
+    echo "set maxdisks=26 [${MAXDISKS}]"
+  fi
+  _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
+  echo "set usbportcfg=${USBPORTCFG}"
+  _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
+  echo "set esataportcfg=${ESATAPORTCFG}"
+  if [ "${USBMOUNT}" = "true" ]; then
+    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS})) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
+  else
+    INTERNALPORTCFG=$((2 ** ${MAXDISKS}))
+  fi
+  _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
+  echo "set internalportcfg=${INTERNALPORTCFG}"
+  _set_conf_kv rd "maxdisks" "${MAXDISKS}"
+  echo "maxdisks=${MAXDISKS}"
 }
 
 #
@@ -415,13 +416,18 @@ if [ "${1}" = "patches" ]; then
   # 2 = hddsort / 3 = usbmount
   HDDSORT="${2:-false}"
   USBMOUNT="${3:-false}"
-  BOOTDISK=""
-  BOOTDISK_PART3=$(blkid -L ARC3 2>/dev/null | sed 's/\/dev\///')
+
+  BOOTDISK_PART3_PATH=$(blkid -L ARC3 2>/dev/null)
+  [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
+  [ -n "${BOOTDISK_PART3_MAJORMINOR}" ] && BOOTDISK_PART3="$(cat /sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent 2>/dev/null | grep 'DEVNAME' | cut -d'=' -f2)" || BOOTDISK_PART3=""
+  
   [ -n "${BOOTDISK_PART3}" ] && BOOTDISK=$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4) || BOOTDISK=""
   [ -n "${BOOTDISK}" ] && BOOTDISK_PHYSDEVPATH="$(cat /sys/block/${BOOTDISK}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" || BOOTDISK_PHYSDEVPATH=""
   echo "BOOTDISK=${BOOTDISK}"
   echo "BOOTDISK_PHYSDEVPATH=${BOOTDISK_PHYSDEVPATH}"
+
   checkSynoboot
+
   [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel || nondtModel
 
 elif [ "${1}" = "late" ]; then
