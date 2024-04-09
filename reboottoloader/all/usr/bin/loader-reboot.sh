@@ -1,7 +1,9 @@
 #!/usr/bin/env ash
 
+MODES="config recovery junior automated update"
+
 function use() {
-  echo "Use: ${0} junior|config"
+  echo "Use: ${0} config|recovery|junior|automated|update"
   exit 1
 }
 
@@ -10,7 +12,7 @@ if [ ! ${USER} = "root" ]; then
   exec sudo $0 $@
 fi
 [ -z "${1}" ] && use
-[ ! "${1}" = "junior" -a ! "${1}" = "config" ] && use
+if ! echo "${MODES}" | grep -qw "${1}"; then use; fi
 echo "Rebooting to ${1} mode"
 echo 1 >/proc/sys/kernel/syno_install_flag
 mount /dev/synoboot1 /mnt
