@@ -351,11 +351,12 @@ function nondtModel() {
     ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
     [ -n "${ISUSB}" ] && USBPORTCFG=$((${USBPORTCFG} | $((1 << ${IDX}))))
     if [ -z "${ISUSB}" ] || [ "${USBMOUNT}" = "true"]; then
-      if [ $((${IDX} + 1)) -gt ${MAXDISKS} ]; then
+      if [ $((${IDX} + 1)) -ge ${MAXDISKS} ]; then
         MAXDISKS=$((${IDX} + 1))
       fi
     fi
   done
+  MAXDISKS=$((${MAXDISKS} - 1))
 
   if [ "${HDDSORT}" = "true" ]; then
     echo "TODO: no-DT's sort!!!"
