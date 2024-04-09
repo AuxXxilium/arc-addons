@@ -396,6 +396,8 @@ function nondtModel() {
     MAXDISKS=26
     echo "set maxdisks=26 [${MAXDISKS}]"
   fi
+  _set_conf_kv rd "maxdisks" "${MAXDISKS}"
+  echo "maxdisks=${MAXDISKS}"
   _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
   echo "set usbportcfg=${USBPORTCFG}"
   _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
@@ -407,8 +409,6 @@ function nondtModel() {
   fi
   _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
   echo "set internalportcfg=${INTERNALPORTCFG}"
-  _set_conf_kv rd "maxdisks" "${MAXDISKS}"
-  echo "maxdisks=${MAXDISKS}"
 }
 
 #
