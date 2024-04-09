@@ -418,11 +418,10 @@ if [ "${1}" = "patches" ]; then
   HDDSORT="${2:-false}"
   USBMOUNT="${3:-false}"
 
-  BOOTDISK_PART3_PATH=$(blkid -L ARC3 2>/dev/null)
-  [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
-  [ -n "${BOOTDISK_PART3_MAJORMINOR}" ] && BOOTDISK_PART3="$(cat /sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent 2>/dev/null | grep 'DEVNAME' | cut -d'=' -f2)" || BOOTDISK_PART3=""
+  BOOTDISK=""
+  BOOTDISK_PART3=$(blkid -L ARC3 2>/dev/null | sed 's/\/dev\///')
 
-  [ -n "${BOOTDISK_PART3}" ] && BOOTDISK=$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4) || BOOTDISK=""
+  [ -n "${BOOTDISK_PART3}" ] && BOOTDISK=$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4)
   [ -n "${BOOTDISK}" ] && BOOTDISK_PHYSDEVPATH="$(cat /sys/block/${BOOTDISK}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" || BOOTDISK_PHYSDEVPATH=""
 
   echo "BOOTDISK=${BOOTDISK}"
@@ -459,12 +458,10 @@ elif [ "${1}" = "late" ]; then
       INTERNALPORTCFG=$(_get_conf_kv internalportcfg)
     fi
     # log
-    echo "maxdisks=${MAXDISKS}"
     echo "usbportcfg=${USBPORTCFG}"
     echo "esataportcfg=${ESATAPORTCFG}"
     echo "internalportcfg=${INTERNALPORTCFG}"
     # set
-    _set_conf_kv hd "maxdisks" "${MAXDISKS}"
     _set_conf_kv hd "usbportcfg" "${USBPORTCFG}"
     _set_conf_kv hd "esataportcfg" "${ESATAPORTCFG}"
     _set_conf_kv hd "internalportcfg" "${INTERNALPORTCFG}"
@@ -472,6 +469,10 @@ elif [ "${1}" = "late" ]; then
     cp -vf /etc/extensionPorts /tmpRoot/etc/extensionPorts
     cp -vf /etc/extensionPorts /tmpRoot/etc.defaults/extensionPorts
   fi
+
+  MAXDISKS=$(_get_conf_kv maxdisks)
+  echo "maxdisks=${MAXDISKS}"
+  _set_conf_kv hd "maxdisks" "${MAXDISKS}"
 
   SUPPORTNVME=$(_get_conf_kv supportnvme)
   SUPPORT_M2_POOL=$(_get_conf_kv support_m2_pool)
