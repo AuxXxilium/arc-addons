@@ -320,7 +320,7 @@ function dtModel() {
     USBCOUNT=$((${COUNT} - 1))
 
     # Set maxdisks
-    if [ ${NVMECOUNT} -gt 0 ]; then
+    if [ "${UNIQUE}" = "synology_epyc7002_sa6400" ]; then
       MAXDISKS=$((${MAXDISKS} + ${NVMECOUNT}))
     fi
     if [ ${USBMOUNT} = "true" ] && [ ${USBCOUNT} -gt 0 ]; then
@@ -389,9 +389,6 @@ function nondtModel() {
   NVMECOUNT=$((${COUNT} - 1))
 
   # Set maxdisks
-  if [ ${NVMECOUNT} -gt 0 ]; then
-    MAXDISKS=$((${MAXDISKS} + ${NVMECOUNT}))
-  fi
   if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
     MAXDISKS=26
     echo "set maxdisks=26 [${MAXDISKS}]"
@@ -403,9 +400,9 @@ function nondtModel() {
   _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
   echo "set esataportcfg=${ESATAPORTCFG}"
   if [ "${USBMOUNT}" = "true" ]; then
-    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS})) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
+    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
   else
-    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS}))))
+    INTERNALPORTCFG=$((2 ** ${MAXDISKS} - 1))
   fi
   _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
   echo "set internalportcfg=${INTERNALPORTCFG}"
@@ -453,7 +450,6 @@ elif [ "${1}" = "late" ]; then
     else
       echo "Adjust maxdisks and internalportcfg automatically"
       # sysfs is unpopulated here, get the values from junior synoinfo.conf
-      MAXDISKS=$(_get_conf_kv maxdisks)
       USBPORTCFG=$(_get_conf_kv usbportcfg)
       ESATAPORTCFG=$(_get_conf_kv esataportcfg)
       INTERNALPORTCFG=$(_get_conf_kv internalportcfg)
@@ -471,7 +467,9 @@ elif [ "${1}" = "late" ]; then
     cp -vf /etc/extensionPorts /tmpRoot/etc.defaults/extensionPorts
   fi
 
-  MAXDISKS=$(_get_conf_kv maxdisks)
+  if [ ! "${USBMOUNT}" = "force" ]; then
+    MAXDISKS=$(_get_conf_kv maxdisks)
+  fi
   echo "maxdisks=${MAXDISKS}"
   _set_conf_kv hd "maxdisks" "${MAXDISKS}"
 
