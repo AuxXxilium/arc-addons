@@ -172,7 +172,7 @@ function getUsbPorts() {
   echo
 }
 
-#
+# DT Model
 function dtModel() {
   DEST="/addons/model.dts"
   UNIQUE=$(_get_conf_kv unique)
@@ -198,7 +198,7 @@ function dtModel() {
     fi
     # SATA ports
     if [ "${HDDSORT}" = "true" ]; then
-      I=0
+      I=1
       # 106 = SATA
       for P in $(lspci -d ::106 2>/dev/null | cut -d' ' -f1); do
         HOSTNUM=$(($(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l) - 1))
@@ -257,7 +257,7 @@ function dtModel() {
         done
       done
     else
-      I=0
+      I=1
       J=1
       while true; do
         [ ! -d /sys/block/sata${J} ] && break
@@ -340,6 +340,7 @@ function dtModel() {
   /usr/syno/bin/syno_slot_mapping
 }
 
+# Non-DT Model
 function nondtModel() {
   MAXDISKS=0
   USBPORTCFG=0
@@ -356,7 +357,6 @@ function nondtModel() {
       fi
     fi
   done
-  MAXDISKS=$((${MAXDISKS} - 1))
 
   if [ "${HDDSORT}" = "true" ]; then
     echo "TODO: no-DT's sort!!!"
