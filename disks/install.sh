@@ -402,11 +402,7 @@ function nondtModel() {
   echo "set usbportcfg=${USBPORTCFG}"
   _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
   echo "set esataportcfg=${ESATAPORTCFG}"
-  if [ "${USBMOUNT}" = "true" ]; then
-    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS})) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
-  else
-    INTERNALPORTCFG=$((2 ** ${MAXDISKS}))
-  fi
+  INTERNALPORTCFG=$(($((2 ** ${MAXDISKS})) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
   _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
   echo "set internalportcfg=${INTERNALPORTCFG}"
 }
@@ -418,10 +414,11 @@ if [ "${1}" = "patches" ]; then
   HDDSORT="${2:-false}"
   USBMOUNT="${3:-false}"
 
-  BOOTDISK=""
-  BOOTDISK_PART3=$(blkid -L ARC3 2>/dev/null | sed 's/\/dev\///')
+  BOOTDISK_PART3_PATH=$(blkid -L ARC3 2>/dev/null)
+  [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
+  [ -n "${BOOTDISK_PART3_MAJORMINOR}" ] && BOOTDISK_PART3="$(cat /sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent 2>/dev/null | grep 'DEVNAME' | cut -d'=' -f2)" || BOOTDISK_PART3=""
 
-  [ -n "${BOOTDISK_PART3}" ] && BOOTDISK=$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4)
+  [ -n "${BOOTDISK_PART3}" ] && BOOTDISK=$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4) || BOOTDISK=""
   [ -n "${BOOTDISK}" ] && BOOTDISK_PHYSDEVPATH="$(cat /sys/block/${BOOTDISK}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" || BOOTDISK_PHYSDEVPATH=""
 
   echo "BOOTDISK=${BOOTDISK}"
