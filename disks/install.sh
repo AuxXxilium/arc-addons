@@ -402,7 +402,11 @@ function nondtModel() {
   echo "set usbportcfg=${USBPORTCFG}"
   _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
   echo "set esataportcfg=${ESATAPORTCFG}"
-  INTERNALPORTCFG=$(($((2 ** ${MAXDISKS})) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
+  if [ "${USBMOUNT}" = "true" ]; then
+    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS})) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
+  else
+    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS}))))
+  fi
   _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
   echo "set internalportcfg=${INTERNALPORTCFG}"
 }
