@@ -47,15 +47,16 @@ function _check_rootraidstatus() {
   if [ ! "$(_get_conf_kv supportraid)" = "yes" ]; then
     return 0
   fi
-  STATE=$(cat /sys/block/md0/md/array_state 2>/dev/null)
-  if [ $? -ne 0 ]; then
+  if [ ! -e /sys/block/md0/md/array_state ]; then
     return 1
+  else
+    STATE=$(cat /sys/block/md0/md/array_state 2>/dev/null)
+    case ${STATE} in
+    "clear" | "inactive" | "suspended" | "readonly" | "read-auto")
+      return 1
+      ;;
+    esac
   fi
-  case ${STATE} in
-  "clear" | "inactive" | "suspended " | "readonly" | "read-auto")
-    return 1
-    ;;
-  esac
   return 0
 }
 
