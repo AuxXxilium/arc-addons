@@ -41,6 +41,7 @@ elif [ "${1}" = "late" ]; then
   # Create storage pool page without RAID type.
   cp -vf /usr/bin/nvmesystem.sh /tmpRoot/usr/bin/nvmesystem.sh
 
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
   echo "[Unit]"                                          >${DEST}
   echo "Description=Modify storage panel"               >>${DEST}
@@ -56,8 +57,8 @@ elif [ "${1}" = "late" ]; then
   echo "[Install]"                                      >>${DEST}
   echo "WantedBy=multi-user.target"                     >>${DEST}
 
-  mkdir -vp /tmpRoot/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/nvmesystem.service /tmpRoot/lib/systemd/system/multi-user.target.wants/nvmesystem.service
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/nvmesystem.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmesystem.service
 
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon nvmesystem - ${1}"
