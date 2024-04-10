@@ -326,6 +326,10 @@ function dtModel() {
     if [ ${USBMOUNT} = "true" ] && [ ${USBCOUNT} -gt 0 ]; then
       MAXDISKS=$((${MAXDISKS} + ${USBCOUNT}))
     fi
+    if ! _check_rootraidstatus && [ ${MAXDISKS} -le 2 ]; then
+      MAXDISKS=4
+      echo "set maxdisks=4 [${MAXDISKS}]"
+    fi
     if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
       MAXDISKS=26
       echo "set maxdisks=26 [${MAXDISKS}]"
@@ -389,6 +393,10 @@ function nondtModel() {
   NVMECOUNT=$((${COUNT} - 1))
 
   # Set maxdisks
+  if ! _check_rootraidstatus && [ ${MAXDISKS} -le 2 ]; then
+    MAXDISKS=4
+    echo "set maxdisks=4 [${MAXDISKS}]"
+  fi
   if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
     MAXDISKS=26
     echo "set maxdisks=26 [${MAXDISKS}]"
