@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env ash
 
 _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
 
