@@ -1,4 +1,10 @@
 #!/usr/bin/env ash
+#
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
 
 if [ "${1}" = "modules" ]; then
   echo "Installing addon console - ${1}"
@@ -6,12 +12,12 @@ if [ "${1}" = "modules" ]; then
     /usr/sbin/modprobe ${2}
   else
     for M in i915 efifb vesafb vga16fb; do
-      [ -e /sys/class/graphics/fb0 ] && continue
-      [ -f /usr/lib/modules/${M}.ko ] && /usr/sbin/modprobe ${M} || echo "Module ${M} not found"
+      [ -e /sys/class/graphics/fb0 ] && break
+      /usr/sbin/modprobe ${M}
     done
   fi
   /usr/sbin/modprobe fbcon
-  echo "Arc Console - wait..." >/dev/tty1
+  echo "Arc console - wait..." >/dev/tty1
   # Workaround for DVA1622
   if [ "${MODEL}" = "DVA1622" ]; then
     echo >/dev/tty2
@@ -24,7 +30,7 @@ elif [ "${1}" = "rcExit" ]; then
   echo -e "Junior mode\n" >/etc/issue
   echo "Starting getty..."
   /usr/sbin/getty -L 0 tty1 &
-  /usr/bin/loadkeys /usr/share/keymaps/i386/${LAYOUT:-qwertz}/${KEYMAP:-de}.map.gz
+  /usr/bin/loadkeys /usr/share/keymaps/i386/${LAYOUT:-qwerty}/${KEYMAP:-us}.map.gz
   # Workaround for DVA1622
   if [ "${MODEL}" = "DVA1622" ]; then
     echo >/dev/tty2
@@ -38,15 +44,16 @@ elif [ "${1}" = "late" ]; then
 
   SED_PATH='/tmpRoot/usr/bin/sed'
   # run when boot installed DSM
-  cp -fv /tmpRoot/lib/systemd/system/serial-getty\@.service /tmpRoot/lib/systemd/system/getty\@.service
-  ${SED_PATH} -i 's|^ExecStart=.*|ExecStart=-/sbin/agetty %I 115200 linux|' /tmpRoot/lib/systemd/system/getty\@.service
-  mkdir -vp /tmpRoot/lib/systemd/system/getty.target.wants
-  ln -vsf /lib/systemd/system/getty\@.service /tmpRoot/lib/systemd/system/getty.target.wants/getty\@tty1.service
+  cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@.service
+  ${SED_PATH} -i 's|^ExecStart=.*|ExecStart=-/sbin/agetty %I 115200 linux|' /tmpRoot/usr/lib/systemd/system/getty\@.service
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
+  ln -vsf /usr/lib/systemd/system/getty\@.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@tty1.service
   echo -e "DSM mode\n" >/tmpRoot/etc/issue
   cp -vfR /usr/share/keymaps /tmpRoot/usr/share/
   cp -fv /usr/bin/loadkeys /tmpRoot/usr/bin/
   cp -fv /usr/bin/setleds /tmpRoot/usr/bin/
-  DEST="/tmpRoot/lib/systemd/system/keymap.service"
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  DEST="/tmpRoot/usr/lib/systemd/system/keymap.service"
   echo "[Unit]"                                                                                      >${DEST}
   echo "Description=Configure keymap"                                                               >>${DEST}
   echo "After=getty.target"                                                                         >>${DEST}
@@ -59,8 +66,8 @@ elif [ "${1}" = "late" ]; then
   echo "[Install]"                                                                                  >>${DEST}
   echo "WantedBy=multi-user.target"                                                                 >>${DEST}
 
-  mkdir -vp /tmpRoot/lib/systemd/system/multi-user.target.wants
-  ln -vsf /lib/systemd/system/keymap.service /tmpRoot/lib/systemd/system/multi-user.target.wants/keymap.service
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/keymap.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/keymap.service
   # Workaround for DVA1622
   if [ "${MODEL}" = "DVA1622" ]; then
     echo >/dev/tty2
@@ -70,10 +77,10 @@ elif [ "${1}" = "late" ]; then
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon console - ${1}"
 
-  rm -f "/tmpRoot/lib/systemd/system/getty.target.wants/getty\@tty1.service"
-  rm -f "/tmpRoot/lib/systemd/system/getty\@.service"
-  rm -f "/tmpRoot/lib/systemd/system/multi-user.target.wants/keymap.service"
-  rm -f "/tmpRoot/lib/systemd/system/keymap.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@tty1.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/getty\@.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/keymap.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/keymap.service"
 
   rm -rf /tmpRoot/usr/share/keymaps
   rm -f /tmpRoot/usr/bin/loadkeys

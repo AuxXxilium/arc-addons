@@ -320,7 +320,7 @@ function dtModel() {
     USBCOUNT=$((${COUNT} - 1))
 
     # Set maxdisks
-    if [ "${UNIQUE}" = "synology_epyc7002_sa6400" ] && [ ${NVMECOUNT} -gt 0 ]; then
+    if [ "${UNIQUE}" = "synology_epyc7002_sa6400" ] && [ ${MAXDISKS} -le 1 ] && [ ${NVMECOUNT} -gt 0 ]; then
       MAXDISKS=$((${MAXDISKS} + ${NVMECOUNT}))
     fi
     if [ ${USBMOUNT} = "true" ] && [ ${USBCOUNT} -gt 0 ]; then
