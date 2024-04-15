@@ -39,49 +39,41 @@ if [ "${1}" = "modules" ]; then
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon eudev - ${1}"
-  MODULESCOPY="${2:-false}"
-  echo "eudev: modulescopy is ${MODULESCOPY}"
-  echo "eudev: copy modules"
+
+  echo "copy modules"
   isChange="false"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-  if cat /proc/version | grep -q 'RR@RR'; then
+  if cat /proc/version 2>/dev/null | grep -q 'RR@RR'; then
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/cp -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     else
-      echo "eudev: backup modules"
+      echo "Custom Kernel - backup modules."
       /tmpRoot/bin/cp -rf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
     fi
     /tmpRoot/bin/cp -rf /usr/lib/modules/* /tmpRoot/usr/lib/modules
     echo "true" >/tmp/modulesChange
   else
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
-      echo "eudev: restore modules from backup"
+      echo "Official Kenrel - restore modules from backup."
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
-    if [ "${MODULESCOPY}" = "true" ]; then
-      echo "eudev: modulescopy is true - copy all modules to DSM"
-      /tmpRoot/bin/cp -rf /usr/lib/modules/* /tmpRoot/usr/lib/modules
+    cat /addons/modulelist 2>/dev/null | /tmpRoot/bin/sed '/^\s*$/d' | while IFS=' ' read -r O M; do
+      [ "${O:0:1}" = "#" ] && continue
+      [ -z "${M}" -o -z "$(ls /usr/lib/modules/${M} 2>/dev/null)" ] && continue
+      if [ "${O}" = "F" ] || [ "${O}" = "f" ]; then
+        /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+      else
+        /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+      fi
+      # isChange="true"
+      # In Bash, the pipe operator | creates a subshell to execute the commands in the pipe.
+      # This means that if you modify a variable inside a while loop,
+      # the modification is not visible outside the loop because the while loop is executed in a subshell.
       echo "true" >/tmp/modulesChange
-    else
-      echo "eudev: modulescopy is false - only copy needed modules to DSM"
-      cat /addons/modulelist 2>/dev/null | /tmpRoot/bin/sed '/^\s*$/d' | while IFS=' ' read -r O M; do
-        [ "${O:0:1}" = "#" ] && continue
-        [ -z "${M}" -o -z "$(ls /usr/lib/modules/${M} 2>/dev/null)" ] && continue
-        if [ "${O}" = "F" ] || [ "${O}" = "f" ]; then
-          /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
-        else
-          /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
-        fi
-        # isChange="true"
-        # In Bash, the pipe operator | creates a subshell to execute the commands in the pipe.
-        # This means that if you modify a variable inside a while loop,
-        # the modification is not visible outside the loop because the while loop is executed in a subshell.
-        echo "true" >/tmp/modulesChange
-      done
-    fi
+    done
   fi
   isChange="$(cat /tmp/modulesChange 2>/dev/null || echo "false")"
   echo "isChange: ${isChange}"
@@ -98,6 +90,7 @@ elif [ "${1}" = "late" ]; then
   #mkdir -p /tmpRoot/etc/udev/hwdb.d
   #cp -rf /etc/udev/hwdb.d/* /tmpRoot/etc/udev/hwdb.d
   
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/lib/systemd/system/udevrules.service"
   echo "[Unit]"                                                                  >${DEST}
   echo "Description=Reload udev rules"                                          >>${DEST}
