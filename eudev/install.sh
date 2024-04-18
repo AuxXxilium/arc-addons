@@ -62,7 +62,7 @@ elif [ "${1}" = "late" ]; then
     echo "true" >/tmp/modulesChange
   else
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
-      echo "Official Kenrel - restore modules from backup."
+      echo "Official Kernel - restore modules from backup."
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
