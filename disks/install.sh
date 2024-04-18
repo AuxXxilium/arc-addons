@@ -155,7 +155,6 @@ function getUsbPorts() {
 #
 function dtModel() {
   DEST="/addons/model.dts"
-  rm -f ${DEST}
   UNIQUE=$(_get_conf_kv unique)
   if [ ! -f "${DEST}" ]; then # Users can put their own dts.
     echo "/dts-v1/;" >${DEST}
@@ -165,23 +164,24 @@ function dtModel() {
     echo "    version = <0x01>;" >>${DEST}
 
     # NVME power_limit
-    POWER_LIMIT=""
-    NVME_PORTS=$(ls /sys/class/nvme 2>/dev/null | wc -w)
-    for I in $(seq 0 $((${NVME_PORTS} - 1))); do
-      [ ${I} -eq 0 ] && POWER_LIMIT="100" || POWER_LIMIT="${POWER_LIMIT},100"
-    done
-    if [ -n "${POWER_LIMIT}" ]; then
-      echo "    power_limit = \"${POWER_LIMIT}\";" >>${DEST}
-    fi
+    NVME_PORTS=$(($(ls /sys/class/nvme 2>/dev/null | wc -w) - 1))
     if [ ${NVME_PORTS} -gt 0 ]; then
+      POWER_LIMIT=""
+      for I in $(seq 0 ${NVME_PORTS}); do
+        [ ${I} -eq 0 ] && POWER_LIMIT="100" || POWER_LIMIT="${POWER_LIMIT},100"
+      done
+      if [ -n "${POWER_LIMIT}" ]; then
+        echo "    power_limit = \"${POWER_LIMIT}\";" >>${DEST}
+      fi
       _set_conf_kv rd "supportnvme" "yes"
       _set_conf_kv rd "support_m2_pool" "yes"
     fi
     # SATA ports
-    if [ "${1}" = "true" ]; then
+    if [ "${HDDSORT}" = "true" ]; then
       I=1
+      # 106 = SATA
       for P in $(lspci -d ::106 2>/dev/null | cut -d' ' -f1); do
-        HOSTNUM=$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l)
+        HOSTNUM=$(($(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l) - 1))
         PCIPATH=""
         for Q in $(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | head -1 | grep -oE ":..\.."); do PCIPATH="${PCIPATH},${Q//:/}"; done
         [ -z "${PCIPATH}" ] && continue
@@ -198,7 +198,7 @@ function dtModel() {
           echo "bootloader: PCIPATH:${PCIPATH}; IDX:${IDX}"
         fi
 
-        for J in $(seq 0 $((${HOSTNUM} - 1))); do
+        for J in $(seq 0 ${HOSTNUM}); do
           [ "${J}" = "${IDX}" ] && continue
           echo "    internal_slot@${I} {" >>${DEST}
           echo "        protocol_type = \"sata\";" >>${DEST}
@@ -210,6 +210,7 @@ function dtModel() {
           I=$((${I} + 1))
         done
       done
+      # 100 = SCSI, 104 = RAID, 107 = HBA
       for P in $(lspci -d ::107 2>/dev/null | cut -d' ' -f1) $(lspci -d ::104 2>/dev/null | cut -d' ' -f1) $(lspci -d ::100 2>/dev/null | cut -d' ' -f1); do
         J=1
         while true; do
@@ -260,21 +261,6 @@ function dtModel() {
       done
     fi
     MAXDISKS=$((${I} - 1))
-    if _check_post_k "rd" "maxdisks"; then
-      MAXDISKS=$(($(_get_conf_kv maxdisks)))
-      echo "get maxdisks=${MAXDISKS}"
-    else
-      # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-      # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
-      [ ${MAXDISKS} -lt 26 ] && MAXDISKS=26
-    fi
-    # # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
-    # if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
-    #   MAXDISKS=26
-    #   echo "set maxdisks=26 [${MAXDISKS}]"
-    # fi
-    _set_conf_kv rd "maxdisks" "${MAXDISKS}"
-    echo "maxdisks=${MAXDISKS}"
 
     # NVME ports
     COUNT=1
@@ -293,6 +279,9 @@ function dtModel() {
       fi
     done
 
+    # NVME Count
+    NVMEDISKS=$((${COUNT} - 1))
+
     # USB ports
     COUNT=1
     for I in $(getUsbPorts); do
@@ -307,6 +296,30 @@ function dtModel() {
       COUNT=$((${COUNT} + 1))
     done
     echo "};" >>${DEST}
+
+    # USB Count
+    USBDISKS=$((${COUNT} - 1))
+
+    # Check for custom MAXDISKS
+    if _check_post_k "rd" "maxdisks"; then
+      MAXDISKS=$(($(_get_conf_kv maxdisks)))
+      echo "get maxdisks=${MAXDISKS}"
+    fi
+    # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
+    if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
+      echo "set maxdisks=26 [${MAXDISKS}]"
+      MAXDISKS=26
+    # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
+    elif ! _check_rootraidstatus && [ ${MAXDISKS} -le 2 ]; then
+      echo "set maxdisks=4 [${MAXDISKS}]"
+      MAXDISKS=4
+    fi
+    if [ ${MAXDISKS} -lt ${NVMEDISKS} ]; then
+      echo "set maxdisks=$((${MAXDISKS} + ${NVMEDISKS})) [${MAXDISKS}]"
+      MAXDISKS=$((${MAXDISKS} + ${NVMEDISKS}))
+    fi
+    _set_conf_kv rd "maxdisks" "${MAXDISKS}"
+    echo "maxdisks=${MAXDISKS}"
   fi
   dtc -I dts -O dtb ${DEST} >/etc/model.dtb
   cp -vf /etc/model.dtb /run/model.dtb
@@ -314,61 +327,76 @@ function dtModel() {
 }
 
 function nondtModel() {
-  MAXDISKS=0
-  USBPORTCFG=0
-  ESATAPORTCFG=0
-  INTERNALPORTCFG=0
-  HBA_NUMBER=$(($(lspci -d ::107 2>/dev/null | wc -l) + $(lspci -d ::104 2>/dev/null | wc -l) + $(lspci -d ::100 2>/dev/null | wc -l)))
-
-  for I in $(ls -d /sys/block/sd* 2>/dev/null); do
-    IDX=$(_atoi ${I/\/sys\/block\/sd/})
-    ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
-    [ -n "${ISUSB}" ] && USBPORTCFG=$((${USBPORTCFG} | $((1 << ${IDX}))))
-    [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
-  done
-
-  if _check_post_k "rd" "maxdisks"; then
-    MAXDISKS=$(($(_get_conf_kv maxdisks)))
-    echo "get maxdisks=${MAXDISKS}"
+  if [ ${USBMOUNT} = "force" ]; then
+    MAXDISKS=26
+    USBPORTCFG=0x00
+    ESATAPORTCFG=0x00
+    INTERNALPORTCFG=0x3ffffff
   else
+    MAXDISKS=0
+    USBPORTCFG=0
+    ESATAPORTCFG=0
+    INTERNALPORTCFG=0
+    HBA_NUMBER=$(($(lspci -d ::107 2>/dev/null | wc -l) + $(lspci -d ::104 2>/dev/null | wc -l) + $(lspci -d ::100 2>/dev/null | wc -l)))
+    
+    for I in $(ls -d /sys/block/sd* 2>/dev/null); do
+      IDX=$(_atoi ${I/\/sys\/block\/sd/})
+      ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
+      [ -n "${ISUSB}" ] && USBPORTCFG=$((${USBPORTCFG} | $((1 << ${IDX}))))
+      if [ -z "${ISUSB}" ] || [ "${USBMOUNT}" = "true"]; then
+        if [ $((${IDX} + 1)) -ge ${MAXDISKS} ]; then
+          MAXDISKS=$((${IDX} + 1))
+        fi
+      fi
+    done
+
+    # Check for custom MAXDISKS
+    if _check_post_k "rd" "maxdisks"; then
+      MAXDISKS=$(($(_get_conf_kv maxdisks)))
+      echo "get maxdisks=${MAXDISKS}"
+    fi
+    # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
+    if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
+      MAXDISKS=26
+      echo "set maxdisks=26 [${MAXDISKS}]"
     # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-    # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
-    [ ${MAXDISKS} -lt 26 ] && MAXDISKS=26
+    elif ! _check_rootraidstatus && [ ${MAXDISKS} -le 2 ]; then
+      MAXDISKS=4
+      echo "set maxdisks=4 [${MAXDISKS}]"
+    fi
+    # Check for custom USBPORTCFG
+    if _check_post_k "rd" "usbportcfg"; then
+      USBPORTCFG=$(($(_get_conf_kv usbportcfg)))
+      echo "get usbportcfg=${USBPORTCFG}"
+    fi
+    # Check for custom ESATAPORTCFG
+    if _check_post_k "rd" "esataportcfg"; then
+      ESATAPORTCFG=$(($(_get_conf_kv esataportcfg)))
+      echo "get esataportcfg=${ESATAPORTCFG}"
+    fi
+    # Check for custom INTERNALPORTCFG
+    if _check_post_k "rd" "internalportcfg"; then
+      INTERNALPORTCFG=$(($(_get_conf_kv internalportcfg)))
+      echo "get internalportcfg=${INTERNALPORTCFG}"
+    else
+      if [ "${USBMOUNT}" = "true" ]; then
+        INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
+      else
+        INTERNALPORTCFG=$((2 ** ${MAXDISKS} - 1))
+      fi
+    fi
   fi
-
-  # # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
-  # if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
-  #   MAXDISKS=26
-  #   echo "set maxdisks=26 [${MAXDISKS}]"
-  # fi
-
-  if _check_post_k "rd" "usbportcfg"; then
-    USBPORTCFG=$(($(_get_conf_kv usbportcfg)))
-    echo "get usbportcfg=${USBPORTCFG}"
-  else
-    _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
-    echo "set usbportcfg=${USBPORTCFG}"
-  fi
-  if _check_post_k "rd" "esataportcfg"; then
-    ESATAPORTCFG=$(($(_get_conf_kv esataportcfg)))
-    echo "get esataportcfg=${ESATAPORTCFG}"
-  else
-    _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
-    echo "set esataportcfg=${ESATAPORTCFG}"
-  fi
-  if _check_post_k "rd" "internalportcfg"; then
-    INTERNALPORTCFG=$(($(_get_conf_kv internalportcfg)))
-    echo "get internalportcfg=${INTERNALPORTCFG}"
-  else
-    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
-    _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
-    echo "set internalportcfg=${INTERNALPORTCFG}"
-  fi
-
+  # Set Maxdisks and Portconfig
   _set_conf_kv rd "maxdisks" "${MAXDISKS}"
   echo "set maxdisks=${MAXDISKS}"
+  _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
+  echo "set usbportcfg=${USBPORTCFG}"
+  _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
+  echo "set esataportcfg=${ESATAPORTCFG}"
+  _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
+  echo "set internalportcfg=${INTERNALPORTCFG}"
 
-  if [ "${1}" = "true" ]; then
+  if [ "${HDDSORT}" = "true" ]; then
     echo "TODO: no-DT's sort!!!"
   fi
 
@@ -400,6 +428,9 @@ function nondtModel() {
 #
 if [ "${1}" = "patches" ]; then
   echo "Installing addon disks - ${1}"
+  # 2 = hddsort / 3 = usbmount
+  HDDSORT="${2:-false}"
+  USBMOUNT="${3:-false}"
 
   BOOTDISK_PART3_PATH=$(blkid -L ARC3 2>/dev/null)
   [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
@@ -413,17 +444,19 @@ if [ "${1}" = "patches" ]; then
 
   checkSynoboot
 
-  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}"
+  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel || nondtModel
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon disks - ${1}"
+  # 2 = hddsort / 3 = usbmount
+  HDDSORT="${2:-false}"
+  USBMOUNT="${3:-false}"
   if [ "$(_get_conf_kv supportportmappingv2)" = "yes" ]; then
     echo "Copying /etc.defaults/model.dtb"
     # copy file
     cp -vf /etc/model.dtb /tmpRoot/etc/model.dtb
     cp -vf /etc/model.dtb /tmpRoot/etc.defaults/model.dtb
   else
-    echo "Adjust maxdisks and internalportcfg automatically"
     # sysfs is unpopulated here, get the values from junior synoinfo.conf
     USBPORTCFG=$(_get_conf_kv usbportcfg)
     ESATAPORTCFG=$(_get_conf_kv esataportcfg)
