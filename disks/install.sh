@@ -332,6 +332,15 @@ function nondtModel() {
     USBPORTCFG=0x00
     ESATAPORTCFG=0x00
     INTERNALPORTCFG=0x3ffffff
+    # Set Maxdisks and Portconfig
+    _set_conf_kv rd "maxdisks" "${MAXDISKS}"
+    echo "set maxdisks=${MAXDISKS} (force)"
+    _set_conf_kv rd "usbportcfg" "${USBPORTCFG}"
+    echo "set usbportcfg=${USBPORTCFG} (force)"
+    _set_conf_kv rd "esataportcfg" "${ESATAPORTCFG}"
+    echo "set esataportcfg=${ESATAPORTCFG} (force)"
+    _set_conf_kv rd "internalportcfg" "${INTERNALPORTCFG}"
+    echo "set internalportcfg=${INTERNALPORTCFG} (force)"
   else
     MAXDISKS=0
     USBPORTCFG=0
@@ -385,16 +394,16 @@ function nondtModel() {
         INTERNALPORTCFG=$((2 ** ${MAXDISKS} - 1))
       fi
     fi
+    # Set Maxdisks and Portconfig
+    _set_conf_kv rd "maxdisks" "${MAXDISKS}"
+    echo "set maxdisks=${MAXDISKS}"
+    _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
+    echo "set usbportcfg=${USBPORTCFG}"
+    _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
+    echo "set esataportcfg=${ESATAPORTCFG}"
+    _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
+    echo "set internalportcfg=${INTERNALPORTCFG}"
   fi
-  # Set Maxdisks and Portconfig
-  _set_conf_kv rd "maxdisks" "${MAXDISKS}"
-  echo "set maxdisks=${MAXDISKS}"
-  _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
-  echo "set usbportcfg=${USBPORTCFG}"
-  _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
-  echo "set esataportcfg=${ESATAPORTCFG}"
-  _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
-  echo "set internalportcfg=${INTERNALPORTCFG}"
 
   if [ "${HDDSORT}" = "true" ]; then
     echo "TODO: no-DT's sort!!!"
