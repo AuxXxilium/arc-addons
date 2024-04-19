@@ -157,12 +157,13 @@ function dtModel() {
   DEST="/addons/model.dts"
   UNIQUE=$(_get_conf_kv unique)
 
-  # Build dts file
-  echo "/dts-v1/;" >${DEST}
-  echo "/ {" >>${DEST}
-  echo "    compatible = \"Synology\";" >>${DEST}
-  echo "    model = \"${UNIQUE}\";" >>${DEST}
-  echo "    version = <0x01>;" >>${DEST}
+  if [ ! -f "${DEST}" ]; then # Users can put their own dts.
+    # Build dts file
+    echo "/dts-v1/;" >${DEST}
+    echo "/ {" >>${DEST}
+    echo "    compatible = \"Synology\";" >>${DEST}
+    echo "    model = \"${UNIQUE}\";" >>${DEST}
+    echo "    version = <0x01>;" >>${DEST}
 
     # NVME power_limit
     POWER_LIMIT=""
@@ -177,127 +178,129 @@ function dtModel() {
       _set_conf_kv rd "supportnvme" "yes"
       _set_conf_kv rd "support_m2_pool" "yes"
     fi
-  # SATA ports
-  if [ "${HDDSORT}" = "true" ]; then
-    I=1
-    # 106 = SATA
-    for P in $(lspci -d ::106 2>/dev/null | cut -d' ' -f1); do
-      HOSTNUM=$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l)
-      PCIPATH=""
-      for Q in $(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | head -1 | grep -oE ":..\.."); do PCIPATH="${PCIPATH},${Q//:/}"; done
-      [ -z "${PCIPATH}" ] && continue
-      if [ "$(_kernelVersionCode "$(_kernelVersion)")" -ge "$(_kernelVersionCode "5.10")" ]; then
-        PCIPATH="0000:00:${PCIPATH:1}" # 5.10+ kernel  TODO: check 0000
-      else
-        PCIPATH="00:${PCIPATH:1}" # 5.10- kernel
-      fi
 
-      IDX=""
-      if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && echo "${BOOTDISK_PHYSDEVPATH}" | grep -q "${P}"; then
-        IDX=$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | sort -V | grep -n "${BOOTDISK_PHYSDEVPATH%%target*}" | head -1 | cut -d: -f1)
-        if [ -n "${IDX}" ] && echo "${IDX}" | grep -q -E '^[0-9]+$'; then if [ ${IDX} -gt 0 ]; then IDX=$((${IDX} - 1)); else IDX="0"; fi; else IDX=""; fi
-        echo "bootloader: PCIPATH:${PCIPATH}; IDX:${IDX}"
-      fi
+    # SATA ports
+    if [ "${HDDSORT}" = "true" ]; then
+      I=1
+      # 106 = SATA
+      for P in $(lspci -d ::106 2>/dev/null | cut -d' ' -f1); do
+        HOSTNUM=$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l)
+        PCIPATH=""
+        for Q in $(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | head -1 | grep -oE ":..\.."); do PCIPATH="${PCIPATH},${Q//:/}"; done
+        [ -z "${PCIPATH}" ] && continue
+        if [ "$(_kernelVersionCode "$(_kernelVersion)")" -ge "$(_kernelVersionCode "5.10")" ]; then
+          PCIPATH="0000:00:${PCIPATH:1}" # 5.10+ kernel  TODO: check 0000
+        else
+          PCIPATH="00:${PCIPATH:1}" # 5.10- kernel
+        fi
 
-      for J in $(seq 0 $((${HOSTNUM} - 1))); do
-        [ "${J}" = "${IDX}" ] && continue
-        echo "    internal_slot@${I} {" >>${DEST}
-        echo "        protocol_type = \"sata\";" >>${DEST}
-        echo "        ahci {" >>${DEST}
-        echo "            pcie_root = \"${PCIPATH}\";" >>${DEST}
-        echo "            ata_port = <0x$(printf '%02X' ${J})>;" >>${DEST}
-        echo "        };" >>${DEST}
-        echo "    };" >>${DEST}
-        I=$((${I} + 1))
+        IDX=""
+        if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && echo "${BOOTDISK_PHYSDEVPATH}" | grep -q "${P}"; then
+          IDX=$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | sort -V | grep -n "${BOOTDISK_PHYSDEVPATH%%target*}" | head -1 | cut -d: -f1)
+          if [ -n "${IDX}" ] && echo "${IDX}" | grep -q -E '^[0-9]+$'; then if [ ${IDX} -gt 0 ]; then IDX=$((${IDX} - 1)); else IDX="0"; fi; else IDX=""; fi
+          echo "bootloader: PCIPATH:${PCIPATH}; IDX:${IDX}"
+        fi
+
+        for J in $(seq 0 $((${HOSTNUM} - 1))); do
+          [ "${J}" = "${IDX}" ] && continue
+          echo "    internal_slot@${I} {" >>${DEST}
+          echo "        protocol_type = \"sata\";" >>${DEST}
+          echo "        ahci {" >>${DEST}
+          echo "            pcie_root = \"${PCIPATH}\";" >>${DEST}
+          echo "            ata_port = <0x$(printf '%02X' ${J})>;" >>${DEST}
+          echo "        };" >>${DEST}
+          echo "    };" >>${DEST}
+          I=$((${I} + 1))
+        done
       done
-    done
-    # 100 = SCSI, 104 = RAID, 107 = HBA
-    for P in $(lspci -d ::107 2>/dev/null | cut -d' ' -f1) $(lspci -d ::104 2>/dev/null | cut -d' ' -f1) $(lspci -d ::100 2>/dev/null | cut -d' ' -f1); do
+      # 100 = SCSI, 104 = RAID, 107 = HBA
+      for P in $(lspci -d ::107 2>/dev/null | cut -d' ' -f1) $(lspci -d ::104 2>/dev/null | cut -d' ' -f1) $(lspci -d ::100 2>/dev/null | cut -d' ' -f1); do
+        J=1
+        while true; do
+          [ ! -d /sys/block/sata${J} ] && break
+          if cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | grep -q "${P}"; then
+            if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
+              echo "bootloader: /sys/block/sata${J}"
+            else
+              PCIEPATH=$(grep 'pciepath' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
+              ATAPORT=$(grep 'ata_port_no' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
+              if [ -n "${PCIEPATH}" -a -n "${ATAPORT}" ]; then
+                echo "    internal_slot@${I} {" >>${DEST}
+                echo "        protocol_type = \"sata\";" >>${DEST}
+                echo "        ahci {" >>${DEST}
+                echo "            pcie_root = \"${PCIEPATH}\";" >>${DEST}
+                echo "            ata_port = <0x$(printf '%02X' ${ATAPORT})>;" >>${DEST}
+                echo "        };" >>${DEST}
+                echo "    };" >>${DEST}
+                I=$((${I} + 1))
+              fi
+            fi
+          fi
+          J=$((${J} + 1))
+        done
+      done
+    else
+      I=1
       J=1
       while true; do
         [ ! -d /sys/block/sata${J} ] && break
-        if cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | grep -q "${P}"; then
-          if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
-            echo "bootloader: /sys/block/sata${J}"
-          else
-            PCIEPATH=$(grep 'pciepath' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
-            ATAPORT=$(grep 'ata_port_no' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
-            if [ -n "${PCIEPATH}" -a -n "${ATAPORT}" ]; then
-              echo "    internal_slot@${I} {" >>${DEST}
-              echo "        protocol_type = \"sata\";" >>${DEST}
-              echo "        ahci {" >>${DEST}
-              echo "            pcie_root = \"${PCIEPATH}\";" >>${DEST}
-              echo "            ata_port = <0x$(printf '%02X' ${ATAPORT})>;" >>${DEST}
-              echo "        };" >>${DEST}
-              echo "    };" >>${DEST}
-              I=$((${I} + 1))
-            fi
+        if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
+          echo "bootloader: /sys/block/sata${J}"
+        else
+          PCIEPATH=$(grep 'pciepath' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
+          ATAPORT=$(grep 'ata_port_no' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
+          if [ -n "${PCIEPATH}" -a -n "${ATAPORT}" ]; then
+            echo "    internal_slot@${I} {" >>${DEST}
+            echo "        protocol_type = \"sata\";" >>${DEST}
+            echo "        ahci {" >>${DEST}
+            echo "            pcie_root = \"${PCIEPATH}\";" >>${DEST}
+            echo "            ata_port = <0x$(printf '%02X' ${ATAPORT})>;" >>${DEST}
+            echo "        };" >>${DEST}
+            echo "    };" >>${DEST}
+            I=$((${I} + 1))
           fi
         fi
         J=$((${J} + 1))
       done
-    done
-  else
-    I=1
-    J=1
-    while true; do
-      [ ! -d /sys/block/sata${J} ] && break
-      if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
-        echo "bootloader: /sys/block/sata${J}"
-      else
-        PCIEPATH=$(grep 'pciepath' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
-        ATAPORT=$(grep 'ata_port_no' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
-        if [ -n "${PCIEPATH}" -a -n "${ATAPORT}" ]; then
-          echo "    internal_slot@${I} {" >>${DEST}
-          echo "        protocol_type = \"sata\";" >>${DEST}
-          echo "        ahci {" >>${DEST}
-          echo "            pcie_root = \"${PCIEPATH}\";" >>${DEST}
-          echo "            ata_port = <0x$(printf '%02X' ${ATAPORT})>;" >>${DEST}
-          echo "        };" >>${DEST}
-          echo "    };" >>${DEST}
-          I=$((${I} + 1))
-        fi
-      fi
-      J=$((${J} + 1))
-    done
-  fi
-  # Maxdisks Count
-  MAXDISKS=$((${I} - 1))
-
-  # NVME ports
-  COUNT=1
-  for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
-    if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
-      echo "bootloader: ${P}"
-      continue
     fi
-    PCIEPATH=$(grep 'pciepath' ${P}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
-    if [ -n "${PCIEPATH}" ]; then
-      echo "    nvme_slot@${COUNT} {" >>${DEST}
-      echo "        pcie_root = \"${PCIEPATH}\";" >>${DEST}
-      echo "        port_type = \"ssdcache\";" >>${DEST}
+    # Maxdisks Count
+    MAXDISKS=$((${I} - 1))
+
+    # NVME ports
+    COUNT=1
+    for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
+      if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
+        echo "bootloader: ${P}"
+        continue
+      fi
+      PCIEPATH=$(grep 'pciepath' ${P}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
+      if [ -n "${PCIEPATH}" ]; then
+        echo "    nvme_slot@${COUNT} {" >>${DEST}
+        echo "        pcie_root = \"${PCIEPATH}\";" >>${DEST}
+        echo "        port_type = \"ssdcache\";" >>${DEST}
+        echo "    };" >>${DEST}
+        COUNT=$((${COUNT} + 1))
+      fi
+    done
+
+    # NVME Count
+    NVMEDISKS=$((${COUNT} - 1))
+
+    # USB ports
+    COUNT=1
+    for I in $(getUsbPorts); do
+      echo "    usb_slot@${COUNT} {" >>${DEST}
+      echo "      usb2 {" >>${DEST}
+      echo "        usb_port =\"${I}\";" >>${DEST}
+      echo "      };" >>${DEST}
+      echo "      usb3 {" >>${DEST}
+      echo "        usb_port =\"${I}\";" >>${DEST}
+      echo "      };" >>${DEST}
       echo "    };" >>${DEST}
       COUNT=$((${COUNT} + 1))
-    fi
-  done
-
-  # NVME Count
-  NVMEDISKS=$((${COUNT} - 1))
-
-  # USB ports
-  COUNT=1
-  for I in $(getUsbPorts); do
-    echo "    usb_slot@${COUNT} {" >>${DEST}
-    echo "      usb2 {" >>${DEST}
-    echo "        usb_port =\"${I}\";" >>${DEST}
-    echo "      };" >>${DEST}
-    echo "      usb3 {" >>${DEST}
-    echo "        usb_port =\"${I}\";" >>${DEST}
-    echo "      };" >>${DEST}
-    echo "    };" >>${DEST}
-    COUNT=$((${COUNT} + 1))
-  done
-  echo "};" >>${DEST}
+    done
+    echo "};" >>${DEST}
+  fi
 
   # USB Count
   USBDISKS=$((${COUNT} - 1))
