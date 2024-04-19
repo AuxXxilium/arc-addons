@@ -180,7 +180,7 @@ function dtModel() {
     fi
 
     # SATA ports
-    if [ "${HDDSORT}" = "true" ]; then
+    if [ "${1}" = "true" ]; then
       I=1
       # 106 = SATA
       for P in $(lspci -d ::106 2>/dev/null | cut -d' ' -f1); do
@@ -321,7 +321,7 @@ function dtModel() {
 }
 
 function nondtModel() {
-  if [ ${USBMOUNT} = "force" ]; then
+  if [ ${2} = "force" ]; then
     MAXDISKS=26
     USBPORTCFG=0x00
     ESATAPORTCFG=0x00
@@ -346,10 +346,8 @@ function nondtModel() {
       IDX=$(_atoi ${I/\/sys\/block\/sd/})
       ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
       [ -n "${ISUSB}" ] && USBPORTCFG=$((${USBPORTCFG} | $((1 << ${IDX}))))
-      if [ -z "${ISUSB}" ] || [ "${USBMOUNT}" = "true"]; then
-        if [ $((${IDX} + 1)) -ge ${MAXDISKS} ]; then
-          MAXDISKS=$((${IDX} + 1))
-        fi
+      if [ -z "${ISUSB}" ] || [ "${2}" = "true"]; then
+        MAXDISKS=$((${IDX} + 1))
       fi
     done
 
@@ -374,7 +372,7 @@ function nondtModel() {
       echo "get internalportcfg=${INTERNALPORTCFG}"
     else
       INTERNALPORTCFG=$((2 ** ${MAXDISKS} - 1))
-      if [ "${USBMOUNT}" = "true" ]; then
+      if [ "${2}" = "true" ]; then
         INTERNALPORTCFG=$((${INTERNALPORTCFG} ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
       fi
     fi
@@ -389,7 +387,7 @@ function nondtModel() {
     echo "set internalportcfg=${INTERNALPORTCFG}"
   fi
 
-  if [ "${HDDSORT}" = "true" ]; then
+  if [ "${1}" = "true" ]; then
     echo "TODO: no-DT's sort!!!"
   fi
 
@@ -421,9 +419,6 @@ function nondtModel() {
 #
 if [ "${1}" = "patches" ]; then
   echo "Installing addon disks - ${1}"
-  # 2 = hddsort / 3 = usbmount
-  HDDSORT="${2:-false}"
-  USBMOUNT="${3:-false}"
 
   BOOTDISK_PART3_PATH=$(blkid -L ARC3 2>/dev/null)
   [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
@@ -437,13 +432,10 @@ if [ "${1}" = "patches" ]; then
 
   checkSynoboot
 
-  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel || nondtModel
+  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}" "${3}"
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon disks - ${1}"
-  # 2 = hddsort / 3 = usbmount
-  HDDSORT="${2:-false}"
-  USBMOUNT="${3:-false}"
   if [ "$(_get_conf_kv supportportmappingv2)" = "yes" ]; then
     echo "Copying /etc.defaults/model.dtb"
     # copy file
