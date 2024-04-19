@@ -300,6 +300,10 @@ function dtModel() {
     # USB Count
     USBDISKS=$((${COUNT} - 1))
 
+    if [ ${NVMEDISKS} -gt 0 ]; then
+      echo "set maxdisks=$((${MAXDISKS} + ${NVMEDISKS})) [${MAXDISKS}]"
+      MAXDISKS=$((${MAXDISKS} + ${NVMEDISKS}))
+    fi
     # Check for custom MAXDISKS
     if _check_post_k "rd" "maxdisks"; then
       MAXDISKS=$(($(_get_conf_kv maxdisks)))
@@ -313,10 +317,6 @@ function dtModel() {
     elif ! _check_rootraidstatus && [ ${MAXDISKS} -le 2 ]; then
       echo "set maxdisks=4 [${MAXDISKS}]"
       MAXDISKS=4
-    fi
-    if [ ${MAXDISKS} -lt ${NVMEDISKS} ]; then
-      echo "set maxdisks=$((${MAXDISKS} + ${NVMEDISKS})) [${MAXDISKS}]"
-      MAXDISKS=$((${MAXDISKS} + ${NVMEDISKS}))
     fi
     _set_conf_kv rd "maxdisks" "${MAXDISKS}"
     echo "maxdisks=${MAXDISKS}"
