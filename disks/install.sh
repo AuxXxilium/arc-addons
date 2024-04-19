@@ -155,7 +155,6 @@ function getUsbPorts() {
 #
 function dtModel() {
   DEST="/addons/model.dts"
-  rm -f ${DEST}
   UNIQUE=$(_get_conf_kv unique)
 
   # Build dts file
@@ -165,25 +164,25 @@ function dtModel() {
   echo "    model = \"${UNIQUE}\";" >>${DEST}
   echo "    version = <0x01>;" >>${DEST}
 
-  # NVME power_limit
-  NVME_PORTS=$(($(ls /sys/class/nvme 2>/dev/null | wc -w) - 1))
-  if [ ${NVME_PORTS} -gt 0 ]; then
+    # NVME power_limit
     POWER_LIMIT=""
-    for I in $(seq 0 ${NVME_PORTS}); do
+    NVME_PORTS=$(ls /sys/class/nvme 2>/dev/null | wc -w)
+    for I in $(seq 0 $((${NVME_PORTS} - 1))); do
       [ ${I} -eq 0 ] && POWER_LIMIT="100" || POWER_LIMIT="${POWER_LIMIT},100"
     done
     if [ -n "${POWER_LIMIT}" ]; then
       echo "    power_limit = \"${POWER_LIMIT}\";" >>${DEST}
     fi
-    _set_conf_kv rd "supportnvme" "yes"
-    _set_conf_kv rd "support_m2_pool" "yes"
-  fi
+    if [ ${NVME_PORTS} -gt 0 ]; then
+      _set_conf_kv rd "supportnvme" "yes"
+      _set_conf_kv rd "support_m2_pool" "yes"
+    fi
   # SATA ports
   if [ "${HDDSORT}" = "true" ]; then
     I=1
     # 106 = SATA
     for P in $(lspci -d ::106 2>/dev/null | cut -d' ' -f1); do
-      HOSTNUM=$(($(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l) - 1))
+      HOSTNUM=$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l)
       PCIPATH=""
       for Q in $(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | head -1 | grep -oE ":..\.."); do PCIPATH="${PCIPATH},${Q//:/}"; done
       [ -z "${PCIPATH}" ] && continue
@@ -200,7 +199,7 @@ function dtModel() {
         echo "bootloader: PCIPATH:${PCIPATH}; IDX:${IDX}"
       fi
 
-      for J in $(seq 0 ${HOSTNUM}); do
+      for J in $(seq 0 $((${HOSTNUM} - 1))); do
         [ "${J}" = "${IDX}" ] && continue
         echo "    internal_slot@${I} {" >>${DEST}
         echo "        protocol_type = \"sata\";" >>${DEST}
