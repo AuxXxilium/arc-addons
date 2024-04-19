@@ -321,7 +321,7 @@ function dtModel() {
 }
 
 function nondtModel() {
-  if [ ${2} = "force" ]; then
+  if [ "${2}" = "force" ]; then
     MAXDISKS=26
     USBPORTCFG=0x00
     ESATAPORTCFG=0x00
@@ -371,9 +371,10 @@ function nondtModel() {
       INTERNALPORTCFG=$(($(_get_conf_kv internalportcfg)))
       echo "get internalportcfg=${INTERNALPORTCFG}"
     else
-      INTERNALPORTCFG=$((2 ** ${MAXDISKS} - 1))
       if [ "${2}" = "true" ]; then
-        INTERNALPORTCFG=$((${INTERNALPORTCFG} ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
+        INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
+      else
+        INTERNALPORTCFG=$((2 ** ${MAXDISKS} - 1))
       fi
     fi
     # Set Maxdisks and Portconfig
