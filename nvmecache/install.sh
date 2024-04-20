@@ -1,4 +1,10 @@
 #!/usr/bin/env ash
+#
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
 
 MODELS="DS918+ RS1619xs+ DS419+ DS1019+ DS719+ DS1621xs+"
 MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
@@ -11,12 +17,16 @@ fi
 if [ "${1}" = "patches" ]; then
   echo "Installing addon nvmecache - ${1}"
 
-  BOOTDISK=""
-  BOOTDISK_PART3=$(blkid -L ARC3 2>/dev/null | sed 's/\/dev\///')
-  [ -n "${BOOTDISK_PART3}" ] && BOOTDISK=$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4)
+  BOOTDISK_PART3_PATH=$(blkid -L ARC3 2>/dev/null)
+  [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
+  [ -n "${BOOTDISK_PART3_MAJORMINOR}" ] && BOOTDISK_PART3="$(cat /sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent 2>/dev/null | grep 'DEVNAME' | cut -d'=' -f2)" || BOOTDISK_PART3=""
+
+  [ -n "${BOOTDISK_PART3}" ] && BOOTDISK=$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4) || BOOTDISK=""
   [ -n "${BOOTDISK}" ] && BOOTDISK_PHYSDEVPATH="$(cat /sys/block/${BOOTDISK}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" || BOOTDISK_PHYSDEVPATH=""
+
   echo "BOOTDISK=${BOOTDISK}"
   echo "BOOTDISK_PHYSDEVPATH=${BOOTDISK_PHYSDEVPATH}"
+
   rm -f /etc/nvmePorts
   for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
     if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then

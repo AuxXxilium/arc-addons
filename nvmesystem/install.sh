@@ -1,4 +1,10 @@
 #!/usr/bin/env ash
+#
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
 
 MODELS="SA6400"
 MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
@@ -28,7 +34,7 @@ elif [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  # disk/shared_disk_info_enum.c::84 Failed to allocate list in SharedDiskInfoEnum, errno=0x900.
+  # disk/shared_disk_info_enum.c::84 Failed to allocate list in SharedDiskInfoEnum, earcno=0x900.
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [ ! -f "${SO_FILE}.bak" ] && cp -vf "${SO_FILE}" "${SO_FILE}.bak"
 
@@ -40,6 +46,8 @@ elif [ "${1}" = "late" ]; then
 
   # Create storage pool page without RAID type.
   cp -vf /usr/bin/nvmesystem.sh /tmpRoot/usr/bin/nvmesystem.sh
+
+  [ ! -f "/tmpRoot/usr/bin/gzip" ] && cp -vf /usr/bin/gzip /tmpRoot/usr/bin/gzip
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
@@ -66,9 +74,10 @@ elif [ "${1}" = "uninstall" ]; then
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
 
-  rm -f "/tmpRoot/lib/systemd/system/multi-user.target.wants/nvmesystem.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmesystem.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
-
+  
+  # rm -f /tmpRoot/usr/bin/gzip 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/nvmesystem.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/nvmesystem.sh" >>/tmpRoot/usr/arc/revert.sh

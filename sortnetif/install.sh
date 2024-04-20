@@ -1,4 +1,10 @@
 #!/usr/bin/env ash
+#
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
 
 if [ "${1}" = "patches" ]; then
   echo "Installing addon sortnetif - ${1}"
@@ -6,8 +12,8 @@ if [ "${1}" = "patches" ]; then
   ETHLIST=""
   ETHX=$(ls /sys/class/net/ 2>/dev/null | grep eth) # real network cards list
   for ETH in ${ETHX}; do
-    MAC="$(cat /sys/class/net/${ETH}/address | sed 's/://g' | tr '[:upper:]' '[:lower:]')"
-    BUS=$(ethtool -i ${ETH} | grep bus-info | awk '{print $2}')
+    MAC="$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g' | tr '[:upper:]' '[:lower:]')"
+    BUS=$(ethtool -i ${ETH} 2>/dev/null | grep bus-info | cut -d' ' -f2)
     ETHLIST="${ETHLIST}${BUS} ${MAC} ${ETH}\n"
   done
 
@@ -33,15 +39,15 @@ EOF
   fi
   ETHLIST="$(echo -e "${ETHLIST}" | grep -v '^$')"
 
-  echo -e "${ETHLIST}" > /tmp/ethlist
+  echo -e "${ETHLIST}" >/tmp/ethlist
   cat /tmp/ethlist
 
   # sort
   IDX=0
   while true; do
-    cat /tmp/ethlist 
-    [ ${IDX} -ge $(wc -l < /tmp/ethlist) ] && break
-    ETH=$(cat /tmp/ethlist | sed -n "$((${IDX} + 1))p" | awk '{print $3}')
+    cat /tmp/ethlist
+    [ ${IDX} -ge $(wc -l </tmp/ethlist) ] && break
+    ETH=$(cat /tmp/ethlist | sed -n "$((${IDX} + 1))p" | cut -d' ' -f3)
     echo "ETH: ${ETH}"
     if [ -n "${ETH}" ] && [ ! "${ETH}" = "eth${IDX}" ]; then
       echo "change ${ETH} <=> eth${IDX}"

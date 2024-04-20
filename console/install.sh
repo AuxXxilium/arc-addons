@@ -16,6 +16,7 @@ if [ "${1}" = "modules" ]; then
       /usr/sbin/modprobe ${M}
     done
   fi
+  /usr/sbin/modprobe fb
   /usr/sbin/modprobe fbcon
   echo "Arc console - wait..." >/dev/tty1
   # Workaround for DVA1622
@@ -61,7 +62,7 @@ elif [ "${1}" = "late" ]; then
   echo "[Service]"                                                                                  >>${DEST}
   echo "Type=oneshot"                                                                               >>${DEST}
   echo "RemainAfterExit=yes"                                                                        >>${DEST}
-  echo "ExecStart=/usr/bin/loadkeys /usr/share/keymaps/i386/${LAYOUT:-qwertz}/${KEYMAP:-de}.map.gz" >>${DEST}
+  echo "ExecStart=/usr/bin/loadkeys /usr/share/keymaps/i386/${LAYOUT:-qwerty}/${KEYMAP:-us}.map.gz" >>${DEST}
   echo                                                                                              >>${DEST}
   echo "[Install]"                                                                                  >>${DEST}
   echo "WantedBy=multi-user.target"                                                                 >>${DEST}

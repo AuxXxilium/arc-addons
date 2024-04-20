@@ -84,11 +84,11 @@ fi
 
 echo "CPU Info set to: \"${VENDOR}\" \"${FAMILY}\" \"${SERIES}\" \"${CORES}\" \"${SPEED}\""
 
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_clock_speed/\1${SPEED}/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_clock_speed/\1${SPEED//\"/}/g" "${FILE_JS}"
 
 if [ -f "${FILE_GZ}.bak" ]; then
   gzip -c "${FILE_JS}" >"${FILE_GZ}"

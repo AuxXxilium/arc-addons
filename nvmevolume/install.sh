@@ -1,4 +1,6 @@
-#!/usr/bin/env ash
+#!/usr/bin/env bash
+#
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # From: https://github.com/PeterSuh-Q3/tcrp-addons/blob/main/nvmevolume-onthefly/src/install.sh
 #

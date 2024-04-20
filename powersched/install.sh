@@ -1,4 +1,10 @@
 #!/usr/bin/env ash
+#
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
 
 if [ "${1}" = "late" ]; then
   echo "Installing addon powersched - ${1}"
@@ -13,7 +19,7 @@ if [ "${1}" = "late" ]; then
   SED_PATH='/tmpRoot/usr/bin/sed'
   ${SED_PATH} -i '/\/usr\/sbin\/powersched/d' /tmpRoot/etc/crontab
   # Add line to crontab, execute each minute
-  echo "*       *       *       *       *       root    /usr/sbin/powersched #arc powersched addon" >>/tmpRoot/etc/crontab
+  echo "*       *       *       *       *       root    /usr/sbin/powersched #arpl powersched addon" >>/tmpRoot/etc/crontab
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon powersched - ${1}"
 

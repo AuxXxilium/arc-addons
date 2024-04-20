@@ -1,4 +1,10 @@
 #!/usr/bin/env ash
+#
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
 
 if [ "${1}" = "late" ]; then
   echo "Installing addon notify - ${1}"
@@ -10,7 +16,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/notify.service"
   echo "[Unit]"                                          >${DEST}
-  echo "Description=Arc Notification"                   >>${DEST}
+  echo "Description=Arc notify"                         >>${DEST}
   echo "After=multi-user.target"                        >>${DEST}
   echo                                                  >>${DEST}
   echo "[Service]"                                      >>${DEST}

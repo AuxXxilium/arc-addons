@@ -6,19 +6,13 @@
 # See /LICENSE for more information.
 #
 
-# DSM version
-MajorVersion=$(/bin/get_key_value /etc.defaults/VERSION majorversion)
-MinorVersion=$(/bin/get_key_value /etc.defaults/VERSION minorversion)
-
-echo "eudev: MajorVersion:${MajorVersion} MinorVersion:${MinorVersion}"
-
-if [ "${1}" = "modules" ]; then
+if [ "${1}" = "early" ]; then
   echo "Installing addon eudev - ${1}"
-  if [ "${MinorVersion}" -lt "2" ]; then # < 2
-    tar zxf /addons/eudev-7.1.tgz -C /
-  else
-    tar zxf /addons/eudev-7.2.tgz -C /
-  fi
+  tar zxf /addons/eudev-7.1.tgz -C /
+
+elif [ "${1}" = "modules" ]; then
+  echo "Installing addon eudev - ${1}"
+
   # mv -f /usr/lib/udev/rules.d/60-persistent-storage.rules /usr/lib/udev/rules.d/60-persistent-storage.rules.bak
   # mv -f /usr/lib/udev/rules.d/60-persistent-storage-tape.rules /usr/lib/udev/rules.d/60-persistent-storage-tape.rules.bak
   # mv -f /usr/lib/udev/rules.d/80-net-name-slot.rules /usr/lib/udev/rules.d/80-net-name-slot.rules.bak
@@ -55,14 +49,14 @@ elif [ "${1}" = "late" ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/cp -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     else
-      echo "Custom Kernel - backup modules."
+      echo "Custom - backup modules."
       /tmpRoot/bin/cp -rf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
     fi
     /tmpRoot/bin/cp -rf /usr/lib/modules/* /tmpRoot/usr/lib/modules
     echo "true" >/tmp/modulesChange
   else
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
-      echo "Official Kernel - restore modules from backup."
+      echo "Custom - restore modules from backup."
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
@@ -84,20 +78,18 @@ elif [ "${1}" = "late" ]; then
   isChange="$(cat /tmp/modulesChange 2>/dev/null || echo "false")"
   echo "isChange: ${isChange}"
   [ "${isChange}" = "true" ] && /usr/sbin/depmod -a -b /tmpRoot
-  
+
+  # Restore kvm module
   /usr/sbin/insmod /usr/lib/modules/irqbypass.ko || true
   /usr/sbin/insmod /usr/lib/modules/kvm.ko || true
-  /usr/sbin/insmod /usr/lib/modules/kvm-intel.ko || true  # kvm-intel.ko
-  /usr/sbin/insmod /usr/lib/modules/kvm-amd.ko || true  # kvm-amd.ko
+  /usr/sbin/insmod /usr/lib/modules/kvm-intel.ko || true # kvm-intel.ko
+  /usr/sbin/insmod /usr/lib/modules/kvm-amd.ko || true   # kvm-amd.ko
 
-  echo "eudev: copy Rules"
-  cp -rf /usr/lib/udev/rules.d/* /tmpRoot/usr/lib/udev/rules.d
-  #echo "eudev: copy HWDB"
-  #mkdir -p /tmpRoot/etc/udev/hwdb.d
-  #cp -rf /etc/udev/hwdb.d/* /tmpRoot/etc/udev/hwdb.d
-  
+  echo "Copy rules"
+  cp -vf /usr/lib/udev/rules.d/* /tmpRoot/usr/lib/udev/rules.d/
+
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/lib/systemd/system/udevrules.service"
+  DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
   echo "[Unit]"                                                                  >${DEST}
   echo "Description=Reload udev rules"                                          >>${DEST}
   echo                                                                          >>${DEST}
@@ -110,6 +102,6 @@ elif [ "${1}" = "late" ]; then
   echo "[Install]"                                                              >>${DEST}
   echo "WantedBy=multi-user.target"                                             >>${DEST}
 
-  mkdir -vp /tmpRoot/lib/systemd/system/multi-user.target.wants
-  ln -vsf /lib/systemd/system/udevrules.service /tmpRoot/lib/systemd/system/multi-user.target.wants/udevrules.service
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/udevrules.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/udevrules.service
 fi
