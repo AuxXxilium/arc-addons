@@ -1,6 +1,6 @@
 version: 1
 name: bootwait
-description: "Boot process waits until boot device (`/dev/synoboot`) is available before other processes start launching."
+description: "Boot process waits until boot device (`/dev/synoboot`) and PCIe Device are available."
 system: false
 beta: false
 all:
