@@ -1,6 +1,6 @@
 version: 1
 name: remotefs
-description: "This patch will allow remote NFS/CIFS shared folder be used in VideoStation, AudioStation and Photos etc."
+description: "Allow remote NFS/CIFS shared folder be used in VideoStation, AudioStation and Photos etc."
 system: false
 beta: true
 all:
