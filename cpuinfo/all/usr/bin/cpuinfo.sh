@@ -29,42 +29,63 @@ restoreCpuinfo() {
   fi
 }
 
-for O in "$@"; do
-  case ${O} in
-  --vendor=*)
-    VENDOR="${O#*=}"
-    ;;
-  --family=*)
-    FAMILY="${O#*=}"
-    ;;
-  --series=*)
-    SERIES="${O#*=}"
-    ;;
-  --cores=*)
-    CORES="${O#*=}"
-    ;;
-  --speed=*)
-    SPEED="${O#*=}"
-    ;;
-  -r)
-    restoreCpuinfo
-    exit 0
-    ;;
-  *)
-    echo "[$O] is not a valid option"
-    echo "Usage: cpuinfo.sh [OPTIONS]"
-    echo "Options:"
-    echo "  --vendor=<VENDOR>   Set the CPU vendor"
-    echo "  --family=<FAMILY>   Set the CPU family"
-    echo "  --series=<SERIES>   Set the CPU series"
-    echo "  --cores=<CORES>     Set the number of CPU cores"
-    echo "  --speed=<SPEED>     Set the CPU clock speed"
-    echo "  -r                  Restore the original cpuinfo"
-    echo "  *                   Show this help message and exit"
-    exit 0
-    ;;
-  esac
-done
+if options="$(getopt -o v:f:s:c:p:rh --long vendor:,family:,series:,cores:,speed:,restore,help -- "$@")"; then
+  eval set -- "$options"
+  while true; do
+    case "${1,,}" in
+    -v | --vendor)
+      VENDOR="${2}"
+      shift 2
+      ;;
+    -f | --family)
+      FAMILY="${2}"
+      shift 2
+      ;;
+    -s | --series)
+      SERIES="${2}"
+      shift 2
+      ;;
+    -c | --cores)
+      CORES="${2}"
+      shift 2
+      ;;
+    -p | --speed)
+      SPEED="${2}"
+      shift 2
+      ;;
+    -r | --restore)
+      restoreCpuinfo
+      exit 0
+      ;;
+    -h | --help)
+      echo "Usage: cpuinfo.sh [OPTIONS]"
+      echo "Options:"
+      echo "  -v, --vendor <VENDOR>   Set the CPU vendor"
+      echo "  -f, --family <FAMILY>   Set the CPU family"
+      echo "  -s, --series <SERIES>   Set the CPU series"
+      echo "  -c, --cores <CORES>     Set the number of CPU cores"
+      echo "  -p, --speed <SPEED>     Set the CPU clock speed"
+      echo "  -r, --restore           Restore the original cpuinfo"
+      echo "  -h, --help              Show this help message and exit"
+      echo "Example:"
+      echo "  cpuinfo.sh -v \"AMD\" -f \"Ryzen\" -s \"Ryzen 7 5800X3D\" -c 64 -p 5200"
+      echo "  cpuinfo.sh --vendor \"Intel\" --family \"Core i9\" --series \"i7-13900ks\" --cores 64 --speed 5200"
+      echo "  cpuinfo.sh --restore"
+      echo "  cpuinfo.sh --help"
+      exit 0
+      ;;
+    --)
+      break
+      ;;
+    *)
+      echo "Invalid option: $OPTARG" >&2
+      ;;
+    esac
+  done
+else
+  echo "getopt error"
+  exit 1
+fi
 
 CORES="${CORES:-1}"
 SPEED="${SPEED:-0}"
