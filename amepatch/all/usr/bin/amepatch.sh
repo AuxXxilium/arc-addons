@@ -1,9 +1,6 @@
-#!/bin/ash
+#!/usr/bin/env bash
 
 if [ -d /var/packages/CodecPack ]; then
-    /usr/syno/bin/synopkg stop CodecPack
-    sleep 10
-
     . /etc.defaults/VERSION
 
     values=('669066909066906690' 'B801000000' '30')
@@ -57,25 +54,22 @@ if [ -d /var/packages/CodecPack ]; then
     rm -f "${lic}"
     echo "${content}" >"${lic}"
 
-	if /var/packages/CodecPack/target/usr/bin/synoame-bin-check-license; then
-        /var/packages/CodecPack/target/usr/bin/synoame-bin-auto-install-needed-codecs
+	if "$cp_usr_path/bin/synoame-bin-check-license"; then
+        "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"
         echo -e "AME Patch: Successful!"
     else
         if [ -f "$so_backup" ]; then
-            mv "$so_backup" "$so"
+            mv -f "$so_backup" "$so"
         fi
         if [ -f "$lic_backup" ]; then
-            mv "$lic_backup" "$lic"
+            mv -f "$lic_backup" "$lic"
         fi
         if [ -f "$licsig_backup" ]; then
-            mv "$licsig_backup" "$licsig"
+            mv -f "$licsig_backup" "$licsig"
         fi
         echo -e "AME Patch: Unsuccessful!"
         exit 1
    	fi
-
-    sleep 5
-    /usr/syno/bin/synopkg start CodecPack
 fi
 
 exit 0
