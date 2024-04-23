@@ -1,6 +1,6 @@
 #!/bin/ash
 
-if [ -d "/var/packages/CodecPack" ]; then
+if [ -d /var/packages/CodecPack ]; then
     /usr/syno/bin/synopkg stop CodecPack
     sleep 10
 
