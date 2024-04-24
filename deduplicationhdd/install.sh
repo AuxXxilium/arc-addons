@@ -2,7 +2,7 @@
 
 if [ "${1}" = "late" ]; then
   echo "Creating service to exec deduplicationhdd"
-  cp -vf /usr/sbin/deduplicationhdd.sh /tmpRoot/usr/sbin/deduplicationhdd.sh
+  cp -vf /usr/bin/deduplicationhdd.sh /tmpRoot/usr/bin/deduplicationhdd.sh
   
   DEST="/tmpRoot/usr/lib/systemd/system/deduplicationhdd.service"
   echo "[Unit]"                                                                >${DEST}
@@ -16,12 +16,12 @@ if [ "${1}" = "late" ]; then
   echo "[Install]"                                                            >>${DEST}
   echo "WantedBy=multi-user.target"                                           >>${DEST}
 
-  mkdir -vp /tmpRoot/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/deduplicationhdd.service /tmpRoot/lib/systemd/system/multi-user.target.wants/deduplicationhdd.service
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/deduplicationhdd.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/deduplicationhdd.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon deduplicationhdd - ${1}"
 
-  rm -f "/tmpRoot/lib/systemd/system/multi-user.target.wants/deduplicationhdd.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/deduplicationhdd.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/deduplicationhdd.service"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
