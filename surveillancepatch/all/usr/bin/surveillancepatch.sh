@@ -1,16 +1,11 @@
 #!/usr/bin/env bash
 
-SSPATH="/var/packages/SurveillanceStation"
-
-if [ -d "${SSPATH}" ]; then
-    
+if [ -d /var/packages/SurveillanceStation ]; then
+    SSPATH="/var/packages/SurveillanceStation"
     PATHROOT="${SSPATH}/target"
     PATHLIB="${PATHROOT}/lib"
     PATHSCRIPTS="${PATHROOT}/scripts"
     SPATCH="/usr/lib"
-
-    /usr/syno/bin/synopkg stop SurveillanceStation
-    sleep 20
 
     rm -f "${PATHLIB}/libssutils.so"
     cp -f "${SPATCH}/libssutils.so" "${PATHLIB}/libssutils.so"
@@ -28,10 +23,6 @@ if [ -d "${SSPATH}" ]; then
     chmod 0777 "${PATHSCRIPTS}/license.sh"
 
     echo -e "Surveillance Patch: Successfull!"
-
-    sleep 5
-    /usr/syno/bin/synopkg start SurveillanceStation
-
 fi
 
 exit 0
