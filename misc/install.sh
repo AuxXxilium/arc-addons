@@ -206,23 +206,4 @@ elif [ "${1}" = "late" ]; then
   else
     echo "synosystemd.conf does not exist."
   fi
-
-  # Disable NVMe resetting hibernation timer - https://www.reddit.com/r/synology/comments/129lzjg/fixing_hdd_hibernation_when_you_have_docker_on/
-  matches_hiber_nvme=$(xxd -p /tmpRoot/usr/syno/bin/scemd | sed ':a;N;$!ba;s/\n//g' | grep -o '4889eebf0100000048890424e8bfd1feff4889eebf0200000089c3e8b0d1feff4889eebf07000000e8a3d1feff85db' | wc -l)
-  if [ "${matches_hiber_nvme}" == "1" ]; then
-    [ ! -f /tmpRoot/usr/syno/bin/scemd.syno ] && cp /tmpRoot/usr/syno/bin/scemd /tmpRoot/usr/syno/bin/scemd.syno
-    xxd -p /tmpRoot/usr/syno/bin/scemd | sed ':a;N;$!ba;s/\n//g' | sed 's/4889eebf0100000048890424e8bfd1feff4889eebf0200000089c3e8b0d1feff4889eebf07000000e8a3d1feff85db/4889eebf0100000048890424e8bfd1feff4889eebf0200000089c3e8b0d1feff4889eebf0b000000e8a3d1feff85db/' | xxd -r -p - /tmpRoot/usr/syno/bin/scemd
-  fi
-  # Fix SMART check waking up SATA disks - https://www.reddit.com/r/synology/comments/129lzjg/fixing_hdd_hibernation_when_you_have_docker_on/
-  matches_hiber_smart=$(xxd -p /tmpRoot/usr/syno/sbin/synostoraged | sed ':a;N;$!ba;s/\n//g' | grep -o '4889debf03000000e82778ffff85c00f886f0100004889debf07000000e81278ffff85c00f88300100004889debf0b000000e8' | wc -l)
-  if [ "${matches_hiber_smart}" == "1" ]; then
-    [ ! -f /tmpRoot/usr/syno/sbin/synostoraged.syno ] && cp /tmpRoot/usr/syno/sbin/synostoraged /tmpRoot/usr/syno/sbin/synostoraged.syno
-    xxd -p /tmpRoot/usr/syno/sbin/synostoraged | sed ':a;N;$!ba;s/\n//g' | sed 's/4889debf03000000e82778ffff85c00f886f0100004889debf07000000e81278ffff85c00f88300100004889debf0b000000e8/4889debf03000000e82778ffff85c00f886f010000eb13debf07000000e81278ffff85c00f88300100004889debf0b000000e8/' | xxd -r -p - /tmpRoot/usr/syno/sbin/synostoraged
-  fi
-  # Suppress "system partion failure" warning
-  matches_sys_fail=$(xxd -p /tmpRoot/usr/lib/libhwcontrol.so.1 | sed ':a;N;$!ba;s/\n//g' | grep -o '73797374656d5f6372617368656400' | wc -l)
-  if [ "${matches_sys_fail}" == "1" ]; then
-    [ ! -f /tmpRoot/usr/lib/libhwcontrol.so.1.syno ] && cp /tmpRoot/usr/lib/libhwcontrol.so.1 /tmpRoot/usr/lib/libhwcontrol.so.1.syno
-    xxd -p /tmpRoot/usr/lib/libhwcontrol.so.1 | sed ':a;N;$!ba;s/\n//g' | sed 's/73797374656d5f6372617368656400/6e6f726d616c006372617368656400/' | xxd -r -p - /tmpRoot/usr/lib/libhwcontrol.so.1
-  fi
 fi

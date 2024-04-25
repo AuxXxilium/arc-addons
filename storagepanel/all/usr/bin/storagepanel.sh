@@ -30,9 +30,6 @@
 # $2 ?
 #  (row)X(column)    # default: 1X8
 
-HDD_BAY="${1:-RACK_24_Bay}"
-SSD_BAY="${2:-1X8}"
-
 HDD_BAY_LIST=(RACK_0_Bay RACK_2_Bay RACK_4_Bay RACK_8_Bay RACK_10_Bay RACK_12_Bay RACK_12_Bay_2 RACK_16_Bay RACK_20_Bay RACK_24_Bay RACK_60_Bay
   TOWER_1_Bay TOWER_2_Bay TOWER_4_Bay TOWER_4_Bay_J TOWER_4_Bay_S TOWER_5_Bay TOWER_6_Bay TOWER_8_Bay TOWER_12_Bay)
 
@@ -49,7 +46,7 @@ FILE_GZ="${FILE_JS}.gz"
 
 [ ! -f "${FILE_GZ}" ] && echo "${FILE_GZ} file does not exist" && exit 0
 
-if [ "${HDD_BAY}" = "-r" ]; then
+if [ "${1}" = "-r" ]; then
   if [ -f "${FILE_GZ}.bak" ]; then
     mv -f "${FILE_GZ}.bak" "${FILE_GZ}"
     gzip -dc "${FILE_GZ}" >"${FILE_JS}"
@@ -57,14 +54,33 @@ if [ "${HDD_BAY}" = "-r" ]; then
   exit
 fi
 
-if ! echo "${HDD_BAY_LIST[@]}" | grep -wq "${HDD_BAY}"; then
-  echo "parameter 1 error"
-  exit
+HDD_BAY="${1}"
+if [ -n "${1}" ] && ! echo "${HDD_BAY_LIST[@]}" | grep -wq "${1}"; then
+  echo "storagepanel: parameter 1 error"
+  HDD_BAY=""
 fi
 
-if [ -z "$(echo ${SSD_BAY} | sed -n '/^[0-9]\{1,2\}X[0-9]\{1,2\}$/p')" ]; then
-  echo "parameter 2 error"
-  exit
+SSD_BAY="${2}"
+if [ -n "${2}" ] && [ -z "$(echo "${2}" | sed -n '/^[0-9]\{1,2\}X[0-9]\{1,2\}$/p')" ]; then
+  echo "storagepanel: parameter 2 error"
+  SSD_BAY=""
+fi
+
+if [ -z "${HDD_BAY}" ]; then
+  IDX="$(echo $(synodisk --enum -t internal 2>/dev/null | grep "Disk id:" | tail -n 1 | cut -d: -f2))"
+  IDX=${IDX:-0}
+  while [ "${IDX}" -le 60 ]; do
+    for i in "${HDD_BAY_LIST[@]}"; do
+      echo "${i}" | grep -q "_${IDX}_" && HDD_BAY="${i}" && break 2
+    done
+    IDX=$((IDX + 1))
+  done
+  HDD_BAY=${HDD_BAY:-RACK_60_Bay}
+fi
+
+if [ -z "${SSD_BAY}" ]; then
+  IDX="$(echo $(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | tail -n 1 | cut -d: -f2))"
+  SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
 fi
 
 [ ! -f "${FILE_GZ}.bak" ] && cp -f "${FILE_GZ}" "${FILE_GZ}.bak"

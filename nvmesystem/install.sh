@@ -34,7 +34,7 @@ elif [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  # disk/shared_disk_info_enum.c::84 Failed to allocate list in SharedDiskInfoEnum, earcno=0x900.
+  # disk/shared_disk_info_enum.c::84 Failed to allocate list in SharedDiskInfoEnum, errno=0x900.
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [ ! -f "${SO_FILE}.bak" ] && cp -vf "${SO_FILE}" "${SO_FILE}.bak"
 
@@ -54,7 +54,7 @@ elif [ "${1}" = "late" ]; then
   echo "[Unit]"                                          >${DEST}
   echo "Description=Modify storage panel"               >>${DEST}
   echo "After=multi-user.target"                        >>${DEST}
-  echo "Wants=storagepanel.service"                     >>${DEST}  # storagepanel
+  echo "After=synoscgi.service"                         >>${DEST}
   echo "After=storagepanel.service"                     >>${DEST}  # storagepanel
   echo                                                  >>${DEST}
   echo "[Service]"                                      >>${DEST}
@@ -68,6 +68,19 @@ elif [ "${1}" = "late" ]; then
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/nvmesystem.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmesystem.service
 
+  # A bug in the custom kernel, the reason for which is currently unknown
+  if cat /proc/version 2>/dev/null | grep -q 'RR@RR'; then
+    ONBOOTUP=""
+    ONBOOTUP="${ONBOOTUP}systemctl restart systemd-udev-trigger.service\n"
+    ONBOOTUP="${ONBOOTUP}echo \"DELETE FROM task WHERE task_name LIKE ''ARCONBOOTUPARC_UDEV'';\" | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db\n"
+    echo "insert reboottoloader task to esynoscheduler.db"
+    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+DELETE FROM task WHERE task_name LIKE 'ARCONBOOTUPARC_UDEV';
+INSERT INTO task VALUES('ARCONBOOTUPARC_UDEV', '', 'bootup', '', 1, 0, 0, 0, '', 0, '$(echo -e ${ONBOOTUP})', 'script', '{}', '', '', '{}', '{}');
+EOF
+  fi
+
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon nvmesystem - ${1}"
 
@@ -76,8 +89,8 @@ elif [ "${1}" = "uninstall" ]; then
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmesystem.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
-  
-  # rm -f /tmpRoot/usr/bin/gzip 
+
+  # rm -f /tmpRoot/usr/bin/gzip
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/nvmesystem.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/nvmesystem.sh" >>/tmpRoot/usr/arc/revert.sh
