@@ -76,7 +76,7 @@ EOF
 
   # error message
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
-    sed -i 's/c("welcome","desc_install")/"Error: The bootloader disk is not successfully mounted, the installation will fail."/' /usr/syno/web/main.js
+    sed -i 's/c("welcome","desc_install")/"Error: The Bootloader Disk is not successfully mounted! The Installation will fail!!!"/' /usr/syno/web/main.js
   fi
 
   # recovery.cgi
@@ -177,6 +177,10 @@ elif [ "${1}" = "late" ]; then
   if [ -d /var/packages/open-vm-tools ]; then
     sed -i 's/package/root/g' /var/packages/open-vm-tools/conf/privilege
   fi
+
+  # Service
+  SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
+  sed -i  's|ExecStart=/|ExecStart=-/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service
 
   # Network
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
