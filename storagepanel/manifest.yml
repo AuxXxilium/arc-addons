@@ -1,6 +1,6 @@
 version: 1
 name: storagepanel
-description: "Modify storage panel (default: RACK_24_Bay 1X8)"
+description: "Automated Storagepanel modification"
 system: false
 beta: false
 all:
