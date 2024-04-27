@@ -12,7 +12,7 @@ if [ "${1}" = "late" ]; then
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
   cp -vf /usr/bin/pup /tmpRoot/usr/bin/pup
-  cp -vf /usr/bin/arc-updatenotify.sh /tmpRoot/usr/bin/arc-updatenotify.sh
+  cp -vf /usr/bin/updatenotify.sh /tmpRoot/usr/bin/updatenotify.sh
 
   FILE_PATH="/tmpRoot/usr/syno/etc/synoschedule.d/root"
   mkdir -p "${FILE_PATH}"
@@ -36,7 +36,7 @@ can edit owner=1
 can delete from ui=1
 edit dialog=SYNO.SDS.TaskScheduler.EditDialog
 type=daily
-action=#common:run#: /usr/bin/arc-updatenotify.sh
+action=#common:run#: /usr/bin/updatenotify.sh
 systemd slice=
 monthly week=0
 can edit from ui=1
@@ -50,7 +50,7 @@ repeat hour store config=[8,9,10,11,12,13,14,15,16,17,18,19,20]
 simple edit form=1
 repeat hour=8
 listable=1
-app args={"notify_enable":false,"notify_if_error":false,"notify_mail":"","script":"/usr/bin/arc-updatenotify.sh"} 
+app args={"notify_enable":false,"notify_if_error":false,"notify_mail":"","script":"/usr/bin/updatenotify.sh"} 
 state=enabled
 can run task same time=0
 start day=0
@@ -70,12 +70,12 @@ EOF
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon mountloader - ${1}"
 
-  rm -f "/tmpRoot/usr/bin/arc-updatenotify.sh"
+  rm -f "/tmpRoot/usr/bin/updatenotify.sh"
 
   FILE_PATH="/tmpRoot/usr/syno/etc/synoschedule.d/root"
   if [ -f "${FILE_PATH}/999.task" ]; then
     NAME="$(cat "${FILE_PATH}/999.task" | grep '^name=' | cut -d'=' -f2)"
-    if [ "${NAME}" = "Arc-UpdateNotify" ]; then
+    if [ "${NAME}" = "UpdateNotify" ]; then
       rm -f "${FILE_PATH}/999.task"
     fi
   fi
