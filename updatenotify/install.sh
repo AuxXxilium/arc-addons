@@ -18,7 +18,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "${FILE_PATH}"
   if [ -f "${FILE_PATH}/999.task" ]; then
     NAME="$(cat "${FILE_PATH}/999.task" | grep '^name=' | cut -d'=' -f2)"
-    if [ "${NAME}" = "arc-UpdateNotify" ]; then
+    if [ "${NAME}" = "UpdateNotify" ]; then
       echo "Existence tasks"
       exit
     else
