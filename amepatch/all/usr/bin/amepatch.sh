@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 
-if [ -d /var/packages/CodecPack ]; then
+if [[ -d /var/packages/CodecPack || -d /volume1/@appstore/CodecPack ]]; then
+
+    [ -d "/var/packages/CodecPack/target/apparmor" ] && apparmor="/var/packages/CodecPack/target/apparmor"
+    [ -d "/volume1/@appstore/CodecPack/apparmor" ] && apparmor="/volume1/@appstore/CodecPack/apparmor"
+    /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
+    # disable apparmor check for AME
+    if [ -e "${apparmor}" ]; then
+        mv -f "${apparmor}" "${apparmor}.bak"
+    fi
+
     . /etc.defaults/VERSION
 
     values=('669066909066906690' 'B801000000' '30')
