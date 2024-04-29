@@ -6,7 +6,18 @@
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "modules" ]; then
+PLATFORMS="apollolake geminilake epyc7002"
+PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
+if ! echo "${PLATFORM}" | grep -qw "${PLATFORM}"; then
+  echo "${PLATFORM} is not supported console addon!"
+  exit 0
+fi
+
+if [ "${1}" = "early" ]; then
+  echo "Installing addon console - ${1}"
+  tar zxf /addons/console-7.1.tgz -C /usr/
+
+elif [ "${1}" = "modules" ]; then
   echo "Installing addon console - ${1}"
   if [ -n "${2}" ]; then
     /usr/sbin/modprobe ${2}
@@ -43,16 +54,14 @@ elif [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  SED_PATH='/tmpRoot/usr/bin/sed'
+  tar zxf /addons/console-7.1.tgz -C /tmpRoot/usr/
   # run when boot installed DSM
+  echo -e "DSM mode\n" >/tmpRoot/etc/issue
   cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@.service
-  ${SED_PATH} -i 's|^ExecStart=.*|ExecStart=-/sbin/agetty %I 115200 linux|' /tmpRoot/usr/lib/systemd/system/getty\@.service
+  sed -i 's|^ExecStart=.*|ExecStart=-/sbin/agetty %I 115200 linux|' /tmpRoot/usr/lib/systemd/system/getty\@.service
   mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
   ln -vsf /usr/lib/systemd/system/getty\@.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@tty1.service
-  echo -e "DSM mode\n" >/tmpRoot/etc/issue
-  cp -vfR /usr/share/keymaps /tmpRoot/usr/share/
-  cp -fv /usr/bin/loadkeys /tmpRoot/usr/bin/
-  cp -fv /usr/bin/setleds /tmpRoot/usr/bin/
+
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/keymap.service"
   echo "[Unit]"                                                                                      >${DEST}
@@ -83,7 +92,11 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/keymap.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/keymap.service"
 
+  rm -rf /tmpRoot/usr/share/consolefonts
   rm -rf /tmpRoot/usr/share/keymaps
+  rm -f /tmpRoot/usr/bin/chvt
+  rm -f /tmpRoot/usr/bin/deallocvt
   rm -f /tmpRoot/usr/bin/loadkeys
   rm -f /tmpRoot/usr/bin/setleds
+  rm -f /tmpRoot/usr/bin/ioctl
 fi

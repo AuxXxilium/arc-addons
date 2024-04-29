@@ -1,19 +1,19 @@
 version: 1
 name: console
-description: "Give a screen console via framebuffer (can cause Kernel Panic)"
+description: "Give a onscreen console via framebuffer"
 system: false
 beta: true
 all:
   install-script: "install.sh"
   copy: "all"
 apollolake: true
-broadwell: true
-broadwellnk: true
-broadwellnkv2: true
-broadwellntbap: true
-denverton: true
+broadwell: false
+broadwellnk: false
+broadwellnkv2: false
+broadwellntbap: false
+denverton: false
 geminilake: true
-purley: true
-v1000: true
-r1000: true
+purley: false
+v1000: false
+r1000: false
 epyc7002: true
