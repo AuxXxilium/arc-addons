@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-LOCALTAG="$(cat /addons/addons.sh 2>/dev/null | grep LOADERVERSION | cut -d'=' -f2)"
+LOCALTAG="$(cat /usr/arc/VERSION 2>/dev/null | grep LOADERVERSION | cut -d'=' -f2)"
 if [ -z "${LOCALTAG}" ]; then
   echo "Unknown bootloader version!"
   exit 0
