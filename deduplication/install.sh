@@ -11,7 +11,7 @@ if [ "${1}" = "late" ]; then
   echo "[Service]"                                                            >>${DEST}
   echo "Type=oneshot"                                                         >>${DEST}
   echo "RemainAfterExit=yes"                                                  >>${DEST}
-  echo "ExecStart=/usr/bin/deduplication.sh --tiny -e"                        >>${DEST}
+  echo "ExecStart=/usr/bin/deduplication.sh --tiny --hdd"                     >>${DEST}
   echo                                                                        >>${DEST}
   echo "[Install]"                                                            >>${DEST}
   echo "WantedBy=multi-user.target"                                           >>${DEST}
