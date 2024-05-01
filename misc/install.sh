@@ -210,4 +210,8 @@ elif [ "${1}" = "late" ]; then
   else
     echo "synosystemd.conf does not exist."
   fi
+
+  # copy loader-reboot.sh
+  cp -vf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin
+  cp -vf /usr/bin/grub-editenv /tmpRoot/usr/bin
 fi
