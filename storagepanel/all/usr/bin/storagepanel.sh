@@ -32,6 +32,7 @@
 
 HDD_BAY_LIST=(RACK_0_Bay RACK_2_Bay RACK_4_Bay RACK_8_Bay RACK_10_Bay RACK_12_Bay RACK_12_Bay_2 RACK_16_Bay RACK_20_Bay RACK_24_Bay RACK_60_Bay
   TOWER_1_Bay TOWER_2_Bay TOWER_4_Bay TOWER_4_Bay_J TOWER_4_Bay_S TOWER_5_Bay TOWER_6_Bay TOWER_8_Bay TOWER_12_Bay)
+SSD_BAY_LIST=(1X0 1X2 1X4 1X8)
 
 _UNIQUE="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique)"
 _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
@@ -80,7 +81,14 @@ fi
 
 if [ -z "${SSD_BAY}" ]; then
   IDX="$(echo $(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | tail -n 1 | cut -d: -f2))"
-  SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
+  IDX=${IDX:-0}
+  while [ "${IDX}" -le 8 ]; do
+    for i in "${SSD_BAY_LIST[@]}"; do
+      echo "${i}" | grep -q "1X${IDX}" && SSD_BAY="${i}" && break 2
+    done
+    IDX=$((IDX + 1))
+  done
+  SSD_BAY=${SSD_BAY:-1X8}
 fi
 
 [ ! -f "${FILE_GZ}.bak" ] && cp -f "${FILE_GZ}" "${FILE_GZ}.bak"
