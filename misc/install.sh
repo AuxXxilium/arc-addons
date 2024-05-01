@@ -178,6 +178,14 @@ elif [ "${1}" = "late" ]; then
     sed -i 's/package/root/g' /var/packages/open-vm-tools/conf/privilege
   fi
 
+  # Qemu-Guest-Agent-Fix
+  if [ -d /tmpRoot/var/packages/qemu-ga ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege
+  fi
+  if [ -d /var/packages/qemu-ga ]; then
+    sed -i 's/package/root/g' /var/packages/qemu-ga/conf/privilege
+  fi
+
   # Service
   SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
   sed -i  's|ExecStart=/|ExecStart=-/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service
