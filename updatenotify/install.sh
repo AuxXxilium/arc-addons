@@ -42,7 +42,7 @@ monthly week=0
 can edit from ui=1
 week=1111111
 app name=#common:command_line#
-name=Arc-UpdateNotify
+name=UpdateNotify
 can run app same time=1
 owner=0
 repeat min store config=[1]
@@ -68,7 +68,7 @@ cmdArgv=
 EOF
 
 elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon mountloader - ${1}"
+  echo "Installing addon updatenotify - ${1}"
 
   rm -f "/tmpRoot/usr/bin/updatenotify.sh"
 
