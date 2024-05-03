@@ -10,7 +10,10 @@ VENDOR=""                                                                       
 FAMILY=""                                                                                     # str
 SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"       # str
 CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)"                                 # str
-SPEED="$(echo $(grep 'MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | cut -d. -f1))" # int
+# Rereive allowed cpu freq on the system
+IFS=" " read -r -a freqlist <<<"$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies)"
+SPEED="${scalingmaxfreq:=${freqlist[0]}}" # int
+SPEED="${SPEED%000}" # remove trailing zeros
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
