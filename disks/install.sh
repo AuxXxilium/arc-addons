@@ -346,7 +346,7 @@ function nondtModel() {
       IDX=$(_atoi ${I/\/sys\/block\/sd/})
       ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
       [ -n "${ISUSB}" ] && USBPORTCFG=$((${USBPORTCFG} | $((1 << ${IDX}))))
-      if [ -z "${ISUSB}" ] || [ "${2}" = "true"]; then
+      if [ -z "${ISUSB}" ] || [ "${2}" = "true" ]; then
         MAXDISKS=$((${IDX} + 1))
       fi
     done
