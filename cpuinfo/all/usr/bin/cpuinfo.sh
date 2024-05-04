@@ -6,14 +6,18 @@
 # See /LICENSE for more information.
 #
 
-VENDOR=""                                                                                     # str
-FAMILY=""                                                                                     # str
-SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"       # str
-CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)"                                 # str
-# Rereive allowed cpu freq on the system
-IFS=" " read -r -a freqlist <<<"$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies)"
-SPEED="${scalingmaxfreq:=${freqlist[0]}}" # int
-SPEED="${SPEED%000}" # remove trailing zeros
+VENDOR=""
+FAMILY=""
+SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"
+CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)" 
+if [ -z ${CORES} ]; then
+  CORES="$(dmidecode -t processor | grep "Core Count" | head -1 | cut -d: -f2)"
+fi
+SPEED="$(grep 'cpu MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2)"
+SPEED="${SPEED%.*}"
+if [ -z ${SPEED} || ${SPEED} -eq 800 ]; then
+  SPEED="$(dmidecode -t processor | grep "Max Speed" | head -1 | cut -d: -f2 | cut -d ' ' -f2)"
+fi
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
