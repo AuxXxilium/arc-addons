@@ -47,7 +47,7 @@ function _check_rootraidstatus() {
   if [ ! "$(_get_conf_kv supportraid)" = "yes" ]; then
     return 0
   fi
-  STATE=$(cat /sys/block/md0/md/array_state 2>/dev/null)
+  STATE="$(cat /sys/block/md0/md/array_state 2>/dev/null)"
   if [ $? -ne 0 ]; then
     return 1
   fi
@@ -66,7 +66,7 @@ function _atoi() {
   while [ ${IDX} -lt ${#DISKNAME} ]; do
     N=$(($(printf '%d' "'${DISKNAME:${IDX}:1}") - $(printf '%d' "'a") + 1))
     BIT=$((${#DISKNAME} - 1 - ${IDX}))
-    [ ${BIT} -eq 0 ] && NUM=$((${NUM} + ${N})) || NUM=$((${NUM} + 26 ** ${BIT} * ${N}))
+    [ ${BIT} -eq 0 ] && NUM=$((${NUM} + ${N:-0})) || NUM=$((${NUM} + 26 ** ${BIT} * ${N:-0}))
     IDX=$((${IDX} + 1))
   done
   echo $((${NUM} - 1))
@@ -156,9 +156,7 @@ function getUsbPorts() {
 function dtModel() {
   DEST="/addons/model.dts"
   UNIQUE=$(_get_conf_kv unique)
-
   if [ ! -f "${DEST}" ]; then # Users can put their own dts.
-    # Build dts file
     echo "/dts-v1/;" >${DEST}
     echo "/ {" >>${DEST}
     echo "    compatible = \"Synology\";" >>${DEST}
@@ -178,11 +176,9 @@ function dtModel() {
       _set_conf_kv rd "supportnvme" "yes"
       _set_conf_kv rd "support_m2_pool" "yes"
     fi
-
     # SATA ports
     if [ "${1}" = "true" ]; then
       I=1
-      # 106 = SATA
       for P in $(lspci -d ::106 2>/dev/null | cut -d' ' -f1); do
         HOSTNUM=$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l)
         PCIPATH=""
@@ -213,7 +209,6 @@ function dtModel() {
           I=$((${I} + 1))
         done
       done
-      # 100 = SCSI, 104 = RAID, 107 = HBA
       for P in $(lspci -d ::107 2>/dev/null | cut -d' ' -f1) $(lspci -d ::104 2>/dev/null | cut -d' ' -f1) $(lspci -d ::100 2>/dev/null | cut -d' ' -f1); do
         J=1
         while true; do
@@ -282,7 +277,6 @@ function dtModel() {
         COUNT=$((${COUNT} + 1))
       fi
     done
-
     # NVME Count
     NVMEDISKS=$((${COUNT} - 1))
 
@@ -300,11 +294,9 @@ function dtModel() {
       COUNT=$((${COUNT} + 1))
     done
     echo "};" >>${DEST}
+    # USB Count
+    USBDISKS=$((${COUNT} - 1))
   fi
-
-  # USB Count
-  USBDISKS=$((${COUNT} - 1))
-
   # Check for custom MAXDISKS
   if _check_post_k "rd" "maxdisks"; then
     MAXDISKS=$(($(_get_conf_kv maxdisks)))
@@ -340,16 +332,25 @@ function nondtModel() {
     USBPORTCFG=0
     ESATAPORTCFG=0
     INTERNALPORTCFG=0
-    HBA_NUMBER=$(($(lspci -d ::107 2>/dev/null | wc -l) + $(lspci -d ::104 2>/dev/null | wc -l) + $(lspci -d ::100 2>/dev/null | wc -l)))
     
+    hasUSB=false
+    USBMINIDX=20
+    USBMAXIDX=20
     for I in $(ls -d /sys/block/sd* 2>/dev/null); do
       IDX=$(_atoi ${I/\/sys\/block\/sd/})
+      [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
       ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
-      [ -n "${ISUSB}" ] && USBPORTCFG=$((${USBPORTCFG} | $((1 << ${IDX}))))
-      if [ -z "${ISUSB}" ] || [ "${2}" = "true" ]; then
-        MAXDISKS=$((${IDX} + 1))
+      if [ -n "${ISUSB}" ] && [ "${2}" = "true" ]; then
+        ([ ${IDX} -lt ${USBMINIDX} ] || [ "${hasUSB}" = "false" ]) && USBMINIDX=${IDX}
+        ([ ${IDX} -gt ${USBMAXIDX} ] || [ "${hasUSB}" = "false" ]) && USBMAXIDX=${IDX}
+        hasUSB=true
       fi
     done
+
+    USBDISKNUM=$((${USBMAXIDX} - ${USBMINIDX}))
+    [ ${USBDISKNUM} -lt 6 ] && USBDISKNUM=6      # Define 6 is the minimum number of USB disks
+    [ $((${USBMINIDX} + ${USBDISKNUM})) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMINIDX} + ${USBDISKNUM}))
+    USBPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ $((2 ** ${USBMINIDX} - 1))))
 
     # Check for custom MAXDISKS
     if _check_post_k "rd" "maxdisks"; then
@@ -359,17 +360,17 @@ function nondtModel() {
     # Check for custom USBPORTCFG
     if _check_post_k "rd" "usbportcfg"; then
       USBPORTCFG=$(($(_get_conf_kv usbportcfg)))
-      echo "get usbportcfg=${USBPORTCFG}"
+      printf 'get usbportcfg=0x%.2x\n' "${USBPORTCFG}"
     fi
     # Check for custom ESATAPORTCFG
     if _check_post_k "rd" "esataportcfg"; then
       ESATAPORTCFG=$(($(_get_conf_kv esataportcfg)))
-      echo "get esataportcfg=${ESATAPORTCFG}"
+      printf 'get esataportcfg=0x%.2x\n' "${ESATAPORTCFG}"
     fi
     # Check for custom INTERNALPORTCFG
     if _check_post_k "rd" "internalportcfg"; then
       INTERNALPORTCFG=$(($(_get_conf_kv internalportcfg)))
-      echo "get internalportcfg=${INTERNALPORTCFG}"
+      printf 'get internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
     else
       if [ "${2}" = "true" ]; then
         INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
@@ -379,13 +380,13 @@ function nondtModel() {
     fi
     # Set Maxdisks and Portconfig
     _set_conf_kv rd "maxdisks" "${MAXDISKS}"
-    echo "set maxdisks=${MAXDISKS}"
+    printf "set maxdisks=%d\n" "${MAXDISKS}"
     _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
-    echo "set usbportcfg=${USBPORTCFG}"
+    printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
     _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
-    echo "set esataportcfg=${ESATAPORTCFG}"
+    printf 'set esataportcfg=0x%.2x\n' "${ESATAPORTCFG}"
     _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
-    echo "set internalportcfg=${INTERNALPORTCFG}"
+    printf 'set internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   fi
 
   if [ "${1}" = "true" ]; then
@@ -421,11 +422,11 @@ function nondtModel() {
 if [ "${1}" = "patches" ]; then
   echo "Installing addon disks - ${1}"
 
-  BOOTDISK_PART3_PATH=$(blkid -L ARC3 2>/dev/null)
+  BOOTDISK_PART3_PATH="$(blkid -L ARC3 2>/dev/null)"
   [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
   [ -n "${BOOTDISK_PART3_MAJORMINOR}" ] && BOOTDISK_PART3="$(cat /sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent 2>/dev/null | grep 'DEVNAME' | cut -d'=' -f2)" || BOOTDISK_PART3=""
 
-  [ -n "${BOOTDISK_PART3}" ] && BOOTDISK=$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4) || BOOTDISK=""
+  [ -n "${BOOTDISK_PART3}" ] && BOOTDISK="$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4)" || BOOTDISK=""
   [ -n "${BOOTDISK}" ] && BOOTDISK_PHYSDEVPATH="$(cat /sys/block/${BOOTDISK}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" || BOOTDISK_PHYSDEVPATH=""
 
   echo "BOOTDISK=${BOOTDISK}"
