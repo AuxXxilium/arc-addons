@@ -258,8 +258,22 @@ function dtModel() {
         J=$((${J} + 1))
       done
     fi
-    # Maxdisks Count
     MAXDISKS=$((${I} - 1))
+    if _check_post_k "rd" "maxdisks"; then
+      MAXDISKS=$(($(_get_conf_kv maxdisks)))
+      echo "get maxdisks=${MAXDISKS}"
+    else
+      # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
+      # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
+      [ ${MAXDISKS} -lt 26 ] && MAXDISKS=26
+    fi
+    # # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
+    # if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
+    #   MAXDISKS=26
+    #   echo "set maxdisks=26 [${MAXDISKS}]"
+    # fi
+    _set_conf_kv rd "maxdisks" "${MAXDISKS}"
+    echo "maxdisks=${MAXDISKS}"
 
     # NVME ports
     COUNT=1
@@ -277,8 +291,6 @@ function dtModel() {
         COUNT=$((${COUNT} + 1))
       fi
     done
-    # NVME Count
-    NVMEDISKS=$((${COUNT} - 1))
 
     # USB ports
     COUNT=1
@@ -294,63 +306,35 @@ function dtModel() {
       COUNT=$((${COUNT} + 1))
     done
     echo "};" >>${DEST}
-    # USB Count
-    USBDISKS=$((${COUNT} - 1))
   fi
-  # Check for custom MAXDISKS
-  if _check_post_k "rd" "maxdisks"; then
-    MAXDISKS=$(($(_get_conf_kv maxdisks)))
-    echo "get maxdisks=${MAXDISKS}"
-  else
-    [ ${MAXDISKS} -lt 26 ] && MAXDISKS=26
-  fi
-  _set_conf_kv rd "maxdisks" "${MAXDISKS}"
-  echo "maxdisks=${MAXDISKS}"
-
   dtc -I dts -O dtb ${DEST} >/etc/model.dtb
   cp -vf /etc/model.dtb /run/model.dtb
   /usr/syno/bin/syno_slot_mapping
 }
 
 function nondtModel() {
-  if [ "${2}" = "true" ]; then
-    MAXDISKS=26
-    USBPORTCFG=0x00
-    ESATAPORTCFG=0x00
-    INTERNALPORTCFG=0x3ffffff
-    # Set Maxdisks and Portconfig
-    _set_conf_kv rd "maxdisks" "${MAXDISKS}"
-    echo "set maxdisks=${MAXDISKS} (force)"
-    _set_conf_kv rd "usbportcfg" "${USBPORTCFG}"
-    echo "set usbportcfg=${USBPORTCFG} (force)"
-    _set_conf_kv rd "esataportcfg" "${ESATAPORTCFG}"
-    echo "set esataportcfg=${ESATAPORTCFG} (force)"
-    _set_conf_kv rd "internalportcfg" "${INTERNALPORTCFG}"
-    echo "set internalportcfg=${INTERNALPORTCFG} (force)"
-  else
-    MAXDISKS=0
-    USBPORTCFG=0
-    ESATAPORTCFG=0
-    INTERNALPORTCFG=0
-    
-    hasUSB=false
-    USBMINIDX=20
-    USBMAXIDX=20
-    for I in $(ls -d /sys/block/sd* 2>/dev/null); do
-      IDX=$(_atoi ${I/\/sys\/block\/sd/})
-      [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
-      ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
-      if [ -n "${ISUSB}" ]; then
-        ([ ${IDX} -lt ${USBMINIDX} ] || [ "${hasUSB}" = "false" ]) && USBMINIDX=${IDX}
-        ([ ${IDX} -gt ${USBMAXIDX} ] || [ "${hasUSB}" = "false" ]) && USBMAXIDX=${IDX}
-        hasUSB=true
-      fi
-    done
+  MAXDISKS=0
+  USBPORTCFG=0
+  ESATAPORTCFG=0
+  INTERNALPORTCFG=0
 
-    USBDISKNUM=$((${USBMAXIDX} - ${USBMINIDX}))
-    [ ${USBDISKNUM} -lt 6 ] && USBDISKNUM=6      # Define 6 is the minimum number of USB disks
-    [ $((${USBMINIDX} + ${USBDISKNUM})) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMINIDX} + ${USBDISKNUM}))
-    USBPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ $((2 ** ${USBMINIDX} - 1))))
+  hasUSB=false
+  USBMINIDX=20
+  USBMAXIDX=20
+  for I in $(ls -d /sys/block/sd* 2>/dev/null); do
+    IDX=$(_atoi ${I/\/sys\/block\/sd/})
+    [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
+    ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
+    if [ -n "${ISUSB}" ]; then
+      ([ ${IDX} -lt ${USBMINIDX} ] || [ "${hasUSB}" = "false" ]) && USBMINIDX=${IDX}
+      ([ ${IDX} -gt ${USBMAXIDX} ] || [ "${hasUSB}" = "false" ]) && USBMAXIDX=${IDX}
+      hasUSB=true
+    fi
+  done
+
+  USBDISKNUM=$((${USBMAXIDX} - ${USBMINIDX}))
+  [ ${USBDISKNUM} -lt 6 ] && USBDISKNUM=6      # Define 6 is the minimum number of USB disks
+  [ $((${USBMINIDX} + ${USBDISKNUM})) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMINIDX} + ${USBDISKNUM}))
 
   if _check_post_k "rd" "maxdisks"; then
     MAXDISKS=$(($(_get_conf_kv maxdisks)))
@@ -439,7 +423,7 @@ if [ "${1}" = "patches" ]; then
 
   checkSynoboot
 
-  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}" "${3}"
+  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}"
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon disks - ${1}"
@@ -449,6 +433,7 @@ elif [ "${1}" = "late" ]; then
     cp -vf /etc/model.dtb /tmpRoot/etc/model.dtb
     cp -vf /etc/model.dtb /tmpRoot/etc.defaults/model.dtb
   else
+    echo "Adjust maxdisks and internalportcfg automatically"
     # sysfs is unpopulated here, get the values from junior synoinfo.conf
     USBPORTCFG=$(_get_conf_kv usbportcfg)
     ESATAPORTCFG=$(_get_conf_kv esataportcfg)
