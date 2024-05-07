@@ -8,8 +8,8 @@
 
 if [ "${1}" = "late" ]; then
   echo "Installing addon remotefs - ${1}"
-  mkdir -p "/tmpRoot/usr/rr/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/rr/addons/"
+  mkdir -p "/tmpRoot/usr/arc/addons/"
+  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
   SO_FILE="/tmpRoot/usr/lib/libsynosdk.so.7"
   if [ -f "${SO_FILE}" ]; then
