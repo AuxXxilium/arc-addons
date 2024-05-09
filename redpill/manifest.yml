@@ -1,0 +1,9 @@
+version: 1
+name: redpill
+description: "Delay redpill."
+system: true
+beta: false
+all:
+  install-script: "install.sh"
+  copy: ""
+epyc7002: true
