@@ -9,14 +9,14 @@
 VENDOR=""
 FAMILY=""
 SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"
-CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)" 
+CORES="$(dmidecode -t processor | grep "Core Count" | head -1 | cut -d: -f2)"
 if [ -z ${CORES} ]; then
-  CORES="$(dmidecode -t processor | grep "Core Count" | head -1 | cut -d: -f2)"
+  CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)"
 fi
-SPEED="$(grep 'cpu MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2)"
-SPEED="${SPEED%.*}"
-if [ -z ${SPEED} || ${SPEED} -eq 800 ]; then
-  SPEED="$(dmidecode -t processor | grep "Max Speed" | head -1 | cut -d: -f2 | cut -d ' ' -f2)"
+SPEED="$(dmidecode -t processor | grep "Max Speed" | head -1 | cut -d: -f2 | cut -d ' ' -f2)"
+if [ -z ${SPEED} ]; then
+  SPEED="$(grep 'cpu MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2)"
+  SPEED="${SPEED%.*}"
 fi
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
