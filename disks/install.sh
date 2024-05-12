@@ -320,7 +320,7 @@ function nondtModel() {
 
   hasUSB=false
   USBMINIDX=20
-  USBMAXIDX=20
+  USBMAXIDX=26
   for I in $(ls -d /sys/block/sd* 2>/dev/null); do
     IDX=$(_atoi ${I/\/sys\/block\/sd/})
     [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
@@ -332,9 +332,11 @@ function nondtModel() {
     fi
   done
 
-  USBDISKNUM=$((${USBMAXIDX} - ${USBMINIDX}))
-  [ ${USBDISKNUM} -lt 6 ] && USBDISKNUM=6      # Define 6 is the minimum number of USB disks
-  [ $((${USBMINIDX} + ${USBDISKNUM})) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMINIDX} + ${USBDISKNUM}))
+  if [ "${hasUSB}" = "true" ]; then
+    USBDISKNUM=$((${USBMAXIDX} - ${USBMINIDX}))
+    [ ${USBDISKNUM} -lt 6 ] && USBDISKNUM=6      # Define 6 is the minimum number of USB disks
+    [ $((${USBMINIDX} + ${USBDISKNUM})) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMINIDX} + ${USBDISKNUM}))
+  fi
 
   if _check_post_k "rd" "maxdisks"; then
     MAXDISKS=$(($(_get_conf_kv maxdisks)))
