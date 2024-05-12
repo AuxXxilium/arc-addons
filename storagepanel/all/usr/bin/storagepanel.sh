@@ -77,7 +77,7 @@ if [ -z "${HDD_BAY}" ]; then
     IDX=$((IDX + 1))
   done
   if [ ${IDX} -gt 24 ]
-    HDD_BAY=RACK_24_Bay
+    HDD_BAY="RACK_24_Bay"
   fi
   HDD_BAY=${HDD_BAY:-RACK_60_Bay}
 fi
