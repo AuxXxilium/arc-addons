@@ -76,10 +76,10 @@ if [ -z "${HDD_BAY}" ]; then
     done
     IDX=$((IDX + 1))
   done
-  if [ ${IDX} -gt 24 ]
+  if [ ${IDX} -gt 24 ]; then
     HDD_BAY="RACK_24_Bay"
   fi
-  HDD_BAY=${HDD_BAY:-RACK_60_Bay}
+  HDD_BAY="${HDD_BAY:-RACK_60_Bay}"
 fi
 
 if [ -z "${SSD_BAY}" ]; then
@@ -91,7 +91,7 @@ if [ -z "${SSD_BAY}" ]; then
     done
     IDX=$((IDX + 1))
   done
-  SSD_BAY=${SSD_BAY:-1X8}
+  SSD_BAY="${SSD_BAY:-1X8}"
 fi
 
 [ ! -f "${FILE_GZ}.bak" ] && cp -f "${FILE_GZ}" "${FILE_GZ}.bak"
