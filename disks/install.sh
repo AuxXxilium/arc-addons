@@ -319,24 +319,20 @@ function nondtModel() {
   INTERNALPORTCFG=0
 
   hasUSB=false
-  USBMINIDX=20
-  USBMAXIDX=26
+  USBDISKNUM=0
   for I in $(ls -d /sys/block/sd* 2>/dev/null); do
     IDX=$(_atoi ${I/\/sys\/block\/sd/})
     [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
     ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
     if [ -n "${ISUSB}" ]; then
-      ([ ${IDX} -lt ${USBMINIDX} ] || [ "${hasUSB}" = "false" ]) && USBMINIDX=${IDX}
-      ([ ${IDX} -gt ${USBMAXIDX} ] || [ "${hasUSB}" = "false" ]) && USBMAXIDX=${IDX}
+      ([ ${IDX} -ge ${USBDISKNUM} ] || [ "${hasUSB}" = "false" ]) && USBDISKNUM=$((${USBDISKNUM} + 1))
       hasUSB=true
     fi
   done
 
-  if [ "${hasUSB}" = "true" ]; then
-    USBDISKNUM=$((${USBMAXIDX} - ${USBMINIDX}))
-    [ ${USBDISKNUM} -lt 6 ] && USBDISKNUM=6      # Define 6 is the minimum number of USB disks
-    [ $((${USBMINIDX} + ${USBDISKNUM})) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMINIDX} + ${USBDISKNUM}))
-  fi
+  [ ${MAXDISKS} -gt 26 ] && MAXDISKS=26
+  USBMINIDX=$((${MAXDISKS} - ${USBDISKNUM}))
+  #[ ${USBDISKNUM} -lt 6 ] && USBDISKNUM=6      # Define 6 is the minimum number of USB disks
 
   if _check_post_k "rd" "maxdisks"; then
     MAXDISKS=$(($(_get_conf_kv maxdisks)))
@@ -372,7 +368,11 @@ function nondtModel() {
     INTERNALPORTCFG=$(($(_get_conf_kv internalportcfg)))
     printf 'get internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   else
-    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
+    if [ "${2}" = "true" ]; then
+      INTERNALPORTCFG=$((2 ** ${MAXDISKS} - 1))
+    else
+      INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
+    fi
     _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
     printf 'set internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   fi
@@ -425,7 +425,7 @@ if [ "${1}" = "patches" ]; then
 
   checkSynoboot
 
-  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}"
+  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}" "${3}"
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon disks - ${1}"
