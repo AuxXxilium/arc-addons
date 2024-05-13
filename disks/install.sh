@@ -318,36 +318,28 @@ function nondtModel() {
   ESATAPORTCFG=0
   INTERNALPORTCFG=0
 
-  hasUSB=false
   USBDISKNUM=0
+  USBMAXIDX=26
   for I in $(ls -d /sys/block/sd* 2>/dev/null); do
     IDX=$(_atoi ${I/\/sys\/block\/sd/})
-    [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
+    [ $((${IDX} + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
     ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
     if [ -n "${ISUSB}" ]; then
-      ([ ${IDX} -ge ${USBDISKNUM} ] || [ "${hasUSB}" = "false" ]) && USBDISKNUM=$((${USBDISKNUM} + 1))
-      hasUSB=true
+      USBDISKNUM=$((${USBDISKNUM} + 1))
     fi
   done
 
-  [ ${MAXDISKS} -gt 26 ] && MAXDISKS=26
-  USBMINIDX=$((${MAXDISKS} - ${USBDISKNUM}))
   #[ ${USBDISKNUM} -lt 6 ] && USBDISKNUM=6      # Define 6 is the minimum number of USB disks
+  USBMINIDX=$((${USBMAXIDX} - ${USBDISKNUM}))
+  #[ $((${USBMINIDX} + ${USBDISKNUM})) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMINIDX} + ${USBDISKNUM}))
 
   if _check_post_k "rd" "maxdisks"; then
     MAXDISKS=$(($(_get_conf_kv maxdisks)))
     printf "get maxdisks=%d\n" "${MAXDISKS}"
   else
-    # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-    # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
+    [ ${MAXDISKS} -gt 26 ] && MAXDISKS=26
     printf "cal maxdisks=%d\n" "${MAXDISKS}"
   fi
-
-  # # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
-  # if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
-  #   MAXDISKS=26
-  #   printf "set maxdisks=26 [%d]\n" "${MAXDISKS}"
-  # fi
 
   if _check_post_k "rd" "usbportcfg"; then
     USBPORTCFG=$(($(_get_conf_kv usbportcfg)))
@@ -368,11 +360,7 @@ function nondtModel() {
     INTERNALPORTCFG=$(($(_get_conf_kv internalportcfg)))
     printf 'get internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   else
-    if [ "${2}" = "true" ]; then
-      INTERNALPORTCFG=$((2 ** ${MAXDISKS} - 1))
-    else
-      INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
-    fi
+    INTERNALPORTCFG=$((2 ** ${MAXDISKS} - 1))
     _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
     printf 'set internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   fi
@@ -425,7 +413,7 @@ if [ "${1}" = "patches" ]; then
 
   checkSynoboot
 
-  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}" "${3}"
+  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}"
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon disks - ${1}"
