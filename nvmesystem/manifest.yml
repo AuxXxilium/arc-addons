@@ -6,14 +6,14 @@ beta: false
 all:
   install-script: "install.sh"
   copy: "all"
-apollolake: false
-broadwell: false
-broadwellnk: false
-broadwellnkv2: false
-broadwellntbap: false
-denverton: false
-geminilake: false
-purley: false
-v1000: false
-r1000: false
+apollolake: true
+broadwell: true
+broadwellnk: true
+broadwellnkv2: true
+broadwellntbap: true
+denverton: true
+geminilake: true
+purley: true
+v1000: true
+r1000: true
 epyc7002: true

@@ -6,11 +6,15 @@
 # See /LICENSE for more information.
 #
 
-MODELS="SA6400"
-MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
-
-if ! echo "${MODELS}" | grep -q "${MODEL}"; then
-  echo "${MODEL} is not supported"
+# PLATFORMS="epyc7002"
+# PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
+# if ! echo "${PLATFORMS}" | grep -qw "${PLATFORM}"; then
+#   echo "${PLATFORM} is not supported nvmesystem addon!"
+#   exit 0
+# fi
+_BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
+if [ ${_BUILD:-64570} -lt 69057 ]; then
+  echo "${_BUILD} is not supported nvmesystem addon!"
   exit 0
 fi
 
@@ -25,7 +29,7 @@ if [ "${1}" = "early" ]; then
   [ ! -f "${SO_FILE}.bak" ] && cp -vf "${SO_FILE}" "${SO_FILE}.bak"
   cp -f "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
-    sed "s/dcfcffff4584ed74b7488b4c24083b01/dcfcffff4584ed75b7488b4c24083b01/" |
+    sed "s/4584ed74b7488b4c24083b01/4584ed75b7488b4c24083b01/" |
     xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
@@ -40,7 +44,7 @@ elif [ "${1}" = "late" ]; then
 
   cp -vf "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
-    sed "s/0f95c00fb6c0488b9424081000006448/0f94c00fb6c0488b9424081000006448/; s/ffff89c18944240c8b44240809e84409/ffff89c18944240c8b44240890904409/" |
+    sed "s/0f95c00fb6c0488b94240810/0f94c00fb6c0488b94240810/; s/8944240c8b44240809e84409/8944240c8b44240890904409/" |
     xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
