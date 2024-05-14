@@ -2,8 +2,14 @@
 #
 # Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
+# From：https://github.com/007revad/Synology_enable_M2_volume
 # From: https://github.com/PeterSuh-Q3/tcrp-addons/blob/main/nvmevolume-onthefly/src/install.sh
 #
+
+if grep -qw "/addons/nvmesystem.sh" "/addons/addons.sh"; then
+  echo "nvmevolume is not required if nvmesystem exists!"
+  exit 0
+fi
 
 if [ "${1}" = "late" ]; then
   echo "Installing addon nvmevolume - ${1}"
