@@ -162,20 +162,8 @@ function dtModel() {
     echo "    compatible = \"Synology\";" >>${DEST}
     echo "    model = \"${UNIQUE}\";" >>${DEST}
     echo "    version = <0x01>;" >>${DEST}
+    echo "    power_limit = \"\";" >>${DEST}
 
-    # NVME power_limit
-    POWER_LIMIT=""
-    NVME_PORTS=$(ls /sys/class/nvme 2>/dev/null | wc -w)
-    for I in $(seq 0 $((${NVME_PORTS} - 1))); do
-      [ ${I} -eq 0 ] && POWER_LIMIT="100" || POWER_LIMIT="${POWER_LIMIT},100"
-    done
-    if [ -n "${POWER_LIMIT}" ]; then
-      echo "    power_limit = \"${POWER_LIMIT}\";" >>${DEST}
-    fi
-    if [ ${NVME_PORTS} -gt 0 ]; then
-      _set_conf_kv rd "supportnvme" "yes"
-      _set_conf_kv rd "support_m2_pool" "yes"
-    fi
     # SATA ports
     if [ "${1}" = "true" ]; then
       I=1
@@ -276,7 +264,8 @@ function dtModel() {
     echo "maxdisks=${MAXDISKS}"
 
     # NVME ports
-    COUNT=1
+    COUNT=0
+    POWER_LIMIT=""
     for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
       if [ -n "${BOOTDISK_PHYSDEVPATH}" -a "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
         echo "bootloader: ${P}"
@@ -284,17 +273,24 @@ function dtModel() {
       fi
       PCIEPATH=$(grep 'pciepath' ${P}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)
       if [ -n "${PCIEPATH}" ]; then
+        COUNT=$((${COUNT} + 1))
         echo "    nvme_slot@${COUNT} {" >>${DEST}
         echo "        pcie_root = \"${PCIEPATH}\";" >>${DEST}
         echo "        port_type = \"ssdcache\";" >>${DEST}
         echo "    };" >>${DEST}
-        COUNT=$((${COUNT} + 1))
+        POWER_LIMIT="${POWER_LIMIT},100"
       fi
     done
+    [ -n "${POWER_LIMIT:1}" ] && sed -i "s/power_limit = .*/power_limit = \"${POWER_LIMIT:1}\";/" ${DEST} || sed -i '/power_limit/d' ${DEST}
+    if [ ${COUNT} -gt 0 ]; then
+      _set_conf_kv rd "supportnvme" "yes"
+      _set_conf_kv rd "support_m2_pool" "yes"
+    fi
 
     # USB ports
-    COUNT=1
+    COUNT=0
     for I in $(getUsbPorts); do
+      COUNT=$((${COUNT} + 1))
       echo "    usb_slot@${COUNT} {" >>${DEST}
       echo "      usb2 {" >>${DEST}
       echo "        usb_port =\"${I}\";" >>${DEST}
@@ -303,7 +299,6 @@ function dtModel() {
       echo "        usb_port =\"${I}\";" >>${DEST}
       echo "      };" >>${DEST}
       echo "    };" >>${DEST}
-      COUNT=$((${COUNT} + 1))
     done
     echo "};" >>${DEST}
   fi
@@ -337,10 +332,8 @@ function nondtModel() {
     MAXDISKS=$(($(_get_conf_kv maxdisks)))
     printf "get maxdisks=%d\n" "${MAXDISKS}"
   else
-    [ ${MAXDISKS} -gt 26 ] && MAXDISKS=26
     printf "cal maxdisks=%d\n" "${MAXDISKS}"
   fi
-
   if _check_post_k "rd" "usbportcfg"; then
     USBPORTCFG=$(($(_get_conf_kv usbportcfg)))
     printf 'get usbportcfg=0x%.2x\n' "${USBPORTCFG}"
