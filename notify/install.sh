@@ -16,7 +16,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/notify.service"
   echo "[Unit]"                                          >${DEST}
-  echo "Description=Arc notify"                         >>${DEST}
+  echo "Description=arc notify"                         >>${DEST}
   echo "After=multi-user.target"                        >>${DEST}
   echo                                                  >>${DEST}
   echo "[Service]"                                      >>${DEST}
