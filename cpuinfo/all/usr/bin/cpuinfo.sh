@@ -11,10 +11,11 @@ FAMILY=""
 SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"
 CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)"
 SPEED="$(echo $(($(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | awk '{print $NF}' | tr -d -c 0-9) * 10)))"
-
+[ -n "${SPEED}" ] && SPEED="$(echo $(grep 'cpu MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"
 while [ ${SPEED} -lt 1000 ]; do
   SPEED="$((${SPEED} * 10))"
 done
+
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
 
