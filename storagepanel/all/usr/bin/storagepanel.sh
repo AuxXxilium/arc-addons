@@ -34,6 +34,22 @@ HDD_BAY_LIST=(RACK_0_Bay RACK_2_Bay RACK_4_Bay RACK_8_Bay RACK_10_Bay RACK_12_Ba
   TOWER_1_Bay TOWER_2_Bay TOWER_4_Bay TOWER_4_Bay_J TOWER_4_Bay_S TOWER_5_Bay TOWER_6_Bay TOWER_8_Bay TOWER_12_Bay)
 SSD_BAY_LIST=(1X0 1X2 1X4 1X8)
 
+if [ "${1}" = "-h" ]; then
+  echo "Use: ${0} [HDD_BAY [SSD_BAY]]"
+  echo "  HDD_BAY: ${HDD_BAY_LIST[@]}"
+  echo "  SSD_BAY: (row)X(column)"
+  echo "  -r: restore"
+  echo "  -h: help"
+  echo "  e.g.:"
+  echo "    ${0}                  - auto"
+  echo "    ${0} RACK_24_Bay      - HDD_BAY set to RACK_24_Bay, SSD_BAY auto"
+  echo "    ${0} RACK_24_Bay 1X8  - HDD_BAY set to RACK_24_Bay, SSD_BAY set to 1X8"
+  echo "    ${0} RACK_60_Bay 2X8  - HDD_BAY set to RACK_60_Bay, SSD_BAY set to 2X8"
+  echo "    ${0} -r               - restore"
+  echo "    ${0} -h               - help"
+  exit
+fi
+
 _UNIQUE="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique)"
 _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
 

@@ -8,7 +8,7 @@
 
 PLATFORMS="apollolake geminilake"
 PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
-if ! echo "${PLATFORM}" | grep -qw "${PLATFORM}"; then
+if ! echo "${PLATFORMS}" | grep -qw "${PLATFORM}"; then
   echo "${PLATFORM} is not supported i915 addon!"
   exit 0
 fi
