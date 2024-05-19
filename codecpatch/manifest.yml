@@ -1,6 +1,6 @@
 version: 1
 name: codecpatch
-description: "Patch Synocodectool (Don't use with Arc Patch)"
+description: "Patch Synocodectool"
 system: false
 beta: true
 all:
