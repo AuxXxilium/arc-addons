@@ -9,13 +9,13 @@
 VENDOR=""
 FAMILY=""
 SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"
-CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)"
-SPEED="$(echo $(($(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | awk '{print $NF}' | tr -d -c 0-9) * 10)))"
-if [ -z "${SPEED}" ] || [ ${SPEED} -eq 0 ]; then
-  SPEED="$(echo $(grep 'cpu MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"
-  while [ ${SPEED} -lt 1000 ]; do
-    SPEED="$((${SPEED} * 10))"
-  done
+if [ -z "${SERIES}" ]; then
+  SERIES="$(cat /proc/cpuinfo | grep -E "model name" | head -1 | cut -d: -f2)"
+fi
+CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)"  
+SPEED="$(echo $(grep 'MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | cut -d. -f1))"
+if [ -z "${SPEED}"] || [ ${SPEED} -eq 800 ]; then
+  SPEED="$(cat /proc/cpuinfo | grep -E "cpu MHz" | head -1 | cut -d: -f2 | cut -d. -f1)"
 fi
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
