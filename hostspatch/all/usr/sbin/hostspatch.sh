@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Define the entries to be added
-ENTRIES=("127.0.0.1 checkip.synology.com" "::1 checkipv6.synology.com")
+ENTRIES=("127.0.0.1 checkip.synology.com" "::1 checkipv6.synology.com" "127.0.0.1 dlid.synology.com")
 
 # Loop over each entry
 for ENTRY in "${ENTRIES[@]}"
