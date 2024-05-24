@@ -1,6 +1,6 @@
 version: 1
 name: hostspatch
-description: "Prevent DSM from calling Home (Can break Syno Services)"
+description: "Prevent DSM from calling Home"
 system: false
 beta: true
 all:
