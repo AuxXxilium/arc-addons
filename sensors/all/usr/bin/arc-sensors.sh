@@ -16,6 +16,7 @@ if [[ ! -x $(which perl) ]]; then
   exit 1
 fi
 
+modprobe -q hwmon-vid
 modprobe -q it87
 modprobe -q adt7470
 modprobe -q adt7475
