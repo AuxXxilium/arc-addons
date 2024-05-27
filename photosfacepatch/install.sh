@@ -10,29 +10,35 @@ if [ "${1}" = "late" ]; then
   echo "Installing addon photosfacepatch - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  
+  cp -vf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
+  cp -vf /usr/bin/photosfacepatch.sh /tmpRoot/usr/bin/photosfacepatch.sh
 
-  SO_FILE="/tmpRoot/var/packages/SynologyPhotos/target/usr/lib/libsynophoto-plugin-platform.so"
-  if [ -f "${SO_FILE}" ]; then
-    if [ ! -f "${SO_FILE}.bak" ]; then
-      echo "Backup ${SO_FILE}"
-      cp -vfp "${SO_FILE}" "${SO_FILE}.bak"
-    fi
-    echo "Patching ${${SO_FILE}}"
-    # support face and concept
-    PatchELFSharp "${SO_FILE}" "_ZN9synophoto6plugin8platform20IsSupportedIENetworkEv" "B8 00 00 00 00 C3"
-    # force to support concept
-    PatchELFSharp "${SO_FILE}" "_ZN9synophoto6plugin8platform18IsSupportedConceptEv" "B8 01 00 00 00 C3"
-    # force no Gpu
-    PatchELFSharp "${SO_FILE}" "_ZN9synophoto6plugin8platform23IsSupportedIENetworkGpuEv" "B8 00 00 00 00 C3"
-  else
-    echo "${SO_FILE} not found"
-  fi
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  DEST="/tmpRoot/usr/lib/systemd/system/photosfacepatch.service"
+  echo "[Unit]"                                                    >${DEST}
+  echo "Description=Enable face recognition in Synology Photos"   >>${DEST}
+  echo "After=multi-user.target"                                  >>${DEST}
+  echo                                                            >>${DEST}
+  echo "[Service]"                                                >>${DEST}
+  echo "Type=oneshot"                                             >>${DEST}
+  echo "RemainAfterExit=yes"                                      >>${DEST}
+  echo "ExecStart=/usr/bin/photosfacepatch.sh"                    >>${DEST}
+  echo                                                            >>${DEST}
+  echo "[Install]"                                                >>${DEST}
+  echo "WantedBy=multi-user.target"                               >>${DEST}
+
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/photosfacepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/photosfacepatch.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon photosfacepatch - ${1}"
 
-  SO_FILE="/tmpRoot/var/packages/SynologyPhotos/target/usr/lib/libsynophoto-plugin-platform.so"
-  if [ -f "${SO_FILE}.bak" ]; then
-    echo "Restore ${SO_FILE}"
-    mv -f "${SO_FILE}.bak" "${SO_FILE}"
-  fi
+  rm -f /tmpRoot/usr/bin/PatchELFSharp
+
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/photosfacepatch.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/photosfacepatch.service"
+
+  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
+  echo "/usr/bin/photosfacepatch.sh -r" >> /tmpRoot/usr/arc/revert.sh
+  echo "rm -f /usr/bin/photosfacepatch.sh" >> /tmpRoot/usr/arc/revert.sh
 fi

@@ -20,7 +20,7 @@ if [ "${1}" = "late" ]; then
   [ ! -f "${SO_FILE}.bak" ] && cp -vf "${SO_FILE}" "${SO_FILE}.bak"
 
   cp -f "${SO_FILE}" "${SO_FILE}.tmp"
-  xxd -c $(xxd -p "${SO_FILE}.tmp" | wc -c) -p "${SO_FILE}.tmp" | sed "s/803e00b8010000007524488b/803e00b8010000009090488b/" | xxd -r -p > "${SO_FILE}"
+  xxd -c $(xxd -p "${SO_FILE}.tmp" | wc -c) -p "${SO_FILE}.tmp" | sed "s/803e00b801000000752.488b/803e00b8010000009090488b/" | xxd -r -p > "${SO_FILE}"
   rm -f "${SO_FILE}.tmp"
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon nvmevolume - ${1}"
