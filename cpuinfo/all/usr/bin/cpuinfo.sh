@@ -6,17 +6,11 @@
 # See /LICENSE for more information.
 #
 
-VENDOR=""
-FAMILY=""
-SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"
-if [ -z "${SERIES}" ]; then
-  SERIES="$(cat /proc/cpuinfo | grep -E "model name" | head -1 | cut -d: -f2)"
-fi
-CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)"  
-SPEED="$(echo $(grep 'MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | cut -d. -f1))"
-if [ -z "${SPEED}"] || [ ${SPEED} -eq 800 ]; then
-  SPEED="$(cat /proc/cpuinfo | grep -E "cpu MHz" | head -1 | cut -d: -f2 | cut -d. -f1)"
-fi
+VENDOR=""                                                                                     # str
+FAMILY=""                                                                                     # str
+SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"       # str
+CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)"                                 # str
+SPEED="$(echo $(grep 'MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | cut -d. -f1))" # int
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
