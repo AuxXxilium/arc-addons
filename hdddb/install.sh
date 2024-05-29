@@ -22,7 +22,7 @@ if [ "${1}" = "late" ]; then
   echo "[Service]"                                >>${DEST}
   echo "Type=oneshot"                             >>${DEST}
   echo "RemainAfterExit=yes"                      >>${DEST}
-  echo "ExecStart=/usr/bin/hdddb.sh -nfre"        >>${DEST}
+  echo "ExecStart=/usr/bin/hdddb.sh -nfreiwp"     >>${DEST}
   echo                                            >>${DEST}
   echo "[Install]"                                >>${DEST}
   echo "WantedBy=multi-user.target"               >>${DEST}
