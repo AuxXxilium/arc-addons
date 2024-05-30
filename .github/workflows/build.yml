@@ -81,6 +81,7 @@ jobs:
           sed -i "s/version:.*$/version: ${VERSION}/g" */manifest.yml
           ./compile-addons.sh
           zip -9 addons.zip -j *.addon VERSION
+          sha256sum addons.zip >checksum.sha256
 
       - name: Upload to Artifacts
         if: success() && env.VERSION == ''
@@ -89,6 +90,7 @@ jobs:
           name: addons
           path: |
             addons.zip
+            checksum.sha256
 
       - name: Release
         if: success() && env.VERSION != ''
@@ -102,3 +104,4 @@ jobs:
           artifacts: |
             addons.zip
             *.addon
+            checksum.sha256
