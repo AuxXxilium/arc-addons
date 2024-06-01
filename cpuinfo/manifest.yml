@@ -1,6 +1,6 @@
 version: 1
 name: cpuinfo
-description: "Adds correct CPU Info to DSM"
+description: "Add real CPU Information to DSM System"
 system: false
 beta: false
 all:
