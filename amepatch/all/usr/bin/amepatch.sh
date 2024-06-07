@@ -1,4 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/ash
+#
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
 
 declare -a path_list_armor=(
 "/var/packages/CodecPack/target/apparmor"
@@ -24,14 +30,13 @@ declare -a path_list_ame=(
 "/volume3/@appstore/CodecPack/usr"
 )
 
-for i in "${path_list_ame[@]}"; do
+for cp_usr_path in "${path_list_ame[@]}"; do
     if [ -d "$i" ]; the
         . /etc.defaults/VERSION
 
         values=('669066909066906690' 'B801000000' '30')
         hex_values=('1F28' '48F5' '4921' '4953' '4975' '9AC8')
         indices=(0 1 1 1 1 2)
-        cp_usr_path="$i"
         so="$cp_usr_path/lib/libsynoame-license.so"
         so_backup="$cp_usr_path/lib/libsynoame-license.so.orig"
         lic="/usr/syno/etc/license/data/ame/offline_license.json"
