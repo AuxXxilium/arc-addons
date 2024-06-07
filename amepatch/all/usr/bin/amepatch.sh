@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/usr/bin/env bash
 #
 # Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium>
 #
@@ -31,7 +31,7 @@ declare -a path_list_ame=(
 )
 
 for cp_usr_path in "${path_list_ame[@]}"; do
-    if [ -d "$i" ]; the
+    if [ -d "$cp_usr_path" ]; the
         . /etc.defaults/VERSION
 
         values=('669066909066906690' 'B801000000' '30')
