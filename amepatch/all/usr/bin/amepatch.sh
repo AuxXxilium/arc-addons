@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 declare -a path_list_armor=(
+"/var/packages/CodecPack/target/apparmor"
 "/volume1/@appstore/CodecPack/apparmor"
 "/volume2/@appstore/CodecPack/apparmor"
 "/volume3/@appstore/CodecPack/apparmor"
@@ -11,15 +12,16 @@ declare -a path_list_armor=(
 # disable apparmor check for AME
 for i in "${path_list_armor[@]}"; do
     if [ -d "$i" ]; then
-        mv -f "$i" "$i.bak"^
+        mv -f "$i" "$i.bak"
         break
     fi
 done
 
 declare -a path_list_ame=(
-"/volume1/@appstore/CodecPack"
-"/volume2/@appstore/CodecPack"
-"/volume3/@appstore/CodecPack"
+"/var/packages/CodecPack/target/usr"
+"/volume1/@appstore/CodecPack/usr"
+"/volume2/@appstore/CodecPack/usr"
+"/volume3/@appstore/CodecPack/usr"
 )
 
 for i in "${path_list_ame[@]}"; do
@@ -29,7 +31,7 @@ for i in "${path_list_ame[@]}"; do
         values=('669066909066906690' 'B801000000' '30')
         hex_values=('1F28' '48F5' '4921' '4953' '4975' '9AC8')
         indices=(0 1 1 1 1 2)
-        cp_usr_path="$i/target/usr"
+        cp_usr_path="$i"
         so="$cp_usr_path/lib/libsynoame-license.so"
         so_backup="$cp_usr_path/lib/libsynoame-license.so.orig"
         lic="/usr/syno/etc/license/data/ame/offline_license.json"
