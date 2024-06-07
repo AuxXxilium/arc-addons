@@ -31,7 +31,7 @@ declare -a path_list_ame=(
 )
 
 for cp_usr_path in "${path_list_ame[@]}"; do
-    if [ -d "$cp_usr_path" ]; the
+    if [ -d "$cp_usr_path" ]; then
         . /etc.defaults/VERSION
 
         values=('669066909066906690' 'B801000000' '30')
