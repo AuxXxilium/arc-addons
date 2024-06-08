@@ -43,7 +43,7 @@ if [ "${1}" = "late" ]; then
     rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/revert.service"
   fi
 
-  # backup cuarcent loader configs
+  # backup current loader configs
   rm -rf "/tmpRoot/usr/arc/backup"
   if [ -d "/usr/arc/backup" ]; then
     mkdir -p "/tmpRoot/usr/arc/backup"
@@ -51,7 +51,7 @@ if [ "${1}" = "late" ]; then
   fi
 
   # Version
-  echo "LOADERLABEL=${LOADERLABEL}"      >"/tmpRoot/usr/arc/VERSION"
-  echo "LOADERVERSION=${LOADERVERSION}" >>"/tmpRoot/usr/arc/VERSION"
+  echo "LOADERLABEL=\"${LOADERLABEL}\""      >"/tmpRoot/usr/arc/VERSION"
+  echo "LOADERVERSION=\"${LOADERVERSION}\"" >>"/tmpRoot/usr/arc/VERSION"
 
 fi
