@@ -1,6 +1,6 @@
 version: 1
 name: hdddb
-description: "Add Disks to DSM compatibility DiskDB (Create Volume with non supported Disks)"
+description: "Add Disks to DSM compatibility DiskDB and bypass Memory Limitation"
 system: false
 beta: false
 all:
