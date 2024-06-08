@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env ash
 #
 # Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
