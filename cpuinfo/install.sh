@@ -18,7 +18,7 @@ if [ "${1}" = "late" ]; then
   DEST="/tmpRoot/usr/lib/systemd/system/cpuinfo.service"
   echo "[Unit]"                                    >${DEST}
   echo "Description=Adds correct CPU Info"        >>${DEST}
-  echo "After=sysinit.target"                     >>${DEST}
+  echo "After=multi-user.target"                  >>${DEST}
   echo                                            >>${DEST}
   echo "[Service]"                                >>${DEST}
   echo "Type=oneshot"                             >>${DEST}
