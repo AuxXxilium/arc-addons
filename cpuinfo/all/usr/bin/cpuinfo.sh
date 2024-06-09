@@ -10,7 +10,10 @@ VENDOR=""                                                                       
 FAMILY=""                                                                                     # str
 SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"       # str
 CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)"                                 # str
+while true; do
 SPEED="$(echo $(grep 'MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | cut -d. -f1))" # int
+[ ${SPEED} -ne 800 ] && break
+done
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
