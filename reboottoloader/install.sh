@@ -7,7 +7,7 @@
 #
 
 if [ "${1}" = "late" ]; then
-  echo "Installing addon reboottoloader - ${1}"
+  echo "Installing addon rebootto... - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
@@ -19,20 +19,22 @@ if [ "${1}" = "late" ]; then
     mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
     cp -vf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
   fi
-  echo "insert reboottoloader task to esynoscheduler.db"
+  echo "insert rebootto... task to esynoscheduler.db"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
 DELETE FROM task WHERE task_name LIKE 'RebootToLoader';
 INSERT INTO task VALUES('RebootToLoader', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/bin/loader-reboot.sh "config"', 'script', '{}', '', '', '{}', '{}');
+DELETE FROM task WHERE task_name LIKE 'RebootToUpdate';
+INSERT INTO task VALUES('RebootToUpdate', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/bin/loader-reboot.sh "update"', 'script', '{}', '', '', '{}', '{}');
 EOF
 elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon reboottoloader - ${1}"
+  echo "Installing addon rebootto... - ${1}"
 
   rm -f /tmpRoot/usr/bin/loader-reboot.sh
   rm -f /tmpRoot/usr/bin/grub-editenv
 
   if [ -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
-    echo "delete reboottoloader task from esynoscheduler.db"
+    echo "delete rebootto... task from esynoscheduler.db"
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
 DELETE FROM task WHERE task_name LIKE 'RebootToLoader';
