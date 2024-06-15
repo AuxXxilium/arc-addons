@@ -1,6 +1,6 @@
 version: 1
 name: deduplication
-description: "Force enable Deduplication (Only SSD and >4GB RAM)"
+description: "Force enable Deduplication (Only for SSD)"
 system: false
 beta: false
 all:
