@@ -1,6 +1,6 @@
 version: 1
-name: deduplication
-description: "Force enable Deduplication (Only for SSD)"
+name: sequentialio
+description: "Enables sequential I/O for your SSD caches (Can cause overheating)"
 system: false
 beta: false
 all:
