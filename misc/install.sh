@@ -128,16 +128,6 @@ elif [ "${1}" = "late" ]; then
     if [ ${CPUFREQ} -eq 0 ]; then
       echo "CPU does NOT support CPU Performance Scaling, disabling"
       sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
-      CPUCORES=$(cat /proc/cpuinfo 2>/dev/null | grep processor | wc -l)
-      while true; do
-        CPUCORES=$((CPUCORES - 1))
-        echo "CPU: ${CPUCORES}"
-        SCHED=$(cat /tmpRoot/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors)
-        echo "${SCHED}"
-        if [ ${CPUCORES} -eq 0 ]; then
-          break
-        fi
-      done
     else
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
