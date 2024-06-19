@@ -139,20 +139,19 @@ elif [ "${1}" = "late" ]; then
 
       mkdir -p "/tmpRoot/usr/lib/systemd/system"
       DEST="/tmpRoot/usr/lib/systemd/system/governor.service"
-      echo "[Unit]"                                              >${DEST}
-      echo "Description=Set CPU Governor"                        >>${DEST}
-      echo "DefaultDependencies=no"                              >>${DEST}
-      echo "IgnoreOnIsolate=true"                                >>${DEST}
-      echo "After=multi-user.target"                             >>${DEST}
-      echo                                                       >>${DEST}
-      echo "[Service]"                                           >>${DEST}
-      echo "User=root"                                           >>${DEST}
-      echo "Restart=always"                                      >>${DEST}
-      echo "RestartSec=30"                                       >>${DEST}
-      echo "ExecStart=/usr/sbin/governor.sh"                     >>${DEST}
-      echo                                                       >>${DEST}
-      echo "[X-Synology]"                                        >>${DEST}
-      echo "Author=Virtualization Team"                          >>${DEST}
+      echo "[Unit]"                                        >${DEST}
+      echo "Description=Set CPU Governor"                  >>${DEST}
+      echo "DefaultDependencies=no"                        >>${DEST}
+      echo "IgnoreOnIsolate=true"                          >>${DEST}
+      echo "After=multi-user.target"                       >>${DEST}
+      echo                                                 >>${DEST}
+      echo "[Service]"                                     >>${DEST}
+      echo "Type=oneshot"                                  >>${DEST}
+      echo "RemainAfterExit=yes"                           >>${DEST}
+      echo "ExecStart=/usr/sbin/governor.sh"               >>${DEST}
+      echo                                                 >>${DEST}
+      echo "[X-Synology]"                                  >>${DEST}
+      echo "Author=Virtualization Team"                    >>${DEST}
 
       mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
       ln -vsf /usr/lib/systemd/system/governor.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/governor.service

@@ -10,18 +10,12 @@ PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f
 CPUCORE=$(cat /proc/cpuinfo 2>/dev/null | grep processor | wc -l)
 while true; do
   CPUCORE=$((CPUCORE - 1))
-  if [ "${PLATFORM}" == "eypc7002" ]; then
-    if grep -qw "schedutil" /sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_available_governors; then
-      echo "schedutil" >/sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_available_governors
-    else
-      echo "performance" >/sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_available_governors
-    fi
+  if [ "${PLATFORM}" = "epyc7002" ]; then
+    echo "schedutil" >"/sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_governor"
+    echo "set schedutil governor for ${PLATFORM} cpu: ${CPUCORE}"
   else
-    if grep -qw "ondemand" /sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_available_governors; then
-      echo "ondemand" >/sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_available_governors
-    else
-      echo "performance" >/sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_available_governors
-    fi
+    echo "ondemand" >"/sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_governor"
+    echo "set ondemand governor for ${PLATFORM} cpu: ${CPUCORE}"
   fi
   if [ ${CPUCORE} -eq 0 ]; then
     break
