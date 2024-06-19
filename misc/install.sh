@@ -128,6 +128,7 @@ elif [ "${1}" = "late" ]; then
     if [ ${CPUFREQ} -eq 0 ]; then
       echo "CPU does NOT support CPU Performance Scaling, disabling"
       sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
+      echo "CPU does NOT support CPU Performance Scaling, disabling" >/tmpRoot/usr/bin/governor.sh
     else
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
@@ -135,7 +136,7 @@ elif [ "${1}" = "late" ]; then
       
       # copy cpu governor
       echo "Installing Set CPU Governor - ${1}"
-      cp -vf /usr/sbin/governor.sh /tmpRoot/usr/sbin/governor.sh
+      cp -vf /usr/bin/governor.sh /tmpRoot/usr/bin/governor.sh
 
       mkdir -p "/tmpRoot/usr/lib/systemd/system"
       DEST="/tmpRoot/usr/lib/systemd/system/governor.service"
@@ -148,7 +149,7 @@ elif [ "${1}" = "late" ]; then
       echo "[Service]"                                     >>${DEST}
       echo "Type=oneshot"                                  >>${DEST}
       echo "RemainAfterExit=yes"                           >>${DEST}
-      echo "ExecStart=/usr/sbin/governor.sh"               >>${DEST}
+      echo "ExecStart=/usr/bin/governor.sh"                >>${DEST}
       echo                                                 >>${DEST}
       echo "[X-Synology]"                                  >>${DEST}
       echo "Author=Virtualization Team"                    >>${DEST}
