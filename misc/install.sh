@@ -132,22 +132,30 @@ elif [ "${1}" = "late" ]; then
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
       cp -vf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
-      PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
-      while read -r CPU; do
-        if [ "${PLATFORM}" == "eypc7002" ]; then
-          if grep -qw "schedutil" /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors; then
-            echo "schedutil" > /tmpRoot${CPU}/cpufreq/scaling_governor
-          else
-            echo "performance" > /tmpRoot${CPU}/cpufreq/scaling_governor
-          fi
-        else
-          if grep -qw "ondemand" /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors; then
-            echo "ondemand" > /tmpRoot${CPU}/cpufreq/scaling_governor
-          else
-            echo "performance" > /tmpRoot${CPU}/cpufreq/scaling_governor
-          fi
-        fi
-      done < <(ls -d /sys/devices/system/cpu/cpu[0-9]*)
+      
+      # copy cpu governor
+      echo "Installing Set CPU Governor - ${1}"
+      cp -vf /usr/sbin/governor.sh /tmpRoot/usr/sbin/governor.sh
+
+      mkdir -p "/tmpRoot/usr/lib/systemd/system"
+      DEST="/tmpRoot/usr/lib/systemd/system/governor.service"
+      echo "[Unit]"                                              >${DEST}
+      echo "Description=Set CPU Governor"                        >>${DEST}
+      echo "DefaultDependencies=no"                              >>${DEST}
+      echo "IgnoreOnIsolate=true"                                >>${DEST}
+      echo "After=multi-user.target"                             >>${DEST}
+      echo                                                       >>${DEST}
+      echo "[Service]"                                           >>${DEST}
+      echo "User=root"                                           >>${DEST}
+      echo "Restart=always"                                      >>${DEST}
+      echo "RestartSec=30"                                       >>${DEST}
+      echo "ExecStart=/usr/sbin/governor.sh"                     >>${DEST}
+      echo                                                       >>${DEST}
+      echo "[X-Synology]"                                        >>${DEST}
+      echo "Author=Virtualization Team"                          >>${DEST}
+
+      mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+      ln -vsf /usr/lib/systemd/system/governor.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/governor.service
     fi
   fi
   umount /sys
