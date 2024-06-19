@@ -128,20 +128,24 @@ elif [ "${1}" = "late" ]; then
     if [ ${CPUFREQ} -eq 0 ]; then
       echo "CPU does NOT support CPU Performance Scaling, disabling"
       sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
+      while read -r CPU; do
+        echo "CPU: ${CPU}"
+      done < <(ls -d /sys/devices/system/cpu/cpu[0-9]*)
     else
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
       cp -vf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
       PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
       while read -r CPU; do
+        echo "CPU: ${CPU}"
         if [ "${PLATFORM}" == "eypc7002" ]; then
-          if grep -qw "schedutil" /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors; then
+          if grep -qw "schedutil" /tmpRoot/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors; then
             echo "schedutil" > /tmpRoot${CPU}/cpufreq/scaling_governor
           else
             echo "performance" > /tmpRoot${CPU}/cpufreq/scaling_governor
           fi
         else
-          if grep -qw "ondemand" /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors; then
+          if grep -qw "ondemand" /tmpRoot/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors; then
             echo "ondemand" > /tmpRoot${CPU}/cpufreq/scaling_governor
           else
             echo "performance" > /tmpRoot${CPU}/cpufreq/scaling_governor
