@@ -14,8 +14,13 @@ while true; do
     echo "schedutil" >"/sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_governor"
     echo "set schedutil governor for ${PLATFORM} cpu: ${CPUCORE}"
   else
-    echo "ondemand" >"/sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_governor"
-    echo "set ondemand governor for ${PLATFORM} cpu: ${CPUCORE}"
+    if [ -f "/usr/lib/modules/cpufreq_ondemand" ]; then
+      echo "ondemand" >"/sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_governor"
+      echo "set ondemand governor for ${PLATFORM} cpu: ${CPUCORE}"
+    else
+      echo "performance" >"/sys/devices/system/cpu/cpu${CPUCORE}/cpufreq/scaling_governor"
+      echo "set performance governor for ${PLATFORM} cpu: ${CPUCORE}"
+    fi
   fi
   if [ ${CPUCORE} -eq 0 ]; then
     break
