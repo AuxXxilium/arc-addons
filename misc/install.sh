@@ -174,16 +174,10 @@ elif [ "${1}" = "late" ]; then
   if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege
   fi
-  if [ -d /var/packages/open-vm-tools ]; then
-    sed -i 's/package/root/g' /var/packages/open-vm-tools/conf/privilege
-  fi
 
   # Qemu-Guest-Agent-Fix
   if [ -d /tmpRoot/var/packages/qemu-ga ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege
-  fi
-  if [ -d /var/packages/qemu-ga ]; then
-    sed -i 's/package/root/g' /var/packages/qemu-ga/conf/privilege
   fi
 
   # service
