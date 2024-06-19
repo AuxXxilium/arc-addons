@@ -124,12 +124,7 @@ elif [ "${1}" = "late" ]; then
   modprobe acpi-cpufreq
   # CPU performance scaling
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
-    CPUFREQ=$(ls -ltr /sys/devices/system/cpu/cpufreq/* 2>/dev/null | wc -l)
-    if [ ${CPUFREQ} -eq 0 ]; then
-      echo "CPU does NOT support CPU Performance Scaling, disabling"
-      sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
-      echo "CPU does NOT support CPU Performance Scaling, disabling" >/tmpRoot/usr/bin/governor.sh
-    else
+    if [ -d /tmpRoot/sys/devices/system/cpu/cpu0/cpufreq ]; then
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
       cp -vf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
@@ -156,6 +151,10 @@ elif [ "${1}" = "late" ]; then
 
       mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
       ln -vsf /usr/lib/systemd/system/governor.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/governor.service
+    else
+      echo "CPU does NOT support CPU Performance Scaling, disabling"
+      sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
+      echo "CPU does NOT support CPU Performance Scaling, disabling" >/tmpRoot/usr/bin/governor.sh
     fi
   fi
   umount /sys
