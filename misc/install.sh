@@ -128,30 +128,42 @@ elif [ "${1}" = "late" ]; then
     if [ ${CPUFREQ} -eq 0 ]; then
       echo "CPU does NOT support CPU Performance Scaling, disabling"
       sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
-      while read -r CPU; do
-        echo "CPU: ${CPU}"
-      done < <(ls -d /sys/devices/system/cpu/cpu[0-9]*)
+      CPUCORES=$(cat /proc/cpuinfo 2>/dev/null | grep processor | wc -l)
+      while true; do
+        CPUCORES=$((CPUCORES - 1))
+        echo "CPU: ${CPUCORES}"
+        SCHED=$(cat /tmpRoot/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors)
+        echo "${SCHED}"
+        if [ ${CPUCORES} -eq 0 ]; then
+          break
+        fi
+      done
     else
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
       cp -vf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
       PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
-      while read -r CPU; do
-        echo "CPU: ${CPU}"
+      CPUCORES=$(cat /proc/cpuinfo 2>/dev/null | grep processor | wc -l)
+      while true; do
+        CPUCORES=$((CPUCORES - 1))
+        echo "CPU: ${CPUCORES}"
         if [ "${PLATFORM}" == "eypc7002" ]; then
           if grep -qw "schedutil" /tmpRoot/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors; then
-            echo "schedutil" > /tmpRoot${CPU}/cpufreq/scaling_governor
+            echo "schedutil" > /tmpRoot/sys/devices/system/cpu/cpu${CPUCORES}/cpufreq/scaling_available_governors
           else
-            echo "performance" > /tmpRoot${CPU}/cpufreq/scaling_governor
+            echo "performance" > /tmpRoot/sys/devices/system/cpu/cpu${CPUCORES}/cpufreq/scaling_available_governors
           fi
         else
           if grep -qw "ondemand" /tmpRoot/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors; then
-            echo "ondemand" > /tmpRoot${CPU}/cpufreq/scaling_governor
+            echo "ondemand" > /tmpRoot/sys/devices/system/cpu/cpu${CPUCORES}/cpufreq/scaling_available_governors
           else
-            echo "performance" > /tmpRoot${CPU}/cpufreq/scaling_governor
+            echo "performance" > /tmpRoot/sys/devices/system/cpu/cpu${CPUCORES}/cpufreq/scaling_available_governors
           fi
         fi
-      done < <(ls -d /sys/devices/system/cpu/cpu[0-9]*)
+        if [ ${CPUCORES} -eq 0 ]; then
+          break
+        fi
+      done
     fi
   fi
   umount /sys
