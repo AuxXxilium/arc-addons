@@ -1,6 +1,6 @@
 version: 1
 name: cpufreqscaling
-description: "Enable CPU Freqscaling for DSM"
+description: "Enable CPU Freqscaling for DSM (Only use if CPU Frequency is not scaling expectedly)"
 system: false
 beta: true
 all:
