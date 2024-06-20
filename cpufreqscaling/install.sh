@@ -15,6 +15,7 @@ if [ "${1}" = "late" ]; then
   cp -vf /usr/sbin/unscaler.sh /tmpRoot/usr/sbin/unscaler.sh
   cp -vf /usr/sbin/rescaler.sh /tmpRoot/usr/sbin/rescaler.sh
 
+if [ "${2}" = "userspace" ]; then
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
   echo "[Unit]"                                              >${DEST}
@@ -27,14 +28,34 @@ if [ "${1}" = "late" ]; then
   echo "User=root"                                           >>${DEST}
   echo "Restart=always"                                      >>${DEST}
   echo "RestartSec=30"                                       >>${DEST}
-  echo "ExecStart=/usr/sbin/scaler.sh \"${2}\""              >>${DEST}
+  echo "ExecStart=/usr/sbin/scaler.sh"                       >>${DEST}
   echo                                                       >>${DEST}
   echo "[X-Synology]"                                        >>${DEST}
   echo "Author=Virtualization Team"                          >>${DEST}
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
+else
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
+  echo "[Unit]"                                              >${DEST}
+  echo "Description=Enable CPU Freq scaling"                 >>${DEST}
+  echo "DefaultDependencies=no"                              >>${DEST}
+  echo "IgnoreOnIsolate=true"                                >>${DEST}
+  echo "After=multi-user.target"                             >>${DEST}
+  echo                                                       >>${DEST}
+  echo "[Service]"                                           >>${DEST}
+  echo "User=root"                                           >>${DEST}
+  echo "Type=oneshot"                                        >>${DEST}
+  echo "RemainAfterExit=yes"                                 >>${DEST}
+  echo "ExecStart=/usr/sbin/rescaler.sh \"${2}\""            >>${DEST}
+  echo                                                       >>${DEST}
+  echo "[X-Synology]"                                        >>${DEST}
+  echo "Author=Virtualization Team"                          >>${DEST}
 
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
+fi
   if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
     echo "copy esynoscheduler.db"
     mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler

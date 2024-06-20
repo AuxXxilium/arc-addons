@@ -17,7 +17,7 @@ set -euo pipefail
 #fi
 
 # Frequency scaling function
-function userspace() {
+function main {
 
   if [ $(cat /proc/cpuinfo | grep Intel | wc -l) -gt 0 ]; then
     CPU="INTEL"
@@ -98,30 +98,22 @@ function userspace() {
 
 # Deamonize the main function...
 while true; do
-  if [ -f "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor" ]; then
-    rm -f /usr/sbin/stopscale
-    # Get cpu cores count minus 1, to allow maping from 0
-    cpucorecount=$(cat /proc/cpuinfo | grep processor | wc -l)
-    cpucorecount=$((cpucorecount - 1))
-    governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-
-    if [ -f "/usr/lib/modules/cpufreq_${1}" ] || [ "${1}" = "userspace" ]; then
-      # Set correct cpufreq governor to allow user defined frequency scaling
-      if [ "$governor" != "${1}" ]; then
-        for i in $(seq 0 "${cpucorecount}"); do
-          echo "${1}" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_governor
-        done
-      fi
-      governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-      if [ "$governor" = "userspace" ]; then
-        userspace
-      fi
-      sleep 0.5
-    else
-      echo "No cpufreq_${1} module found"
-      exit 1
-    fi
-  else
-    exit 1
+  if [ -f /usr/sbin/stopscale ]; then
+      exit 0
   fi
+  # Get cpu cores count minus 1, to allow maping from 0
+  cpucorecount=$(cat /proc/cpuinfo | grep processor | wc -l)
+  cpucorecount=$((cpucorecount - 1))
+  governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+  # Set correct cpufreq governor to allow user defined frequency scaling
+  if [ "$governor" != "userspace" ]; then
+    for i in $(seq 0 "${cpucorecount}"); do
+      echo "userspace" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_governor
+    done
+  fi
+  governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+  if [ "$governor" = "userspace" ]; then
+    main
+  fi
+  sleep 0.5
 done
