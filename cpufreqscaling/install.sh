@@ -27,13 +27,27 @@ if [ "${1}" = "late" ]; then
   echo "User=root"                                           >>${DEST}
   echo "Restart=always"                                      >>${DEST}
   echo "RestartSec=30"                                       >>${DEST}
-  echo "ExecStart=/usr/sbin/scaler.sh"                       >>${DEST}
+  echo "ExecStart=/usr/sbin/scaler.sh \"${2}\""              >>${DEST}
   echo                                                       >>${DEST}
   echo "[X-Synology]"                                        >>${DEST}
   echo "Author=Virtualization Team"                          >>${DEST}
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
+
+  if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+    echo "copy esynoscheduler.db"
+    mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
+    cp -vf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+  fi
+  echo "insert scaling... task to esynoscheduler.db"
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+DELETE FROM task WHERE task_name LIKE 'Rescaler';
+INSERT INTO task VALUES('Rescaler', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/rescaler.sh "${2}"', 'script', '{}', '', '', '{}', '{}');
+DELETE FROM task WHERE task_name LIKE 'Unscaler';
+INSERT INTO task VALUES('Unscaler', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/unscaler.sh', 'script', '{}', '', '', '{}', '{}');
+EOF
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing cpufreqscalingscaling - ${1}"
 
