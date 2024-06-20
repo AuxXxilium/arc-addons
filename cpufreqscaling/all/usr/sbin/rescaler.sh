@@ -5,8 +5,8 @@ set -euo pipefail
 
 rm -f /usr/sbin/stopscale
 
-systemctl enable cpufreqscaling.service
-systemctl start cpufreqscaling.service
+#systemctl enable cpufreqscaling.service
+#systemctl start cpufreqscaling.service
 
 # Get cpu cores count minus 1, to allow maping from 0
 cpucorecount=$(cat /proc/cpuinfo | grep processor | wc -l)
@@ -19,6 +19,9 @@ if [ -f "/usr/lib/modules/cpufreq_${1}" ] || [ "${1}" = "schedutil" ]; then
     for i in $(seq 0 "${cpucorecount}"); do
       echo "${1}" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_governor
     done
+  fi
+  if [ "${1}" = "ondemand" ] || [ "${1}" = "conservative" ]; then
+    modprobe cpufreq_${1}
   fi
 else
   echo "No cpufreq_${1} module found"
