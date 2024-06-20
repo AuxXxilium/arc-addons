@@ -135,29 +135,6 @@ elif [ "${1}" = "late" ]; then
   fi
   umount /sys
 
-  # copy cpu governor
-  echo "Installing Set CPU Governor - ${1}"
-  cp -vf /usr/bin/governor.sh /tmpRoot/usr/bin/governor.sh
-
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/governor.service"
-  echo "[Unit]"                                        >${DEST}
-  echo "Description=Set CPU Governor"                  >>${DEST}
-  echo "DefaultDependencies=no"                        >>${DEST}
-  echo "IgnoreOnIsolate=true"                          >>${DEST}
-  echo "After=multi-user.target"                       >>${DEST}
-  echo                                                 >>${DEST}
-  echo "[Service]"                                     >>${DEST}
-  echo "Type=oneshot"                                  >>${DEST}
-  echo "RemainAfterExit=yes"                           >>${DEST}
-  echo "ExecStart=/usr/bin/governor.sh"                >>${DEST}
-  echo                                                 >>${DEST}
-  echo "[X-Synology]"                                  >>${DEST}
-  echo "Author=Virtualization Team"                    >>${DEST}
-
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/governor.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/governor.service
-
   # crypto-kernel
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf ]; then
     # crc32c-intel
