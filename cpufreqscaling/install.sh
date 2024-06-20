@@ -48,7 +48,7 @@ else
   echo "User=root"                                           >>${DEST}
   echo "Type=oneshot"                                        >>${DEST}
   echo "RemainAfterExit=yes"                                 >>${DEST}
-  echo "ExecStart=/usr/sbin/rescaler.sh \"${2}\""            >>${DEST}
+  echo "ExecStart=/usr/sbin/rescaler.sh ${2}"                >>${DEST}
   echo                                                       >>${DEST}
   echo "[X-Synology]"                                        >>${DEST}
   echo "Author=Virtualization Team"                          >>${DEST}
@@ -65,7 +65,7 @@ fi
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
 DELETE FROM task WHERE task_name LIKE 'Rescaler';
-INSERT INTO task VALUES('Rescaler', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/rescaler.sh "${2}"', 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('Rescaler', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/rescaler.sh ${2}', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'Unscaler';
 INSERT INTO task VALUES('Unscaler', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/unscaler.sh', 'script', '{}', '', '', '{}', '{}');
 EOF
