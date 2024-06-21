@@ -67,7 +67,7 @@ fi
 DELETE FROM task WHERE task_name LIKE 'Rescaler';
 INSERT INTO task VALUES('Rescaler', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/rescaler.sh ${2}', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'Unscaler';
-INSERT INTO task VALUES('Unscaler', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/unscaler.sh', 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('Unscaler', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/sbin/unscaler.sh', 'script', '{}', '', '', '{}', '{}');
 EOF
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing cpufreqscalingscaling - ${1}"
