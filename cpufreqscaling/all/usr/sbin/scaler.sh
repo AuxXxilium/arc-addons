@@ -117,3 +117,5 @@ while true; do
   fi
   sleep 0.5
 done
+
+exit 0

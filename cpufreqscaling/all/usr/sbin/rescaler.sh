@@ -27,3 +27,5 @@ else
   echo "No cpufreq_${1} module found"
   exit 1
 fi
+
+exit 0
