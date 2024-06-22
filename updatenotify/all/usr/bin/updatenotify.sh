@@ -35,5 +35,4 @@ SUBJECT="$(curl -skL --connect-timeout 10 "${URL}/releases/tag/${TAG}" | pup 'di
 SUBJECT="${SUBJECT//\"/\\\\\\\"}"
 synodsmnotify -e false -b false "@administrators" "arc_notify_subject" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\", \"%SUBJECT%\": \"${SUBJECT}\"}"
 
-
 exit 0
