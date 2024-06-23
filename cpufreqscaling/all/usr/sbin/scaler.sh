@@ -99,7 +99,7 @@ function main {
 # Deamonize the main function...
 while true; do
   if [ -f /usr/sbin/stopscale ]; then
-      exit 0
+    exit 0
   fi
   # Get cpu cores count minus 1, to allow maping from 0
   cpucorecount=$(cat /proc/cpuinfo | grep processor | wc -l)

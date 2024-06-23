@@ -11,7 +11,7 @@ governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 # Deamonize the main function...
 while true; do
   if [ -f /usr/sbin/stopscale ]; then
-      exit 0
+    exit 0
   fi
   # Set correct cpufreq governor to allow user defined frequency scaling
   if [ "${1}" = "ondemand" ] || [ "${1}" = "conservative" ]; then
