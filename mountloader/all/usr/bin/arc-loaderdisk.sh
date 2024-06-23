@@ -48,7 +48,7 @@ function mountLoaderDisk() {
         break
       )
 
-      ARC_RAMDISK_FILE="/mnt/p3/initrd-ARC"
+      ARC_RAMDISK_FILE="/mnt/p3/initrd-arc"
       ARC_PATH="/tmp/initrd"
       extractInitrd "${ARC_RAMDISK_FILE}" "${ARC_PATH}"
       if [ ! -f "${ARC_PATH}/opt/arc/arc.sh" ]; then
