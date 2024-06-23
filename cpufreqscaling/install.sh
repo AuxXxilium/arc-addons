@@ -63,12 +63,21 @@ fi
   fi
   echo "insert scaling... task to esynoscheduler.db"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+  if [ "${2}" = "userspace" ]; then
+    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+DELETE FROM task WHERE task_name LIKE 'Rescaler';
+INSERT INTO task VALUES('Rescaler', '', 'bootup', '', 1, 0, 0, 0, '', 0, '/usr/sbin/scaler.sh', 'script', '{}', '', '', '{}', '{}');
+DELETE FROM task WHERE task_name LIKE 'Unscaler';
+INSERT INTO task VALUES('Unscaler', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/sbin/unscaler.sh', 'script', '{}', '', '', '{}', '{}');
+EOF
+  else
+    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
 DELETE FROM task WHERE task_name LIKE 'Rescaler';
 INSERT INTO task VALUES('Rescaler', '', 'bootup', '', 1, 0, 0, 0, '', 0, '/usr/sbin/rescaler.sh ${2}', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'Unscaler';
 INSERT INTO task VALUES('Unscaler', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/sbin/unscaler.sh', 'script', '{}', '', '', '{}', '{}');
 EOF
+  fi
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing cpufreqscalingscaling - ${1}"
 
