@@ -19,5 +19,3 @@ if [ "$governor" != "performance" ]; then
 fi
 
 touch /usr/sbin/stopscale
-
-exit 0
