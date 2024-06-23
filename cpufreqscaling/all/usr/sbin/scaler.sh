@@ -112,7 +112,7 @@ while true; do
     done
   fi
   governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-  if [ "$governor" == "userspace" ]; then
+  if [ "$governor" = "userspace" ]; then
     main
   fi
   sleep 0.5
