@@ -111,6 +111,28 @@ EOF
     /usr/syno/web/webman/recovery.cgi
   fi
 
+elif [ "${1}" = "patches" ]; then
+  if grep -q 'network.' /proc/cmdline; then
+    for I in $(grep -o 'network.[0-9a-fA-F:]\{12,17\}=[^ ]*' /proc/cmdline); do
+      MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g' | tr '[:upper:]' '[:lower:]')"
+      IPRS="$(echo "${I}" | cut -d= -f2)"
+      for ETH in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
+        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g' | tr '[:upper:]' '[:lower:]')
+        if [ "${MACR}" = "${MACX}" ]; then
+          echo "Setting IP for ${ETH} to ${IPRS}"
+          mkdir -p /etc/sysconfig/network-scripts
+          echo "DEVICE=${ETH}" >/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "IPADDR=$(echo "${IPRS}" | cut -d/ -f1)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "NETMASK=$(echo "${IPRS}" | cut -d/ -f2)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "GATEWAY=$(echo "${IPRS}" | cut -d/ -f3)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "${ETH}" >> /etc/ifcfgs
+        fi
+      done
+    done
+  fi
+
 elif [ "${1}" = "late" ]; then
   echo "Installing addon misc - ${1}"
 
@@ -189,11 +211,21 @@ elif [ "${1}" = "late" ]; then
 
   # network
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
-  for I in $(seq 0 7); do
-    if [ -f "/etc/sysconfig/network-scripts/ifcfg-eth${I}" ] && [ ! -f "/tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-eth${I}" ]; then
-      cp -vf "/etc/sysconfig/network-scripts/ifcfg-eth${I}" "/tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-eth${I}"
-    fi
+  mkdir -p /tmpRoot/etc/sysconfig/network-scripts
+  mkdir -p /tmpRoot/etc.defaults/sysconfig/network-scripts
+  for I in $(ls /etc/sysconfig/network-scripts/ifcfg-eth*); do
+    [ ! -f "/tmpRoot/${I}" ] && cp -vf "${I}" "/tmpRoot/${I}"
+    [ ! -f "/tmpRoot/${I/etc/etc.defaults}" ] && cp -vf "${I}" "/tmpRoot/${I/etc/etc.defaults}"
   done
+  if grep -q 'network.' /proc/cmdline && [ -f "/etc/ifcfgs" ]; then
+    for ETH in $(cat /etc/ifcfgs); do
+      echo "Copy ifcfg-${ETH}"
+      if [ -f "/etc/sysconfig/network-scripts/ifcfg-${ETH}" ]; then
+        cp -vf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc/sysconfig/network-scripts/
+        cp -vf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/
+      fi
+    done
+  fi
 
   # packages
   if [ ! -f /tmpRoot/usr/syno/etc/packages/feeds ]; then
