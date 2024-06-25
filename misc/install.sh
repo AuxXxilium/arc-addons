@@ -77,6 +77,8 @@ EOF
   # error message
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
     sed -i 's/c("welcome","desc_install")/"Error: The Bootloader Disk is not successfully mounted! The Installation will fail!!!"/' /usr/syno/web/main.js
+  else
+    sed -i 's/c("welcome","desc_install")/"Welcome to DSM Installation. Your Arc Loader is working properly!"/' /usr/syno/web/main.js
   fi
 
   # recovery.cgi
