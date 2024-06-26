@@ -11,7 +11,6 @@ bin_file="synocodectool"
 conf_file="activation.conf"
 conf_path="/usr/syno/etc/codec"
 conf_string='{"success":true,"activated_codec":["hevc_dec","ac3_dec","h264_dec","h264_enc","aac_dec","aac_enc","mpeg4part2_dec","vc1_dec","vc1_enc"],"token":"123456789987654abc"}'
-opmode="patchhelp"
 
 #arrays
 declare -A binhash_version_list=(
@@ -194,19 +193,6 @@ declare -a versions_list=(
     "7.2.1 69057-5"
 )
 
-#functions
-print_usage() { 
-printf "
-SYNOPSIS
-    patch.sh [-h] [-p|-r|-l]
-DESCRIPTION
-    Patch to enable transcoding without a valid serial in DSM 6+
-        -h      Print this help message
-        -p      Patch synocodectool
-        -r      Restore from original from backup
-        -l      List supported DSM versions
-"
-}
 check_path () {
     for i in "${path_list[@]}"; do
         if [ -e "$i/$bin_file" ]; then
@@ -227,34 +213,6 @@ list_versions () {
         echo "$i"
     done
     return 0
-}
-
-patch_menu() {
-    local options=("$@")
-    echo "Available binaries to patch/restore:"
-    local PS3="Please choose which binary you want to patch/restore:"
-    select option in "${options[@]}" "Quit"; do    
-    if [[ $REPLY = "$(( ${#options[@]}+1 ))" ]] ; then
-        echo "Goodbye"
-        exit 0
-    fi
-    bin_path="$option"
-    break
-done
-}
-
-restore_menu() {
-    local options=("$@")
-    echo "Available backups to restore:"
-    local PS3="Please choose which binary you want to restore to $bin_path:"
-    select option in "${options[@]}" "Quit"; do    
-    if [[ $REPLY = "$(( ${#options[@]}+1 ))" ]] ; then
-        echo "Goodbye"
-        exit 0
-    fi
-    backup_file="$option"
-    break
-done
 }
 
 patch_common () {
@@ -281,12 +239,15 @@ patch_common () {
         echo "Something went wrong. Could not find synocodectool"
         exit 1
     fi
-    
-    patch_menu "${binpath_list[@]}"
+    for i in "${binpath_list[@]}"; do
+        echo -e "Patching $i"
+        bin_path="$i"
+        patch
+    done
+    exit 0
 }
 
 patch () {
-    patch_common
     local backup_path="${bin_path%??????????????}/backup"
     local synocodectool_hash="$(sha1sum "$bin_path" | cut -f1 -d\ )"
     if [[ "${binhash_version_list[$synocodectool_hash]+isset}" ]] ; then
@@ -303,21 +264,18 @@ patch () {
                     echo "$conf_string" > "$conf_path/$conf_file"
                     chattr +i "$conf_path/$conf_file"
                     echo "Spoofed activation.conf created successfully"
-                    exit 0
                     else
                     chattr -i "$conf_path/$conf_file"
                     rm "$conf_path/$conf_file"
                     echo "$conf_string" > "$conf_path/$conf_file"
                     chattr +i "$conf_path/$conf_file"
                     echo "Spoofed activation.conf created successfully"
-                    exit 0
                 fi
             else
                 echo "Corrupted backup and original synocodectool detected. Overwriting backup..."
                 mkdir -p "$backup_path"
                 cp -p "$bin_path" \
                 "$backup_path/$bin_file.$backup_identifier"
-                exit 0
             fi
         else    
             echo "Detected valid synocodectool. Creating backup.."
@@ -333,14 +291,12 @@ patch () {
                 echo "$conf_string" > "$conf_path/$conf_file"
                 chattr +i "$conf_path/$conf_file"
                 echo "Spoofed activation.conf created successfully"
-                exit 0
             else
                 chattr -i "$conf_path/$conf_file"
                 rm "$conf_path/$conf_file"
                 echo "$conf_string" > "$conf_path/$conf_file"
                 chattr +i "$conf_path/$conf_file"
                 echo "Spoofed activation.conf created successfully"
-                exit 0
             fi
         fi
     elif [[ "${patchhash_binhash_list[$synocodectool_hash]+isset}" ]]; then
@@ -350,7 +306,6 @@ patch () {
             backup_hash="$(sha1sum "$backup_path/$bin_file.$backup_identifier" | cut -f1 -d\ )"
             if [[ "$original_hash"="$backup_hash" ]]; then
                 echo "Valid backup and patched synocodectool detected. Skipping patch."
-                exit 0
             else
                 echo "Patched synocodectool and corrupted backup detected. Skipping patch."
                 exit 1
@@ -419,21 +374,4 @@ if [ ! ${USER} = "root" ]; then
     exit 1
 fi
 
-while getopts "prhl" flag; do
-    case "${flag}" in
-        p) opmode="patch";;
-        r) opmode="patchrollback" ;;
-        h) opmode="${opmode}" ;;
-        l) opmode="listversions" ;;
-        *) echo "Incorrect option specified in command line" ; exit 2 ;;
-    esac
-done
-
-case "${opmode}" in
-    patch) patch ;;
-    patchrollback) rollback ;;
-    patchhelp) print_usage ; exit 2 ;;
-    listversions) list_versions ;;
-    *) echo "Incorrect combination of flags. Use option -h to get help."
-       exit 2 ;;
-esac
+patch_common
