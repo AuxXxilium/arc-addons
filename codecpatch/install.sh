@@ -30,6 +30,18 @@ if [ "${1}" = "late" ]; then
     echo                                                 >>${DEST}
     echo "[Install]"                                     >>${DEST}
     echo "WantedBy=multi-user.target"                    >>${DEST}
+
+    mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+    ln -vsf /usr/lib/systemd/system/codecpatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service
+
+    echo "insert codecpatch & amepatch... task to esynoscheduler.db"
+    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+DELETE FROM task WHERE task_name LIKE 'Amepatch';
+INSERT INTO task VALUES('Amepatch', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/bin/amepatch.sh', 'script', '{}', '', '', '{}', '{}');
+DELETE FROM task WHERE task_name LIKE 'Codecpatch';
+INSERT INTO task VALUES('Codecpatch', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/bin/codecpatch.sh', 'script', '{}', '', '', '{}', '{}');
+EOF
   else
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/codecpatch.service"
@@ -44,9 +56,17 @@ if [ "${1}" = "late" ]; then
     echo                                                 >>${DEST}
     echo "[Install]"                                     >>${DEST}
     echo "WantedBy=multi-user.target"                    >>${DEST}
+
+    mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+    ln -vsf /usr/lib/systemd/system/codecpatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service
+
+    echo "insert codecpatch... task to esynoscheduler.db"
+    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+DELETE FROM task WHERE task_name LIKE 'Codecpatch';
+INSERT INTO task VALUES('Codecpatch', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/bin/codecpatch.sh', 'script', '{}', '', '', '{}', '{}');
+EOF
   fi
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/codecpatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon codecpatch - ${1}"
 
