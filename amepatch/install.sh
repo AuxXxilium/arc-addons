@@ -10,6 +10,7 @@ if [ "${1}" = "late" ]; then
   echo "Installing addon amepatch - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+
   if [ -f "/usr/bin/codecpatch.sh" ]; then
     echo -e "AME Patch: Codecpatch found -> skipping"
   else
@@ -25,19 +26,13 @@ if [ "${1}" = "late" ]; then
     echo "Type=oneshot"                                  >>${DEST}
     echo "RemainAfterExit=yes"                           >>${DEST}
     echo "ExecStart=/bin/ash /usr/bin/amepatch.sh"       >>${DEST}
+    echo "ExecStop=/bin/ash /usr/bin/amepatch.sh"        >>${DEST}
     echo                                                 >>${DEST}
     echo "[Install]"                                     >>${DEST}
     echo "WantedBy=multi-user.target"                    >>${DEST}
 
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
-
-    echo "insert amepatch... task to esynoscheduler.db"
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
-DELETE FROM task WHERE task_name LIKE 'Amepatch';
-INSERT INTO task VALUES('Amepatch', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/bin/amepatch.sh', 'script', '{}', '', '', '{}', '{}');
-EOF
   fi
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon amepatch - ${1}"
