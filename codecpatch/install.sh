@@ -24,10 +24,10 @@ if [ "${1}" = "late" ]; then
     echo "[Service]"                                     >>${DEST}
     echo "Type=oneshot"                                  >>${DEST}
     echo "RemainAfterExit=yes"                           >>${DEST}
-    echo "ExecStartPre=/bin/ash /usr/bin/codecpatch.sh"  >>${DEST}
-    echo "ExecStart=/bin/ash /usr/bin/amepatch.sh"       >>${DEST}
-    echo "ExecStop=/bin/ash /usr/bin/codecpatch.sh"      >>${DEST}
-    echo "ExecStopPost=/bin/ash /usr/bin/amepatch.sh"    >>${DEST}
+    echo "ExecStartPre=/usr/bin/codecpatch.sh"           >>${DEST}
+    echo "ExecStart=/usr/bin/amepatch.sh"                >>${DEST}
+    echo "ExecStop=/usr/bin/codecpatch.sh"               >>${DEST}
+    echo "ExecStopPost=usr/bin/amepatch.sh"              >>${DEST}
     echo                                                 >>${DEST}
     echo "[Install]"                                     >>${DEST}
     echo "WantedBy=multi-user.target"                    >>${DEST}
@@ -44,8 +44,8 @@ if [ "${1}" = "late" ]; then
     echo "[Service]"                                     >>${DEST}
     echo "Type=oneshot"                                  >>${DEST}
     echo "RemainAfterExit=yes"                           >>${DEST}
-    echo "ExecStart=/bin/ash /usr/bin/codecpatch.sh"     >>${DEST}
-    echo "ExecStop=/bin/ash /usr/bin/codecpatch.sh"      >>${DEST}
+    echo "ExecStart=/usr/bin/codecpatch.sh"              >>${DEST}
+    echo "ExecStop=/usr/bin/codecpatch.sh"               >>${DEST}
     echo                                                 >>${DEST}
     echo "[Install]"                                     >>${DEST}
     echo "WantedBy=multi-user.target"                    >>${DEST}
@@ -62,6 +62,5 @@ elif [ "${1}" = "uninstall" ]; then
   [ -f "/tmpRoot/usr/bin/amepatch.sh" ] && rm -f "/tmpRoot/usr/bin/amepatch.sh"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
-  echo "/usr/bin/codecpatch.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/codecpatch.sh" >>/tmpRoot/usr/arc/revert.sh
 fi

@@ -25,8 +25,8 @@ if [ "${1}" = "late" ]; then
     echo "[Service]"                                     >>${DEST}
     echo "Type=oneshot"                                  >>${DEST}
     echo "RemainAfterExit=yes"                           >>${DEST}
-    echo "ExecStart=/bin/ash /usr/bin/amepatch.sh"       >>${DEST}
-    echo "ExecStop=/bin/ash /usr/bin/amepatch.sh"        >>${DEST}
+    echo "ExecStart=/usr/bin/amepatch.sh"                >>${DEST}
+    echo "ExecStop=/usr/bin/amepatch.sh"                 >>${DEST}
     echo                                                 >>${DEST}
     echo "[Install]"                                     >>${DEST}
     echo "WantedBy=multi-user.target"                    >>${DEST}
@@ -41,6 +41,5 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/amepatch.service"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
-  echo "/usr/bin/amepatch.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/amepatch.sh" >>/tmpRoot/usr/arc/revert.sh
 fi
