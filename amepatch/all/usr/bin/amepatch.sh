@@ -11,8 +11,6 @@
 cp_usr_path="/var/packages/CodecPack/target/usr"
 
 if [ -d "$cp_usr_path" ]; then
-    . /etc.defaults/VERSION
-
     values=('669066909066906690' 'B801000000' '30')
     hex_values=('1F28' '48F5' '4921' '4953' '4975' '9AC8')
     indices=(0 1 1 1 1 2)
@@ -83,5 +81,4 @@ if [ -d "$cp_usr_path" ]; then
         echo -e "AME Patch: Unsuccessful!"
         exit 1
     fi
-    break
 fi
