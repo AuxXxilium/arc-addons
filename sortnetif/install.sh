@@ -6,6 +6,30 @@
 # See /LICENSE for more information.
 #
 
+# Get values in synoinfo.conf K=V file
+# 1 - key
+function _get_conf_kv() {
+  grep "${1}=" /etc/synoinfo.conf 2>/dev/null | sed "s|^${1}=\"\(.*\)\"$|\1|g"
+}
+
+# Replace/add values in synoinfo.conf K=V file
+# Args: $1 rd|hd, $2 key, $3 val
+function _set_conf_kv() {
+  local ROOT
+  local FILE
+  [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
+  for SD in etc etc.defaults; do
+    FILE="${ROOT}/${SD}/synoinfo.conf"
+    # Replace
+    if grep -q "^$2=" ${FILE}; then
+      sed -i ${FILE} -e "s\"^$2=.*\"$2=\\\"$3\\\"\""
+    else
+      # Add if doesn't exist
+      echo "$2=\"$3\"" >>${FILE}
+    fi
+  done
+}
+
 if [ "${1}" = "patches" ]; then
   echo "Installing addon sortnetif - ${1}"
 
@@ -16,58 +40,30 @@ if [ "${1}" = "patches" ]; then
     BUS="$(ethtool -i ${ETH} 2>/dev/null | grep bus-info | cut -d' ' -f2)"
     ETHLIST="${ETHLIST}${BUS} ${MAC} ${ETH}\n"
   done
-
+  ETHLISTTMPM=""
+  ETHLISTTMPB="$(echo -e "${ETHLIST}" | sort)"
   if [ -n "${2}" ]; then
     MACS="$(echo "${2}" | sed 's/://g' | tr '[:upper:]' '[:lower:]' | tr ',' ' ')"
-    ETHLISTTMPC=""
-    ETHLISTTMPF=""
-
     for MACX in ${MACS}; do
-      ETHLISTTMPC="${ETHLISTTMPC}$(echo -e "${ETHLIST}" | grep "${MACX}")\n"
+      ETHLISTTMPM="${ETHLISTTMPM}$(echo -e "${ETHLISTTMPB}" | grep "${MACX}")\n"
+      ETHLISTTMPB="$(echo -e "${ETHLISTTMPB}" | grep -v "${MACX}")\n"
     done
-
-    while read -r BUS MAC ETH; do
-      [ -z "${MAC}" ] && continue
-      if echo "${MACS}" | grep -q "${MAC}"; then continue; fi
-      ETHLISTTMPF="${ETHLISTTMPF}${BUS} ${MAC} ${ETH}\n"
-    done <<EOF
-$(echo -e ${ETHLIST} | sort)
-EOF
-    ETHLIST="${ETHLISTTMPC}${ETHLISTTMPF}"
-  else
-    ETHLIST="$(echo -e "${ETHLIST}" | sort)"
   fi
-  ETHLIST="$(echo -e "${ETHLIST}" | grep -v '^$')"
+  ETHLIST="$(echo -e "${ETHLISTTMPM}${ETHLISTTMPB}" | grep -v '^$')"
+  ETHSEQ="$(echo -e "${ETHLIST}" | awk '{print $3}' | sed 's/eth//g' | tr '\n' ' ')"
+  ETHNUM="$(echo -e "${ETHLIST}" | wc -l)"
 
-  echo -e "${ETHLIST}" >/tmp/ethlist
-  cat /tmp/ethlist
+  _set_conf_kv rd netif_seq "${ETHSEQ}"
 
-  # sort
-  IDX=0
-  while true; do
-    cat /tmp/ethlist
-    [ ${IDX} -ge $(wc -l </tmp/ethlist) ] && break
-    ETH="$(cat /tmp/ethlist | sed -n "$((${IDX} + 1))p" | cut -d' ' -f3)"
-    echo "ETH: ${ETH}"
-    if [ -n "${ETH}" ] && [ ! "${ETH}" = "eth${IDX}" ]; then
-      echo "change ${ETH} <=> eth${IDX}"
-      ip link set dev eth${IDX} down
-      ip link set dev ${ETH} down
-      sleep 1
-      ip link set dev eth${IDX} name ethN
-      ip link set dev ${ETH} name eth${IDX}
-      ip link set dev ethN name ${ETH}
-      sleep 1
-      ip link set dev eth${IDX} up
-      ip link set dev ${ETH} up
-      sleep 1
-      sed -i "s/eth${IDX}/ethN/" /tmp/ethlist
-      sed -i "s/${ETH}/eth${IDX}/" /tmp/ethlist
-      sed -i "s/ethN/${ETH}/" /tmp/ethlist
-      sleep 1
-    fi
-    IDX=$((${IDX} + 1))
-  done
+  if [ -x /usr/syno/bin/synonetseqadj ]; then
+    /usr/syno/bin/synonetseqadj
+  else
+    echo "sortnetif error: synonetseqadj not found!"
+  fi
 
-  rm -f /tmp/ethlist
+elif [ "${1}" = "late" ]; then
+  echo "Installing addon sortnetif - ${1}"
+
+  ETHSEQ="$(_get_conf_kv netif_seq)"
+  _set_conf_kv hd netif_seq "${ETHSEQ}"
 fi
