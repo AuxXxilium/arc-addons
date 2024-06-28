@@ -44,12 +44,6 @@ function compile-addon() {
   OUT_PATH="${TMP_PATH}/${1}"
   rm -rf "${OUT_PATH}"
   mkdir -p "${OUT_PATH}"
-  VER=$(readConfigKey "version" "${MANIFEST}")
-  # Check manifest version
-  if [ ${VER} -ne 1 ]; then
-    echo -e "\033[1;44mWarning: version ${VER} of manifest not suported, ignoring it\033[0m"
-    return 0
-  fi
   # Check if has compile script
   COMPILESCRIPT=$(readConfigKey "compile-script" "${MANIFEST}")
   if [ -n "${COMPILESCRIPT}" ]; then
