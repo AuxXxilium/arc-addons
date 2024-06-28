@@ -15,22 +15,24 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/codecpatch.service"
-  echo "[Unit]"                                         >${DEST}
-  echo "Description=addon codecpatch"                  >>${DEST}
-  echo "After=multi-user.target"                       >>${DEST}
-  echo                                                 >>${DEST}
-  echo "[Service]"                                     >>${DEST}
-  echo "Type=oneshot"                                  >>${DEST}
-  echo "Restart=on-failure"                            >>${DEST}
-  echo "RestartSec=5s"                                 >>${DEST}
-  echo "RemainAfterExit=yes"                           >>${DEST}
-  echo "ExecStartPre=synopkg stop CodecPack"           >>${DEST}
-  echo "ExecStart=/usr/bin/codecpatch.sh"              >>${DEST}
-  echo "ExecStartPost=/usr/bin/amepatch.sh"            >>${DEST}
-  echo "ExecStartPost=synopkg restart CodecPack"       >>${DEST}
-  echo                                                 >>${DEST}
-  echo "[Install]"                                     >>${DEST}
-  echo "WantedBy=multi-user.target"                    >>${DEST}
+  cat > ${DEST} <<'EOF'
+[Unit]
+Description=addon codecpatch
+After=multi-user.target
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5s
+RemainAfterExit=yes
+ExecStartPre=/usr/syno/binsynopkg stop CodecPack
+ExecStart=/usr/bin/codecpatch.sh
+ExecStartPost=/usr/bin/amepatch.sh
+ExecStartPost=/usr/syno/bin/synopkg restart CodecPack
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/codecpatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service

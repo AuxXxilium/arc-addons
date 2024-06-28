@@ -13,7 +13,7 @@ cp_usr_path="/var/packages/CodecPack/target/usr"
 if [ -f "/usr/arc/amepatch.enabled" ]; then
     echo "AME Patch: already enabled"
     exit 0
-elif [ -d "$cp_usr_path" ]; then
+elif [ -d $cp_usr_path ]; then
     values=('669066909066906690' 'B801000000' '30')
     hex_values=('1F28' '48F5' '4921' '4953' '4975' '9AC8')
     indices=(0 1 1 1 1 2)
@@ -64,9 +64,9 @@ elif [ -d "$cp_usr_path" ]; then
     rm -f "${lic}"
     echo "${content}" >"${lic}"
 
-    if "$cp_usr_path/bin/synoame-bin-check-license"; then
+    if $cp_usr_path/bin/synoame-bin-check-license; then
         echo -e "AME Patch: Downloading Codec!"
-        if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
+        if $cp_usr_path/bin/synoame-bin-auto-install-needed-codec; then
             echo -e "AME Patch: Successful!"
             echo "AME Patch: Successful!" > /usr/arc/amepatch.enabled
         else
