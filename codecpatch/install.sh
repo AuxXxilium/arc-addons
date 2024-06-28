@@ -26,8 +26,6 @@ if [ "${1}" = "late" ]; then
     echo "RemainAfterExit=yes"                           >>${DEST}
     echo "ExecStartPre=/usr/bin/codecpatch.sh"           >>${DEST}
     echo "ExecStart=/usr/bin/amepatch.sh"                >>${DEST}
-    echo "ExecStop=/usr/bin/codecpatch.sh"               >>${DEST}
-    echo "ExecStopPost=usr/bin/amepatch.sh"              >>${DEST}
     echo                                                 >>${DEST}
     echo "[Install]"                                     >>${DEST}
     echo "WantedBy=multi-user.target"                    >>${DEST}
@@ -45,7 +43,6 @@ if [ "${1}" = "late" ]; then
     echo "Type=oneshot"                                  >>${DEST}
     echo "RemainAfterExit=yes"                           >>${DEST}
     echo "ExecStart=/usr/bin/codecpatch.sh"              >>${DEST}
-    echo "ExecStop=/usr/bin/codecpatch.sh"               >>${DEST}
     echo                                                 >>${DEST}
     echo "[Install]"                                     >>${DEST}
     echo "WantedBy=multi-user.target"                    >>${DEST}

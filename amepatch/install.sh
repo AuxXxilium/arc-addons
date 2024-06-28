@@ -10,12 +10,11 @@ if [ "${1}" = "late" ]; then
   echo "Installing addon amepatch - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -vf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
 
   if [ -f "/usr/bin/codecpatch.sh" ]; then
     echo -e "AME Patch: Codecpatch found -> skipping"
   else
-    cp -vf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
-
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/amepatch.service"
     echo "[Unit]"                                         >${DEST}
@@ -26,7 +25,6 @@ if [ "${1}" = "late" ]; then
     echo "Type=oneshot"                                  >>${DEST}
     echo "RemainAfterExit=yes"                           >>${DEST}
     echo "ExecStart=/usr/bin/amepatch.sh"                >>${DEST}
-    echo "ExecStop=/usr/bin/amepatch.sh"                 >>${DEST}
     echo                                                 >>${DEST}
     echo "[Install]"                                     >>${DEST}
     echo "WantedBy=multi-user.target"                    >>${DEST}
