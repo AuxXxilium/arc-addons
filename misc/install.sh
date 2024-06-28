@@ -77,8 +77,6 @@ EOF
   # error message
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
     sed -i 's/c("welcome","desc_install")/"Error: The Bootloader Disk is not successfully mounted! The Installation will fail!!!"/' /usr/syno/web/main.js
-  else
-    sed -i 's/c("welcome","desc_install")/"Welcome to DSM Installation. Your Arc Loader is working properly!"/' /usr/syno/web/main.js
   fi
 
   # recovery.cgi
@@ -148,13 +146,14 @@ elif [ "${1}" = "late" ]; then
   modprobe acpi-cpufreq
   # CPU performance scaling
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
-    if [ -d /tmpRoot/sys/devices/system/cpu/cpu0/cpufreq ]; then
+    CPUFREQ=$(ls -ltr /sys/devices/system/cpu/cpufreq/* 2>/dev/null | wc -l)
+    if [ ${CPUFREQ} -eq 0 ]; then
+      echo "CPU does NOT support CPU Performance Scaling, disabling"
+      sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
+    else
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
       cp -vf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
-    else
-      echo "CPU does NOT support CPU Performance Scaling, disabling"
-      sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
     fi
   fi
   umount /sys
