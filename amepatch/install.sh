@@ -12,6 +12,8 @@ if [ "${1}" = "late" ]; then
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
   cp -vf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
 
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  DEST="/tmpRoot/usr/lib/systemd/system/amepatch.service"
   cat > ${DEST} <<EOF
 [Unit]
 Description=addon amepatch
