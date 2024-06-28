@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-if [ -d "$cp_usr_path" ]; then
+if [ -d "/var/packages/CodecPack" ]; then
     /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
 
     cp_usr_path="/var/packages/CodecPack/target/usr"
@@ -82,5 +82,5 @@ if [ -d "$cp_usr_path" ]; then
         echo -e "AME Patch: Unsuccessful!"
         exit 1
     fi
-    exit 0
 fi
+exit 0
