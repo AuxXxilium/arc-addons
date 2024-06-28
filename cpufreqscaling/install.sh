@@ -19,41 +19,43 @@ if [ "${1}" = "late" ]; then
   if [ "${2}" = "userspace" ]; then
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
-    echo "[Unit]"                                              >${DEST}
-    echo "Description=Enable CPU Freq scaling"                 >>${DEST}
-    echo "DefaultDependencies=no"                              >>${DEST}
-    echo "IgnoreOnIsolate=true"                                >>${DEST}
-    echo "After=multi-user.target"                             >>${DEST}
-    echo                                                       >>${DEST}
-    echo "[Service]"                                           >>${DEST}
-    echo "User=root"                                           >>${DEST}
-    echo "Restart=always"                                      >>${DEST}
-    echo "RestartSec=30"                                       >>${DEST}
-    echo "ExecStart=/bin/ash /usr/sbin/scaler.sh"              >>${DEST}
-    echo                                                       >>${DEST}
-    echo "[X-Synology]"                                        >>${DEST}
-    echo "Author=Virtualization Team"                          >>${DEST}
+    cat > ${DEST} <<EOF
+[Unit]
+Description=Enable CPU Freq scaling
+DefaultDependencies=no
+IgnoreOnIsolate=true
+After=multi-user.target
 
+[Service]
+User=root
+Restart=always
+RestartSec=30
+ExecStart=/bin/ash /usr/sbin/scaler.sh
+
+[X-Synology]
+Author=Virtualization Team
+EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
   else
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
-    echo "[Unit]"                                              >${DEST}
-    echo "Description=Enable CPU Freq scaling"                 >>${DEST}
-    echo "DefaultDependencies=no"                              >>${DEST}
-    echo "IgnoreOnIsolate=true"                                >>${DEST}
-    echo "After=multi-user.target"                             >>${DEST}
-    echo                                                       >>${DEST}
-    echo "[Service]"                                           >>${DEST}
-    echo "User=root"                                           >>${DEST}
-    echo "Type=oneshot"                                        >>${DEST}
-    echo "RemainAfterExit=yes"                                 >>${DEST}
-    echo "ExecStart=/bin/ash /usr/sbin/rescaler.sh ${2}"       >>${DEST}
-    echo                                                       >>${DEST}
-    echo "[X-Synology]"                                        >>${DEST}
-    echo "Author=Virtualization Team"                          >>${DEST}
+    cat > ${DEST} <<EOF
+[Unit]
+Description=Enable CPU Freq scaling
+DefaultDependencies=no
+IgnoreOnIsolate=true
+After=multi-user.target
 
+[Service]
+User=root
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/ash /usr/sbin/rescaler.sh ${2}
+
+[X-Synology]
+Author=Virtualization Team
+EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
   fi

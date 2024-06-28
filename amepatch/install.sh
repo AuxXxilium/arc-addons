@@ -12,7 +12,7 @@ if [ "${1}" = "late" ]; then
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
   cp -vf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
 
-  cat > ${DEST} <<'EOF'
+  cat > ${DEST} <<EOF
 [Unit]
 Description=addon amepatch
 After=multi-user.target
@@ -29,7 +29,6 @@ ExecStartPost=/usr/syno/bin/systemctl stop amepatch
 [Install]
 WantedBy=multi-user.target
 EOF
-
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
   fi
