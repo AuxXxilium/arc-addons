@@ -67,8 +67,6 @@ elif [ -d "$cp_usr_path" ]; then
     if "$cp_usr_path/bin/synoame-bin-check-license"; then
         echo -e "AME Patch: Downloading Codec!"
         if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
-            echo -e "AME Patch: Restart AME!"
-            synopkg restart CodecPack
             echo -e "AME Patch: Successful!"
             echo "AME Patch: Successful!" > /usr/arc/amepatch.enabled
         else

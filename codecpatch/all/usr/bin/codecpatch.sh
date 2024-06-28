@@ -1,10 +1,12 @@
-#!/bin/ash
-
-# https://github.com/wirgen/synocodectool-patch
-# 2023/11/1
+#!/usr/bin/env bash
+#
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
 
 set -eo pipefail;
-shopt -s nullglob;
 
 #variables
 bin_file="synocodectool"
