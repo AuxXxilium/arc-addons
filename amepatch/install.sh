@@ -33,12 +33,17 @@ WantedBy=multi-user.target
 EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
-  fi
+
+    # Cleanup codecpatch
+    [ -f "/tmpRoot/usr/bin/codecpatch.sh" ] && rm -f "/tmpRoot/usr/bin/codecpatch.sh"
+    [ -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service" ] && rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service"
+    [ -f "/tmpRoot/usr/lib/systemd/system/codecpatch.service" ] && rm -f "/tmpRoot/usr/lib/systemd/system/codecpatch.service"
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon amepatch - ${1}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/amepatch.service"
+  rm -f "/tmpRoot/usr/bin/amepatch.sh"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/amepatch.sh" >>/tmpRoot/usr/arc/revert.sh
