@@ -235,16 +235,10 @@ if [ ! ${USER} = "root" ]; then
     exit 1
 fi
 
-if [ -f "/usr/arc/codecpatch.enabled" ]; then
-    echo "Codecpatch: Already enabled!"
+if patch_common; then
+    echo "Codecpatch: Successful!"
     exit 0
 else
-    if patch_common; then
-        echo "Codecpatch: Successful!"
-        echo "Codecatch: Successful!" > /usr/arc/codecpatch.enabled
-        exit 0
-    else
-        echo "Codecatch: Failed!"
-        exit 1
-    fi
+    echo "Codecpatch: Failed!"
+    exit 1
 fi
