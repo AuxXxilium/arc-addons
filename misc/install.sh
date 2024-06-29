@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -76,7 +76,7 @@ EOF
 
   # error message
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
-    sed -i 's/c("welcome","desc_install")/"Error: The Bootloader Disk is not successfully mounted! The Installation will fail!!!"/' /usr/syno/web/main.js
+    sed -i 's/c("welcome","desc_install")/"Error: The bootloader disk is not successfully mounted, the installation will fail."/' /usr/syno/web/main.js
   fi
 
   # recovery.cgi
@@ -208,7 +208,7 @@ elif [ "${1}" = "late" ]; then
 
   # sdcard
   cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
-  echo -en '#!/bin/sh\nexit 0\n' > /tmpRoot/usr/lib/udev/script/sdcard.sh
+  echo -en '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
 
   # network
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
@@ -232,21 +232,6 @@ elif [ "${1}" = "late" ]; then
   if [ ! -f /tmpRoot/usr/syno/etc/packages/feeds ]; then
     mkdir -p /tmpRoot/usr/syno/etc/packages
     echo '[{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/tmpRoot/usr/syno/etc/packages/feeds
-  fi
-
-  # syslog-ng
-  if [ -f /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf ]; then
-    cp -vfp /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf.bak
-    sed -i 's/destination(d_scemd)/flags(final)/g' /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf
-  else
-    echo "scemd.conf does not exist."
-  fi
-
-  if [ -f /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf ]; then
-    cp -vfp /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf.bak
-    sed -i 's/destination(d_synosystemd)/flags(final)/g; s/destination(d_systemd)/flags(final)/g' /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf
-  else
-    echo "synosystemd.conf does not exist."
   fi
 
   # copy loader-reboot.sh

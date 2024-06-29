@@ -34,4 +34,4 @@ if [ -f "${FILE}" ]; then
   fi
 fi
 
-exit
+exit 0
