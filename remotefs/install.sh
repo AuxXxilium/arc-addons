@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2022 Ing <https://github.com/wjz304>
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -10,35 +10,24 @@ if [ "${1}" = "late" ]; then
   echo "Installing addon remotefs - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
-  
-  cp -vf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
-  cp -vf /usr/bin/remotefs.sh /tmpRoot/usr/bin/remotefs.sh
 
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/remotefs.service"
-  echo "[Unit]"                                                    >${DEST}
-  echo "Description=Enable face recognition in Synology Photos"   >>${DEST}
-  echo "After=multi-user.target"                                  >>${DEST}
-  echo                                                            >>${DEST}
-  echo "[Service]"                                                >>${DEST}
-  echo "Type=oneshot"                                             >>${DEST}
-  echo "RemainAfterExit=yes"                                      >>${DEST}
-  echo "ExecStart=/usr/bin/remotefs.sh"                           >>${DEST}
-  echo                                                            >>${DEST}
-  echo "[Install]"                                                >>${DEST}
-  echo "WantedBy=multi-user.target"                               >>${DEST}
-
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/remotefs.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/remotefs.service
+  SO_FILE="/tmpRoot/usr/lib/libsynosdk.so.7"
+  if [ -f "${SO_FILE}" ]; then
+    if [ ! -f "${SO_FILE}.bak" ]; then
+      echo "Backup ${SO_FILE}"
+      cp -vfp "${SO_FILE}" "${SO_FILE}.bak"
+    fi
+    echo "Patching libsynosdk.so.7"
+    PatchELFSharp "${SO_FILE}" "SYNOFSIsRemoteFS" "B8 00 00 00 00 C3"
+  else
+    echo "libsynosdk.so.7 not found"
+  fi
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon remotefs - ${1}"
 
-  rm -f /tmpRoot/usr/bin/PatchELFSharp
-
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/remotefs.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/remotefs.service"
-
-  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
-  echo "/usr/bin/remotefs.sh -r" >> /tmpRoot/usr/arc/revert.sh
-  echo "rm -f /usr/bin/remotefs.sh" >> /tmpRoot/usr/arc/revert.sh
+  SO_FILE="/tmpRoot/usr/lib/libsynosdk.so.7"
+  if [ -f "${SO_FILE}.bak" ]; then
+    echo "Restore ${SO_FILE}"
+    mv -f "${SO_FILE}.bak" "${SO_FILE}"
+  fi
 fi
