@@ -32,6 +32,6 @@ else
   # NOTIFICATION="Arc Notify"
   # synodsmnotify -e false -b false "@administrators" "arc_notify" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\"}"
   # NOTIFICATION="Arc Notify"
-  # SUBJECT="Welcome to <a href=\\\"https://github.com/arcOrg\\\" target=blank>arcOrg</a>!"
+  # SUBJECT="Welcome to <a href=\\\"https://github.com/AuxXxilium\\\" target=blank>AuxXxilium</a>!"
   # synodsmnotify -e false -b false "@administrators" "arc_notify_subject" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\", \"%SUBJECT%\": \"${SUBJECT}\"}"
 fi
