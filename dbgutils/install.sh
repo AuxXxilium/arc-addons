@@ -15,7 +15,8 @@ function getlog() {
   if ! mount | grep -q "${WORK_PATH}"; then
     LOADER_DISK_PART1="$(blkid -L ARC1)"
     [ -z "${LOADER_DISK_PART1}" -a -b "/dev/synoboot1" ] && LOADER_DISK_PART1="/dev/synoboot1"
-    [ -z "${LOADER_DISK_PART1}" ] && echo "Boot disk not found" && exit 1
+    [ -z "${LOADER_DISK_PART1}" ] && echo "dbgutils: Boot disk not found" >"${DEST_PATH}/loaderdisk.log"
+    [ -z "${LOADER_DISK_PART1}" ] && echo "dbgutils: Boot disk not found" && exit 1
 
     modprobe vfat
     echo 1 >/proc/sys/kernel/syno_install_flag
