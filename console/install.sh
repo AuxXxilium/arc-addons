@@ -8,14 +8,14 @@
 
 PLATFORMS="apollolake geminilake epyc7002"
 PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
-if ! echo "${PLATFORM}" | grep -qw "${PLATFORM}"; then
+if ! echo "${PLATFORMS}" | grep -qw "${PLATFORM}"; then
   echo "${PLATFORM} is not supported console addon!"
   exit 0
 fi
 
 if [ "${1}" = "early" ]; then
   echo "Installing addon console - ${1}"
-  tar zxf /addons/console-7.1.tgz -C /usr/
+  tar -zxf /addons/console-7.1.tgz -C /usr/
 
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon console - ${1}"
@@ -54,7 +54,7 @@ elif [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  tar zxf /addons/console-7.1.tgz -C /tmpRoot/usr/
+  tar -zxf /addons/console-7.1.tgz -C /tmpRoot/usr/
   # run when boot installed DSM
   echo -e "DSM mode\n" >/tmpRoot/etc/issue
   cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@.service

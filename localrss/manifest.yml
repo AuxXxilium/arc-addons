@@ -5,7 +5,7 @@ system: true
 beta: false
 all:
   install-script: "install.sh"
-  copy: "all"
+  copy: ""
 apollolake: true
 broadwell: true
 broadwellnk: true
