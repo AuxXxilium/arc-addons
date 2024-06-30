@@ -31,7 +31,7 @@ Restart=always
 RestartSec=5
 RemainAfterExit=yes
 ExecStartPre=/usr/bin/ledcontrol.sh install
-ExecStart=/usr/bin/lecontrol.sh on
+ExecStart=/usr/bin/ledcontrol.sh on
 
 [Install]
 WantedBy=multi-user.target
