@@ -172,9 +172,9 @@ function dtModel() {
         PCIHEAD="$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | head -1)"
         PCIPATH=""
         if [ "$(_kernelVersionCode "$(_kernelVersion)")" -ge "$(_kernelVersionCode "5.10")" ]; then
-          PCIPATH="$(echo "${PCIHEAD}" | grep -oP 'pci\K[0-9]{4}:[0-9]{2}')" # 5.10+ kernel
+          PCIPATH="$(echo "${PCIHEAD}" | grep -oE 'pci[0-9]{4}:[0-9]{2}' | sed 's/pci//')" # 5.10+ kernel
         else
-          PCIPATH="$(echo "${PCIHEAD}" | grep -oP 'pci\K[0-9]{4}:[0-9]{2}' | cut -d':' -f2)" # 5.10- kernel
+          PCIPATH="$(echo "${PCIHEAD}" | grep -oE 'pci[0-9]{4}:[0-9]{2}' | sed 's/pci//' | cut -d':' -f2)" # 5.10- kernel
         fi
         PCISUBS=""
         for Q in $(echo "${PCIHEAD}" | grep -oE ":..\.."); do PCISUBS="${PCISUBS},${Q//:/}"; done
@@ -415,7 +415,7 @@ function nondtModel() {
 if [ "${1}" = "patches" ]; then
   echo "Installing addon disks - ${1}"
 
-  BOOTDISK_PART3_PATH="$(blkid -L ARC3 2>/dev/null)"
+  BOOTDISK_PART3_PATH="$(blkid -L RR3 2>/dev/null)"
   [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
   [ -n "${BOOTDISK_PART3_MAJORMINOR}" ] && BOOTDISK_PART3="$(cat /sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent 2>/dev/null | grep 'DEVNAME' | cut -d'=' -f2)" || BOOTDISK_PART3=""
 

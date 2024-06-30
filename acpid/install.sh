@@ -11,38 +11,37 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  mkdir -p /tmpRoot/etc/acpi/events/
-  cp -vf /etc/acpi/events/power /tmpRoot/etc/acpi/events/power
-  cp -vf /etc/acpi/power.sh /tmpRoot/etc/acpi/power.sh
-  cp -vf /usr/bin/acpi_listen /tmpRoot/usr/bin/acpi_listen
-  cp -vf /usr/sbin/acpid /tmpRoot/usr/sbin/acpid
-  cp -vf /usr/sbin/kacpimon /tmpRoot/usr/sbin/kacpimon
+  tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/usr/ ./bin ./sbin
+  tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/ ./etc ./usr
+  sed -i 's|=/|=-/|g' /tmpRoot/usr/lib/systemd/system/acpid.service
   if [ -f /usr/lib/modules/button.ko ]; then
     cp -vf /usr/lib/modules/button.ko /tmpRoot/usr/lib/modules/button.ko
   else
     echo "No button.ko found"
   fi
 
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/acpid.service"
-  echo "[Unit]"                                               >${DEST}
-  echo "Description=addon acpid"                             >>${DEST}
-  echo "DefaultDependencies=no"                              >>${DEST}
-  echo "IgnoreOnIsolate=true"                                >>${DEST}
-  echo "After=multi-user.target"                             >>${DEST}
-  echo                                                       >>${DEST}
-  echo "[Service]"                                           >>${DEST}
-  echo "Restart=always"                                      >>${DEST}
-  echo "RestartSec=30"                                       >>${DEST}
-  echo "ExecStartPre=-/usr/sbin/modprobe button"             >>${DEST}
-  echo "ExecStart=/usr/sbin/acpid -f"                        >>${DEST}
-  echo "ExecStopPost=-/usr/sbin/modprobe -r button"          >>${DEST}
-  echo                                                       >>${DEST}
-  echo "[X-Synology]"                                        >>${DEST}
-  echo "Author=Virtualization Team"                          >>${DEST}
-
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/acpid.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/acpid.service
+  # mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  # DEST="/tmpRoot/usr/lib/systemd/system/acpid.service"
+  # echo "[Unit]"                                               >${DEST}
+  # echo "Description=ACPI Daemon"                             >>${DEST}
+  # echo "DefaultDependencies=no"                              >>${DEST}
+  # echo "IgnoreOnIsolate=true"                                >>${DEST}
+  # echo "After=multi-user.target"                             >>${DEST}
+  # echo                                                       >>${DEST}
+  # echo "[Service]"                                           >>${DEST}
+  # echo "Type=forking"                                        >>${DEST}
+  # echo "Restart=always"                                      >>${DEST}
+  # echo "RestartSec=30"                                       >>${DEST}
+  # echo "PIDFile=/var/run/acpid.pid"                          >>${DEST}
+  # echo "ExecStartPre=-/usr/sbin/modprobe button"             >>${DEST}
+  # echo "ExecStart=/usr/sbin/acpid"                           >>${DEST}
+  # echo "ExecStopPost=-/usr/sbin/modprobe -r button"          >>${DEST}
+  # echo                                                       >>${DEST}
+  # echo "[X-Synology]"                                        >>${DEST}
+  # echo "Author=Virtualization Team"                          >>${DEST}
+  # 
+  # mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  # ln -vsf /usr/lib/systemd/system/acpid.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/acpid.service
 
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon acpid - ${1}"
@@ -50,8 +49,7 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/acpid.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/acpid.service"
 
-  rm -f /tmpRoot/etc/acpi/events/power
-  rm -f /tmpRoot/etc/acpi/power.sh
+  rm -rf /tmpRoot/etc/acpi
   rm -f /tmpRoot/usr/bin/acpi_listen
   rm -f /tmpRoot/usr/sbin/acpid
   rm -f /tmpRoot/usr/sbin/kacpimon
