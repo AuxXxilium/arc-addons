@@ -1,0 +1,19 @@
+version: 1
+name: ledcontrol
+description: "Add Ugreen Ledcontrol to DSM"
+system: false
+beta: true
+all:
+  install-script: "install.sh"
+  copy: "all"
+apollolake: false
+broadwell: false
+broadwellnk: false
+broadwellnkv2: false
+broadwellntbap: false
+denverton: false
+geminilake: false
+purley: false
+v1000: false
+r1000: false
+epyc7002: true
