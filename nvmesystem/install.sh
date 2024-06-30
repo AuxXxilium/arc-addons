@@ -77,7 +77,7 @@ elif [ "${1}" = "late" ]; then
     ONBOOTUP=""
     ONBOOTUP="${ONBOOTUP}systemctl restart systemd-udev-trigger.service\n"
     ONBOOTUP="${ONBOOTUP}echo \"DELETE FROM task WHERE task_name LIKE ''ARCONBOOTUPARC_UDEV'';\" | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db\n"
-    echo "insert reboottoloader task to esynoscheduler.db"
+    echo "insert ARCONBOOTUPARC_UDEV task to esynoscheduler.db"
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
 DELETE FROM task WHERE task_name LIKE 'ARCONBOOTUPARC_UDEV';
