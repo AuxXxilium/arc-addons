@@ -172,9 +172,9 @@ function dtModel() {
         PCIHEAD="$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | head -1)"
         PCIPATH=""
         if [ "$(_kernelVersionCode "$(_kernelVersion)")" -ge "$(_kernelVersionCode "5.10")" ]; then
-          PCIPATH="$(echo "${PCIHEAD}" | grep -oP 'pci\K[0-9]{4}:[0-9]{2}')" # 5.10+ kernel
+          PCIPATH="$(echo "${PCIHEAD}" | grep -oE 'pci[0-9]{4}:[0-9]{2}' | sed 's/pci//')" # 5.10+ kernel
         else
-          PCIPATH="$(echo "${PCIHEAD}" | grep -oP 'pci\K[0-9]{4}:[0-9]{2}' | cut -d':' -f2)" # 5.10- kernel
+          PCIPATH="$(echo "${PCIHEAD}" | grep -oE 'pci[0-9]{4}:[0-9]{2}' | sed 's/pci//' | cut -d':' -f2)" # 5.10- kernel
         fi
         PCISUBS=""
         for Q in $(echo "${PCIHEAD}" | grep -oE ":..\.."); do PCISUBS="${PCISUBS},${Q//:/}"; done

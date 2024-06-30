@@ -1,6 +1,6 @@
 version: 1
 name: acpid
-description: "Daemon for delivering ACPI events (Shutdown Button, CPU Frequency, etc.)"
+description: "Daemon for delivering ACPI events (Powerbutton, etc.)"
 system: false
 beta: false
 all:
