@@ -30,7 +30,7 @@ After=multi-user.target
 User=root
 Restart=always
 RestartSec=30
-ExecStart=/bin/ash /usr/sbin/scaler.sh
+ExecStart=/usr/sbin/scaler.sh
 
 [X-Synology]
 Author=Virtualization Team
@@ -49,37 +49,17 @@ After=multi-user.target
 
 [Service]
 User=root
-Type=oneshot
+Type=on-failure
+Restart=always
+RestartSec=5
 RemainAfterExit=yes
-ExecStart=/bin/ash /usr/sbin/rescaler.sh ${2}
+ExecStart=/usr/sbin/rescaler.sh ${2}
 
 [X-Synology]
 Author=Virtualization Team
 EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
-  fi
-  if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
-    echo "copy esynoscheduler.db"
-    mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-    cp -vf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
-  fi
-  echo "insert scaling... task to esynoscheduler.db"
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  if [ "${2}" = "userspace" ]; then
-    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
-DELETE FROM task WHERE task_name LIKE 'Rescaler';
-INSERT INTO task VALUES('Rescaler', '', 'bootup', '', 1, 0, 0, 0, '', 0, '/usr/sbin/scaler.sh', 'script', '{}', '', '', '{}', '{}');
-DELETE FROM task WHERE task_name LIKE 'Unscaler';
-INSERT INTO task VALUES('Unscaler', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/sbin/unscaler.sh', 'script', '{}', '', '', '{}', '{}');
-EOF
-  else
-    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
-DELETE FROM task WHERE task_name LIKE 'Rescaler';
-INSERT INTO task VALUES('Rescaler', '', 'bootup', '', 1, 0, 0, 0, '', 0, '/usr/sbin/rescaler.sh ${2}', 'script', '{}', '', '', '{}', '{}');
-DELETE FROM task WHERE task_name LIKE 'Unscaler';
-INSERT INTO task VALUES('Unscaler', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/sbin/unscaler.sh', 'script', '{}', '', '', '{}', '{}');
-EOF
   fi
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing cpufreqscalingscaling - ${1}"
