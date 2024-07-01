@@ -29,8 +29,9 @@ After=multi-user.target
 
 [Service]
 User=root
-Restart=always
-RestartSec=5
+Type=simple
+Restart=on-failure
+RestartSec=5s
 RemainAfterExit=yes
 ExecStart=/usr/bin/ledcontrol.sh on
 
