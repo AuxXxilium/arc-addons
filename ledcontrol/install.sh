@@ -12,9 +12,11 @@ if [ "${1}" = "late" ]; then
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
   
   cp -vf /usr/lib/modules/i2c* /tmpRoot/usr/lib/modules/
-  cp -vf /usr/bin/i2c* /tmpRoot/usr/bin/
   cp -vf /usr/bin/ledcontrol.sh /tmpRoot/usr/bin/ledcontrol.sh
   cp -vf /usr/bin/ugreen_leds_cli /tmpRoot/usr/bin/ugreen_leds_cli
+  modprobe i2c-algo-bit
+  modprobe i2c-smbus
+  modprobe i2c-i801
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
@@ -30,7 +32,6 @@ User=root
 Restart=always
 RestartSec=5
 RemainAfterExit=yes
-ExecStartPre=/usr/bin/ledcontrol.sh install
 ExecStart=/usr/bin/ledcontrol.sh on
 
 [Install]
