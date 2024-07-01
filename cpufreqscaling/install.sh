@@ -28,8 +28,9 @@ After=multi-user.target
 
 [Service]
 User=root
-Restart=always
-RestartSec=30
+Type=simple
+Restart=on-failure
+RestartSec=30s
 ExecStart=/usr/sbin/scaler.sh
 
 [X-Synology]
@@ -49,9 +50,9 @@ After=multi-user.target
 
 [Service]
 User=root
-Type=on-failure
-Restart=always
-RestartSec=5
+Type=simple
+Restart=on-failure
+RestartSec=5s
 RemainAfterExit=yes
 ExecStart=/usr/sbin/rescaler.sh ${2}
 
