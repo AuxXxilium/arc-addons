@@ -24,7 +24,7 @@ elif [ "${1}" = "rcExit" ]; then
   echo "Installing addon misc - ${1}"
 
   mkdir -p /usr/syno/web/webman
-  # clear system disk space
+  # Create: Cleanup Disk
   cat >/usr/syno/web/webman/clean_system_disk.cgi <<EOF
 #!/bin/sh
 
@@ -44,7 +44,7 @@ fi
 EOF
   chmod +x /usr/syno/web/webman/clean_system_disk.cgi
 
-  # reboot to loader
+  # Create: Reboot to Loader
   cat >/usr/syno/web/webman/reboot_to_loader.cgi <<EOF
 #!/bin/sh
 
@@ -58,7 +58,7 @@ fi
 EOF
   chmod +x /usr/syno/web/webman/reboot_to_loader.cgi
 
-  # get logs
+  # Get Boot Logs
   cat >/usr/syno/web/webman/get_logs.cgi <<EOF
 #!/bin/sh
 
@@ -74,12 +74,12 @@ cat /var/log/messages
 EOF
   chmod +x /usr/syno/web/webman/get_logs.cgi
 
-  # error message
+  # Error message if bootloader disk is not mounted
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
     sed -i 's/c("welcome","desc_install")/"Error: The bootloader disk is not successfully mounted, the installation will fail."/' /usr/syno/web/main.js
   fi
 
-  # recovery.cgi
+  # Create: Recovery Mode
   cat >/usr/syno/web/webman/recovery.cgi <<EOF
 #!/bin/sh
 
@@ -117,12 +117,13 @@ echo "Arc Recovery mode is ready"
 EOF
   chmod +x /usr/syno/web/webman/recovery.cgi
 
-  # recovery
+  # Start: Recovery Mode
   if [ -n "$(grep force_junior /proc/cmdline 2>/dev/null)" ] && [ -n "$(grep recovery /proc/cmdline 2>/dev/null)" ]; then
     /usr/syno/web/webman/recovery.cgi
   fi
 
 elif [ "${1}" = "patches" ]; then
+  # Set static IP from cmdline
   if grep -q 'network.' /proc/cmdline; then
     for I in $(grep -o 'network.[0-9a-fA-F:]\{12,17\}=[^ ]*' /proc/cmdline); do
       MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g' | tr '[:upper:]' '[:lower:]')"
@@ -143,7 +144,8 @@ elif [ "${1}" = "patches" ]; then
       done
     done
   fi
-
+  # Update Modelconfig if changed
+  cp -f "/etc.defaults/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"
 elif [ "${1}" = "late" ]; then
   echo "Installing addon misc - ${1}"
 
@@ -155,7 +157,7 @@ elif [ "${1}" = "late" ]; then
 
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
-  # CPU performance scaling
+  # CPU Scaling Driver
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
     CPUFREQ=$(ls -ltr /sys/devices/system/cpu/cpufreq/* 2>/dev/null | wc -l)
     if [ ${CPUFREQ} -eq 0 ]; then
@@ -169,9 +171,8 @@ elif [ "${1}" = "late" ]; then
   fi
   umount /sys
 
-  # crypto-kernel
+  # CPU Crypto Support Check
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf ]; then
-    # crc32c-intel
     CPUFLAGS=$(cat /proc/cpuinfo 2>/dev/null | grep flags | grep sse4_2 | wc -l)
     if [ ${CPUFLAGS} -gt 0 ]; then
       echo "CPU Supports SSE4.2, crc32c-intel should load"
@@ -180,7 +181,6 @@ elif [ "${1}" = "late" ]; then
       sed -i 's/^crc32c-intel/# crc32c-intel/g' /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf
     fi
 
-    # aesni-intel
     CPUFLAGS=$(cat /proc/cpuinfo 2>/dev/null | grep flags | grep aes | wc -l)
     if [ ${CPUFLAGS} -gt 0 ]; then
       echo "CPU Supports AES, aesni-intel should load"
@@ -191,7 +191,7 @@ elif [ "${1}" = "late" ]; then
     fi
   fi
 
-  # Nvidia GPU
+  # Nvidia GPU Check
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf ]; then
     NVIDIADEV=$(cat /proc/bus/pci/devices 2>/dev/null | grep -i 10de | wc -l)
     if [ ${NVIDIADEV} -eq 0 ]; then
@@ -203,25 +203,25 @@ elif [ "${1}" = "late" ]; then
     fi
   fi
 
-  # Open-VM-Tools-Fix
+  # Open-VM-Tools Fix
   if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege
   fi
 
-  # Qemu-Guest-Agent-Fix
+  # Qemu-Guest-Agent Fix
   if [ -d /tmpRoot/var/packages/qemu-ga ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege
   fi
 
-  # service
+  # OOB Service
   SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
   sed -i 's|ExecStart=/|ExecStart=-/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service ${SERVICE_PATH}/syno_update_disk_logs.service
 
-  # sdcard
+  # SD Card
   cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
   echo -en '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
 
-  # network
+  # Network Init
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
   mkdir -p /tmpRoot/etc/sysconfig/network-scripts
   mkdir -p /tmpRoot/etc.defaults/sysconfig/network-scripts
@@ -239,13 +239,13 @@ elif [ "${1}" = "late" ]; then
     done
   fi
 
-  # packages
+  # Community Packages
   if [ ! -f /tmpRoot/usr/syno/etc/packages/feeds ]; then
     mkdir -p /tmpRoot/usr/syno/etc/packages
     echo '[{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/tmpRoot/usr/syno/etc/packages/feeds
   fi
 
-  # copy loader-reboot.sh
+  # Copy Loader Reboot
   cp -vf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin
   cp -vf /usr/bin/grub-editenv /tmpRoot/usr/bin
 fi
