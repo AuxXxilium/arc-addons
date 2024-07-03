@@ -55,20 +55,21 @@ elif [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
-  echo "[Unit]"                                          >${DEST}
-  echo "Description=Modify storage panel"               >>${DEST}
-  echo "After=multi-user.target"                        >>${DEST}
-  echo "After=synoscgi.service"                         >>${DEST}
-  echo "After=storagepanel.service"                     >>${DEST}  # storagepanel
-  echo                                                  >>${DEST}
-  echo "[Service]"                                      >>${DEST}
-  echo "Type=oneshot"                                   >>${DEST}
-  echo "RemainAfterExit=yes"                            >>${DEST}
-  echo "ExecStart=/usr/bin/nvmesystem.sh"               >>${DEST}
-  echo                                                  >>${DEST}
-  echo "[Install]"                                      >>${DEST}
-  echo "WantedBy=multi-user.target"                     >>${DEST}
+  cat > ${DEST} <<EOF
+[Unit]
+Description=Modify storage panel
+After=multi-user.target
+After=synoscgi.service
+After=storagepanel.service
 
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/nvmesystem.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/nvmesystem.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmesystem.service
 
