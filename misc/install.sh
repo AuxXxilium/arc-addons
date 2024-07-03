@@ -144,8 +144,6 @@ elif [ "${1}" = "patches" ]; then
       done
     done
   fi
-  # Update Modelconfig if changed
-  cp -f "/etc.defaults/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"
 elif [ "${1}" = "late" ]; then
   echo "Installing addon misc - ${1}"
 
