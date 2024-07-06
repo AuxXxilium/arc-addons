@@ -64,22 +64,20 @@ if [ -d "/var/packages/CodecPack" ]; then
         echo -e "AME Patch: Downloading Codec!"
         if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
             echo -e "AME Patch: Successful!"
-        else
-            echo -e "AME Patch: Unsuccessful!"
-            exit 1
+            exit 0
         fi
-    else
-        if [ -f "$so_backup" ]; then
-            mv -f "$so_backup" "$so"
-        fi
-        if [ -f "$lic_backup" ]; then
-            mv -f "$lic_backup" "$lic"
-        fi
-        if [ -f "$licsig_backup" ]; then
-            mv -f "$licsig_backup" "$licsig"
-        fi
-        echo -e "AME Patch: Unsuccessful!"
-        exit 1
     fi
+    echo -e "AME Patch: Unsuccessful!"
+    if [ -f "$so_backup" ]; then
+        mv -f "$so_backup" "$so"
+    fi
+    if [ -f "$lic_backup" ]; then
+        mv -f "$lic_backup" "$lic"
+    fi
+    if [ -f "$licsig_backup" ]; then
+        mv -f "$licsig_backup" "$licsig"
+    fi
+    echo -e "AME Patch: Backup restored!"
+    exit 1
 fi
 exit 0
