@@ -6,30 +6,6 @@
 # See /LICENSE for more information.
 #
 
-# Get values in synoinfo.conf K=V file
-# 1 - key
-function _get_conf_kv() {
-  grep "${1}=" /etc/synoinfo.conf 2>/dev/null | sed "s|^${1}=\"\(.*\)\"$|\1|g"
-}
-
-# Replace/add values in synoinfo.conf K=V file
-# Args: $1 rd|hd, $2 key, $3 val
-function _set_conf_kv() {
-  local ROOT
-  local FILE
-  [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
-  for SD in etc etc.defaults; do
-    FILE="${ROOT}/${SD}/synoinfo.conf"
-    # Replace
-    if grep -q "^$2=" ${FILE}; then
-      sed -i ${FILE} -e "s\"^$2=.*\"$2=\\\"$3\\\"\""
-    else
-      # Add if doesn't exist
-      echo "$2=\"$3\"" >>${FILE}
-    fi
-  done
-}
-
 if [ "${1}" = "patches" ]; then
   echo "Installing addon sortnetif - ${1}"
 
@@ -50,20 +26,21 @@ if [ "${1}" = "patches" ]; then
     done
   fi
   ETHLIST="$(echo -e "${ETHLISTTMPM}${ETHLISTTMPB}" | grep -v '^$')"
-  ETHSEQ="$(echo -e "${ETHLIST}" | awk '{print $3}' | sed 's/eth//g' | tr '\n' ' ')"
+  ETHSEQ="$(echo -e "${ETHLIST}" | awk '{print $3}' | sed 's/eth//g')"
   ETHNUM="$(echo -e "${ETHLIST}" | wc -l)"
 
-  _set_conf_kv rd netif_seq "${ETHSEQ}"
-
-  if [ -x /usr/syno/bin/synonetseqadj ]; then
-    /usr/syno/bin/synonetseqadj
-  else
-    echo "sortnetif error: synonetseqadj not found!"
+  echo "${ETHSEQ}"
+  # sort
+  if [ ! "${ETHSEQ}" = "$(seq 0 $((${ETHNUM:0} - 1)))" ]; then
+    /etc/rc.network stop
+    for i in $(seq 0 $((${ETHNUM:0} - 1))); do
+      ip link set dev eth${i} name tmp${i}
+    done
+    I=0
+    for i in ${ETHSEQ}; do
+      ip link set dev tmp${i} name eth${I}
+      I=$((${I} + 1))
+    done
+    /etc/rc.network start
   fi
-
-elif [ "${1}" = "late" ]; then
-  echo "Installing addon sortnetif - ${1}"
-
-  ETHSEQ="$(_get_conf_kv netif_seq)"
-  _set_conf_kv hd netif_seq "${ETHSEQ}"
 fi

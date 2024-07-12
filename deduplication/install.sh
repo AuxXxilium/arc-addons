@@ -15,18 +15,19 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"  
   DEST="/tmpRoot/usr/lib/systemd/system/deduplication.service"
-  echo "[Unit]"                                    >${DEST}
-  echo "Description=Enable Deduplication"         >>${DEST}
-  echo "After=multi-user.target"                  >>${DEST}
-  echo                                            >>${DEST}
-  echo "[Service]"                                >>${DEST}
-  echo "Type=oneshot"                             >>${DEST}
-  echo "RemainAfterExit=yes"                      >>${DEST}
-  echo "ExecStart=/usr/bin/deduplication.sh -st"  >>${DEST}
-  echo                                            >>${DEST}
-  echo "[Install]"                                >>${DEST}
-  echo "WantedBy=multi-user.target"               >>${DEST}
+  cat > ${DEST} <<EOF
+[Unit]
+Description=Enable Deduplication
+After=multi-user.target
 
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/deduplication.sh -s -e
+
+[Install]
+WantedBy=multi-user.target
+EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/deduplication.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/deduplication.service
 elif [ "${1}" = "uninstall" ]; then
