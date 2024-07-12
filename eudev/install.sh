@@ -8,7 +8,8 @@
 
 if [ "${1}" = "early" ]; then
   echo "Installing addon eudev - ${1}"
-  tar zxf /addons/eudev-7.1.tgz -C /
+  tar -zxf /addons/eudev-7.1.tgz -C /
+  [ ! -L "/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /usr/sbin/modinfo
 
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
@@ -37,10 +38,27 @@ elif [ "${1}" = "modules" ]; then
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm && /usr/sbin/rmmod kvm || true
   /usr/sbin/lsmod 2>/dev/null | grep -q ^irqbypass && /usr/sbin/rmmod irqbypass || true
 
+  # getty
+  # Find the getty setting in cmdline
+  for I in $(cat /proc/cmdline 2>/dev/null | grep -oE 'getty=[^ ]+' | sed 's/getty=//'); do
+    TTYN="$(echo "${I}" | cut -d',' -f1)"
+    BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
+    echo "ttyS0 ttyS1 ttyS2" | grep -qw "${TTYN}" && continue
+    if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
+      echo "Starting getty on ${TTYN}"
+      if [ -n "${BAUD}" ]; then
+        /usr/sbin/getty -L "${TTYN}" "${BAUD}" linux &
+      else
+        /usr/sbin/getty -L "${TTYN}" linux & 
+      fi
+    fi
+  done
+
 elif [ "${1}" = "late" ]; then
   echo "Installing addon eudev - ${1}"
-  
+
   [ ! -L "/tmpRoot/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modinfo
+  [ ! -L "/tmpRoot/usr/sbin/depmod" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/depmod
 
   echo "copy modules"
   isChange="false"
