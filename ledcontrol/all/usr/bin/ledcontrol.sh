@@ -83,10 +83,10 @@ elif [ "${1}" = "nic" ]; then
 elif [ "${1}" = "disk" ]; then
     # Get Disks
     devices=$(ls -d /dev/sd[a-z] 2>/dev/null)
-    bootdisk=$(cat /usr/addons/bootdisk)
+    # bootdisk=$(cat /usr/addons/bootdisk)
     # Disks Smart Check
     for i in "${!devices[@]}"; do
-        [ "${devices[$i]}" = "/dev/${bootdisk}" ] && continue
+        # [ "${devices[$i]}" = "/dev/${bootdisk}" ] && continue
         device=${devices[$i]}
         disk_number=$((i + 1))  # Disknummer für die LED-Steuerung (disk1, disk2, etc.)
         color="0 255 0"  # Standardfarbe grün
