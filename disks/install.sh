@@ -424,7 +424,6 @@ if [ "${1}" = "patches" ]; then
 
   echo "BOOTDISK=${BOOTDISK}"
   echo "BOOTDISK_PHYSDEVPATH=${BOOTDISK_PHYSDEVPATH}"
-  echo "${BOOTDISK}" >/usr/addons/bootdisk
 
   checkSynoboot
 
@@ -465,6 +464,4 @@ elif [ "${1}" = "late" ]; then
   SUPPORT_M2_POOL=$(_get_conf_kv support_m2_pool)
   _set_conf_kv hd "supportnvme" "${SUPPORTNVME}"
   _set_conf_kv hd "support_m2_pool" "${SUPPORT_M2_POOL}"
-  # export Bootdisk for Ledcontrol
-  cp -vf /usr/addons/bootdisk /tmpRoot/usr/addons/bootdisk
 fi
