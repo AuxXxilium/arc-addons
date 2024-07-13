@@ -6,20 +6,6 @@
 # See /LICENSE for more information.
 #
 
-function extractInitrd() {
-  [ -z "${1}" -o -z "${2}" ] && return 1
-
-  if [ -f "${1}" ]; then
-    rm -rf "${2}"
-    mkdir -p "${2}"
-    (
-      cd "${2}"
-      xz -dc <"${1}" | cpio -idm
-    ) >/dev/null 2>&1 || true
-  fi
-  return 0
-}
-
 function mountLoaderDisk() {
   if [ ! -f "/usr/arc/.mountloader" ]; then
     while true; do
@@ -48,20 +34,11 @@ function mountLoaderDisk() {
         break
       )
 
-      ARC_RAMDISK_FILE="/mnt/p3/initrd-arc"
-      ARC_PATH="/tmp/initrd"
-      extractInitrd "${ARC_RAMDISK_FILE}" "${ARC_PATH}"
-      if [ ! -f "${ARC_PATH}/opt/arc/arc.sh" ]; then
-        echo "ARC initrd work path not found!"
-        break
-      fi
-
       mkdir -p /usr/arc
       echo "export LOADER_DISK=\"/dev/synoboot\"" >"/usr/arc/.mountloader"
       echo "export LOADER_DISK_PART1=\"/dev/synoboot1\"" >>"/usr/arc/.mountloader"
       echo "export LOADER_DISK_PART2=\"/dev/synoboot2\"" >>"/usr/arc/.mountloader"
       echo "export LOADER_DISK_PART3=\"/dev/synoboot3\"" >>"/usr/arc/.mountloader"
-      echo "export WORK_PATH=\"${ARC_PATH}/opt/arc\"" >>"/usr/arc/.mountloader"
       break
     done
   fi
