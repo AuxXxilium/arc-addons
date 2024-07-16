@@ -22,7 +22,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
 # NIC
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
-  cat > ${DEST} <<EOF
+  cat > ${DEST} <<'EOF'
 [Unit]
 Description=NIC Ledcontrol for Ugreen
 DefaultDependencies=no
@@ -31,9 +31,9 @@ After=multi-user.target
 
 [Service]
 User=root
-Type=oneshot
-Restart=no
-RemainAfterExit=yes
+Type=simple
+Restart=always
+RestartSec=10s
 ExecStart=/usr/bin/ledcontrol.sh nic
 
 [Install]
@@ -43,7 +43,7 @@ EOF
   ln -vsf /usr/lib/systemd/system/ledcontrol_disk.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_disk.service
 # Disk
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol_disk.service"
-  cat > ${DEST} <<EOF
+  cat > ${DEST} <<'EOF'
 [Unit]
 Description=Disk Ledcontrol for Ugreen
 DefaultDependencies=no
@@ -52,9 +52,9 @@ After=multi-user.target
 
 [Service]
 User=root
-Type=onshot
-Restart=no
-RemainAfterExit=yes
+Type=simple
+Restart=always
+RestartSec=5min
 ExecStart=/usr/bin/ledcontrol.sh disk
 
 [Install]
@@ -62,9 +62,9 @@ WantedBy=multi-user.target
 EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/ledcontrol_disk.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_disk.service
-
+# CPU
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol_cpu.service"
-  cat > ${DEST} <<EOF
+  cat > ${DEST} <<'EOF'
 [Unit]
 Description=CPU Ledcontrol for Ugreen
 DefaultDependencies=no
@@ -73,9 +73,9 @@ After=multi-user.target
 
 [Service]
 User=root
-Type=oneshot
-Restart=no
-RemainAfterExit=yes
+Type=simple
+Restart=always
+RestartSec=200ms
 ExecStart=/usr/bin/ledcontrol.sh cpu
 
 [Install]
@@ -83,42 +83,6 @@ WantedBy=multi-user.target
 EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/ledcontrol_cpu.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_cpu.service
-# Timer for Disk
-  DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol_disk.timer"
-  cat > ${DEST} <<EOF
-[Unit]
-Description=Disk Ledcontrol Timer for Ugreen
-
-[Timer]
-OnBootSec=5m
-OnUnitInactiveSec=5m
-Persistent=true
-User=root
-Unit=ledcontrol_disk.service
-
-[Install]
-WantedBy=timers.target
-EOF
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/timers.target.wants
-  ln -vsf /usr/lib/systemd/system/ledcontrol_disk.timer /tmpRoot/usr/lib/systemd/system/timers.target.wants/ledcontrol_disk.timer
-# Timer for CPU
-  DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol_cpu.timer"
-  cat > ${DEST} <<EOF
-[Unit]
-Description=CPU Ledcontrol Timer for Ugreen
-
-[Timer]
-OnBootSec=5s
-OnUnitInactiveSec=0.2s
-Persistent=true
-User=root
-Unit=ledcontrol_cpu.service
-
-[Install]
-WantedBy=timers.target
-EOF
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/timers.target.wants
-  ln -vsf /usr/lib/systemd/system/ledcontrol_cpu.timer /tmpRoot/usr/lib/systemd/system/timers.target.wants/ledcontrol_cpu.timer
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon ledcontrol - ${1}"
 
@@ -128,10 +92,6 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol_disk.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_cpu.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol_cpu.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/timers.target.wants/ledcontrol_disk.timer"
-  rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol_disk.timer"
-  rm -f "/tmpRoot/usr/lib/systemd/system/timers.target.wants/ledcontrol_cpu.timer"
-  rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol_cpu.timer"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/ledcontrol.sh" >>/tmpRoot/usr/arc/revert.sh

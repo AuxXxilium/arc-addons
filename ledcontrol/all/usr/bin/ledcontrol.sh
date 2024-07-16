@@ -28,7 +28,7 @@ function check_power_status() {
 
 # Funktion, um den Load Average-Wert zu ermitteln
 function get_load_average() {
-    load_average=$(uptime | awk -F'[a-z]:' '{print $2}' | awk -F',' '{print $1}' | tr -d '[:space:]')
+    load_average=$(uptime | awk -F'[a-z]:' '{print $2}' | awk -F',' '{print $1}' | tr -d '[:space:]' | awk -F'.' '{print $1}')
     echo $load_average
 }
 
@@ -77,12 +77,10 @@ elif [ "${1}" = "nic" ]; then
 
     if [[ $interface_up -eq 1 ]]; then
         $UGREEN_LEDS_CLI netdev -on -color 0 255 0 -brightness $brightness > /dev/null 2>&1
-    else
-        $UGREEN_LEDS_CLI netdev -blink 400 400 -color 255 0 255 -brightness $brightness > /dev/null 2>&1
     fi
 elif [ "${1}" = "disk" ]; then
     # Get Disks
-    devices=$(ls -d /dev/sd[a-z] 2>/dev/null)
+    devices=$(ls -d /dev/sata[1-9] 2>/dev/null)
     # bootdisk=$(cat /usr/addons/bootdisk)
     # Disks Smart Check
     for i in "${!devices[@]}"; do
@@ -116,31 +114,20 @@ elif [ "${1}" = "disk" ]; then
     done
 elif [ "${1}" = "cpu" ]; then
     # CPU Load Average
-    if awk "BEGIN {exit !($load_average < 1.0)}"; then
-        blink_on=2000
-        blink_off=2000
+    load_average=$(get_load_average)
+    if [ $load_average -lt 1 ]; then
         color="0 255 0"  # Grün
-    elif awk "BEGIN {exit !($load_average < 2.0)}"; then
-        blink_on=1500
-        blink_off=1500
+    elif [ $load_average -lt 2 ]; then
         color="127 255 0"  # Gelbgrün
-    elif awk "BEGIN {exit !($load_average < 3.0)}"; then
-        blink_on=1000
-        blink_off=1000
+    elif [ $load_average -lt 3 ]; then
         color="255 255 0"  # Gelb
-    elif awk "BEGIN {exit !($load_average < 4.0)}"; then
-        blink_on=750
-        blink_off=750
+    elif [ $load_average -lt 4 ]; then
         color="255 127 0"  # Orange
-    elif awk "BEGIN {exit !($load_average < 5.0)}"; then
-        blink_on=500
-        blink_off=500
+    elif [ $load_average -lt 5 ]; then
         color="255 0 0"  # Rot
     else
-        blink_on=250
-        blink_off=250
         color="255 0 0"  # Rot (schnelleres Blinken)
     fi
-    $UGREEN_LEDS_CLI power -blink $blink_on $blink_off -color $color -brightness $brightness > /dev/null 2>&1
+    $UGREEN_LEDS_CLI power -color $color -brightness $brightness > /dev/null 2>&1
 fi
 exit 0
