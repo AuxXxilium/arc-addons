@@ -9,7 +9,7 @@
 UGREEN_LEDS_CLI="/usr/bin/ugreen_leds_cli"
 SMARTCTL="/usr/bin/smartctl"
 HDPARM="/usr/bin/hdparm"
-CONFIG_FILE="/usr/arc/addons/led.conf"
+CONFIG_FILE="/usr/bin/led.conf"
 
 
 # Funktion, um den SMART-Status einer Festplatte zu überprüfen
