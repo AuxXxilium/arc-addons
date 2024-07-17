@@ -57,11 +57,14 @@ elif [ "${1}" = "late" ]; then
   tar -zxf /addons/console-7.1.tgz -C /tmpRoot/usr/
   # run when boot installed DSM
   echo -e "DSM mode\n" >/tmpRoot/etc/issue
-  cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@.service
-  sed -i 's|^ExecStart=.*|ExecStart=-/sbin/agetty %I 115200 linux|' /tmpRoot/usr/lib/systemd/system/getty\@.service
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
-  ln -vsf /usr/lib/systemd/system/getty\@.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@tty1.service
-
+  if [ ! -f /tmpRoot/usr/lib/systemd/system/getty\@.service ]; then # misc addon is do this
+    cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@.service
+    sed -i 's|^ExecStart=.*|ExecStart=-/sbin/agetty %I 115200 linux|' /tmpRoot/usr/lib/systemd/system/getty\@.service
+  fi
+  if [ ! -f /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@tty1.service ]; then
+    mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
+    ln -vsf /usr/lib/systemd/system/getty\@.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@tty1.service
+  fi
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/keymap.service"
   echo "[Unit]"                                                                                      >${DEST}
@@ -88,7 +91,7 @@ elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon console - ${1}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@tty1.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/getty\@.service"
+  # rm -f "/tmpRoot/usr/lib/systemd/system/getty\@.service"  # Do not remove, used by misc addons
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/keymap.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/keymap.service"
 
