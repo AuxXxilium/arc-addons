@@ -14,10 +14,12 @@ if [ "${1}" = "late" ]; then
   cp -vf /usr/bin/ledcontrol.sh /tmpRoot/usr/bin/ledcontrol.sh
   cp -vf /usr/bin/ugreen_leds_cli /tmpRoot/usr/bin/ugreen_leds_cli
   cp -vf /usr/bin/led.conf /tmpRoot/usr/bin/led.conf
+  cp -vf /usr/bin/modules/i2c-algo-bit.ko /tmpRoot/usr/bin/modules/i2c-algo-bit.ko
   cp -vf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/i2c-i801.ko
   cp -vf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/i2c-smbus.ko
-  modprobe i2c-i801
+  modprobe i2c-algo-bit
   modprobe i2c-smbus
+  modprobe i2c-i801
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
 # NIC
