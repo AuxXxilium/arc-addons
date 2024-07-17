@@ -1,6 +1,6 @@
 version: 1
 name: i915
-description: "Automatically replace the device ID of i915.ko, up to 10th Gen. (apollolake, geminilake)"
+description: "Automatically replace the device ID of i915 module. (Intel 2nd - 9th Gen)"
 system: false
 beta: false
 all:
