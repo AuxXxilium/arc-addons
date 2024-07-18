@@ -9,8 +9,6 @@
 if [ "${1}" = "early" ]; then
   echo "Installing addon misc - ${1}"
 
-  [ ! -L "/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /usr/sbin/modinfo
-
   # [CREATE][failed] Raidtool initsys
   SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -vf "${SO_FILE}" "${SO_FILE}.bak"
@@ -125,7 +123,7 @@ EOF
 elif [ "${1}" = "patches" ]; then
   # Set static IP from cmdline
   if grep -q 'network.' /proc/cmdline; then
-    for I in $(grep -o 'network.[0-9a-fA-F:]\{12,17\}=[^ ]*' /proc/cmdline); do
+    for I in $(grep -oE 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
       MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g' | tr '[:upper:]' '[:lower:]')"
       IPRS="$(echo "${I}" | cut -d= -f2)"
       for ETH in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
@@ -139,7 +137,7 @@ elif [ "${1}" = "patches" ]; then
           echo "IPADDR=$(echo "${IPRS}" | cut -d/ -f1)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
           echo "NETMASK=$(echo "${IPRS}" | cut -d/ -f2)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
           echo "GATEWAY=$(echo "${IPRS}" | cut -d/ -f3)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "${ETH}" >> /etc/ifcfgs
+          echo "${ETH}" >>/etc/ifcfgs
         fi
       done
     done
@@ -201,6 +199,27 @@ elif [ "${1}" = "late" ]; then
     fi
   fi
 
+  # service
+  SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
+  sed -i 's|ExecStart=/|ExecStart=-/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service ${SERVICE_PATH}/syno_update_disk_logs.service
+  if [ ! -f /tmpRoot/usr/lib/systemd/system/getty\@.service ]; then
+    cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@.service
+    sed -i 's|^ExecStart=.*|ExecStart=-/sbin/agetty %I 115200 linux|' /tmpRoot/usr/lib/systemd/system/getty\@.service
+  fi
+  # getty
+  for I in $(cat /proc/cmdline 2>/dev/null | grep -oE 'getty=[^ ]+' | sed 's/getty=//'); do
+    TTYN="$(echo "${I}" | cut -d',' -f1)"
+    BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
+    echo "ttyS0 ttyS1 ttyS2" | grep -qw "${TTYN}" && continue
+
+    mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
+    if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
+      echo "Make getty\@${TTYN}.service"
+      cp -vf /tmpRoot/usr/lib/systemd/system/getty\@.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@${TTYN}.service
+      [ -n "${BAUD}" ] && sed -i "s|115200 linux|${BAUD} linux|" /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@${TTYN}.service
+    fi
+  done
+
   # Open-VM-Tools Fix
   if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege
@@ -210,10 +229,6 @@ elif [ "${1}" = "late" ]; then
   if [ -d /tmpRoot/var/packages/qemu-ga ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege
   fi
-
-  # OOB Service
-  SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
-  sed -i 's|ExecStart=/|ExecStart=-/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service ${SERVICE_PATH}/syno_update_disk_logs.service
 
   # SD Card
   cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
