@@ -7,6 +7,9 @@ if [ -d /var/packages/SurveillanceStation ]; then
     PATHSCRIPTS="${PATHROOT}/scripts"
     SPATCH="/usr/lib"
 
+    /usr/syno/bin/synopkg stop SurveillanceStation
+    sleep 5
+
     rm -f "${PATHLIB}/libssutils.so"
     cp -f "${SPATCH}/libssutils.so" "${PATHLIB}/libssutils.so"
     chown SurveillanceStation:SurveillanceStation "${PATHLIB}/libssutils.so"
@@ -23,6 +26,9 @@ if [ -d /var/packages/SurveillanceStation ]; then
     chmod 0777 "${PATHSCRIPTS}/license.sh"
 
     echo -e "Surveillance Patch: Successfull!"
+
+    sleep 5
+    /usr/syno/bin/synopkg start SurveillanceStation
 fi
 
 exit 0
