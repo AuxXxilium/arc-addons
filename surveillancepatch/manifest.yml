@@ -1,6 +1,6 @@
 version: 1
 name: surveillancepatch
-description: "Patch License for SS 9.1.2-10854! (Not for DVA)"
+description: "Patch License for SS 9.1.2-10854! (Not for DVA) <- select only ONE"
 system: false
 beta: true
 all:
