@@ -65,7 +65,7 @@ elif [ "${1}" = "nic" ]; then
     brightness=$(get_brightness)
     # NIC Status
     interface_up=0
-    interfaces=($(ls /sys/class/net/ 2>/dev/null | grep eth))
+    interfaces=($(ls /sys/class/net 2>/dev/null | grep eth))
 
     for interface in "${interfaces[@]}"; do
         if check_network_interface $interface; then
@@ -81,7 +81,7 @@ elif [ "${1}" = "disk" ]; then
     # Get Brightness
     brightness=$(get_brightness)
     # Get Disks
-    devices=($(ls -d /dev/sata[1-9] 2>/dev/null))
+    devices=($(ls -d /dev/sata*[1-9] 2>/dev/null))
     # bootdisk=$(cat /usr/addons/bootdisk)
     # Disks Smart Check
     for i in "${!devices[@]}"; do
