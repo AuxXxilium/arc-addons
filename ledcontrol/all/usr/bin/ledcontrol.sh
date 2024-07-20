@@ -61,12 +61,11 @@ elif [ "${1}" = "off" ]; then
     echo "Disable Ugreen LED"
     $UGREEN_LEDS_CLI all -off
 elif [ "${1}" = "nic" ]; then
-    echo "NIC Ugreen LED"
     # Get Brightness
     brightness=$(get_brightness)
     # NIC Status
     interface_up=0
-    interfaces=$(ls /sys/class/net/ 2>/dev/null | grep eth)
+    interfaces=($(ls /sys/class/net/ 2>/dev/null | grep eth))
 
     for interface in "${interfaces[@]}"; do
         if check_network_interface $interface; then
@@ -79,8 +78,10 @@ elif [ "${1}" = "nic" ]; then
         $UGREEN_LEDS_CLI netdev -on -color 0 255 0 -brightness $brightness > /dev/null 2>&1
     fi
 elif [ "${1}" = "disk" ]; then
+    # Get Brightness
+    brightness=$(get_brightness)
     # Get Disks
-    devices=$(ls -d /dev/sata[1-9] 2>/dev/null)
+    devices=($(ls -d /dev/sata[1-9] 2>/dev/null))
     # bootdisk=$(cat /usr/addons/bootdisk)
     # Disks Smart Check
     for i in "${!devices[@]}"; do
@@ -113,6 +114,8 @@ elif [ "${1}" = "disk" ]; then
         esac
     done
 elif [ "${1}" = "cpu" ]; then
+    # Get Brightness
+    brightness=$(get_brightness)
     # CPU Load Average
     load_average=$(get_load_average)
     if [ $load_average -lt 1 ]; then
