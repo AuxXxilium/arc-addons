@@ -18,9 +18,38 @@ if [ "${1}" = "late" ]; then
   cp -vf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/i2c-i801.ko
   cp -vf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/i2c-smbus.ko
   modprobe i2c-algo-bit
-  modprobe i2c-smbus
   modprobe i2c-i801
+  modprobe i2c-smbus
 
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_disk.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol_disk.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_cpu.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol_cpu.service"
+
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+# All on
+  DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
+  cat > ${DEST} <<'EOF'
+[Unit]
+Description=NIC Ledcontrol for Ugreen
+DefaultDependencies=no
+IgnoreOnIsolate=true
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/ledcontrol.sh on
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/ledcontrol_disk.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_disk.service
+
+if [ "${1}" = "nothing" ]; then
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
 # NIC
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
