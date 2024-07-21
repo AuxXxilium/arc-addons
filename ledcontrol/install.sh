@@ -33,9 +33,7 @@ if [ "${1}" = "late" ]; then
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
   cat > ${DEST} <<'EOF'
 [Unit]
-Description=NIC Ledcontrol for Ugreen
-DefaultDependencies=no
-IgnoreOnIsolate=true
+Description=Ledcontrol for Ugreen
 After=multi-user.target
 
 [Service]
@@ -49,7 +47,7 @@ EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/ledcontrol_disk.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_disk.service
 
-if [ "${1}" = "nothing" ]; then
+elif [ "${1}" = "nothing" ]; then
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
 # NIC
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
