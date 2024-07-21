@@ -11,7 +11,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
   cp -vf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
-  cp -vf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
+  cp -vf /usr/bin/codecpatch.sh /tmpRoot/usr/bin/codecpatch.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/amepatch.service"
