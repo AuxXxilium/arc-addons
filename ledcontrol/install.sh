@@ -33,9 +33,7 @@ if [ "${1}" = "late" ]; then
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
   cat > ${DEST} <<'EOF'
 [Unit]
-Description=NIC Ledcontrol for Ugreen
-DefaultDependencies=no
-IgnoreOnIsolate=true
+Description=Ledcontrol for Ugreen
 After=multi-user.target
 
 [Service]
