@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-if [ -d "/var/packages/CodecPack" ]; then
+amepatch() {
     /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
 
     cp_usr_path="/var/packages/CodecPack/target/usr"
@@ -43,7 +43,6 @@ if [ -d "/var/packages/CodecPack" ]; then
         content='[{"attribute": {"codec": "hevc", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}, {"attribute": {"codec": "aac", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}]'
     else
         echo "MD5 mismatch"
-        exit 1
     fi
 
     for ((i = 0; i < ${#hex_values[@]}; i++)); do
@@ -52,14 +51,19 @@ if [ -d "/var/packages/CodecPack" ]; then
         printf '%s' "$value" | xxd -r -p | dd of="$so" bs=1 seek="$offset" conv=notrunc
         if [[ $? -ne 0 ]]; then
             echo -e "AME Patch: Error while writing to file!"
-            exit 1
         fi
     done
 
     mkdir -p "$(dirname "${lic}")"
     rm -f "${lic}"
     echo "${content}" >"${lic}"
+}
 
+codecpatch() {
+    /usr/bin/codecpatch.sh
+}
+
+installcodec() {
     if "$cp_usr_path/bin/synoame-bin-check-license"; then
         echo -e "AME Patch: Downloading Codec!"
         if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
@@ -67,17 +71,11 @@ if [ -d "/var/packages/CodecPack" ]; then
             exit 0
         fi
     fi
-    echo -e "AME Patch: Unsuccessful!"
-    if [ -f "$so_backup" ]; then
-        mv -f "$so_backup" "$so"
-    fi
-    if [ -f "$lic_backup" ]; then
-        mv -f "$lic_backup" "$lic"
-    fi
-    if [ -f "$licsig_backup" ]; then
-        mv -f "$licsig_backup" "$licsig"
-    fi
-    echo -e "AME Patch: Backup restored!"
-    exit 1
+}
+
+if [ -d "/var/packages/CodecPack" ]; then
+    amepatch
+    codecpatch
+    installcodec
 fi
 exit 0
