@@ -6,6 +6,7 @@
 # See /LICENSE for more information.
 #
 
+TEMP="on"
 VENDOR=""                                                                                     # str
 FAMILY=""                                                                                     # str
 SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"       # str
@@ -29,10 +30,14 @@ restoreCpuinfo() {
   fi
 }
 
-if options="$(getopt -o v:f:s:c:p:rh --long vendor:,family:,series:,cores:,speed:,restore,help -- "$@")"; then
+if options="$(getopt -o t:v:f:s:c:p:rh --long temp:,vendor:,family:,series:,cores:,speed:,restore,help -- "$@")"; then
   eval set -- "$options"
   while true; do
     case "${1,,}" in
+    -t | --temp)
+      TEMP="${2}"
+      shift 2
+      ;;
     -v | --vendor)
       VENDOR="${2}"
       shift 2
@@ -60,6 +65,7 @@ if options="$(getopt -o v:f:s:c:p:rh --long vendor:,family:,series:,cores:,speed
     -h | --help)
       echo "Usage: cpuinfo.sh [OPTIONS]"
       echo "Options:"
+      echo "  -t, --temp   <on/off>   Set the CPU&GPU temperature display"
       echo "  -v, --vendor <VENDOR>   Set the CPU vendor"
       echo "  -f, --family <FAMILY>   Set the CPU family"
       echo "  -s, --series <SERIES>   Set the CPU series"
@@ -68,8 +74,8 @@ if options="$(getopt -o v:f:s:c:p:rh --long vendor:,family:,series:,cores:,speed
       echo "  -r, --restore           Restore the original cpuinfo"
       echo "  -h, --help              Show this help message and exit"
       echo "Example:"
-      echo "  cpuinfo.sh -v \"AMD\" -f \"Ryzen\" -s \"Ryzen 7 5800X3D\" -c 64 -p 5200"
-      echo "  cpuinfo.sh --vendor \"Intel\" --family \"Core i9\" --series \"i7-13900ks\" --cores 64 --speed 5200"
+      echo "  cpuinfo.sh -t \"on\" -v \"AMD\" -f \"Ryzen\" -s \"Ryzen 7 5800X3D\" -c 64 -p 5200"
+      echo "  cpuinfo.sh -t \"on\" --vendor \"Intel\" --family \"Core i9\" --series \"i7-13900ks\" --cores 64 --speed 5200"
       echo "  cpuinfo.sh --restore"
       echo "  cpuinfo.sh --help"
       exit 0
@@ -103,13 +109,18 @@ else
   cp -f "${FILE_JS}.bak" "${FILE_JS}"
 fi
 
-echo "CPU Info set to: \"${VENDOR}\" \"${FAMILY}\" \"${SERIES}\" \"${CORES}\" \"${SPEED}\""
+echo "CPU Info set to: \"TEMP:${TEMP}\" \"${VENDOR}\" \"${FAMILY}\" \"${SERIES}\" \"${CORES}\" \"${SPEED}\""
 
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_clock_speed/\1${SPEED//\"/}/g" "${FILE_JS}"
+
+if [ "${TEMP^^}" = "ON" ]; then
+  sed -i 's/,t,i,s)}/,t,i,s+" \| "+e.sys_temp+" °C")}/g' "${FILE_JS}"
+  sed -i 's/,C,D);/,C,D+" \| "+t.gpu.temperature_c+" °C");/g' "${FILE_JS}"
+fi
 
 if [ -f "${FILE_GZ}.bak" ]; then
   gzip -c "${FILE_JS}" >"${FILE_GZ}"
