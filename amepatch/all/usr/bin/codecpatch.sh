@@ -244,7 +244,6 @@ patch_common () {
         bin_path="$i"
         patch
     done
-    exit 0
 }
 
 patch () {
@@ -333,18 +332,16 @@ rollback () {
                     cp -p "$backup_path/$bin_file.$backup_identifier" \
                     "$bin_path"
                     echo "Backup restored successfully (DSM ${binhash_version_list[$backup_hash]})"
-                    exit 0
                 else
-                    echo "No valid backup found for patched synocodectool currently in use. You can download the original file for DSM ${binhash_version_list[$original_hash]}  from https://github.com/stl88083365/synocodectool-patch/."
+                    echo "No valid backup found for patched synocodectool currently in use."
                     exit 1
                 fi
         else
-            echo "No backups found for patched synocodectool currently in use. You can download the original file for DSM ${binhash_version_list[$original_hash]}  from https://github.com/stl88083365/synocodectool-patch/."
+            echo "No backups found for patched synocodectool currently in use."
             exit 1
         fi
     elif [[ "${binhash_version_list[$synocodectool_hash]+isset}" ]]; then
         echo "Detected unpatched original synocodectool. Restoring not neccessary!"
-        exit 0
     else
         echo "Detected corrupted synocodectool."
         local backup_files=( "$backup_path"/* )
@@ -356,16 +353,25 @@ rollback () {
                 cp -p "$backup_file" \
                 "$bin_path"
                 echo "Backup restored successfully (DSM ${binhash_version_list[$backup_hash]})"
-                exit 0
             else
-                echo "Not a valid backup. You can either try restoring another backup or download the original file for DSM $dsm_version from https://github.com/stl88083365/synocodectool-patch/."
+                echo "Not a valid backup."
                 exit 1
             fi
         else
-            echo "No backups found. You can download the original file for DSM $dsm_version from https://github.com/stl88083365/synocodectool-patch/."
+            echo "No backups found."
             exit 1
         fi
     fi        
+}
+
+installcodec() {
+    if /var/packages/CodecPack/target/usr/bin/synoame-bin-check-license; then
+        echo -e "Coded Patch: Downloading Codec!"
+        if /var/packages/CodecPack/target/usr/bin/synoame-bin-auto-install-needed-codec; then
+            echo -e "Codec Patch: Successful!"
+            exit 0
+        fi
+    fi
 }
 
 #main()
@@ -374,4 +380,7 @@ if [ ! ${USER} = "root" ]; then
     exit 1
 fi
 
-patch_common
+if [ -d "/var/packages/CodecPack" ]; then
+    patch_common
+    installcodec
+fi
