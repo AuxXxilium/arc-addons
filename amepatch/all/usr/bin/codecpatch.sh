@@ -368,6 +368,17 @@ rollback () {
     fi        
 }
 
+installcodec() {
+    cp_usr_path="/var/packages/CodecPack/target/usr"
+    if "$cp_usr_path/bin/synoame-bin-check-license"; then
+        echo -e "AME Patch: Downloading Codec!"
+        if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
+            echo -e "AME Patch: Successful!"
+            exit 0
+        fi
+    fi
+}
+
 #main()
 if [ ! ${USER} = "root" ]; then
     echo "Please run as root"
@@ -375,3 +386,4 @@ if [ ! ${USER} = "root" ]; then
 fi
 
 patch_common
+installcodec

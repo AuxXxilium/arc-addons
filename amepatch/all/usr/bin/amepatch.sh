@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-amepatch() {
+function amepatch() {
     /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
 
     cp_usr_path="/var/packages/CodecPack/target/usr"
@@ -59,11 +59,7 @@ amepatch() {
     echo "${content}" >"${lic}"
 }
 
-codecpatch() {
-    /usr/bin/codecpatch.sh
-}
-
-installcodec() {
+function installcodec() {
     if "$cp_usr_path/bin/synoame-bin-check-license"; then
         echo -e "AME Patch: Downloading Codec!"
         if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
@@ -75,7 +71,6 @@ installcodec() {
 
 if [ -d "/var/packages/CodecPack" ]; then
     amepatch
-    codecpatch
     installcodec
 fi
 exit 0

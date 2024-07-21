@@ -24,6 +24,7 @@ After=multi-user.target
 Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=/usr/bin/amepatch.sh
+ExecStartPre=/usr/bin/codecpatch.sh
 ExecStart=/usr/syno/bin/synopkg restart CodecPack
 
 [Install]
