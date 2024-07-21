@@ -38,6 +38,7 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/amepatch.service"
   rm -f "/tmpRoot/usr/bin/amepatch.sh"
+  rm -f "/tmpRoot/usr/bin/codecpatch.sh"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/amepatch.sh" >>/tmpRoot/usr/arc/revert.sh
