@@ -43,6 +43,7 @@ function amepatch() {
         content='[{"attribute": {"codec": "hevc", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}, {"attribute": {"codec": "aac", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}]'
     else
         echo "MD5 mismatch"
+        exit 1
     fi
 
     for ((i = 0; i < ${#hex_values[@]}; i++)); do
@@ -51,6 +52,7 @@ function amepatch() {
         printf '%s' "$value" | xxd -r -p | dd of="$so" bs=1 seek="$offset" conv=notrunc
         if [[ $? -ne 0 ]]; then
             echo -e "AME Patch: Error while writing to file!"
+            exit 1
         fi
     done
 
