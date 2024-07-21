@@ -6,20 +6,18 @@
 # See /LICENSE for more information.
 #
 
+cp_usr_path="/var/packages/CodecPack/target/usr"
+values=('669066909066906690' 'B801000000' '30')
+hex_values=('1F28' '48F5' '4921' '4953' '4975' '9AC8')
+indices=(0 1 1 1 1 2)
+so="$cp_usr_path/lib/libsynoame-license.so"
+so_backup="$cp_usr_path/lib/libsynoame-license.so.orig"
+lic="/usr/syno/etc/license/data/ame/offline_license.json"
+lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
+licsig="/usr/syno/etc/license/data/ame/offline_license.sig"
+licsig_backup="/usr/syno/etc/license/data/ame/offline_license.sig.orig"
+
 function amepatch() {
-    /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
-
-    cp_usr_path="/var/packages/CodecPack/target/usr"
-    values=('669066909066906690' 'B801000000' '30')
-    hex_values=('1F28' '48F5' '4921' '4953' '4975' '9AC8')
-    indices=(0 1 1 1 1 2)
-    so="$cp_usr_path/lib/libsynoame-license.so"
-    so_backup="$cp_usr_path/lib/libsynoame-license.so.orig"
-    lic="/usr/syno/etc/license/data/ame/offline_license.json"
-    lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
-    licsig="/usr/syno/etc/license/data/ame/offline_license.sig"
-    licsig_backup="/usr/syno/etc/license/data/ame/offline_license.sig.orig"
-
     if [ ! -f "$so_backup" ]; then
         cp -p "$so" "$so_backup"
     fi
@@ -72,7 +70,8 @@ function installcodec() {
 }
 
 if [ -d "/var/packages/CodecPack" ]; then
+    /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
     amepatch
-    installcodec
+    #installcodec
 fi
 exit 0

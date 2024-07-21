@@ -244,7 +244,6 @@ patch_common () {
         bin_path="$i"
         patch
     done
-    exit 0
 }
 
 patch () {
@@ -333,7 +332,6 @@ rollback () {
                     cp -p "$backup_path/$bin_file.$backup_identifier" \
                     "$bin_path"
                     echo "Backup restored successfully (DSM ${binhash_version_list[$backup_hash]})"
-                    exit 0
                 else
                     echo "No valid backup found for patched synocodectool currently in use."
                     exit 1
@@ -344,7 +342,6 @@ rollback () {
         fi
     elif [[ "${binhash_version_list[$synocodectool_hash]+isset}" ]]; then
         echo "Detected unpatched original synocodectool. Restoring not neccessary!"
-        exit 0
     else
         echo "Detected corrupted synocodectool."
         local backup_files=( "$backup_path"/* )
@@ -356,7 +353,6 @@ rollback () {
                 cp -p "$backup_file" \
                 "$bin_path"
                 echo "Backup restored successfully (DSM ${binhash_version_list[$backup_hash]})"
-                exit 0
             else
                 echo "Not a valid backup."
                 exit 1
@@ -369,11 +365,10 @@ rollback () {
 }
 
 installcodec() {
-    cp_usr_path="/var/packages/CodecPack/target/usr"
-    if "$cp_usr_path/bin/synoame-bin-check-license"; then
-        echo -e "AME Patch: Downloading Codec!"
-        if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
-            echo -e "AME Patch: Successful!"
+    if "/var/packages/CodecPack/target/usr/bin/synoame-bin-check-license"; then
+        echo -e "Coded Patch: Downloading Codec!"
+        if "/var/packages/CodecPack/target/usr/bin/synoame-bin-auto-install-needed-codec"; then
+            echo -e "Codec Patch: Successful!"
             exit 0
         fi
     fi
@@ -385,5 +380,7 @@ if [ ! ${USER} = "root" ]; then
     exit 1
 fi
 
-patch_common
-installcodec
+if [ -d "/var/packages/CodecPack" ]; then
+    patch_common
+    installcodec
+fi
