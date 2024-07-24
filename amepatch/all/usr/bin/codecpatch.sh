@@ -384,3 +384,4 @@ if [ -d "/var/packages/CodecPack" ]; then
     patch_common
     installcodec
 fi
+exit 1

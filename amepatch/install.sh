@@ -21,11 +21,12 @@ Description=addon amepatch
 After=multi-user.target
 
 [Service]
-Type=oneshot
+Type=simple
+Restart=on-failure
+RestartSec=5s
 RemainAfterExit=yes
-ExecStartPre=/usr/bin/amepatch.sh
-ExecStart=/usr/bin/codecpatch.sh
-ExecStartPost=/usr/syno/bin/synopkg restart CodecPack
+ExecStart=/usr/bin/amepatch.sh
+ExecStartPost=/usr/bin/codecpatch.sh
 
 [Install]
 WantedBy=multi-user.target
