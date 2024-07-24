@@ -72,6 +72,9 @@ function installcodec() {
 if [ -d "/var/packages/CodecPack" ]; then
     /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
     amepatch
-    #installcodec
+    installcodec
+else
+    echo "AME Patch: CodecPack not found!"
+    exit 0
 fi
-exit 0
+exit 1

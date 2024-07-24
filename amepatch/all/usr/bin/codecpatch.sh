@@ -383,4 +383,8 @@ fi
 if [ -d "/var/packages/CodecPack" ]; then
     patch_common
     installcodec
+else
+    echo "Codec Patch: CodecPack not found!"
+    exit 0
 fi
+exit 1
