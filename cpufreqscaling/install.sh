@@ -32,6 +32,9 @@ Restart=on-failure
 RestartSec=30s
 ExecStart=/usr/sbin/scaler.sh
 
+[Install]
+WantedBy=multi-user.target
+
 [X-Synology]
 Author=Virtualization Team
 EOF
@@ -54,6 +57,9 @@ Restart=on-failure
 RestartSec=5s
 RemainAfterExit=yes
 ExecStart=/usr/sbin/rescaler.sh ${2}
+
+[Install]
+WantedBy=multi-user.target
 
 [X-Synology]
 Author=Virtualization Team

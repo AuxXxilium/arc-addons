@@ -34,15 +34,21 @@ if [ "${1}" = "late" ]; then
   cat > ${DEST} <<'EOF'
 [Unit]
 Description=Ledcontrol for Ugreen
+DefaultDependencies=no
+IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
+User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/ledcontrol.sh on
 
 [Install]
 WantedBy=multi-user.target
+
+[X-Synology]
+Author=Virtualization Team
 EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/ledcontrol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service

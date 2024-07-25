@@ -25,6 +25,9 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/surveillancepatch.sh
 
+[Install]
+WantedBy=multi-user.target
+
 [X-Synology]
 Author=Virtualization Team
 EOF

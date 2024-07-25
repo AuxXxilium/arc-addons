@@ -24,11 +24,13 @@ After=multi-user.target
 
 [Service]
 User=root
-Type=simple
-Restart=on-failure
-RestartSec=10s
+Type=oneshot
+RemainAfterExit=yes
 ExecStartPre=/usr/bin/amepatch.sh
 ExecStart=/usr/bin/codecpatch.sh
+
+[Install]
+WantedBy=multi-user.target
 
 [X-Synology]
 Author=Virtualization Team
