@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
 
-# Define the entries to be added
-ENTRIES=("127.0.0.1 synosurveillance.synology.com")
-
-# Loop over each entry
-for ENTRY in "${ENTRIES[@]}"
-do
-  if [ -f /etc/hosts ]; then
-      # Check if the entry is already in the file
-      if grep -Fxq "$ENTRY" /etc/hosts; then
-          echo "Entry $ENTRY already exists"
-      else
-          echo "Entry $ENTRY does not exist, adding now"
-          echo "$ENTRY" >> /etc/hosts
-      fi
-  fi
-  if [ -f /etc.defaults/hosts ]; then
-      if grep -Fxq "$ENTRY" /etc.defaults/hosts; then
-          echo "Entry $ENTRY already exists"
-      else
-          echo "Entry $ENTRY does not exist, adding now"
-          echo "$ENTRY" >> /etc.defaults/hosts
-      fi
-  fi
-done
-
 if [ -d /var/packages/SurveillanceStation ]; then
+    # Define the entries to be added
+    ENTRIES=("0.0.0.0 synosurveillance.synology.com")
+
+    # Loop over each entry
+    for ENTRY in "${ENTRIES[@]}"
+    do
+    if [ -f /etc/hosts ]; then
+        # Check if the entry is already in the file
+        if grep -Fxq "$ENTRY" /etc/hosts; then
+            echo "Entry $ENTRY already exists"
+        else
+            echo "Entry $ENTRY does not exist, adding now"
+            echo "$ENTRY" >> /etc/hosts
+        fi
+    fi
+    if [ -f /etc.defaults/hosts ]; then
+        if grep -Fxq "$ENTRY" /etc.defaults/hosts; then
+            echo "Entry $ENTRY already exists"
+        else
+            echo "Entry $ENTRY does not exist, adding now"
+            echo "$ENTRY" >> /etc.defaults/hosts
+        fi
+    fi
+    done
+
     SSPATH="/var/packages/SurveillanceStation"
     PATHROOT="${SSPATH}/target"
     PATHLIB="${PATHROOT}/lib"
