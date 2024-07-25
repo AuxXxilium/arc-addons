@@ -64,6 +64,7 @@ if [ -d "/var/packages/CodecPack" ]; then
     function installcodec() {
         if "$cp_usr_path/bin/synoame-bin-check-license"; then
             echo -e "AME Patch: Downloading Codec!"
+            /usr/bin/codecpatch.sh
             if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
                 echo -e "AME Patch: Successful!"
                 exit 0
