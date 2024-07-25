@@ -18,47 +18,20 @@ if [ "${1}" = "late" ]; then
   cat > ${DEST} <<EOF
 [Unit]
 Description=addon amepatch
-DefaultDependencies=no
-IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
-User=root
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/amepatch.sh
-
-[Install]
-WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
-EOF
-    mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-    ln -vsf /usr/lib/systemd/system/codecpatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service
-
-    DEST="/tmpRoot/usr/lib/systemd/system/codecpatch.service"
-  cat > ${DEST} <<EOF
-[Unit]
-Description=addon codecpatch
-DefaultDependencies=no
-IgnoreOnIsolate=true
-After=amepatch.service
-
-[Service]
-User=root
-Type=oneshot
-RemainAfterExit=yes
+ExecStartPre=/usr/bin/amepatch.sh
 ExecStart=/usr/bin/codecpatch.sh
+ExecStartPost=/usr/syno/bin/synopkg restart CodecPack
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-    ln -vsf /usr/lib/systemd/system/codecpatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service
+    ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon amepatch - ${1}"
 
