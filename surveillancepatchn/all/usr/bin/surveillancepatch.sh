@@ -31,6 +31,7 @@ if [ -d /var/packages/SurveillanceStation ]; then
     PATHLIB="${PATHROOT}/lib"
     PATHSCRIPTS="${PATHROOT}/scripts"
     SPATCH="/usr/lib"
+    SPATCHBIN="/usr/bin"
 
     /usr/syno/bin/synopkg stop SurveillanceStation
     sleep 5
@@ -41,12 +42,12 @@ if [ -d /var/packages/SurveillanceStation ]; then
     chmod 0644 "${PATHLIB}/libssutils.so"
 
     rm -f "${PATHSCRIPTS}/S82surveillance.sh"
-    cp -f "${SPATCH}/S82surveillance.sh" "${PATHSCRIPTS}/S82surveillance.sh"
+    cp -f "${SPATCHBIN}/S82surveillance.sh" "${PATHSCRIPTS}/S82surveillance.sh"
     chown SurveillanceStation:SurveillanceStation "${PATHSCRIPTS}/S82surveillance.sh"
     chmod 0755 "${PATHSCRIPTS}/S82surveillance.sh"
 
     rm -f "${PATHSCRIPTS}/license.sh"
-    cp -f "${SPATCH}/license.sh" "${PATHSCRIPTS}/license.sh"
+    cp -f "${SPATCHBIN}/license.sh" "${PATHSCRIPTS}/license.sh"
     chown SurveillanceStation:SurveillanceStation "${PATHSCRIPTS}/license.sh"
     chmod 0777 "${PATHSCRIPTS}/license.sh"
 
