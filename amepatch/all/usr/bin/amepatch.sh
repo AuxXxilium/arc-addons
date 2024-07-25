@@ -6,18 +6,7 @@
 # See /LICENSE for more information.
 #
 
-cp_usr_path="/var/packages/CodecPack/target/usr"
-values=('669066909066906690' 'B801000000' '30')
-hex_values=('1F28' '48F5' '4921' '4953' '4975' '9AC8')
-indices=(0 1 1 1 1 2)
-so="$cp_usr_path/lib/libsynoame-license.so"
-so_backup="$cp_usr_path/lib/libsynoame-license.so.orig"
-lic="/usr/syno/etc/license/data/ame/offline_license.json"
-lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
-licsig="/usr/syno/etc/license/data/ame/offline_license.sig"
-licsig_backup="/usr/syno/etc/license/data/ame/offline_license.sig.orig"
-
-function amepatch() {
+amepatch() {
     if [ ! -f "$so_backup" ]; then
         cp -p "$so" "$so_backup"
     fi
@@ -59,24 +48,37 @@ function amepatch() {
     echo "${content}" >"${lic}"
 }
 
-function installcodec() {
+installcodec() {
     if "$cp_usr_path/bin/synoame-bin-check-license"; then
         echo -e "AME Patch: Downloading Codec!"
         if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
             echo -e "AME Patch: Successful!"
             exit 0
+        else
+            echo -e "AME Patch: Error while downloading codec!"
+            exit 1
         fi
+    else
+        echo -e "AME Patch: License error!"
+        exit 1
     fi
 }
 
 if [ -d "/var/packages/CodecPack" ]; then
+    cp_usr_path="/var/packages/CodecPack/target/usr"
+    values=('669066909066906690' 'B801000000' '30')
+    hex_values=('1F28' '48F5' '4921' '4953' '4975' '9AC8')
+    indices=(0 1 1 1 1 2)
+    so="$cp_usr_path/lib/libsynoame-license.so"
+    so_backup="$cp_usr_path/lib/libsynoame-license.so.orig"
+    lic="/usr/syno/etc/license/data/ame/offline_license.json"
+    lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
+    licsig="/usr/syno/etc/license/data/ame/offline_license.sig"
+    licsig_backup="/usr/syno/etc/license/data/ame/offline_license.sig.orig"
+
     /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
     amepatch
-    if /usr/bin/codecpatch.sh; then
-        installcodec
-        echo -e "AME Patch: CodecPack successful patched!"
-        exit 0
-    fi
+    installcodec
 else
     echo "AME Patch: CodecPack not found!"
     exit 0
