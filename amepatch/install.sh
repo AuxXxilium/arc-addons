@@ -26,8 +26,8 @@ After=multi-user.target
 User=root
 Type=oneshot
 RemainAfterExit=yes
-ExecStartPre=/usr/bin/amepatch.sh
-ExecStart=/usr/bin/codecpatch.sh
+ExecStart=/usr/bin/amepatch.sh
+ExecStartPost=/usr/bin/codecpatch.sh
 
 [Install]
 WantedBy=multi-user.target

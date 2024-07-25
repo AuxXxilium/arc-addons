@@ -294,6 +294,7 @@ if [ -d "/var/packages/CodecPack" ]; then
     cp_usr_path="/var/packages/CodecPack/target/usr"
     patch_common
     installcodec
+    systemctl stop amepatch
 else
     echo "Codec Patch: CodecPack not found!"
     exit 0
