@@ -14,7 +14,7 @@ if [ "${1}" = "late" ]; then
   cp -vf /usr/sbin/scaler.sh /tmpRoot/usr/sbin/scaler.sh
   cp -vf /usr/sbin/unscaler.sh /tmpRoot/usr/sbin/unscaler.sh
   cp -vf /usr/sbin/rescaler.sh /tmpRoot/usr/sbin/rescaler.sh
-  cp -vf /usr/bin/echo /tmpRoot/usr/bin/echo
+  [ ! -f "/tmpRoot/usr/bin/echo" ] && cp -vf /usr/bin/echo /tmpRoot/usr/bin/echo
 
   if [ "${2}" = "userspace" ]; then
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
@@ -32,6 +32,9 @@ Type=simple
 Restart=on-failure
 RestartSec=30s
 ExecStart=/usr/sbin/scaler.sh
+
+[Install]
+WantedBy=multi-user.target
 
 [X-Synology]
 Author=Virtualization Team
@@ -55,6 +58,9 @@ Restart=on-failure
 RestartSec=5s
 RemainAfterExit=yes
 ExecStart=/usr/sbin/rescaler.sh ${2}
+
+[Install]
+WantedBy=multi-user.target
 
 [X-Synology]
 Author=Virtualization Team
