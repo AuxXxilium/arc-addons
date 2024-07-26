@@ -213,11 +213,12 @@ if [ -d "/var/packages/CodecPack" ]; then
             patch
         done
     }
+
     if "$cp_usr_path/bin/synoame-bin-check-license"; then
         echo -e "AME Patch: Downloading Codec!"
+        patch_common
         if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
             echo "AME Patch: Successful!"
-            patch_common
             exit 0
         fi
     fi
