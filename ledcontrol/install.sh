@@ -31,7 +31,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
 # All on
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
-  cat > ${DEST} <<'EOF'
+  cat << EOF > ${DEST}
 [Unit]
 Description=Ledcontrol for Ugreen
 DefaultDependencies=no
@@ -40,9 +40,10 @@ After=multi-user.target
 
 [Service]
 User=root
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/ledcontrol.sh on
+Type=simple
+Restart=on-failure
+RestartSec=10s
+ExecStart=/usr/bin/ledcontrol.sh
 
 [Install]
 WantedBy=multi-user.target

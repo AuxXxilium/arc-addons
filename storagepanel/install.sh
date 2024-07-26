@@ -17,7 +17,7 @@ if [ "${1}" = "late" ]; then
   shift
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/storagepanel.service"
-  cat > ${DEST} <<EOF
+  cat << EOF > ${DEST}
 [Unit]
 Description=Modify storage panel
 DefaultDependencies=no

@@ -14,22 +14,26 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/amepatch.service"
-  cat > ${DEST} <<EOF
+  cat << EOF > ${DEST}
 [Unit]
 Description=addon amepatch
+DefaultDependencies=no
+IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
 Type=simple
 Restart=on-failure
-RestartSec=5s
+RestartSec=10s
 RemainAfterExit=yes
 ExecStartPre=/usr/bin/amepatch.sh
 ExecStart=/usr/syno/bin/synopkg restart CodecPack
-ExecStartPost=/usr/syno/bin/systemctl stop amepatch
 
 [Install]
 WantedBy=multi-user.target
+
+[X-Synology]
+Author=Virtualization Team
 EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
