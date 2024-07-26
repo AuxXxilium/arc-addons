@@ -17,17 +17,25 @@ if [ "${1}" = "late" ]; then
   shift
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/storagepanel.service"
-  echo "[Unit]"                                          >${DEST}
-  echo "Description=Modify storage panel"               >>${DEST}
-  echo "After=multi-user.target"                        >>${DEST}
-  echo                                                  >>${DEST}
-  echo "[Service]"                                      >>${DEST}
-  echo "Type=oneshot"                                   >>${DEST}
-  echo "RemainAfterExit=yes"                            >>${DEST}
-  echo "ExecStart=/usr/bin/storagepanel.sh $@"          >>${DEST}
-  echo                                                  >>${DEST}
-  echo "[Install]"                                      >>${DEST}
-  echo "WantedBy=multi-user.target"                     >>${DEST}
+  cat > ${DEST} <<EOF
+[Unit]
+Description=Modify storage panel
+DefaultDependencies=no
+IgnoreOnIsolate=true
+After=multi-user.target
+
+[Service]
+User=root
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/storagepanel.sh $@
+
+[Install]
+WantedBy=multi-user.target
+
+[X-Synology]
+Author=Virtualization Team
+EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/storagepanel.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/storagepanel.service
