@@ -15,20 +15,26 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/codecpatch.service"
-  echo "[Unit]"                                         >${DEST}
-  echo "Description=addon codecpatch"                  >>${DEST}
-  echo "After=multi-user.target"                       >>${DEST}
-  echo                                                 >>${DEST}
-  echo "[Service]"                                     >>${DEST}
-  echo "Type=oneshot"                                  >>${DEST}
-  echo "RemainAfterExit=yes"                           >>${DEST}
-  echo "ExecStart=/usr/bin/codecpatch.sh"              >>${DEST}
-  echo                                                 >>${DEST}
-  echo "[Install]"                                     >>${DEST}
-  echo "WantedBy=multi-user.target"                    >>${DEST}
+  cat << EOF > ${DEST}
+[Unit]
+Description=addon codecpatch
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/codecpatch.sh
+
+[Install]
+WantedBy=multi-user.target
+
+[X-Synology]
+Author=Virtualization Team
+EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/codecpatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service
+fi
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon codecpatch - ${1}"
 

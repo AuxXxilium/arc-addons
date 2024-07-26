@@ -19,7 +19,7 @@ if [ "${1}" = "late" ]; then
   if [ "${2}" = "userspace" ]; then
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
-    cat > ${DEST} <<EOF
+    cat << EOF > ${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
 DefaultDependencies=no
@@ -30,7 +30,7 @@ After=multi-user.target
 User=root
 Type=simple
 Restart=on-failure
-RestartSec=30s
+RestartSec=10s
 ExecStart=/usr/sbin/scaler.sh
 
 [Install]
@@ -44,7 +44,7 @@ EOF
   else
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
-    cat > ${DEST} <<EOF
+    cat << EOF > ${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
 DefaultDependencies=no

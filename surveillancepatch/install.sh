@@ -12,7 +12,7 @@ if [ "${1}" = "late" ]; then
   
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/surveillancepatch.service"
-  cat > ${DEST} <<EOF
+  cat << EOF > ${DEST}
 [Unit]
 Description=addon surveillancepatch
 DefaultDependencies=no
@@ -21,8 +21,9 @@ After=multi-user.target
 
 [Service]
 User=root
-Type=oneshot
-RemainAfterExit=yes
+Type=simple
+Restart=on-failure
+RestartSec=10s
 ExecStart=/usr/bin/surveillancepatch.sh
 
 [Install]
