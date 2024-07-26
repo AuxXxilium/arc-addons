@@ -5,7 +5,6 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-
 if [ "${1}" = "early" ]; then
   echo "Installing addon misc - ${1}"
 
