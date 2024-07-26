@@ -34,84 +34,24 @@ if [ "${1}" = "late" ]; then
   cat > ${DEST} <<'EOF'
 [Unit]
 Description=Ledcontrol for Ugreen
+DefaultDependencies=no
+IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
+User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/ledcontrol.sh on
 
 [Install]
 WantedBy=multi-user.target
+
+[X-Synology]
+Author=Virtualization Team
 EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/ledcontrol_disk.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_disk.service
-
-elif [ "${1}" = "nothing" ]; then
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
-# NIC
-  DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
-  cat > ${DEST} <<'EOF'
-[Unit]
-Description=NIC Ledcontrol for Ugreen
-DefaultDependencies=no
-IgnoreOnIsolate=true
-After=multi-user.target
-
-[Service]
-User=root
-Type=simple
-Restart=always
-RestartSec=10s
-ExecStart=/usr/bin/ledcontrol.sh nic
-
-[Install]
-WantedBy=multi-user.target
-EOF
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/ledcontrol_disk.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_disk.service
-# Disk
-  DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol_disk.service"
-  cat > ${DEST} <<'EOF'
-[Unit]
-Description=Disk Ledcontrol for Ugreen
-DefaultDependencies=no
-IgnoreOnIsolate=true
-After=multi-user.target
-
-[Service]
-User=root
-Type=simple
-Restart=always
-RestartSec=5min
-ExecStart=/usr/bin/ledcontrol.sh disk
-
-[Install]
-WantedBy=multi-user.target
-EOF
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/ledcontrol_disk.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_disk.service
-# CPU
-  DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol_cpu.service"
-  cat > ${DEST} <<'EOF'
-[Unit]
-Description=CPU Ledcontrol for Ugreen
-DefaultDependencies=no
-IgnoreOnIsolate=true
-After=multi-user.target
-
-[Service]
-User=root
-Type=simple
-Restart=always
-RestartSec=200ms
-ExecStart=/usr/bin/ledcontrol.sh cpu
-
-[Install]
-WantedBy=multi-user.target
-EOF
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/ledcontrol_cpu.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_cpu.service
+  ln -vsf /usr/lib/systemd/system/ledcontrol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon ledcontrol - ${1}"
 
