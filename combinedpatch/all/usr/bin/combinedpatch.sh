@@ -149,7 +149,7 @@ if [ -d "/var/packages/CodecPack" ]; then
                         echo "$conf_string" > "$conf_path/$conf_file"
                         chattr +i "$conf_path/$conf_file"
                         echo "Spoofed activation.conf created successfully"
-                        else
+                    else
                         chattr -i "$conf_path/$conf_file"
                         rm "$conf_path/$conf_file"
                         echo "$conf_string" > "$conf_path/$conf_file"
@@ -159,14 +159,12 @@ if [ -d "/var/packages/CodecPack" ]; then
                 else
                     echo "Corrupted backup and original synocodectool detected. Overwriting backup..."
                     mkdir -p "$backup_path"
-                    cp -p "$bin_path" \
-                    "$backup_path/$bin_file.$backup_identifier"
+                    cp -p "$bin_path" "$backup_path/$bin_file.$backup_identifier"
                 fi
             else    
                 echo "Detected valid synocodectool. Creating backup.."
                 mkdir -p "$backup_path"
-                cp -p "$bin_path" \
-                "$backup_path/$bin_file.$backup_identifier"
+                cp -p "$bin_path" "$backup_path/$bin_file.$backup_identifier"
                 echo "Patching..."
                 echo -e "${binhash_patch_list[$synocodectool_hash]}" | xxd -r - "$bin_path"            
                 echo "Patched"
