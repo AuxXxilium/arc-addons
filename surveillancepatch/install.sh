@@ -15,15 +15,11 @@ if [ "${1}" = "late" ]; then
   cat << EOF > ${DEST}
 [Unit]
 Description=addon surveillancepatch
-DefaultDependencies=no
-IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
-User=root
-Type=simple
-Restart=on-failure
-RestartSec=10s
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/bin/surveillancepatch.sh
 
 [Install]

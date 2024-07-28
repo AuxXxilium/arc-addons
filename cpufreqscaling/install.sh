@@ -22,12 +22,9 @@ if [ "${1}" = "late" ]; then
     cat << EOF > ${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
-DefaultDependencies=no
-IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
-User=root
 Type=simple
 Restart=on-failure
 RestartSec=10s
@@ -47,12 +44,9 @@ EOF
     cat << EOF > ${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
-DefaultDependencies=no
-IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
-User=root
 Type=simple
 Restart=on-failure
 RestartSec=5s
