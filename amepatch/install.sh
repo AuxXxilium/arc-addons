@@ -22,12 +22,11 @@ IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
+User=root
 Type=simple
 Restart=on-failure
-RestartSec=10s
-RemainAfterExit=yes
-ExecStartPre=/usr/bin/amepatch.sh
-ExecStart=/usr/syno/bin/synopkg restart CodecPack
+RestartSec=5s
+ExecStart=/usr/bin/amepatch.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -35,13 +34,9 @@ WantedBy=multi-user.target
 [X-Synology]
 Author=Virtualization Team
 EOF
-    mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-    ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
 
-    # Cleanup codecpatch
-    [ -f "/tmpRoot/usr/bin/codecpatch.sh" ] && rm -f "/tmpRoot/usr/bin/codecpatch.sh"
-    [ -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service" ] && rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service"
-    [ -f "/tmpRoot/usr/lib/systemd/system/codecpatch.service" ] && rm -f "/tmpRoot/usr/lib/systemd/system/codecpatch.service"
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon amepatch - ${1}"
 
