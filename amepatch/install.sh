@@ -14,7 +14,7 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/amepatch.service"
-  cat << EOF > ${DEST}
+  cat > ${DEST} <<EOF
 [Unit]
 Description=addon amepatch
 After=multi-user.target
@@ -23,7 +23,10 @@ After=multi-user.target
 Type=simple
 Restart=on-failure
 RestartSec=5s
-ExecStart=/usr/bin/amepatch.sh
+RemainAfterExit=yes
+ExecStartPre=/usr/bin/amepatch.sh
+ExecStart=/usr/syno/bin/synopkg restart CodecPack
+ExecStartPost=/usr/syno/bin/systemctl stop amepatch
 
 [Install]
 WantedBy=multi-user.target
@@ -33,7 +36,6 @@ Author=Virtualization Team
 EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
-
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon amepatch - ${1}"
 
