@@ -14,16 +14,12 @@ if [ "${1}" = "late" ]; then
   DEST="/tmpRoot/usr/lib/systemd/system/surveillancepatch.service"
   cat << EOF > ${DEST}
 [Unit]
-Description=addon surveillancepatchn
-DefaultDependencies=no
-IgnoreOnIsolate=true
+Description=addon surveillancepatch
 After=multi-user.target
 
 [Service]
-User=root
-Type=simple
-Restart=on-failure
-RestartSec=10s
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/bin/surveillancepatch.sh
 
 [Install]
