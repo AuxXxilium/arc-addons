@@ -1,0 +1,1 @@
+SUBSYSTEM=="pci", DRIVER=="qed*", ACTION=="change", ENV{QED_DEBUGFS_BDF_DBG}=="?*", RUN+="/lib/udev/qed_udev_dbg.sh"
