@@ -1,0 +1,5 @@
+#
+# RULES FILE: located in /etc/udev/rules.d/
+#
+# qedstor drivers
+SUBSYSTEMS=="pci", ATTRS{class}=="0x020000", ACTION=="change", RUN+="qedstor_udev.sh"
