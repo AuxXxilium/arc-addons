@@ -80,8 +80,19 @@ elif [ "${1}" = "late" ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
-    /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
-    echo "true" >/tmp/modulesChange
+    cat /addons/modulelist 2>/dev/null | /tmpRoot/bin/sed '/^\s*$/d' | while IFS=' ' read -r O M; do
+      [ "${O:0:1}" = "#" ] && continue
+      [ -z "${M}" -o -z "$(ls /usr/lib/modules/${M} 2>/dev/null)" ] && continue
+      if [ "${O}" = "F" ] || [ "${O}" = "f" ]; then
+        /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+      else
+        /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+      fi
+      # isChange="true"
+      # In Bash, the pipe operator | creates a subshell to execute the commands in the pipe.
+      # This means that if you modify a variable inside a while loop,
+      # the modification is not visible outside the loop because the while loop is executed in a subshell.
+      echo "true" >/tmp/modulesChange
     done
   fi
   isChange="$(cat /tmp/modulesChange 2>/dev/null || echo "false")"
