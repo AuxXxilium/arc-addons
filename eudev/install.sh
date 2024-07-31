@@ -107,6 +107,8 @@ elif [ "${1}" = "late" ]; then
 
   echo "Copy rules"
   cp -vf /usr/lib/udev/rules.d/* /tmpRoot/usr/lib/udev/rules.d/
+  echo "Copy hwdb"
+  cp -vf /etc/udev/hwdb.d/* /tmpRoot/usr/lib/udev/hwdb.d/
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
