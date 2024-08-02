@@ -164,6 +164,7 @@ elif [ "${1}" = "late" ]; then
       cp -vf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
     fi
   fi
+  modprobe -r acpi-cpufreq
   umount /sys
 
   # CPU Crypto Support Check
