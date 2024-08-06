@@ -283,7 +283,7 @@ function dtModel() {
         echo "        pcie_root = \"${PCIEPATH}\";" >>${DEST}
         echo "        port_type = \"ssdcache\";" >>${DEST}
         echo "    };" >>${DEST}
-        POWER_LIMIT="${POWER_LIMIT},100"
+        POWER_LIMIT="${POWER_LIMIT},0"
       fi
     done
     [ -n "${POWER_LIMIT:1}" ] && sed -i "s/power_limit = .*/power_limit = \"${POWER_LIMIT:1}\";/" ${DEST} || sed -i '/power_limit/d' ${DEST}
