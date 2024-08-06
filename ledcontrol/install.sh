@@ -33,16 +33,12 @@ if [ "${1}" = "late" ]; then
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
   cat << EOF > ${DEST}
 [Unit]
-Description=Ledcontrol for Ugreen
-DefaultDependencies=no
-IgnoreOnIsolate=true
+Description=Adds uGreen LED control
 After=multi-user.target
 
 [Service]
-User=root
-Type=simple
-Restart=on-failure
-RestartSec=10s
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/bin/ledcontrol.sh
 
 [Install]
