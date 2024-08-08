@@ -41,16 +41,21 @@ else
         $UGREEN_LEDS_CLI netdev -on -color $color -brightness $brightness > /dev/null 2>&1
     fi
 
+    # CPU
+    $UGREEN_LEDS_CLI power -on -color $color -brightness $brightness > /dev/null 2>&1
+
     # Disks
     devices=($(ls -d /dev/sata*[1-9] 2>/dev/null | grep -v 'p'))
     for i in "${!devices[@]}"; do
-        # [ "${devices[$i]}" = "/dev/${bootdisk}" ] && continue
         device=${devices[$i]}
         disk_number=$((i + 1))  # Disknummer für die LED-Steuerung (disk1, disk2, etc.)
+        smartstatus=$(smartctl -H "/dev/sata$disk_number" | grep "SMART Health Status")
+        if echo $smartstatus | grep -q "OK"; then
+            color="0 255 0"  # Grün
+        else
+            color="255 0 0"  # Rot
+        fi
         $UGREEN_LEDS_CLI disk$disk_number -on -color $color -brightness $brightness > /dev/null 2>&1
     done
-
-    # CPU
-    $UGREEN_LEDS_CLI power -on -color $color -brightness $brightness > /dev/null 2>&1
 fi
 exit 0
