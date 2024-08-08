@@ -24,6 +24,7 @@ elif [ "${1}" = "off" ]; then
     echo "Disable Ugreen LED"
     $UGREEN_LEDS_CLI all -off
 else
+    $UGREEN_LEDS_CLI all -off
     brightness=255
     color="0 255 0"  # Grün
     # NIC Status
