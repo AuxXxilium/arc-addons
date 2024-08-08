@@ -42,7 +42,7 @@ else
     fi
 
     # Disks
-    devices=($(ls -d /dev/sata*[1-9] 2>/dev/null))
+    devices=($(ls -d /dev/sata*[1-9] 2>/dev/null | grep -v 'p'))
     for i in "${!devices[@]}"; do
         # [ "${devices[$i]}" = "/dev/${bootdisk}" ] && continue
         device=${devices[$i]}
