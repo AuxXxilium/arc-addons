@@ -51,6 +51,6 @@ else
     done
 
     # CPU
-    $UGREEN_LEDS_CLI power -color $color -brightness $brightness > /dev/null 2>&1
+    $UGREEN_LEDS_CLI power -on -color $color -brightness $brightness > /dev/null 2>&1
 fi
 exit 0
