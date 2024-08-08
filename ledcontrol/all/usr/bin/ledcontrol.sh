@@ -51,7 +51,7 @@ else
         device=${devices[$i]}
         disk_number=$((i + 1))  # Disknummer für die LED-Steuerung (disk1, disk2, etc.)
         smartstatus=$(smartctl -H "/dev/sata$disk_number" | grep "SMART Health Status")
-        if echo $smartstatus | grep -q "OK"; then
+        if echo $smartstatus | grep -q 'OK'; then
             color="0 255 0"  # Grün
         else
             color="255 0 0"  # Rot
