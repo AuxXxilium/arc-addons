@@ -13,44 +13,51 @@ HDPARM="/usr/bin/hdparm"
 # Funktion, um zu überprüfen, ob ein Netzwerkinterface verbunden ist
 function check_network_interface() {
     local interface=$1
-    ip link show dev $interface | grep -q "state UP"
+    ip link show dev ${interface} | grep -q "state UP"
     return $?
 }
 
 if [ "${1}" = "on" ]; then
     echo "Enable Ugreen LED"
-    $UGREEN_LEDS_CLI all -on -color 255 255 255 -brightness 65
+    ${UGREEN_LEDS_CLI} all -on -color 255 255 255 -brightness 65
 elif [ "${1}" = "off" ]; then
     echo "Disable Ugreen LED"
-    $UGREEN_LEDS_CLI all -off
+    ${UGREEN_LEDS_CLI} all -off
 else
-    $UGREEN_LEDS_CLI all -off
+    ${UGREEN_LEDS_CLI} all -off
     brightness=255
     color="0 255 0"  # Grün
     # NIC Status
     interface_up=0
-    interfaces=($(ls /sys/class/net 2>/dev/null | grep eth))
+    interfaces=$(ls /sys/class/net 2>/dev/null | grep eth)
 
-    for interface in "${interfaces[@]}"; do
-        if check_network_interface $interface; then
+    for interface in ${interfaces}; do
+        if check_network_interface ${interface}; then
             interface_up=1
             break
         fi
     done
 
-    if [[ $interface_up -eq 1 ]]; then
-        $UGREEN_LEDS_CLI netdev -on -color $color -brightness $brightness > /dev/null 2>&1
+    if [ ${interface_up} -eq 1 ]; then
+        ${UGREEN_LEDS_CLI} netdev -on -color ${color} -brightness ${brightness} >/dev/null 2>&1
     fi
 
     # CPU
-    $UGREEN_LEDS_CLI power -on -color $color -brightness $brightness > /dev/null 2>&1
+    ${UGREEN_LEDS_CLI} power -on -color ${color} -brightness $brightness >/dev/null 2>&1
 
     # Disks
-    devices=($(ls -d /dev/sata*[1-9] 2>/dev/null | grep -v 'p'))
-    for i in "${!devices[@]}"; do
-        device=${devices[$i]}
-        disk_number=$((i + 1))  # Disknummer für die LED-Steuerung (disk1, disk2, etc.)
-        $UGREEN_LEDS_CLI disk$disk_number -on -color $color -brightness $brightness > /dev/null 2>&1
+    devices=$(ls -d /dev/sata*[1-9] 2>/dev/null | grep -v 'p')
+    disk_number=0
+    for i in ${devices}; do
+        disk_number=$((${disk_number} + 1))  # Disknummer für die LED-Steuerung (disk1, disk2, etc.)
+        smartstatus=$(smartctl -H ${i} | grep "SMART Health Status")
+        if [ $(echo ${smartstatus} | grep -q 'OK' | wc -l) -gt 0 ]; then
+            color="0 255 0"  # Grün
+        else
+            color="255 0 0"  # Rot
+        fi
+        ${UGREEN_LEDS_CLI} disk${disk_number} -on -color ${color} -brightness ${brightness} >/dev/null 2>&1
     done
+
 fi
 exit 0
