@@ -117,6 +117,18 @@ sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_clock_speed/\1${SPEED//\"/}/g" "${FILE_JS}"
 
+if [ -d "/sys/class/drm/card0" ]; then
+  LABLE="$(cat "/sys/class/drm/card0/device/label" 2>/dev/null)"
+  CLOCK="$(cat "/sys/class/drm/card0/gt_max_freq_mhz" 2>/dev/null)"
+  [ -n "${CLOCK}" ] && CLOCK="${CLOCK} MHz"
+  if [ -n "${LABLE}" ] && [ -n "${CLOCK}" ]; then
+    echo "GPU Info set to: \"${LABLE}\" \"${CLOCK}\""
+    sed -i "s/_D(\"support_nvidia_gpu\")},/_D(\"support_nvidia_gpu\")||true},/g" "${FILE_JS}"
+    # t.gpu={};t.gpu.clock=\"455 MHz\";t.gpu.memory=\"8192 MiB\";t.gpu.name=\"Tesla P4\";t.gpu.temperature_c=47;t.gpu.tempwarn=false;
+    sed -i "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!t.gpu){t.gpu={};t.gpu.clock=\"${CLOCK}\";t.gpu.name=\"${LABLE}\";}let/g" "${FILE_JS}"
+  fi
+fi
+
 if [ "${TEMP^^}" = "ON" ]; then
   sed -i 's/,t,i,s)}/,t,i,s+" \| "+e.sys_temp+" °C")}/g' "${FILE_JS}"
   sed -i 's/,C,D);/,C,D+" \| "+t.gpu.temperature_c+" °C");/g' "${FILE_JS}"
