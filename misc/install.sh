@@ -120,13 +120,27 @@ EOF
   fi
 
 elif [ "${1}" = "patches" ]; then
+  # Start getty
+  for I in $(cat /proc/cmdline 2>/dev/null | grep -oE 'getty=[^ ]+' | sed 's/getty=//'); do
+    TTYN="$(echo "${I}" | cut -d',' -f1)"
+    BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
+    echo "ttyS0 ttyS1 ttyS2" | grep -qw "${TTYN}" && continue
+    if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
+      echo "Starting getty on ${TTYN}"
+      if [ -n "${BAUD}" ]; then
+        /usr/sbin/getty -L "${TTYN}" "${BAUD}" linux &
+      else
+        /usr/sbin/getty -L "${TTYN}" linux &
+      fi
+    fi
+  done
   # Set static IP from cmdline
   if grep -q 'network.' /proc/cmdline; then
     for I in $(grep -oE 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
-      MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g' | tr '[:upper:]' '[:lower:]')"
+      MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/')"
       IPRS="$(echo "${I}" | cut -d= -f2)"
       for ETH in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
-        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g' | tr '[:upper:]' '[:lower:]')
+        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/')
         if [ "${MACR}" = "${MACX}" ]; then
           echo "Setting IP for ${ETH} to ${IPRS}"
           mkdir -p /etc/sysconfig/network-scripts
@@ -182,7 +196,7 @@ elif [ "${1}" = "late" ]; then
       echo "CPU Supports AES, aesni-intel should load"
     else
       echo "CPU does NOT support AES, aesni-intel will not load, disabling"
-      sed -i 's/support_aesni_intel="yes"/support_aesni_intel="no"/' /tmpRoot/etc.defaults/synoinfo.conf
+      sed -i 's/support_aesni_intel="yes"/support_aesni_intel="no"/' /tmpRoot/etc/synoinfo.conf /tmpRoot/etc.defaults/synoinfo.conf
       sed -i 's/^aesni-intel/# aesni-intel/g' /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf
     fi
   fi
@@ -244,6 +258,7 @@ elif [ "${1}" = "late" ]; then
     for ETH in $(cat /etc/ifcfgs); do
       echo "Copy ifcfg-${ETH}"
       if [ -f "/etc/sysconfig/network-scripts/ifcfg-${ETH}" ]; then
+        rm -vf /tmpRoot/etc/sysconfig/network-scripts/ifcfg-*${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-*${ETH}
         cp -vf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc/sysconfig/network-scripts/
         cp -vf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/
       fi
