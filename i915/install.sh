@@ -17,11 +17,11 @@ if [ "${1}" = "patches" ]; then
   echo "Installing addon i915 - ${1}"
 
   if [ -n "${2}" ]; then
-    GPU="$(echo "${2}" | sed 's/://g' | tr '[:upper:]' '[:lower:]')"
+    GPU="$(echo "${2}" | sed 's/://g; s/.*/\L&/')"
   else
-    GPU="$(lspci -n 2>/dev/null | grep 0300 | grep 8086 | cut -d " " -f 3 | sed 's/://g')"
+    GPU="$(lspci -n 2>/dev/null | grep 0300 | grep 8086 | cut -d' ' -f3 | sed 's/://g')"
     if [ -z "${GPU}" ]; then
-      GPU="$(lspci -n 2>/dev/null | grep 0380 | grep 8086 | cut -d " " -f 3 | sed 's/://g')"
+      GPU="$(lspci -n 2>/dev/null | grep 0380 | grep 8086 | cut -d' ' -f3 | sed 's/://g')"
     fi
   fi
   [ -z "${GPU}" -o $(echo -n "${GPU}" | wc -c) -ne 8 ] && echo "GPU is not detected" && exit 0
@@ -33,7 +33,7 @@ if [ "${1}" = "patches" ]; then
     isLoad=0
     if lsmod 2>/dev/null | grep -q ^i915; then
       isLoad=1
-      rmmod i915
+      /usr/sbin/modprobe -r i915
     fi
     GPU_DEF="86800000923e0000"
     GPU_BIN="${GPU:2:2}${GPU:0:2}0000${GPU:6:2}${GPU:4:2}0000"
@@ -44,7 +44,7 @@ if [ "${1}" = "patches" ]; then
       sed "s/${GPU_DEF}/${GPU_BIN}/; s/308201f706092a86.*70656e6465647e0a//" |
       xxd -r -p >"${KO_FILE}" 2>/dev/null
     rm -f "${KO_FILE}.tmp"
-    [ "${isLoad}" = "1" ] && /usr/sbin/modprobe "/usr/lib/modules/i915.ko"
+    [ "${isLoad}" = "1" ] && /usr/sbin/modprobe i915
   fi
 elif [ "${1}" = "late" ]; then
   echo "Installing addon i915 - ${1}"

@@ -94,5 +94,5 @@ EOF
     # cat /usr/syno/web/localrss.json
     sed -i "s|rss_server_v2=.*$|rss_server_v2=\"http://localhost:5000/localrss.json\"|g" "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"
   fi
-  grep "rss_server" "/etc/synoinfo.conf"
+  grep "rss_server" "/etc.defaults/synoinfo.conf"
 fi
