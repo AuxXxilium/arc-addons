@@ -26,7 +26,7 @@ RestartSec=5s
 RemainAfterExit=yes
 ExecStartPre=/usr/bin/amepatch.sh
 ExecStart=/usr/syno/bin/synopkg restart CodecPack
-ExecStartPost=/usr/syno/bin/systemctl stop amepatch
+ExecStartPost=/usr/bin/systemctl stop amepatch
 
 [Install]
 WantedBy=multi-user.target
