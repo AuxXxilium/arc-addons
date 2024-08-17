@@ -16,29 +16,31 @@ if [ "${1}" = "early" ]; then
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
+  # mv -f /usr/lib/udev/rules.d/60-persistent-storage.rules /usr/lib/udev/rules.d/60-persistent-storage.rules.bak
+  # mv -f /usr/lib/udev/rules.d/60-persistent-storage-tape.rules /usr/lib/udev/rules.d/60-persistent-storage-tape.rules.bak
+  # mv -f /usr/lib/udev/rules.d/80-net-name-slot.rules /usr/lib/udev/rules.d/80-net-name-slot.rules.bak
+  [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
+  /usr/sbin/depmod -a
+  /usr/sbin/udevd -d || {
+    echo "FAIL"
+    exit 1
+  }
+  echo "Triggering add events to udev"
+  udevadm trigger --type=subsystems --action=add
+  udevadm trigger --type=devices --action=add
+  udevadm trigger --type=devices --action=change
+  udevadm settle --timeout=30 || echo "udevadm settle failed"
+  # Give more time
+  sleep 10
+  # Remove from memory to not conflict with RAID mount scripts
+  /usr/bin/killall udevd
+  # Remove kvm module
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_intel && /usr/sbin/modprobe -r kvm_intel || true # kvm-intel.ko
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_amd && /usr/sbin/modprobe -r kvm_amd || true     # kvm-amd.ko
 
-  # getty
-  # Find the getty setting in cmdline
-  for I in $(cat /proc/cmdline 2>/dev/null | grep -oE 'getty=[^ ]+' | sed 's/getty=//'); do
-    TTYN="$(echo "${I}" | cut -d',' -f1)"
-    BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
-    echo "ttyS0 ttyS1 ttyS2" | grep -qw "${TTYN}" && continue
-    if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
-      echo "Starting getty on ${TTYN}"
-      if [ -n "${BAUD}" ]; then
-        /usr/sbin/getty -L "${TTYN}" "${BAUD}" linux &
-      else
-        /usr/sbin/getty -L "${TTYN}" linux & 
-      fi
-    fi
-  done
-
 elif [ "${1}" = "late" ]; then
   echo "Installing addon eudev - ${1}"
-
-# [ ! -L "/tmpRoot/usr/sbin/modprobe" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modprobe
+  # [ ! -L "/tmpRoot/usr/sbin/modprobe" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modprobe
   [ ! -L "/tmpRoot/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modinfo
   [ ! -L "/tmpRoot/usr/sbin/depmod" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/depmod
 
@@ -87,8 +89,6 @@ elif [ "${1}" = "late" ]; then
 
   echo "Copy rules"
   cp -vf /usr/lib/udev/rules.d/* /tmpRoot/usr/lib/udev/rules.d/
-  echo "Copy hwdb"
-  cp -vf /etc/udev/hwdb.d/* /tmpRoot/usr/lib/udev/hwdb.d/
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
