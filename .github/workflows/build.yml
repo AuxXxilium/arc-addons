@@ -103,5 +103,4 @@ jobs:
             ${{ steps.Changelog.outputs.changelog }}
           artifacts: |
             addons.zip
-            *.addon
             checksum.sha256
