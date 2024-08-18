@@ -43,8 +43,8 @@ if [ "${1}" = "late" ]; then
             xxd -r -p >"${SO_FILE}" 2>/dev/null
         rm -f "${SO_FILE}.tmp"
         echo "SSPatch: libssutils.so is patched"
-    elif [ "$(sha256sum "${SO_FILE}" | cut -d' ' -f1)" = "6a9636880dde48c6d7f0dc6f6337f33960fa12df67a8ed3a97aa9ff6fe45ce7d" ]; then
-        PATCH="850b010000e8b684e5ff83f80141bc7b/850b010000e8b684e5ff83f80141bc43"
+    elif [ "$(sha256sum "${SO_FILE}" | cut -d' ' -f1)" = "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
+        PATCH="850b010000e8b684e5ff83f80141bc43/850b010000e8b684e5ff83f80141bc7b"
         cp -vf "${SO_FILE}" "${SO_FILE}.bak"
         cp -f "${SO_FILE}" "${SO_FILE}.tmp"
         xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
