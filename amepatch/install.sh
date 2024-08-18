@@ -23,7 +23,6 @@ After=multi-user.target
 Type=simple
 Restart=on-failure
 RestartSec=5s
-RemainAfterExit=yes
 ExecStart=/usr/bin/amepatch.sh
 
 [Install]
