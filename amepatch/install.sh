@@ -24,8 +24,7 @@ Type=simple
 Restart=on-failure
 RestartSec=5s
 RemainAfterExit=yes
-ExecStartPre=/usr/bin/amepatch.sh
-ExecStart=/usr/syno/bin/synopkg restart CodecPack
+ExecStart=/usr/bin/amepatch.sh
 
 [Install]
 WantedBy=multi-user.target

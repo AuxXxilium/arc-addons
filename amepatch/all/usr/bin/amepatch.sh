@@ -43,7 +43,6 @@ if [ -d "/var/packages/CodecPack" ]; then
         content='[{"attribute": {"codec": "hevc", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}, {"attribute": {"codec": "aac", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}]'
     else
         echo "MD5 mismatch - Already patched or unsupported version!"
-        exit 0
     fi
 
     for ((i = 0; i < ${#hex_values[@]}; i++)); do
@@ -65,19 +64,22 @@ if [ -d "/var/packages/CodecPack" ]; then
         if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
             echo -e "AME Patch: Successful!"
             exit 0
+        else
+            echo -e "AME Patch: Unsuccessful!"
+            exit 1
         fi
+    else
+        if [ -f "$so_backup" ]; then
+            mv -f "$so_backup" "$so"
+        fi
+        if [ -f "$lic_backup" ]; then
+            mv -f "$lic_backup" "$lic"
+        fi
+        if [ -f "$licsig_backup" ]; then
+            mv -f "$licsig_backup" "$licsig"
+        fi
+        echo -e "AME Patch: Backup restored!"
+        exit 1
     fi
-    echo -e "AME Patch: Unsuccessful!"
-    if [ -f "$so_backup" ]; then
-        mv -f "$so_backup" "$so"
-    fi
-    if [ -f "$lic_backup" ]; then
-        mv -f "$lic_backup" "$lic"
-    fi
-    if [ -f "$licsig_backup" ]; then
-        mv -f "$licsig_backup" "$licsig"
-    fi
-    echo -e "AME Patch: Backup restored!"
-    exit 1
 fi
 exit 0
