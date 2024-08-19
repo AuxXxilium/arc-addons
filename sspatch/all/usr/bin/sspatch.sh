@@ -80,9 +80,12 @@ if [ -d /var/packages/SurveillanceStation ]; then
     chown SurveillanceStation:SurveillanceStation "${PATHSCRIPTS}/license.sh"
     chmod 0777 "${PATHSCRIPTS}/license.sh"
 
-    echo -e "Surveillance Patch: Successfull!"
+    echo -e "SSPatch: Successfull!"
 
     sleep 5
     /usr/syno/bin/synopkg start SurveillanceStation
+    exit 0
+else
+    echo "SSPatch: SurveillanceStation not found"
+    exit 1
 fi
-exit 0
