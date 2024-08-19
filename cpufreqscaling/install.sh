@@ -11,9 +11,9 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  cp -vf /usr/sbin/scaler.sh /tmpRoot/usr/sbin/scaler.sh
-  cp -vf /usr/sbin/unscaler.sh /tmpRoot/usr/sbin/unscaler.sh
-  cp -vf /usr/sbin/rescaler.sh /tmpRoot/usr/sbin/rescaler.sh
+  cp -vf /usr/bin/scaler.sh /tmpRoot/usr/sbin/scaler.sh
+  cp -vf /usr/bin/unscaler.sh /tmpRoot/usr/sbin/unscaler.sh
+  cp -vf /usr/bin/rescaler.sh /tmpRoot/usr/sbin/rescaler.sh
   [ ! -f "/tmpRoot/usr/bin/echo" ] && cp -vf /usr/bin/echo /tmpRoot/usr/bin/echo
 
   if [ "${2}" = "userspace" ]; then
@@ -29,7 +29,7 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=10s
-ExecStart=/usr/sbin/scaler.sh
+ExecStart=/usr/bin/scaler.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -53,7 +53,7 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=10s
-ExecStart=/usr/sbin/rescaler.sh "${2}"
+ExecStart=/usr/bin/rescaler.sh "${2}"
 
 [Install]
 WantedBy=multi-user.target
@@ -70,7 +70,7 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
 
-  rm -f /tmpRoot/usr/sbin/scaler.sh
-  rm -f /tmpRoot/usr/sbin/rescaler.sh
-  rm -f /tmpRoot/usr/sbin/unscaler.sh
+  rm -f /tmpRoot/usr/bin/scaler.sh
+  rm -f /tmpRoot/usr/bin/rescaler.sh
+  rm -f /tmpRoot/usr/bin/unscaler.sh
 fi
