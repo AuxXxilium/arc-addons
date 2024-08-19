@@ -51,7 +51,7 @@ After=multi-user.target
 Type=simple
 Restart=on-failure
 RestartSec=5s
-ExecStart=/usr/sbin/rescaler.sh ${2}
+ExecStart=/usr/sbin/rescaler.sh "${2}"
 
 [Install]
 WantedBy=multi-user.target
