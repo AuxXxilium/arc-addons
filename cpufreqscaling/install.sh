@@ -25,6 +25,7 @@ Description=Enable CPU Freq scaling
 After=multi-user.target
 
 [Service]
+User=root
 Type=simple
 Restart=on-failure
 RestartSec=10s
@@ -48,9 +49,10 @@ Description=Enable CPU Freq scaling
 After=multi-user.target
 
 [Service]
+User=root
 Type=simple
 Restart=on-failure
-RestartSec=5s
+RestartSec=10s
 ExecStart=/usr/sbin/rescaler.sh "${2}"
 
 [Install]
