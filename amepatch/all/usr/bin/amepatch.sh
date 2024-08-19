@@ -81,7 +81,6 @@ if [ -d "/var/packages/CodecPack" ]; then
         echo -e "AME Patch: Backup restored!"
         exit 1
     fi
-    exit 0
 else
     echo -e "AME Patch: CodecPack not found!"
     exit 1
