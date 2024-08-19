@@ -33,6 +33,7 @@ while true; do
       done
     fi
   fi
+  sleep 10
   # Check if the governor is set correctly
   governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
   if [ "${governor}" = "${1}" ]; then
