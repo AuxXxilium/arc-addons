@@ -39,6 +39,7 @@ EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
   else
+    [ "${2}" != "schedutil" ] && cp -vf /usr/lib/modules/cpufreq_${2}.ko /tmpRoot/usr/lib/modules/cpufreq_${2}.ko
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
     cat << EOF > ${DEST}
@@ -50,7 +51,6 @@ After=multi-user.target
 Type=simple
 Restart=on-failure
 RestartSec=5s
-RemainAfterExit=yes
 ExecStart=/usr/sbin/rescaler.sh ${2}
 
 [Install]
