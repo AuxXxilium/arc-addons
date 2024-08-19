@@ -13,15 +13,12 @@ governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 
 # Deamonize the main function...
 while true; do
-  if [ -f /usr/sbin/stopscale ]; then
-    exit 0
-  fi
   # Set correct cpufreq governor to allow user defined frequency scaling
   if [ "${1}" = "ondemand" ] || [ "${1}" = "conservative" ]; then
     if [ -f "/usr/lib/modules/cpufreq_${1}.ko" ]; then
       modprobe cpufreq_${1}
       if [ "${governor}" != "${1}" ]; then
-        for i in $(seq 0 "${cpucorecount}"); do
+        for i in $(seq 0 ${cpucorecount}); do
           echo "${1}" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor
         done
       fi
@@ -31,7 +28,7 @@ while true; do
     fi
   elif [ "${1}" = "schedutil" ]; then
     if [ "${governor}" != "${1}" ]; then
-      for i in $(seq 0 "${cpucorecount}"); do
+      for i in $(seq 0 ${cpucorecount}); do
         echo "${1}" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor
       done
     fi
