@@ -17,9 +17,12 @@ if [ "${1}" = "late" ]; then
   cat > ${DEST} <<EOF
 [Unit]
 Description=addon amepatch
+DefaultDependencies=no
+IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
+User=root
 Type=simple
 Restart=on-failure
 RestartSec=5s
