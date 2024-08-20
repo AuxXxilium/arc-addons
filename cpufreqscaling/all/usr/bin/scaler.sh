@@ -40,8 +40,8 @@ function main {
   # This will set user defined min and max frequencies
   if [ "$governor" = "userspace" ]; then
     for i in $(seq 0 "${cpucorecount}"); do
-      echo "$scalingminfreq" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_min_freq
-      echo "$scalingmaxfreq" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_max_freq
+      echo "$scalingminfreq" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_min_freq
+      echo "$scalingmaxfreq" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_max_freq
     done
   fi
 
@@ -74,23 +74,23 @@ function main {
         elif [ "$loadavg" -ge $((10#$lowload)) ] && [ "$loadavg" -le $((10#$midload)) ]; then
           echo "$midfreq" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_setspeed
         elif [ "$loadavg" -ge $((10#$midload)) ]; then
-          echo "$maxfreq" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_setspeed
+          echo "$maxfreq" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_setspeed
         fi
       done
     else
       for i in $(seq 0 "${cpucorecount}"); do
-        echo "$coolfreq" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_setspeed
+        echo "$coolfreq" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_setspeed
       done
       sleep 30
     fi
   elif [ "$CPU" = "AMD" ]; then  
       for i in $(seq 0 "${cpucorecount}"); do
         if [ "$loadavg" -le $((10#$lowload)) ]; then
-          echo "$minfreq" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_setspeed
+          echo "$minfreq" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_setspeed
         elif [ "$loadavg" -ge $((10#$lowload)) ] && [ "$loadavg" -le $((10#$midload)) ]; then
-          echo "$midfreq" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_setspeed
+          echo "$midfreq" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_setspeed
         elif [ "$loadavg" -ge $((10#$midload)) ]; then
-          echo "$maxfreq" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_setspeed
+          echo "$maxfreq" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_setspeed
         fi
       done
   fi
@@ -107,8 +107,8 @@ while true; do
   governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
   # Set correct cpufreq governor to allow user defined frequency scaling
   if [ "$governor" != "userspace" ]; then
-    for i in $(seq 0 "${cpucorecount}"); do
-      echo "userspace" >/sys/devices/system/cpu/cpu"${i}"/cpufreq/scaling_governor
+    for i in $(seq 0 ${cpucorecount}); do
+      echo "userspace" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor
     done
   fi
   governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)

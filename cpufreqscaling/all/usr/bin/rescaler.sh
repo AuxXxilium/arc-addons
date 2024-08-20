@@ -6,43 +6,42 @@
 # See /LICENSE for more information.
 #
 
+# Make things safer
+set -euo pipefail
+
 # Get cpu cores count minus 1, to allow maping from 0
 cpucorecount=$(cat /proc/cpuinfo | grep processor | wc -l)
 cpucorecount=$((cpucorecount - 1))
-governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+error=0
 
-# Deamonize the main function...
-while true; do
-  # Set correct cpufreq governor to allow user defined frequency scaling
-  if [ "${1}" = "ondemand" ] || [ "${1}" = "conservative" ]; then
-    if [ -f "/usr/lib/modules/cpufreq_${1}.ko" ]; then
-      modprobe cpufreq_${1}
-      if [ "${governor}" != "${1}" ]; then
-        for i in $(seq 0 ${cpucorecount}); do
-          echo "${1}" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor
-        done
-      fi
-    else
-      echo "No cpufreq_${1} module found"
-      exit 1
-    fi
-  elif [ "${1}" = "schedutil" ]; then
-    if [ "${governor}" != "${1}" ]; then
-      for i in $(seq 0 ${cpucorecount}); do
-        echo "${1}" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor
-      done
-    fi
-  fi
-  sleep 10
-  # Check if the governor is set correctly
-  governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-  if [ "${governor}" = "${1}" ]; then
-    echo "Governor set to ${1}"
-    break
-    exit 0
+# Load the correct cpufreq module
+if [ "${1}" = "ondemand" ] || [ "${1}" = "conservative" ]; then
+  if [ -f "/usr/lib/modules/cpufreq_${1}.ko" ]; then
+    modprobe cpufreq_${1}
+    echo "CPUFreqScaling: cpufreq_${1} loaded"
   else
-    echo "Failed to set governor to ${1}"
-    break
-    exit 1
+    echo "CPUFreqScaling: cpufreq_${1} not found"
+    error=1
+  fi
+fi
+# Deamonize the main function...
+for i in $(seq 0 ${cpucorecount}); do
+  governor=$(cat /sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor)
+  # Set correct cpufreq governor to allow frequency scaling
+  if [ "${governor}" != "${1}" ]; then
+    echo "${1}" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor
   fi
 done
+sleep 10
+# Check if the governor is set correctly
+for i in $(seq 0 ${cpucorecount}); do
+  governor=$(cat /sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor)
+  if [ "${governor}" = "${1}" ]; then
+    echo "CPUFreqScaling: Governor set to ${1}"
+  else
+    echo "CPUFreqScaling: Failed to set governor to ${1}"
+    error=1
+  fi
+done
+[ "${error}" -eq 1 ] && exit 1
+exit 0
