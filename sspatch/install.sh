@@ -14,6 +14,8 @@ if [ "${1}" = "late" ]; then
   cat << EOF > ${DEST}
 [Unit]
 Description=addon amepatch
+DefaultDependencies=no
+IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
