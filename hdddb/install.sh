@@ -23,7 +23,7 @@ After=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/hdddb.sh -nfrewp
+ExecStart=-/usr/bin/hdddb.sh -nfrewp
 
 [Install]
 WantedBy=multi-user.target

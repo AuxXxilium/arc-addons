@@ -23,7 +23,7 @@ elif [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/rndis.service"
-  echo "[Unit]"                                   > ${DEST}
+  echo "[Unit]"                                    >${DEST}
   echo "Description=Android USB Network Adapter"  >>${DEST}
   echo "After=multi-user.target"                  >>${DEST}
   echo "ConditionPathExists=/sys/class/net/usb0"  >>${DEST}
@@ -31,7 +31,7 @@ elif [ "${1}" = "late" ]; then
   echo "[Service]"                                >>${DEST}
   echo "Type=simple"                              >>${DEST}
   echo "Restart=always"                           >>${DEST}
-  echo "ExecStart=/usr/bin/rndis.sh"              >>${DEST}
+  echo "ExecStart=-/usr/bin/rndis.sh"             >>${DEST}
   echo                                            >>${DEST}
   echo "[Install]"                                >>${DEST}
   echo "WantedBy=multi-user.target"               >>${DEST}

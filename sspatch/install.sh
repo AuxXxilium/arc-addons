@@ -6,9 +6,14 @@ if [ "${1}" = "late" ]; then
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
   cp -vf /usr/bin/sspatch.sh /tmpRoot/usr/bin/sspatch.sh
-  cp -vf /usr/bin/license.sh /tmpRoot/usr/bin/license.sh
-  cp -vf /usr/bin/S82surveillance.sh /tmpRoot/usr/bin/S82surveillance.sh
+  cp -vf /usr/bin/patchelf /tmpRoot/usr/bin/patchelf
+  cp -vf /usr/lib/libssutils.mitm.so /tmpRoot/usr/lib/libssutils.mitm.so
   
+  SED_PATH='/tmpRoot/usr/bin/sed'
+  ${SED_PATH} -i '/synopkg restart SurveillanceStation/d' /tmpRoot/etc/crontab
+  # Add line to crontab, execute each minute
+  echo "5       0       *       *       *       root    synopkg restart SurveillanceStation #arc sspatch addon" >>/tmpRoot/etc/crontab
+
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/sspatch.service"
   cat << EOF > ${DEST}
@@ -23,7 +28,7 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=5s
-ExecStart=/usr/bin/sspatch.sh
+ExecStart=-/usr/bin/sspatch.sh
 
 [Install]
 WantedBy=multi-user.target
