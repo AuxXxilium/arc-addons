@@ -23,7 +23,7 @@ After=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/codecpatch.sh
+ExecStart=-/usr/bin/codecpatch.sh
 
 [Install]
 WantedBy=multi-user.target
