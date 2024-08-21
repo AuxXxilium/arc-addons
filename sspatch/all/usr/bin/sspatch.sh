@@ -47,7 +47,7 @@ if [ -d /var/packages/SurveillanceStation ]; then
     sleep 5
 
     # Check Sha256sum (DVA 92a8c8c75446daa7328a34acc67172e1f9f3af8229558766dbe5804a86c08a5e)
-    if [ "$(sha256sum "${SO_FILE}.so" | cut -d' ' -f1)" = "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
+    if [ "$(sha256sum "${SO_FILE}" | cut -d' ' -f1)" = "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
         mv -f "${SO_FILE}" "${ORG_FILE}"
         cp -f "/usr/lib/libssutils.mitm.so" "${MITM_FILE}"
         patchelf --add-needed ${ORG_FILE} ${MITM_FILE}
