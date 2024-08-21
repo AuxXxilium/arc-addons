@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+#
+# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
 
 if [ -d /var/packages/SurveillanceStation ]; then
     # Define the entries to be added
@@ -30,8 +36,8 @@ if [ -d /var/packages/SurveillanceStation ]; then
     PATHSCRIPTS="${SSPATH}/target/scripts"
     SPATCHBIN="/usr/bin"
 
-    SO_FILE="${SSPATH}/target/lib/libssutils.so"
-    if [ ! -f "${SO_FILE}" ]; then
+    SO_FILE="${SSPATH}/target/lib/libssutils"
+    if [ ! -f "${SO_FILE}.so" ]; then
         echo "SSPatch: libssutils.so does not exist"
         exit 1
     fi
@@ -40,26 +46,14 @@ if [ -d /var/packages/SurveillanceStation ]; then
     sleep 5
 
     # Check Sha256sum
-    if [ "$(sha256sum "${SO_FILE}" | cut -d' ' -f1)" = "81b64d65f4a2a65626f9280ba43ea43f031a239af3152b859b79e1b5124cc6e3" ]; then
-        PATCH="8548ffffff41be43000000e93dffffff/8548ffffff41be7b000000e93dffffff"
-        cp -f "${SO_FILE}" "${SO_FILE}.bak"
-        cp -f "${SO_FILE}" "${SO_FILE}.tmp"
-        xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
-            sed "s/${PATCH}/" |
-            xxd -r -p >"${SO_FILE}" 2>/dev/null
-        rm -f "${SO_FILE}.tmp"
-        echo "SSPatch: libssutils.so is patched"
-    elif [ "$(sha256sum "${SO_FILE}" | cut -d' ' -f1)" = "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
-        PATCH="850b010000e8b684e5ff83f80141bc43/850b010000e8b684e5ff83f80141bc7b"
-        cp -f "${SO_FILE}" "${SO_FILE}.bak"
-        cp -f "${SO_FILE}" "${SO_FILE}.tmp"
-        xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
-            sed "s/${PATCH}/" |
-            xxd -r -p >"${SO_FILE}" 2>/dev/null
-        rm -f "${SO_FILE}.tmp"
+if [ "$(sha256sum "${SO_FILE}" | cut -d' ' -f1)" = "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
+        mv -f "${SO_FILE}.so" "${SO_FILE}.org.so"
+        cp -f "/usr/lib/libssutils.mitm.so" "${SO_FILE}.mitm.so"
+        patchelf --add-needed /var/packages/SurveillanceStation/target/lib/libssutils.org.so /var/packages/SurveillanceStation/target/lib/libssutils.mitm.so
+        mv -f "${SO_FILE}.mitm.so" "${SO_FILE}.so"
         echo "SSPatch: libssutils.so is patched"
     else
-        if [ -f "${SO_FILE}.bak" ]; then
+        if [ -f "${SO_FILE}.org.so" ]; then
             echo "SSPatch: libssutils.so is already patched"
             exit 0
         else
@@ -69,16 +63,6 @@ if [ -d /var/packages/SurveillanceStation ]; then
     fi
     chown SurveillanceStation:SurveillanceStation "${SO_FILE}"
     chmod 0644 "${SO_FILE}"
-
-    rm -f "${PATHSCRIPTS}/S82surveillance.sh"
-    cp -f "${SPATCHBIN}/S82surveillance.sh" "${PATHSCRIPTS}/S82surveillance.sh"
-    chown SurveillanceStation:SurveillanceStation "${PATHSCRIPTS}/S82surveillance.sh"
-    chmod 0755 "${PATHSCRIPTS}/S82surveillance.sh"
-
-    rm -f "${PATHSCRIPTS}/license.sh"
-    cp -f "${SPATCHBIN}/license.sh" "${PATHSCRIPTS}/license.sh"
-    chown SurveillanceStation:SurveillanceStation "${PATHSCRIPTS}/license.sh"
-    chmod 0777 "${PATHSCRIPTS}/license.sh"
 
     echo -e "SSPatch: Successfull!"
 
