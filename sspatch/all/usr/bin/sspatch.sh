@@ -33,10 +33,11 @@ if [ -d /var/packages/SurveillanceStation ]; then
     done
 
     SSPATH="/var/packages/SurveillanceStation"
-    PATHSCRIPTS="${SSPATH}/target/scripts"
-    SPATCHBIN="/usr/bin"
 
-    SO_FILE="${SSPATH}/target/lib/libssutils"
+    SO_FILE="${SSPATH}/target/lib/libssutils.so"
+    ORG_FILE="${SSPATH}/target/lib/libssutils.so"
+    MITM_FILE="${SSPATH}/target/lib/libssutils.mitm.so"
+    JS_FILE="${SSPATH}/target/ui/sds.js"
     if [ ! -f "${SO_FILE}.so" ]; then
         echo "SSPatch: libssutils.so does not exist"
         exit 1
@@ -45,15 +46,15 @@ if [ -d /var/packages/SurveillanceStation ]; then
     /usr/syno/bin/synopkg stop SurveillanceStation
     sleep 5
 
-    # Check Sha256sum
-if [ "$(sha256sum "${SO_FILE}" | cut -d' ' -f1)" = "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
-        mv -f "${SO_FILE}.so" "${SO_FILE}.org.so"
-        cp -f "/usr/lib/libssutils.mitm.so" "${SO_FILE}.mitm.so"
-        patchelf --add-needed /var/packages/SurveillanceStation/target/lib/libssutils.org.so /var/packages/SurveillanceStation/target/lib/libssutils.mitm.so
-        mv -f "${SO_FILE}.mitm.so" "${SO_FILE}.so"
+    # Check Sha256sum (DVA 92a8c8c75446daa7328a34acc67172e1f9f3af8229558766dbe5804a86c08a5e)
+    if [ "$(sha256sum "${SO_FILE}.so" | cut -d' ' -f1)" = "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
+        mv -f "${SO_FILE}" "${ORG_FILE}"
+        cp -f "/usr/lib/libssutils.mitm.so" "${MITM_FILE}"
+        patchelf --add-needed ${ORG_FILE} ${MITM_FILE}
+        mv -f "${MITM_FILE}" "${SO_FILE}"
         echo "SSPatch: libssutils.so is patched"
     else
-        if [ -f "${SO_FILE}.org.so" ]; then
+        if [ -f "${ORG_FILE}" ]; then
             echo "SSPatch: libssutils.so is already patched"
             exit 0
         else
@@ -61,13 +62,18 @@ if [ "$(sha256sum "${SO_FILE}" | cut -d' ' -f1)" = "b0fafefe820aa8ecd577313dff2a
             exit 1
         fi
     fi
+    # Change owner and permissions
     chown SurveillanceStation:SurveillanceStation "${SO_FILE}"
     chmod 0644 "${SO_FILE}"
+    echo -e "SSPatch: libssutils.so permissions set"
 
-    echo -e "SSPatch: Successfull!"
+    # Remove warning message
+    sed -i 's/SYNO.API.RedirectToDSMByErrorCode=function(c){alert(SYNO.API.getErrorString(c));/SYNO.API.RedirectToDSMByErrorCode = () => { };/g' ${JS_FILE}
+    echo -e "SSPatch: sds.js patched"
 
     sleep 5
     /usr/syno/bin/synopkg start SurveillanceStation
+    echo -e "SSPatch: Successfull!"
     exit 0
 else
     echo "SSPatch: SurveillanceStation not found"

@@ -1,6 +1,6 @@
 version: 1
 name: sspatch
-description: "Dynamic 50 License Patch for SS 9.2.0-11289!"
+description: "Dynamic 50 License Patch for SS 9.2.0-11289 (Non DVA)"
 system: false
 beta: true
 all:
