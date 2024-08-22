@@ -24,7 +24,7 @@ if [ "${1}" = "late" ]; then
 Description=Enable CPU Freq scaling
 DefaultDependencies=no
 IgnoreOnIsolate=true
-After=multi-user.target
+After=udevrules.service
 
 [Service]
 User=root
@@ -42,20 +42,22 @@ EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
   else
-    [ "${2}" != "schedutil" ] && cp -vf /usr/lib/modules/cpufreq_${2}.ko /tmpRoot/usr/lib/modules/cpufreq_${2}.ko
+    [ "${2}" != "schedutil" ] && cp -vf /usr/lib/modules/cpufreq_${2}.ko /tmpRoot/usr/lib/modules/cpufreq_${2}.ko && modprobe cpufreq_${2}
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
     cat << EOF > ${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
-After=multi-user.target
+DefaultDependencies=no
+IgnoreOnIsolate=true
+After=udevrules.service
 
 [Service]
 User=root
 Type=simple
 Restart=on-failure
 RestartSec=10s
-ExecStart=-/usr/bin/rescaler.sh "${2}"
+ExecStart=-/usr/bin/rescaler.sh ${2}
 
 [Install]
 WantedBy=multi-user.target
