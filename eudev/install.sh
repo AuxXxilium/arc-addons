@@ -92,17 +92,22 @@ elif [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
-  echo "[Unit]"                                                                  >${DEST}
-  echo "Description=Reload udev rules"                                          >>${DEST}
-  echo                                                                          >>${DEST}
-  echo "[Service]"                                                              >>${DEST}
-  echo "Type=oneshot"                                                           >>${DEST}
-  echo "RemainAfterExit=yes"                                                    >>${DEST}
-  echo "ExecStart=/usr/bin/udevadm hwdb --update"                               >>${DEST}
-  echo "ExecStart=/usr/bin/udevadm control --reload-rules"                      >>${DEST}
-  echo                                                                          >>${DEST}
-  echo "[Install]"                                                              >>${DEST}
-  echo "WantedBy=multi-user.target"                                             >>${DEST}
+  cat << EOF > ${DEST}
+[Unit]
+Description=Reload udev rules
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/udevadm hwdb --update
+ExecStart=/usr/bin/udevadm control --reload-rules
+
+[Install]
+WantedBy=multi-user.target
+
+[X-Synology]
+Author=Virtualization Team
+EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/udevrules.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/udevrules.service
