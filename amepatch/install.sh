@@ -26,7 +26,7 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=5s
-ExecStart=-/usr/bin/amepatch.sh
+ExecStart=/usr/bin/amepatch.sh
 
 [Install]
 WantedBy=multi-user.target
