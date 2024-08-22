@@ -24,7 +24,7 @@ After=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=-/usr/bin/cpuinfo.sh $@
+ExecStart=/usr/bin/cpuinfo.sh $@
 
 [Install]
 WantedBy=multi-user.target

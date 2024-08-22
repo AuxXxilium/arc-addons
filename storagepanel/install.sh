@@ -28,7 +28,7 @@ After=multi-user.target
 User=root
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=-/usr/bin/storagepanel.sh $@
+ExecStart=/usr/bin/storagepanel.sh $@
 
 [Install]
 WantedBy=multi-user.target

@@ -32,7 +32,7 @@ After=multi-user.target
 User=root
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=-/usr/bin/wol.sh
+ExecStart=/usr/bin/wol.sh
 
 [Install]
 WantedBy=multi-user.target

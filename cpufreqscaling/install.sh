@@ -31,7 +31,7 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=10s
-ExecStart=-/usr/bin/scaler.sh
+ExecStart=/usr/bin/scaler.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -57,7 +57,7 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=10s
-ExecStart=-/usr/bin/rescaler.sh ${2}
+ExecStart=/usr/bin/rescaler.sh ${2}
 
 [Install]
 WantedBy=multi-user.target
