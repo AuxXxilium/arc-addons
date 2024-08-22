@@ -22,6 +22,7 @@ if [ "${1}" = "ondemand" ] || [ "${1}" = "conservative" ]; then
   else
     echo "CPUFreqScaling: cpufreq_${1} not found"
     error=1
+    break
   fi
 fi
 # Deamonize the main function...
@@ -41,7 +42,8 @@ for i in $(seq 0 ${cpucorecount}); do
   else
     echo "CPUFreqScaling: Failed to set governor to ${1}"
     error=1
+    break
   fi
 done
-[ "${error}" -eq 1 ] && exit 1
+[ ${error} -eq 1 ] && exit 1
 exit 0
