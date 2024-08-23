@@ -28,7 +28,7 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=5s
-ExecStart=-/usr/bin/sspatch.sh
+ExecStart=/usr/bin/sspatch.sh
 
 [Install]
 WantedBy=multi-user.target
