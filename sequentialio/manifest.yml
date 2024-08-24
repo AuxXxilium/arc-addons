@@ -1,6 +1,6 @@
 version: 1
 name: sequentialio
-description: "Enables sequential I/O for your SSD caches (Can cause overheating)"
+description: "Enables sequential I/O for SSD caches (Can cause overheating) - Modify in Arc DSM Options"
 system: false
 beta: false
 all:

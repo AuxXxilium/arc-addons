@@ -1,6 +1,6 @@
 version: 1
 name: storagepanel
-description: "Automated Storagepanel selection (Modify in Arc Options - DSM Storagepanel)"
+description: "Automated Storagepanel selection - Modify in Arc DSM Options"
 system: false
 beta: false
 all:
