@@ -18,7 +18,7 @@ if [ "${1}" = "late" ]; then
   DEST="/tmpRoot/usr/lib/systemd/system/sspatch.service"
   cat << EOF > ${DEST}
 [Unit]
-Description=addon amepatch
+Description=addon sspatch
 DefaultDependencies=no
 IgnoreOnIsolate=true
 After=multi-user.target
