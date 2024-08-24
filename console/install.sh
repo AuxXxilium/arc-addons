@@ -59,7 +59,7 @@ elif [ "${1}" = "late" ]; then
   echo -e "DSM mode\n" >/tmpRoot/etc/issue
 
   cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@tty1.service
-  sed -i 's|^ExecStart=.*|ExecStart=-/sbin/agetty %I 115200 linux|' /tmpRoot/usr/lib/systemd/system/getty\@tty1.service
+  sed -i 's|^ExecStart=.*|ExecStart=/sbin/agetty %I 115200 linux|' /tmpRoot/usr/lib/systemd/system/getty\@tty1.service
   mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
   ln -vsf /usr/lib/systemd/system/getty\@tty1.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@tty1.service
 

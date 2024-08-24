@@ -215,7 +215,7 @@ elif [ "${1}" = "late" ]; then
 
   # service
   SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
-  sed -i 's|ExecStart=/|ExecStart=-/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service ${SERVICE_PATH}/syno_update_disk_logs.service
+  sed -i 's|ExecStart=/|ExecStart=/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service ${SERVICE_PATH}/syno_update_disk_logs.service
   # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -oE 'getty=[^ ]+' | sed 's/getty=//'); do
     TTYN="$(echo "${I}" | cut -d',' -f1)"
@@ -226,7 +226,7 @@ elif [ "${1}" = "late" ]; then
     if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
       echo "Make getty\@${TTYN}.service"
       cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@${TTYN}.service
-      sed -i "s|^ExecStart=.*|ExecStart=-/sbin/agetty %I ${BAUD:-115200} linux|" /tmpRoot/usr/lib/systemd/system/getty\@${TTYN}.service
+      sed -i "s|^ExecStart=.*|ExecStart=/sbin/agetty %I ${BAUD:-115200} linux|" /tmpRoot/usr/lib/systemd/system/getty\@${TTYN}.service
       mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
       ln -vsf /usr/lib/systemd/system/getty\@${TTYN}.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@${TTYN}.service
     fi

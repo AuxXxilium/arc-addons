@@ -13,7 +13,7 @@ if [ "${1}" = "late" ]; then
 
   tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/usr/ ./bin ./sbin ./lib
   tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/ ./etc
-  sed -i '/^Exec/s|=/|=-/|g' /tmpRoot/usr/lib/systemd/system/acpid.service
+  sed -i '/^Exec/s|=/|=/|g' /tmpRoot/usr/lib/systemd/system/acpid.service
   if [ -f /usr/lib/modules/button.ko ]; then
     cp -vf /usr/lib/modules/button.ko /tmpRoot/usr/lib/modules/button.ko
   else
@@ -33,9 +33,9 @@ if [ "${1}" = "late" ]; then
   # echo "Restart=always"                                      >>${DEST}
   # echo "RestartSec=30"                                       >>${DEST}
   # echo "PIDFile=/var/run/acpid.pid"                          >>${DEST}
-  # echo "ExecStartPre=-/usr/sbin/modprobe button"             >>${DEST}
+  # echo "ExecStartPre=/usr/sbin/modprobe button"              >>${DEST}
   # echo "ExecStart=/usr/sbin/acpid"                           >>${DEST}
-  # echo "ExecStopPost=-/usr/sbin/modprobe -r button"          >>${DEST}
+  # echo "ExecStopPost=/usr/sbin/modprobe -r button"           >>${DEST}
   # echo                                                       >>${DEST}
   # echo "[X-Synology]"                                        >>${DEST}
   # echo "Author=Virtualization Team"                          >>${DEST}
