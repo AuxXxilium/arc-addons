@@ -1,6 +1,6 @@
 version: 1
 name: arcdns
-description: "Dynamic DNS client for arcdns.tech"
+description: "Dynamic DNS client for arcdns.tech - Modify in Arc DSM Options"
 system: false
 beta: true
 all:

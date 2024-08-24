@@ -7,7 +7,7 @@
 #
 ARCHOST="${1}"
 
-if curl "${ARCHOST}" -o /tmp/arcdns; then
+if curl https://arcdns.tech/update/${ARCHOST} -o /tmp/arcdns; then
     if cat /tmp/arcdns | grep -q "Successfuly updated"; then
         IP=$(cat /tmp/arcdns | grep "current_ip" | sed 's/.*current_ip":"\([0-9.]*\).*/\1/')
         echo "ArcDNS: IP updated to ${IP}"
