@@ -31,8 +31,8 @@ After=multi-user.target
 User=root
 Type=simple
 Restart=on-failure
-RestartSec=5s
-ExecStart=/usr/bin/arcdns.sh ${2}
+RestartSec=10
+ExecStart=/usr/bin/arcdns.sh "${2}"
 
 [Install]
 WantedBy=multi-user.target

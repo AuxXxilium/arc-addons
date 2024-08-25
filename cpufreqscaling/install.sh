@@ -30,7 +30,8 @@ After=udevrules.service
 User=root
 Type=simple
 Restart=on-failure
-RestartSec=10s
+RestartSec=10
+ExecStartPre=sleep 30
 ExecStart=/usr/bin/scaler.sh
 
 [Install]
@@ -56,8 +57,8 @@ After=udevrules.service
 User=root
 Type=simple
 Restart=on-failure
-RestartSec=10s
-ExecStart=/usr/bin/rescaler.sh ${2}
+RestartSec=10
+ExecStart=/usr/bin/rescaler.sh "${2}"
 
 [Install]
 WantedBy=multi-user.target
