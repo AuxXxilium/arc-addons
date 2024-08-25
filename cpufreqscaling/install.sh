@@ -29,7 +29,6 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=10
-ExecStartPre=sleep 10
 ExecStart=/usr/sbin/scaling.sh "${2}"
 
 [Install]
