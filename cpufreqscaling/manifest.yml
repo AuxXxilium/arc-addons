@@ -1,7 +1,7 @@
 version: 1
 name: cpufreqscaling
-description: "Enable CPU Freqscaling for DSM"
-system: true
+description: "Enable CPU Freqscaling for DSM - Only use if Scaling is not working"
+system: false
 beta: false
 all:
   install-script: "install.sh"
