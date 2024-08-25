@@ -68,8 +68,8 @@ if [ -d /var/packages/SurveillanceStation ]; then
     echo -e "SSPatch: ${SO_FILE} permissions set"
 
     # Remove warning message
-    sed -i 's/SYNO.API.RedirectToDSMByErrorCode=function(c){alert(SYNO.API.getErrorString(c));/SYNO.API.RedirectToDSMByErrorCode = () => { };/g' ${JS_FILE}
-    echo -e "SSPatch: sds.js patched"
+    #sed -i 's/SYNO.API.RedirectToDSMByErrorCode=function(c){alert(SYNO.API.getErrorString(c));/SYNO.API.RedirectToDSMByErrorCode = () => { };/g' ${JS_FILE}
+    #echo -e "SSPatch: sds.js patched"
 
     sleep 5
     /usr/syno/bin/synopkg start SurveillanceStation
