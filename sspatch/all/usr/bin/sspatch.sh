@@ -35,7 +35,7 @@ if [ -d /var/packages/SurveillanceStation ]; then
     SSPATH="/var/packages/SurveillanceStation"
 
     SO_FILE="${SSPATH}/target/lib/libssutils.so"
-    ORG_FILE="${SSPATH}/target/lib/libssutils.so"
+    ORG_FILE="${SSPATH}/target/lib/libssutils.org.so"
     MITM_FILE="${SSPATH}/target/lib/libssutils.mitm.so"
     JS_FILE="${SSPATH}/target/ui/sds.js"
     if [ ! -f "${SO_FILE}" ]; then
