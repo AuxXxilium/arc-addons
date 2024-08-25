@@ -1,6 +1,6 @@
 version: 1
 name: cpufreqscaling
-description: "Enable CPU Freqscaling for DSM - Only use if Scaling is not working"
+description: "Enable CPU Freqscaling for DSM - Modify in Arc DSM Options"
 system: false
 beta: false
 all:
