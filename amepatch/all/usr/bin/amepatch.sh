@@ -9,25 +9,21 @@
 if [ -d "/var/packages/CodecPack" ]; then
     /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
 
-    cp_usr_path="/var/packages/CodecPack/target/usr"
+    [ -f "/var/packages/CodecPack/target/apparmor" ] && mv -f "/var/packages/CodecPack/target/apparmor" "/var/packages/CodecPack/target/apparmor.bak"
+
+    ame_path="/var/packages/CodecPack/target/usr"
     values=('669066909066906690' 'B801000000' '30')
-    hex_values=('1F28' '48F5' '4921' '4953' '4975' '9AC8')
     indices=(0 1 1 1 1 2)
-    so="$cp_usr_path/lib/libsynoame-license.so"
-    so_backup="$cp_usr_path/lib/libsynoame-license.so.orig"
+    so="$ame_path/lib/libsynoame-license.so"
+    so_backup="$ame_path/lib/libsynoame-license.so.orig"
     lic="/usr/syno/etc/license/data/ame/offline_license.json"
     lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
-    licsig="/usr/syno/etc/license/data/ame/offline_license.sig"
-    licsig_backup="/usr/syno/etc/license/data/ame/offline_license.sig.orig"
 
     if [ ! -f "$so_backup" ]; then
         cp -p "$so" "$so_backup"
     fi
     if [ ! -f "$lic_backup" ]; then
         cp -p "$lic" "$lic_backup"
-    fi
-    if [ ! -f "$licsig_backup" ]; then
-        cp -p "$licsig" "$licsig_backup"
     fi
 
     hash_to_check="$(md5sum -b "$so" | awk '{print $1}')"
@@ -59,9 +55,9 @@ if [ -d "/var/packages/CodecPack" ]; then
     rm -f "${lic}"
     echo "${content}" >"${lic}"
 
-    if "$cp_usr_path/bin/synoame-bin-check-license"; then
+    if "$ame_path/bin/synoame-bin-check-license"; then
         echo -e "AME Patch: Downloading Codec!"
-        if "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"; then
+        if "$ame_path/bin/synoame-bin-auto-install-needed-codec"; then
             echo -e "AME Patch: Successful!"
             exit 0
         else
@@ -74,9 +70,6 @@ if [ -d "/var/packages/CodecPack" ]; then
         fi
         if [ -f "$lic_backup" ]; then
             mv -f "$lic_backup" "$lic"
-        fi
-        if [ -f "$licsig_backup" ]; then
-            mv -f "$licsig_backup" "$licsig"
         fi
         echo -e "AME Patch: Backup restored!"
         exit 1
