@@ -1,0 +1,20 @@
+version: 1
+name: ups
+description:
+  en_US: "Force UPS to shut down in standby mode."
+system: false
+beta: false
+all:
+  install-script: "install.sh"
+  copy: ""
+apollolake: true
+broadwell: true
+broadwellnk: true
+broadwellnkv2: true
+broadwellntbap: true
+denverton: true
+geminilake: true
+purley: true
+v1000: true
+r1000: true
+epyc7002: true
