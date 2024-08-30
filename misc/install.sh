@@ -281,10 +281,10 @@ elif [ "${1}" = "late" ]; then
   fi
 
   # Allow VideoStation install and AME Downgrade on DSM 7.2.2
-  /usr/syno/bin/synosetkeyvalue /etc.defaults/synopackageslimit.conf VideoStation "3.1.0-3153"
-  /usr/syno/bin/synosetkeyvalue /etc/synopackageslimit.conf VideoStation "3.1.0-3153"
-  /usr/syno/bin/synosetkeyvalue /etc.defaults/synopackageslimit.conf CodecPack "3.1.0-3005"
-  /usr/syno/bin/synosetkeyvalue /etc/synopackageslimit.conf CodecPack "3.1.0-3005"
+  /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synopackageslimit.conf VideoStation "3.1.0-3153"
+  /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc/synopackageslimit.conf VideoStation "3.1.0-3153"
+  /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synopackageslimit.conf CodecPack "3.1.0-3005"
+  /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc/synopackageslimit.conf CodecPack "3.1.0-3005"
 
   # Community Packages
   if [ ! -f /tmpRoot/usr/syno/etc/packages/feeds ]; then
