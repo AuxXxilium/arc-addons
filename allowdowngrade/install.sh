@@ -35,7 +35,6 @@ EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/allowdowngrade.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/allowdowngrade.service
-fi
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon allowdowngrade - ${1}"
   # To-Do
