@@ -280,12 +280,6 @@ elif [ "${1}" = "late" ]; then
     echo "synosystemd.conf does not exist."
   fi
 
-  # Allow VideoStation install and AME Downgrade on DSM 7.2.2
-  /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synopackageslimit.conf VideoStation "3.1.0-3153"
-  /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc/synopackageslimit.conf VideoStation "3.1.0-3153"
-  /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synopackageslimit.conf CodecPack "3.1.0-3005"
-  /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc/synopackageslimit.conf CodecPack "3.1.0-3005"
-
   # Community Packages
   if [ ! -f /tmpRoot/usr/syno/etc/packages/feeds ]; then
     mkdir -p /tmpRoot/usr/syno/etc/packages
