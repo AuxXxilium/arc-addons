@@ -1,0 +1,19 @@
+version: 1
+name: allowdowngrade
+description: "Allow Downgrade for AME, SS and VideoStation on 7.2.2"
+system: false
+beta: true
+all:
+  install-script: "install.sh"
+  copy: "all"
+apollolake: true
+broadwell: true
+broadwellnk: true
+broadwellnkv2: true
+broadwellntbap: true
+denverton: true
+geminilake: true
+purley: true
+v1000: true
+r1000: true
+epyc7002: true
