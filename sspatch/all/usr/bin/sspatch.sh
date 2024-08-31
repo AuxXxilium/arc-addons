@@ -19,7 +19,7 @@ function copy_file() {
 }
 
 SSPATH="/var/packages/SurveillanceStation/target"
-ADDONSPATH="/usr/arc/addons"
+ADDONSPATH="/usr/arc"
 if [ -d "${SSPATH}" ]; then
   # Define the hosts entries to be added
   ENTRIES=("0.0.0.0 synosurveillance.synology.com")
