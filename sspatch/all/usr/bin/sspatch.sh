@@ -21,30 +21,34 @@ function copy_file() {
 SSPATH="/var/packages/SurveillanceStation/target"
 PATCHPATH="/usr/arc"
 if [ -d "${SSPATH}" ]; then
+  echo "sspatch: SurveillanceStation found"
+  
   # Define the hosts entries to be added
   ENTRIES=("0.0.0.0 synosurveillance.synology.com")
   for ENTRY in "${ENTRIES[@]}"
   do
-    if [ -f "/tmpRoot/etc/hosts" ]; then
+    if [ -f "/etc/hosts" ]; then
         # Check if the entry is already in the file
-        if grep -Fxq "${ENTRY}" /tmpRoot/etc/hosts; then
+        if grep -Fxq "${ENTRY}" /etc/hosts; then
           echo "sspatch: Entry ${ENTRY} already exists"
         else
           echo "sspatch: Entry ${ENTRY} does not exist, adding now"
-          echo "${ENTRY}" >> /tmpRoot/etc/hosts
+          echo "${ENTRY}" >> /etc/hosts
         fi
     fi
-    if [ -f "/tmpRoot/etc.defaults/hosts" ]; then
-        if grep -Fxq "${ENTRY}" /tmpRoot/etc.defaults/hosts; then
+    if [ -f "/etc.defaults/hosts" ]; then
+        if grep -Fxq "${ENTRY}" /etc.defaults/hosts; then
           echo "sspatch: Entry ${ENTRY} already exists"
         else
           echo "sspatch: Entry ${ENTRY} does not exist, adding now"
-          echo "${ENTRY}" >> /tmpRoot/etc.defaults/hosts
+          echo "${ENTRY}" >> /etc.defaults/hosts
         fi
     fi
   done
 
-  echo "sspatch: SurveillanceStation found"
+  /usr/syno/bin/synopkg stop SurveillanceStation
+  sleep 5
+
   # Check Sha256sum for Patch
   [ -f "${SSPATH}/lib/libssutils.org.so" ] && CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.org.so | cut -d' ' -f1)" || CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)"
   if [ "${CHECKSUM}" == "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
@@ -70,6 +74,9 @@ if [ -d "${SSPATH}" ]; then
   else
     echo "sspatch: SurveillanceStation Version not supported"
   fi
+
+  sleep 5
+  /usr/syno/bin/synopkg start SurveillanceStation
 fi
 
 exit 0
