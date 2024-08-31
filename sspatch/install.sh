@@ -28,27 +28,23 @@ if [ "${1}" = "late" ]; then
   ADDONSPATH="/tmpRoot/usr/arc/addons"
   if [ -d "${SSPATH}" ]; then
     # Define the hosts entries to be added
-    ENTRIES=("0.0.0.0 synosurveillance.synology.com")
-    for ENTRY in "${ENTRIES[@]}"
-    do
-      if [ -f "/tmpRoot/etc/hosts" ]; then
-          # Check if the entry is already in the file
-          if grep -Fxq "${ENTRY}" /tmpRoot/etc/hosts; then
-            echo "Entry ${ENTRY} already exists"
-          else
-            echo "Entry ${ENTRY} does not exist, adding now"
-            echo "${ENTRY}" >> /tmpRoot/etc/hosts
-          fi
-      fi
-      if [ -f "/tmpRoot/etc.defaults/hosts" ]; then
-          if grep -Fxq "${ENTRY}" /tmpRoot/etc.defaults/hosts; then
-            echo "Entry ${ENTRY} already exists"
-          else
-            echo "Entry ${ENTRY} does not exist, adding now"
-            echo "${ENTRY}" >> /tmpRoot/etc.defaults/hosts
-          fi
-      fi
-    done
+    if [ -f "/tmpRoot/etc/hosts" ]; then
+        # Check if the entry is already in the file
+        if grep -Fxq "0.0.0.0 synosurveillance.synology.com" /tmpRoot/etc/hosts; then
+          echo "Entry already exists"
+        else
+          echo "Entry does not exist, adding now"
+          echo "0.0.0.0 synosurveillance.synology.com" >> /tmpRoot/etc/hosts
+        fi
+    fi
+    if [ -f "/tmpRoot/etc.defaults/hosts" ]; then
+        if grep -Fxq "${ENTRY}" /tmpRoot/etc.defaults/hosts; then
+          echo "Entry ${ENTRY} already exists"
+        else
+          echo "Entry ${ENTRY} does not exist, adding now"
+          echo "${ENTRY}" >> /tmpRoot/etc.defaults/hosts
+        fi
+    fi
 
     # Check Sha256sum for Patch
     CHECKSUM=$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)
