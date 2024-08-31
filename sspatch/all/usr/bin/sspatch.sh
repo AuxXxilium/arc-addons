@@ -19,7 +19,7 @@ function copy_file() {
 }
 
 SSPATH="/var/packages/SurveillanceStation/target"
-ADDONSPATH="/usr/arc"
+PATCHPATH="/usr/arc"
 if [ -d "${SSPATH}" ]; then
   # Define the hosts entries to be added
   ENTRIES=("0.0.0.0 synosurveillance.synology.com")
@@ -46,29 +46,29 @@ if [ -d "${SSPATH}" ]; then
 
   echo "sspatch: SurveillanceStation found"
   # Check Sha256sum for Patch
-  CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)"
+  [ -f "${SSPATH}/lib/libssutils.org.so" ] && CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.org.so | cut -d' ' -f1)" || CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)"
   if [ "${CHECKSUM}" == "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
     echo "sspatch: SurveillanceStation 9.2.0-11289"
-    tar -zxf "${ADDONSPATH}/sspatch.tgz" -C "${ADDONSPATH}/"
-    copy_file ${SSPATH}/lib  libssutils.so    ${ADDONSPATH}  0644
-    copy_file ${SSPATH}/sbin sscmshostd       ${ADDONSPATH}  0755
-    copy_file ${SSPATH}/sbin sscored          ${ADDONSPATH}  0755
-    copy_file ${SSPATH}/sbin ssdaemonmonitord ${ADDONSPATH}  0755
-    copy_file ${SSPATH}/sbin ssexechelperd    ${ADDONSPATH}  0755
-    copy_file ${SSPATH}/sbin ssroutined       ${ADDONSPATH}  0755
-    copy_file ${SSPATH}/sbin ssrtmpclientd    ${ADDONSPATH}  0755
+    tar -zxf "${PATCHPATH}/sspatch.tgz" -C "${PATCHPATH}/"
+    copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATH}  0644
+    copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin sscored          ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATH}  0755
   elif [ "${CHECKSUM}" == "92a8c8c75446daa7328a34acc67172e1f9f3af8229558766dbe5804a86c08a5e" ]; then
     echo "sspatch: SurveillanceStation Openvino 9.2.0-11289"
-    tar -zxf "${ADDONSPATH}/sspatch-openvino.tgz" -C "${ADDONSPATH}/"
-    copy_file ${SSPATH}/lib  libssutils.so    ${ADDONSPATH}  0644
-    copy_file ${SSPATH}/sbin sscmshostd       ${ADDONSPATH}  0755
-    copy_file ${SSPATH}/sbin sscored          ${ADDONSPATH}  0755
-    copy_file ${SSPATH}/sbin ssdaemonmonitord ${ADDONSPATH}  0755
-    copy_file ${SSPATH}/sbin ssexechelperd    ${ADDONSPATH}  0755
-    copy_file ${SSPATH}/sbin ssroutined       ${ADDONSPATH}  0755
-    copy_file ${SSPATH}/sbin ssrtmpclientd    ${ADDONSPATH}  0755
+    tar -zxf "${PATCHPATH}/sspatch-openvino.tgz" -C "${PATCHPATH}/"
+    copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATH}  0644
+    copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin sscored          ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATH}  0755
   else
-    echo "sspatch: SurveillanceStation version not supported"
+    echo "sspatch: SurveillanceStation Version not supported"
   fi
 fi
 
