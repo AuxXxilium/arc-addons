@@ -12,8 +12,8 @@ function copy_file() {
   local input="${3}"
   local mode="${4}"
 
-  mv -f "${target}/${file}" "${target}/${file}".bak
-  cp -f "${input}/${file}" "${target}/${file}"
+  mv -vf "${target}/${file}" "${target}/${file}".bak
+  cp -vf "${input}/${file}" "${target}/${file}"
   chown SurveillanceStation:SurveillanceStation "${target}/${file}"
   chmod "${mode}" "${target}/${file}"
 }
@@ -27,28 +27,11 @@ if [ "${1}" = "late" ]; then
   INPUTPATH="/usr/arc/addons"
   ADDONSPATH="/tmpRoot/usr/arc/addons"
   if [ -d "${SSPATH}" ]; then
-    # Define the hosts entries to be added
-    if [ -f "/tmpRoot/etc/hosts" ]; then
-        # Check if the entry is already in the file
-        if grep -Fxq "0.0.0.0 synosurveillance.synology.com" /tmpRoot/etc/hosts; then
-          echo "Entry already exists"
-        else
-          echo "Entry does not exist, adding now"
-          echo "0.0.0.0 synosurveillance.synology.com" >> /tmpRoot/etc/hosts
-        fi
-    fi
-    if [ -f "/tmpRoot/etc.defaults/hosts" ]; then
-        if grep -Fxq "${ENTRY}" /tmpRoot/etc.defaults/hosts; then
-          echo "Entry ${ENTRY} already exists"
-        else
-          echo "Entry ${ENTRY} does not exist, adding now"
-          echo "${ENTRY}" >> /tmpRoot/etc.defaults/hosts
-        fi
-    fi
-
+    echo "sspatch: SurveillanceStation found"
     # Check Sha256sum for Patch
-    CHECKSUM=$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)
+    CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)"
     if [ "${CHECKSUM}" == "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
+      echo "sspatch: SurveillanceStation 9.2.0-11289"
       tar -zxf "${INPUTPATH}/sspatch.tgz" -C "${ADDONSPATH}/"
       copy_file ${SSPATH}/lib  libssutils.so    ${ADDONSPATH}  0644
       copy_file ${SSPATH}/sbin sscmshostd       ${ADDONSPATH}  0755
@@ -58,6 +41,7 @@ if [ "${1}" = "late" ]; then
       copy_file ${SSPATH}/sbin ssroutined       ${ADDONSPATH}  0755
       copy_file ${SSPATH}/sbin ssrtmpclientd    ${ADDONSPATH}  0755
     elif [ "${CHECKSUM}" == "92a8c8c75446daa7328a34acc67172e1f9f3af8229558766dbe5804a86c08a5e" ]; then
+      echo "sspatch: SurveillanceStation Openvino 9.2.0-11289"
       tar -zxf "${INPUTPATH}/sspatch-openvino.tgz" -C "${ADDONSPATH}/"
       copy_file ${SSPATH}/lib  libssutils.so    ${ADDONSPATH}  0644
       copy_file ${SSPATH}/sbin sscmshostd       ${ADDONSPATH}  0755
@@ -67,7 +51,7 @@ if [ "${1}" = "late" ]; then
       copy_file ${SSPATH}/sbin ssroutined       ${ADDONSPATH}  0755
       copy_file ${SSPATH}/sbin ssrtmpclientd    ${ADDONSPATH}  0755
     else
-      echo "sspatch: Surveillance Station version not supported"
+      echo "sspatch: SurveillanceStation version not supported"
     fi
   fi
 elif [ "${1}" = "uninstall" ]; then
