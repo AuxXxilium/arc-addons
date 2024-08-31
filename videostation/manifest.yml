@@ -1,6 +1,6 @@
 version: 1
 name: videostation
-description: "Add ability to install Video Station and AME 3.0 on DSM 7.2.2"
+description: "Force downgrade Video Station and AME to DSM 7.2.1 Versions on DSM 7.2.2"
 system: false
 beta: true
 all:
