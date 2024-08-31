@@ -51,7 +51,8 @@ if [ "${1}" = "late" ]; then
     done
 
     # Check Sha256sum for Patch
-    if [ "$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)" = "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
+    CHECKSUM=$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)
+    if [ "${CHECKSUM}" == "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
       tar -zxf "${INPUTPATH}/sspatch.tgz" -C "${ADDONSPATH}/"
       copy_file ${SSPATH}/lib  libssutils.so    ${ADDONSPATH}  0644
       copy_file ${SSPATH}/sbin sscmshostd       ${ADDONSPATH}  0755
@@ -60,6 +61,17 @@ if [ "${1}" = "late" ]; then
       copy_file ${SSPATH}/sbin ssexechelperd    ${ADDONSPATH}  0755
       copy_file ${SSPATH}/sbin ssroutined       ${ADDONSPATH}  0755
       copy_file ${SSPATH}/sbin ssrtmpclientd    ${ADDONSPATH}  0755
+    elif [ "${CHECKSUM}" == "92a8c8c75446daa7328a34acc67172e1f9f3af8229558766dbe5804a86c08a5e" ]; then
+      tar -zxf "${INPUTPATH}/sspatch-openvino.tgz" -C "${ADDONSPATH}/"
+      copy_file ${SSPATH}/lib  libssutils.so    ${ADDONSPATH}  0644
+      copy_file ${SSPATH}/sbin sscmshostd       ${ADDONSPATH}  0755
+      copy_file ${SSPATH}/sbin sscored          ${ADDONSPATH}  0755
+      copy_file ${SSPATH}/sbin ssdaemonmonitord ${ADDONSPATH}  0755
+      copy_file ${SSPATH}/sbin ssexechelperd    ${ADDONSPATH}  0755
+      copy_file ${SSPATH}/sbin ssroutined       ${ADDONSPATH}  0755
+      copy_file ${SSPATH}/sbin ssrtmpclientd    ${ADDONSPATH}  0755
+    else
+      echo "sspatch: Surveillance Station version not supported"
     fi
   fi
 elif [ "${1}" = "uninstall" ]; then
