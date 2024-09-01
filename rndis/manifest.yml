@@ -1,6 +1,6 @@
 version: 1
 name: rndis
-description: "Android USB Network Adapter."
+description: "Android USB Network Adapter support"
 system: false
 beta: true
 all:

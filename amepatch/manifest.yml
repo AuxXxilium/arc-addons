@@ -1,6 +1,6 @@
 version: 1
 name: amepatch
-description: "Dynamic Licensepatch for AME (depends on Arc Patch)"
+description: "Dynamic Licensepatch for AME (Depends on Arc Patch)"
 system: false
 beta: false
 all:
