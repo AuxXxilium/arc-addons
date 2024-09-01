@@ -1,6 +1,6 @@
 version: 1
 name: ups
-description: "Force UPS to shut down in standby mode."
+description: "Force UPS to shut down in Standby mode"
 system: false
 beta: false
 all:

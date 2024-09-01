@@ -1,6 +1,6 @@
 version: 1
 name: addincards
-description: "Remove the Modelrestrictions for official Addin Cards."
+description: "Remove the Modelrestrictions for official Addin Cards"
 system: false
 beta: false
 all:

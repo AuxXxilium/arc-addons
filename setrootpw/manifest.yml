@@ -1,6 +1,6 @@
 version: 1
 name: setrootpw
-description: "Set root password and enable ssh/sftp. Please modify PW=\"\" to the desired password in DSM Task Scheduler and run the task."
+description: "Set root password and enable ssh/sftp. Please modify PW=\"\" to the desired password in DSM Task Scheduler and run the task"
 system: false
 beta: true
 all:

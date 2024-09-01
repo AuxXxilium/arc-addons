@@ -1,6 +1,6 @@
 version: 1
 name: expands
-description: "Expanded miscellaneous, updated usb.map, ca-certificates.crt, etc."
+description: "Expanded miscellaneous, updated usb.map, ca-certificates.crt and more"
 system: false
 beta: false
 all:

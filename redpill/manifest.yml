@@ -1,6 +1,6 @@
 version: 1
 name: redpill
-description: "Delay redpill."
+description: "Delay redpill for epyc7002"
 system: true
 beta: false
 all:
