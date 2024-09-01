@@ -21,6 +21,7 @@ if [ "${1}" = "late" ]; then
 [Unit]
 Description=addon sspatch
 After=multi-user.target
+After=allowdowngrade.service
 
 [Service]
 User=root
