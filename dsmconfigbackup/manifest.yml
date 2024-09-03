@@ -1,6 +1,6 @@
 version: 1
 name: dsmconfigbackup
-description: "Automatically backup Systemconfig Settings to the Bootloader Disk(/mnt/p1/dsmbackup) at Shutdown."
+description: "Automatically backup Systemconfig Settings to the Bootloader Disk(/mnt/p1/dsmbackup) at Shutdown"
 system: false
 beta: false
 all:

@@ -1,6 +1,6 @@
 version: 1
 name: notify
-description: "Add Arc Notifications."
+description: "Add Arc Notification System"
 system: true
 beta: false
 all:

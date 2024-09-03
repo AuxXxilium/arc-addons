@@ -1,6 +1,6 @@
 version: 1
 name: updatenotify
-description: "Arc Update Notifications."
+description: "Arc Update Notifications"
 system: true
 beta: false
 all:

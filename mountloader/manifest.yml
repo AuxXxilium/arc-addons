@@ -1,6 +1,6 @@
 version: 1
 name: mountloader
-description: "Add a script to mount/unmount loader disk in the DSM scheduled task."
+description: "Add a script to mount/unmount loader disk in the DSM scheduled task"
 system: true
 beta: false
 all:
