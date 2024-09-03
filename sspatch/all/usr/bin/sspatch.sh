@@ -60,7 +60,7 @@ if [ -d "${SSPATH}" ]; then
     copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}  0755
   elif [ "${CHECKSUM}" == "92a8c8c75446daa7328a34acc67172e1f9f3af8229558766dbe5804a86c08a5e" ]; then
     echo "sspatch: SurveillanceStation Openvino 9.2.0-11289"
     tar -zxf "${PATCHPATH}/sspatch-openvino.tgz" -C "${PATCHPATH}/"
@@ -70,7 +70,7 @@ if [ -d "${SSPATH}" ]; then
     copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}  0755
   else
     echo "sspatch: SurveillanceStation Version not supported"
   fi
