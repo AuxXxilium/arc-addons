@@ -22,6 +22,7 @@ if [ "${1}" = "late" ]; then
 Description=Enable CPU Freq scaling
 DefaultDependencies=no
 IgnoreOnIsolate=true
+After=multi-user.target
 After=udevrules.service
 
 [Service]
