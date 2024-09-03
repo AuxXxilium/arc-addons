@@ -1,6 +1,6 @@
 version: 1
 name: codecpatch
-description: "Codec Patches for DSM (Do not use with AME Patch)"
+description: "Enables transcoding for DSM without a valid serial number"
 system: false
 beta: true
 all:
