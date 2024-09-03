@@ -19,6 +19,7 @@ if [ "${1}" = "late" ]; then
 [Unit]
 Description=addon codecpatch
 After=multi-user.target
+After=amepatch.service
 
 [Service]
 Type=oneshot
