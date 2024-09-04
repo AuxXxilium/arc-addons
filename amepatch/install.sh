@@ -21,7 +21,6 @@ DefaultDependencies=no
 IgnoreOnIsolate=true
 After=multi-user.target
 After=allowdowngrade.service
-After=codecpatch.service
 
 [Service]
 User=root
