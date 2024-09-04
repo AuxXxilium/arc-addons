@@ -1,8 +1,8 @@
 version: 1
 name: codecpatch
-description: "Enables transcoding for DSM without a valid serial number"
+description: "Enables transcoding for DSM without a valid serial number - Force download AAC + HEVC Codec (Don't use with amepatch)"
 system: false
-beta: true
+beta: false
 all:
   install-script: "install.sh"
   copy: "all"
