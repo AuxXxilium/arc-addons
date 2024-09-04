@@ -11,11 +11,15 @@ function copy_file() {
   local file="${2}"
   local input="${3}"
   local mode="${4}"
-
-  mv -vf "${target}/${file}" "${target}/${file}".bak
-  cp -vf "${input}/${file}" "${target}/${file}"
-  chown SurveillanceStation:SurveillanceStation "${target}/${file}"
-  chmod "${mode}" "${target}/${file}"
+  if [ -f "${input}/${file}" ]; then
+    echo "sspatch: Copying ${file} to ${target}"
+    mv -vf "${target}/${file}" "${target}/${file}".bak
+    cp -vf "${input}/${file}" "${target}/${file}"
+    chown SurveillanceStation:SurveillanceStation "${target}/${file}"
+    chmod "${mode}" "${target}/${file}"
+  else
+    echo "sspatch: ${file} not found"
+  fi
 }
 
 SSPATH="/var/packages/SurveillanceStation/target"
@@ -51,29 +55,34 @@ if [ -d "${SSPATH}" ]; then
 
   # Check Sha256sum for Patch
   [ -f "${SSPATH}/lib/libssutils.org.so" ] && CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.org.so | cut -d' ' -f1)" || CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)"
+  SSPATCH="false"
   if [ "${CHECKSUM}" == "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
     echo "sspatch: SurveillanceStation 9.2.0-11289"
     tar -zxf "${PATCHPATH}/sspatch.tgz" -C "${PATCHPATH}/"
-    copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATH}  0644
-    copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin sscored          ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}  0755
+    SSPATCH="true"
   elif [ "${CHECKSUM}" == "92a8c8c75446daa7328a34acc67172e1f9f3af8229558766dbe5804a86c08a5e" ]; then
-    echo "sspatch: SurveillanceStation Openvino 9.2.0-11289"
-    tar -zxf "${PATCHPATH}/sspatch-openvino.tgz" -C "${PATCHPATH}/"
-    copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATH}  0644
-    copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin sscored          ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
-    copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}  0755
+    if [ -d "/var/packages/NVIDIARuntimeLibrary" ]; then
+      echo "sspatch: SurveillanceStation DVA3221 9.2.0-11289"
+      tar -zxf "${PATCHPATH}/sspatch-3221.tgz" -C "${PATCHPATH}/"
+    else
+      echo "sspatch: SurveillanceStation Openvino 9.2.0-11289"
+      tar -zxf "${PATCHPATH}/sspatch-openvino.tgz" -C "${PATCHPATH}/"
+    fi
+    SSPATCH="true"
   else
     echo "sspatch: SurveillanceStation Version not supported"
+    exit 1
   fi
+
+if [ "${SSPATCH}" == "true" ]; then
+  copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATH}  0644
+  copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATH}  0755
+  copy_file ${SSPATH}/sbin sscored          ${PATCHPATH}  0755
+  copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755
+  copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATH}  0755
+  copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
+  copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}  0755
+fi
 
   sleep 5
   /usr/syno/bin/synopkg start SurveillanceStation
