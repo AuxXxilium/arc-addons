@@ -1,7 +1,7 @@
 version: 1
 name: updatenotify
-description: "Arc Update Notifications"
-system: true
+description: "Arc Loader Update Notifications in DSM"
+system: false
 beta: false
 all:
   install-script: "install.sh"
