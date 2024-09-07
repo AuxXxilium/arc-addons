@@ -8,7 +8,7 @@
 
 cp -f /usr/bin/arcdns.php /usr/syno/bin/ddns/arcdns.php
 
-ENTRIES=("[Custom - ArcDNS]")
+ENTRIES=("[ArcDNS]")
 for ENTRY in "${ENTRIES[@]}"
 do
 if [ -f "/etc/ddns_provider.conf" ]; then
