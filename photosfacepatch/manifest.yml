@@ -1,6 +1,6 @@
 version: 1
 name: photosfacepatch
-description: "Face Patch for Syno Photos"
+description: "Face Detection Patch for Syno Photos (Best with iGPU)"
 system: false
 beta: false
 all:
