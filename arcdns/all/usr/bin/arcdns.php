@@ -12,24 +12,12 @@ $hostname = (string)$argv[3];
 $ip = (string)$argv[4];
 
 // check the hostname contains '.'
-if (strpos($hostname, '.') === false) {
+if (strpos($hostname, '.') === true) {
     echo 'badparam';
     exit();
 }
 
-// check the hostname contains '.'
-if (strpos($pwd, '.') === false) {
-    echo 'badparam';
-    exit();
-}
-
-// only for IPv4 format
-if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-    echo "badparam";
-    exit();
-}
-
-$url = 'https://arcdns.tech/update/'.$hostname.'/'.$pwd.;
+$url = 'https://arcdns.tech/update/' . $hostname . '/' . $pwd;
 
 $req = curl_init();
 curl_setopt($req, CURLOPT_URL, $url);
@@ -46,3 +34,5 @@ if ($json['status'] !== 'Successfuly updated') {
     curl_close($req);
     exit();
 }
+
+?>
