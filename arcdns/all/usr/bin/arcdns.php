@@ -11,10 +11,10 @@ $pwd = (string)$argv[2];
 $hostname = (string)$argv[3];
 $ip = (string)$argv[4];
 
-// check the hostname contains '.'
-if (strpos($hostname, '.') === true) {
-    echo 'badparam';
-    exit();
+// Remove .dyn.arcdns.tech if present
+$suffix = '.dyn.arcdns.tech';
+if (substr($hostname, -strlen($suffix)) === $suffix) {
+    $hostname = substr($hostname, 0, -strlen($suffix));
 }
 
 $url = 'https://arcdns.tech/update/' . $hostname . '/' . $pwd;
