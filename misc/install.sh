@@ -140,7 +140,7 @@ elif [ "${1}" = "patches" ]; then
       MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/')"
       IPRS="$(echo "${I}" | cut -d= -f2)"
       for ETH in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
-        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/')
+        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/' | tr '[:lower:]' '[:upper:]')
         if [ "${MACR}" = "${MACX}" ]; then
           echo "Setting IP for ${ETH} to ${IPRS}"
           mkdir -p /etc/sysconfig/network-scripts
@@ -216,6 +216,7 @@ elif [ "${1}" = "late" ]; then
   # service
   SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
   sed -i 's|ExecStart=/|ExecStart=/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service ${SERVICE_PATH}/syno_update_disk_logs.service
+
   # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -oE 'getty=[^ ]+' | sed 's/getty=//'); do
     TTYN="$(echo "${I}" | cut -d',' -f1)"
@@ -258,7 +259,7 @@ elif [ "${1}" = "late" ]; then
     for ETH in $(cat /etc/ifcfgs); do
       echo "Copy ifcfg-${ETH}"
       if [ -f "/etc/sysconfig/network-scripts/ifcfg-${ETH}" ]; then
-        rm -vf /tmpRoot/etc/sysconfig/network-scripts/ifcfg-*${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-*${ETH}
+        rm -vf /tmpRoot/etc/sysconfig/network-scripts/ifcfg-* /tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-*
         cp -vf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc/sysconfig/network-scripts/
         cp -vf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/
       fi
