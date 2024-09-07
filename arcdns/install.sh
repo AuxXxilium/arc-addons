@@ -11,24 +11,30 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  cp -vf /usr/bin/arcdns.php /tmpRoot/usr/syno/bin/ddns/arcdns.php
+  cp -vf /usr/bin/arcdns.php /tmpRoot/usr/bin/arcdns.php
+  cp -vf /usr/bin/arcdns.sh /tmpRoot/usr/bin/arcdns.sh
   
-  # Define the entries to be added
-  ENTRIES=("[Custom - ArcDNS]")
-  for ENTRY in "${ENTRIES[@]}"
-  do
-    if [ -f "/tmpRoot/etc.defaults/ddns_provider.conf" ]; then
-        if grep -Fxq "${ENTRY}" /tmpRoot/etc.defaults/ddns_provider.conf; then
-          echo "arcdns: Entry ${ENTRY} already exists"
-        else
-          echo "arcdns: Entry ${ENTRY} does not exist, adding now"
-          echo "${ENTRY}" >> /tmpRoot/etc.defaults/ddns_provider.conf
-          echo "        modulepath=/usr/syno/bin/ddns/namecheap.php" >> /tmpRoot/etc.defaults/ddns_provider.conf
-          echo "        queryurl=https://arcdns.tech/update/__HOSTNAME__/__PASSWORD__" >> /tmpRoot/etc.defaults/ddns_provider.conf
-        fi
-    fi
-  done
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  DEST="/tmpRoot/usr/lib/systemd/system/arcdns.service"
+  cat << EOF > ${DEST}
+[Unit]
+Description=addon arcdns
+After=multi-user.target
 
+[Service]
+User=root
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/arcdns.sh
+
+[Install]
+WantedBy=multi-user.target
+
+[X-Synology]
+Author=Virtualization Team
+EOF
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/arcdns.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arcdns.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon arcdns - ${1}"
   # To-Do
