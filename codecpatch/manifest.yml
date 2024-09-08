@@ -1,6 +1,6 @@
 version: 1
 name: codecpatch
-description: "Enables transcoding for DSM without a valid serial number - Force download AAC + HEVC Codec (Don't use with amepatch)"
+description: "Enables transcoding for DSM - Force download AAC + HEVC Codec (Don't use with amepatch)"
 system: false
 beta: false
 all:
