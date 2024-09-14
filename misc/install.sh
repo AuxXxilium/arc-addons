@@ -137,7 +137,7 @@ elif [ "${1}" = "patches" ]; then
   # Set static IP from cmdline
   if grep -q 'network.' /proc/cmdline; then
     for I in $(grep -oE 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
-      MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/')"
+      MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/' | tr '[:lower:]' '[:upper:]')"
       IPRS="$(echo "${I}" | cut -d= -f2)"
       for ETH in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
         MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/' | tr '[:lower:]' '[:upper:]')
