@@ -20,23 +20,16 @@ if [ "${1}" = "late" ]; then
   cat << EOF > ${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
-DefaultDependencies=no
-IgnoreOnIsolate=true
-After=multi-user.target
-After=udevrules.service
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 
 [Service]
-User=root
-Type=simple
-Restart=on-failure
-RestartSec=10
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/sbin/scaling.sh "${2}"
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service

@@ -15,17 +15,19 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/notify.service"
-  echo "[Unit]"                                          >${DEST}
-  echo "Description=arc notify"                         >>${DEST}
-  echo "After=multi-user.target"                        >>${DEST}
-  echo                                                  >>${DEST}
-  echo "[Service]"                                      >>${DEST}
-  echo "Type=oneshot"                                   >>${DEST}
-  echo "RemainAfterExit=yes"                            >>${DEST}
-  echo "ExecStart=/usr/bin/notify.sh"                   >>${DEST}
-  echo                                                  >>${DEST}
-  echo "[Install]"                                      >>${DEST}
-  echo "WantedBy=multi-user.target"                     >>${DEST}
+  cat <<EOF >${DEST}
+[Unit]
+Description=arc notify
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/notify.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/notify.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/notify.service

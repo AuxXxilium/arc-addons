@@ -18,7 +18,8 @@ if [ "${1}" = "late" ]; then
   cat > ${DEST} <<EOF
 [Unit]
 Description=VideoStation for DSM
-After=multi-user.target
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 
 [Service]
 Type=oneshot
