@@ -24,13 +24,10 @@ After=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/cpuinfo.sh $@
+ExecStart=/usr/bin/cpuinfo.sh "$@"
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants

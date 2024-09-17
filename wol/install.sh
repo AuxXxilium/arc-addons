@@ -24,21 +24,15 @@ elif [ "${1}" = "late" ]; then
   cat <<EOF > ${DEST}
 [Unit]
 Description=Force WOL on ethN
-DefaultDependencies=no
-IgnoreOnIsolate=true
 After=multi-user.target
 
 [Service]
-User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/wol.sh
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants

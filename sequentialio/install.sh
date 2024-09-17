@@ -15,17 +15,20 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/sequentialio.service"
-  echo "[Unit]"                                    >${DEST}
-  echo "Description=Sequential I/O SSD caches"    >>${DEST}
-  echo "After=multi-user.target"                  >>${DEST}
-  echo                                            >>${DEST}
-  echo "[Service]"                                >>${DEST}
-  echo "Type=oneshot"                             >>${DEST}
-  echo "RemainAfterExit=yes"                      >>${DEST}
-  echo "ExecStart=/usr/bin/sequentialio.sh $@"    >>${DEST}
-  echo                                            >>${DEST}
-  echo "[Install]"                                >>${DEST}
-  echo "WantedBy=multi-user.target"               >>${DEST}
+  cat <<EOF >${DEST}
+[Unit]
+Description=Sequential I/O SSD caches
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/sequentialio.sh "$@"
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/sequentialio.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sequentialio.service

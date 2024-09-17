@@ -17,23 +17,16 @@ if [ "${1}" = "late" ]; then
   cat > ${DEST} <<EOF
 [Unit]
 Description=addon amepatch
-DefaultDependencies=no
-IgnoreOnIsolate=true
-After=multi-user.target
-After=allowdowngrade.service
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 
 [Service]
-User=root
-Type=simple
-Restart=on-failure
-RestartSec=5
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/bin/amepatch.sh
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service

@@ -16,17 +16,19 @@ if [ "${1}" = "late" ]; then
   
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/arc-updatenotify.service"
-  echo "[Unit]"                                         >${DEST}
-  echo "Description=addon arc-updatenotify"            >>${DEST}
-  echo "After=multi-user.target"                       >>${DEST}
-  echo                                                 >>${DEST}
-  echo "[Service]"                                     >>${DEST}
-  echo "Type=oneshot"                                  >>${DEST}
-  echo "RemainAfterExit=yes"                           >>${DEST}
-  echo "ExecStart=/usr/bin/arc-updatenotify.sh create" >>${DEST}
-  echo                                                 >>${DEST}
-  echo "[Install]"                                     >>${DEST}
-  echo "WantedBy=multi-user.target"                    >>${DEST}
+  cat <<EOF >${DEST}
+[Unit]
+Description=addon arc-updatenotify
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/arc-updatenotify.sh create
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/arc-updatenotify.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arc-updatenotify.service

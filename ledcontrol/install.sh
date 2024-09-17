@@ -34,7 +34,8 @@ if [ "${1}" = "late" ]; then
   cat << EOF > ${DEST}
 [Unit]
 Description=Adds uGreen LED control
-After=multi-user.target
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 
 [Service]
 Type=oneshot
@@ -43,9 +44,6 @@ ExecStart=/usr/bin/ledcontrol.sh
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/ledcontrol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service
