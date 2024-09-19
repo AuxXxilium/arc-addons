@@ -331,6 +331,12 @@ function nondtModel() {
       hasUSB=true
     fi
   done
+  # USB Port Mapping
+  if [ "${2}" = "internal" ]; then
+    hasUSB=true
+  elif [ "${2}" = "external" ]; then
+    hasUSB=false
+  fi
   # Define 6 is the minimum number of USB disks
   if [ "${hasUSB}" = "false" ]; then
     USBMINIDX=$((${MAXDISKS} - 1))
