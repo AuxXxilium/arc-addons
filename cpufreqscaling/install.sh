@@ -17,7 +17,7 @@ if [ "${1}" = "late" ]; then
   [ "${2}" != "schedutil" ] && cp -vf /usr/lib/modules/cpufreq_${2}.ko /tmpRoot/usr/lib/modules/cpufreq_${2}.ko && modprobe cpufreq_${2} || true
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
-  cat << EOF > ${DEST}
+  cat <<EOF >${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
 DefaultDependencies=no
@@ -30,13 +30,10 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=10
-ExecStart=/usr/sbin/scaling.sh "${2}"
+ExecStart=/usr/sbin/scaling.sh ${2}
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service

@@ -288,6 +288,6 @@ elif [ "${1}" = "late" ]; then
   fi
 
   # Copy Loader Reboot
-  cp -vf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin
-  cp -vf /usr/bin/grub-editenv /tmpRoot/usr/bin
+  cp -vf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
+  cp -vf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
 fi

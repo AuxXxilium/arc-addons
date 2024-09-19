@@ -15,7 +15,7 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"  
   DEST="/tmpRoot/usr/lib/systemd/system/deduplication.service"
-  cat > ${DEST} <<EOF
+  cat <<EOF >${DEST}
 [Unit]
 Description=Enable Deduplication
 After=multi-user.target

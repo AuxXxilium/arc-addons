@@ -24,17 +24,19 @@ if [ "${1}" = "late" ]; then
   if [ ! "$(cat "/tmpRoot/usr/arc/revert.sh")" = '#!/usr/bin/env bash' ]; then
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/revert.service"
-    echo "[Unit]"                                    >${DEST}
-    echo "Description=revert"                       >>${DEST}
-    echo "After=multi-user.target"                  >>${DEST}
-    echo                                            >>${DEST}
-    echo "[Service]"                                >>${DEST}
-    echo "Type=oneshot"                             >>${DEST}
-    echo "RemainAfterExit=yes"                      >>${DEST}
-    echo "ExecStart=/usr/arc/revert.sh"             >>${DEST}
-    echo                                            >>${DEST}
-    echo "[Install]"                                >>${DEST}
-    echo "WantedBy=multi-user.target"               >>${DEST}
+    cat <<EOF >${DEST}
+  [Unit]
+  Description=revert
+  After=multi-user.target
+
+  [Service]
+  Type=oneshot
+  RemainAfterExit=yes
+  ExecStart=/usr/arc/revert.sh
+
+  [Install]
+  WantedBy=multi-user.target
+  EOF
 
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/revert.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/revert.service

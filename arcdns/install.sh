@@ -16,7 +16,7 @@ if [ "${1}" = "late" ]; then
   
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/arcdns.service"
-  cat << EOF > ${DEST}
+  cat <<EOF >${DEST}
 [Unit]
 Description=addon arcdns
 After=multi-user.target
@@ -29,9 +29,6 @@ ExecStart=/usr/bin/arcdns.sh
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/arcdns.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arcdns.service

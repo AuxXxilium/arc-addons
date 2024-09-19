@@ -15,17 +15,19 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/expands.service"
-  echo "[Unit]"                                    >${DEST}
-  echo "Description=Expanded miscellaneous"       >>${DEST}
-  echo "After=multi-user.target"                  >>${DEST}
-  echo                                            >>${DEST}
-  echo "[Service]"                                >>${DEST}
-  echo "Type=oneshot"                             >>${DEST}
-  echo "RemainAfterExit=yes"                      >>${DEST}
-  echo "ExecStart=/usr/bin/expands.sh"            >>${DEST}
-  echo                                            >>${DEST}
-  echo "[Install]"                                >>${DEST}
-  echo "WantedBy=multi-user.target"               >>${DEST}
+  cat <<EOF >${DEST}
+[Unit]
+Description=Expanded miscellaneous
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/expands.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/expands.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/expands.service

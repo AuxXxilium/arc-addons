@@ -92,7 +92,7 @@ elif [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
-  cat << EOF > ${DEST}
+  cat <<EOF >${DEST}
 [Unit]
 Description=Reload udev rules
 
@@ -104,9 +104,6 @@ ExecStart=/usr/bin/udevadm control --reload-rules
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants

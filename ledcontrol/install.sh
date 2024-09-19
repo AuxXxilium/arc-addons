@@ -31,7 +31,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
 # All on
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
-  cat << EOF > ${DEST}
+  cat <<EOF >${DEST}
 [Unit]
 Description=Adds uGreen LED control
 After=multi-user.target
@@ -43,9 +43,6 @@ ExecStart=/usr/bin/ledcontrol.sh
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/ledcontrol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service

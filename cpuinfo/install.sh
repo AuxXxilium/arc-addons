@@ -16,7 +16,7 @@ if [ "${1}" = "late" ]; then
   shift
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/cpuinfo.service"
-  cat << EOF > ${DEST}
+  cat <<EOF >${DEST}
 [Unit]
 Description=Adds correct CPU Info
 After=multi-user.target
@@ -28,9 +28,6 @@ ExecStart=/usr/bin/cpuinfo.sh $@
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
