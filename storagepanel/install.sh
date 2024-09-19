@@ -17,7 +17,7 @@ if [ "${1}" = "late" ]; then
   shift
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/storagepanel.service"
-  cat << EOF > ${DEST}
+  cat <<EOF >${DEST}
 [Unit]
 Description=Modify storage panel
 DefaultDependencies=no
@@ -32,9 +32,6 @@ ExecStart=/usr/bin/storagepanel.sh $@
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
