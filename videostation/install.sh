@@ -15,7 +15,7 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/videostation.service"
-  cat > ${DEST} <<EOF
+  cat <<EOF >${DEST}
 [Unit]
 Description=VideoStation for DSM
 After=multi-user.target

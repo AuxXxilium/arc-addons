@@ -36,9 +36,6 @@ if [ "${1}" = "late" ]; then
   # echo "ExecStartPre=/usr/sbin/modprobe button"              >>${DEST}
   # echo "ExecStart=/usr/sbin/acpid"                           >>${DEST}
   # echo "ExecStopPost=/usr/sbin/modprobe -r button"           >>${DEST}
-  # echo                                                       >>${DEST}
-  # echo "[X-Synology]"                                        >>${DEST}
-  # echo "Author=Virtualization Team"                          >>${DEST}
   # 
   # mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   # ln -vsf /usr/lib/systemd/system/acpid.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/acpid.service

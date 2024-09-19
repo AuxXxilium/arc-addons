@@ -18,7 +18,7 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/sspatch.service"
-  cat > ${DEST} <<EOF
+  cat <<EOF >${DEST}
 [Unit]
 Description=addon sspatch
 After=multi-user.target
