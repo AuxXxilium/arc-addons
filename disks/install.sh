@@ -344,42 +344,54 @@ function nondtModel() {
     MAXDISKS=$(($(_get_conf_kv maxdisks)))
     printf "get maxdisks=%d\n" "${MAXDISKS}"
   else
-    # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-    # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
+    if [ "${2}" = "internal" ]; then
+      MAXDISKS=26
+    else
+      # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
+      [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
+    fi
     printf "cal maxdisks=%d\n" "${MAXDISKS}"
   fi
-
   if _check_post_k "rd" "usbportcfg"; then
     USBPORTCFG=$(($(_get_conf_kv usbportcfg)))
     printf 'get usbportcfg=0x%.2x\n' "${USBPORTCFG}"
   else
-    USBPORTCFG=$(($((2 ** $((${USBMAXIDX} + 1)) - 1)) ^ $((2 ** $((${USBMINIDX} + 1)) - 1))))
-    _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
+    if [ "${2}" = "internal" ]; then
+      USBPORTCFG=0
+    else
+      USBPORTCFG=$(($((2 ** $((${USBMAXIDX} + 1)) - 1)) ^ $((2 ** $((${USBMINIDX} + 1)) - 1))))
+    fi
     printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
   fi
   if _check_post_k "rd" "esataportcfg"; then
     ESATAPORTCFG=$(($(_get_conf_kv esataportcfg)))
     printf 'get esataportcfg=0x%.2x\n' "${ESATAPORTCFG}"
   else
-    _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
     printf 'set esataportcfg=0x%.2x\n' "${ESATAPORTCFG}"
   fi
   if _check_post_k "rd" "internalportcfg"; then
     INTERNALPORTCFG=$(($(_get_conf_kv internalportcfg)))
     printf 'get internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   else
-    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
-    _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
+    if [ "${2}" = "external" ]; then
+      INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1))))
+    else
+      INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
+    fi
     printf 'set internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   fi
-
   # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
   if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
     MAXDISKS=26
     printf "set maxdisks=26 [%d]\n" "${MAXDISKS}"
   fi
-  _set_conf_kv rd "maxdisks" "${MAXDISKS}"
   printf "set maxdisks=%d\n" "${MAXDISKS}"
+
+  # Set Values
+  _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
+  _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
+  _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
+  _set_conf_kv rd "maxdisks" "${MAXDISKS}"
 
   if [ "${1}" = "true" ]; then
     echo "TODO: no-DT's sort!!!"
