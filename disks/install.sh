@@ -443,7 +443,7 @@ if [ "${1}" = "patches" ]; then
 
   checkSynoboot
 
-  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}"
+  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}" "${3}"
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon disks - ${1}"
