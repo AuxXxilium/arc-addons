@@ -56,11 +56,11 @@ if [ -d "${SSPATH}" ]; then
   # Check Sha256sum for Patch
   [ -f "${SSPATH}/lib/libssutils.org.so" ] && CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.org.so | cut -d' ' -f1)" || CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)"
   SSPATCH="false"
-  if [ "${CHECKSUM}" == "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
+  if [ "${CHECKSUM}" = "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
     echo "sspatch: SurveillanceStation 9.2.0-11289"
     tar -zxf "${PATCHPATH}/sspatch.tgz" -C "${PATCHPATH}/"
     SSPATCH="true"
-  elif [ "${CHECKSUM}" == "92a8c8c75446daa7328a34acc67172e1f9f3af8229558766dbe5804a86c08a5e" ]; then
+  elif [ "${CHECKSUM}" = "92a8c8c75446daa7328a34acc67172e1f9f3af8229558766dbe5804a86c08a5e" ]; then
     if [ -d "/var/packages/NVIDIARuntimeLibrary" ]; then
       echo "sspatch: SurveillanceStation DVA3221 9.2.0-11289"
       tar -zxf "${PATCHPATH}/sspatch-3221.tgz" -C "${PATCHPATH}/"
