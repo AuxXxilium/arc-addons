@@ -338,7 +338,11 @@ function nondtModel() {
   else
     [ $((${USBMAXIDX} - ${USBMINIDX})) -lt 6 ] && USBMAXIDX=$((${USBMINIDX} + 6))
   fi
-  [ $((${USBMAXIDX} + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMAXIDX} + 1))
+  if [ "${2}" = "external" ]; then
+    MAXDISKS=$((${MAXDISKS} - ${USBMAXIDX}))
+  else
+    [ $((${USBMAXIDX} + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMAXIDX} + 1))
+  fi
 
   if _check_post_k "rd" "maxdisks"; then
     MAXDISKS=$(($(_get_conf_kv maxdisks)))
@@ -354,31 +358,31 @@ function nondtModel() {
   fi
   if _check_post_k "rd" "usbportcfg"; then
     USBPORTCFG=$(($(_get_conf_kv usbportcfg)))
-    printf 'get usbportcfg=0x%.2x\n' "${USBPORTCFG}"
+    printf "get usbportcfg=0x%.2x\n" "${USBPORTCFG}"
   else
     if [ "${2}" = "internal" ]; then
       USBPORTCFG=0
     else
       USBPORTCFG=$(($((2 ** $((${USBMAXIDX} + 1)) - 1)) ^ $((2 ** $((${USBMINIDX} + 1)) - 1))))
     fi
-    printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
+    printf "set usbportcfg=0x%.2x\n" "${USBPORTCFG}"
   fi
   if _check_post_k "rd" "esataportcfg"; then
     ESATAPORTCFG=$(($(_get_conf_kv esataportcfg)))
-    printf 'get esataportcfg=0x%.2x\n' "${ESATAPORTCFG}"
+    printf "get esataportcfg=0x%.2x\n" "${ESATAPORTCFG}"
   else
-    printf 'set esataportcfg=0x%.2x\n' "${ESATAPORTCFG}"
+    printf "set esataportcfg=0x%.2x\n" "${ESATAPORTCFG}"
   fi
   if _check_post_k "rd" "internalportcfg"; then
     INTERNALPORTCFG=$(($(_get_conf_kv internalportcfg)))
-    printf 'get internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
+    printf "get internalportcfg=0x%.2x\n" "${INTERNALPORTCFG}"
   else
     if [ "${2}" = "external" ]; then
       INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1))))
     else
       INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
     fi
-    printf 'set internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
+    printf "set internalportcfg=0x%.2x\n" "${INTERNALPORTCFG}"
   fi
   # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
   if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
@@ -439,7 +443,7 @@ if [ "${1}" = "patches" ]; then
 
   checkSynoboot
 
-  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}"
+  [ "$(_get_conf_kv supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}" "${3}"
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon disks - ${1}"
