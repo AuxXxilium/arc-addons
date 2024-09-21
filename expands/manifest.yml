@@ -3,6 +3,7 @@ name: expands
 description: "Expanded miscellaneous, updated usb.map, ca-certificates.crt and more"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

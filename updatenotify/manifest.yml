@@ -3,6 +3,7 @@ name: updatenotify
 description: "Arc Loader Update Notifications in DSM"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

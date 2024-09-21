@@ -3,6 +3,7 @@ name: photosfacepatch
 description: "Face Detection Patch for Syno Photos (Best with iGPU)"
 system: false
 beta: false
+target: app
 all:
   install-script: "install.sh"
   copy: "all"

@@ -3,6 +3,7 @@ name: console
 description: "Give a onscreen console via framebuffer"
 system: false
 beta: true
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

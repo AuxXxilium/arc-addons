@@ -3,6 +3,7 @@ name: nvmecache
 description: "Enable M.2 as Cache (for DS918+ RS1619xs+ DS1019+ DS1621xs+)"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: ""

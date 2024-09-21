@@ -3,6 +3,7 @@ name: sequentialio
 description: "Enables sequential I/O for SSD caches (Can cause overheating) - Modify in Arc DSM Options"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

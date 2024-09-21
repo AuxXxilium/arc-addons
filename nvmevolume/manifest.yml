@@ -3,6 +3,7 @@ name: nvmevolume
 description: "Enable M.2 as Volume (for non supported Models)"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: ""

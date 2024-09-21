@@ -3,6 +3,7 @@ name: ups
 description: "Force UPS to shut down in Standby mode"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: ""
