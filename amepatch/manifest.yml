@@ -3,6 +3,7 @@ name: amepatch
 description: "Dynamic Licensepatch for AME - Force download HEVC Codec (Don't use with codecpatch)"
 system: false
 beta: false
+target: app
 all:
   install-script: "install.sh"
   copy: "all"

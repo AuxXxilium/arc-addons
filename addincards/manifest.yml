@@ -3,6 +3,7 @@ name: addincards
 description: "Remove the Modelrestrictions for official Addin Cards"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: ""

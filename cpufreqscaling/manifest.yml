@@ -3,6 +3,7 @@ name: cpufreqscaling
 description: "Enable CPU Freqscaling for DSM - Modify in Arc DSM Options"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

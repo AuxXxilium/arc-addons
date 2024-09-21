@@ -3,6 +3,7 @@ name: dsmconfigbackup
 description: "Automatically backup Systemconfig Settings to the Bootloader Disk(/mnt/p1/dsmbackup) at Shutdown"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"
