@@ -3,6 +3,7 @@ name: ledcontrol
 description: "Add Ugreen Ledcontrol to DSM"
 system: false
 beta: true
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

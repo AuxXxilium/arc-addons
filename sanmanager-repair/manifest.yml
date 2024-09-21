@@ -3,6 +3,7 @@ name: sanmanager-repair
 description: "Repair SAN Manager in DSM (Only use if you have a broken SAN Manager)"
 system: false
 beta: true
+target: app
 all:
   install-script: "install.sh"
   copy: "all"

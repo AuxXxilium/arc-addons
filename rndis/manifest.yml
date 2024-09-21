@@ -3,6 +3,7 @@ name: rndis
 description: "Android USB Network Adapter support"
 system: false
 beta: true
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

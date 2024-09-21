@@ -3,6 +3,7 @@ name: deduplication
 description: "Force enable Deduplication (Only for SSD)"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

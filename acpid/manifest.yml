@@ -3,6 +3,7 @@ name: acpid
 description: "Daemon for delivering ACPI events (Powerbutton, etc.)"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

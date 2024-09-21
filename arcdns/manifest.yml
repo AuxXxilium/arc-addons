@@ -3,6 +3,7 @@ name: arcdns
 description: "Dynamic DNS client for arcdns.tech - Modify in DSM DynDNS Settings"
 system: false
 beta: true
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

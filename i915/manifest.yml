@@ -3,6 +3,7 @@ name: i915
 description: "Automatically replace the device ID of i915 module. (Intel 2nd - 9th Gen)"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

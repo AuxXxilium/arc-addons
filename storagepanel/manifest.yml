@@ -3,6 +3,7 @@ name: storagepanel
 description: "Automated Storagepanel selection - Modify in Arc DSM Options"
 system: false
 beta: false
+target: app
 all:
   install-script: "install.sh"
   copy: "all"

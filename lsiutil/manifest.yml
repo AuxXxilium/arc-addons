@@ -3,6 +3,7 @@ name: lsiutil
 description: "A tool for working with some LSI RAID controllers"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

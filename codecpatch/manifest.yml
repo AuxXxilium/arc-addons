@@ -3,6 +3,7 @@ name: codecpatch
 description: "Enables transcoding for DSM - Force download AAC + HEVC Codec (Don't use with amepatch)"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"

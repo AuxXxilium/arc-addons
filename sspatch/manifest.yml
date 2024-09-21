@@ -3,6 +3,7 @@ name: sspatch
 description: "Dynamic License Patch for SS 9.2.0-11289 (Not for DVA 3219)"
 system: false
 beta: true
+target: app
 all:
   install-script: "install.sh"
   copy: "all"
