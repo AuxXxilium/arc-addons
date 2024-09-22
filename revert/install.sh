@@ -25,18 +25,18 @@ if [ "${1}" = "late" ]; then
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/revert.service"
     cat <<EOF >${DEST}
-  [Unit]
-  Description=revert
-  After=multi-user.target
+[Unit]
+Description=revert
+After=multi-user.target
 
-  [Service]
-  Type=oneshot
-  RemainAfterExit=yes
-  ExecStart=/usr/arc/revert.sh
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/arc/revert.sh
 
-  [Install]
-  WantedBy=multi-user.target
-  EOF
+[Install]
+WantedBy=multi-user.target
+EOF
 
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/revert.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/revert.service
@@ -55,5 +55,6 @@ if [ "${1}" = "late" ]; then
   # Version
   echo "LOADERLABEL=\"${LOADERLABEL}\""      >"/tmpRoot/usr/arc/VERSION"
   echo "LOADERVERSION=\"${LOADERVERSION}\"" >>"/tmpRoot/usr/arc/VERSION"
+  echo "LOADERBRANCH=\"${LOADERBRANCH}\"" >>"/tmpRoot/usr/arc/VERSION"
 
 fi
