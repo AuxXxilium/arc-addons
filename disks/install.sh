@@ -339,7 +339,7 @@ function nondtModel() {
     [ $((${USBMAXIDX} - ${USBMINIDX})) -lt 6 ] && USBMAXIDX=$((${USBMINIDX} + 6))
   fi
   if [ "${2}" = "external" ]; then
-    MAXDISKS=$((${MAXDISKS} - ${USBMAXIDX}))
+    MAXDISKS=$((${MAXDISKS} - ${USBMINIDX}))
   else
     [ $((${USBMAXIDX} + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMAXIDX} + 1))
   fi
