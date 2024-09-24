@@ -46,21 +46,21 @@ function Check() {
   fi
   [ "${TAG:0:1}" = "v" ] && TAG="${TAG:1}"
   if [ -z "${TAG}" -o "${TAG}" = "latest" ]; then
-    echo "Error checking new version. TAG is ${TAG}"
+    echo "Error checking new version - Your version is ${LOCALTAG}"
     exit 0
   fi
   if [ "${TAG}" = "${LOCALTAG}" ]; then
-    echo "Actual version is ${TAG}"
+    echo "Actual version is ${TAG} - Your version is ${LOCALTAG}"
     exit 0
   fi
 
   # NOTIFICATION="Arc Notify"
   # synodsmnotify -e false -b false "@administrators" "arc_notify" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\"}"
-  # NOTIFICATION="ARc Update"
+  # NOTIFICATION="Arc Update"
   # SUBJECT="Arc <a href=\\\"${URL}/releases/tag/${TAG}\\\" target=blank>${TAG}</a> version has been released!"
   # synodsmnotify -e false -b false "@administrators" "arc_notify_subject" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\", \"%SUBJECT%\": \"${SUBJECT}\"}"
 
-  NOTIFICATION="Arc Relase ${TAG}"
+  NOTIFICATION="Arc Release ${TAG}"
   SUBJECT="$(curl -skL --connect-timeout 10 "${URL}/releases/tag/${TAG}" | pup 'div[data-test-selector="body-content"]')"
   SUBJECT="${SUBJECT//\"/\\\\\\\"}"
   synodsmnotify -e false -b false "@administrators" "arc_notify_subject" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\", \"%SUBJECT%\": \"${SUBJECT}\"}"
