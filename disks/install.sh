@@ -314,6 +314,7 @@ function dtModel() {
 
 function nondtModel() {
   MAXDISKS=0
+  MAXINTDISKS=0
   USBPORTCFG=0
   ESATAPORTCFG=0
   INTERNALPORTCFG=0
@@ -329,6 +330,8 @@ function nondtModel() {
       ([ ${IDX} -lt ${USBMINIDX} ] || [ "${hasUSB}" = "false" ]) && USBMINIDX=${IDX}
       ([ ${IDX} -gt ${USBMAXIDX} ] || [ "${hasUSB}" = "false" ]) && USBMAXIDX=${IDX}
       hasUSB=true
+    else
+      [ $((${IDX} + 1)) -ge ${MAXINTDISKS} ] && MAXINTDISKS=$((${IDX} + 1))
     fi
   done
   # Define 6 is the minimum number of USB disks
@@ -339,7 +342,7 @@ function nondtModel() {
     [ $((${USBMAXIDX} - ${USBMINIDX})) -lt 6 ] && USBMAXIDX=$((${USBMINIDX} + 6))
   fi
   if [ "${2}" = "external" ]; then
-    MAXDISKS=$((${MAXDISKS} - ${USBMINIDX}))
+    MAXDISKS=${MAXINTDISKS}
   else
     [ $((${USBMAXIDX} + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMAXIDX} + 1))
   fi
