@@ -20,16 +20,12 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
-DefaultDependencies=no
-IgnoreOnIsolate=true
-After=multi-user.target
-After=udevrules.service
+Wants=smpkg-custom-install.service
+After=smpkg-custom-install.service
 
 [Service]
-User=root
-Type=simple
-Restart=on-failure
-RestartSec=10
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/sbin/scaling.sh ${2}
 
 [Install]

@@ -20,12 +20,10 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=Modify storage panel
-DefaultDependencies=no
-IgnoreOnIsolate=true
-After=multi-user.target
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 
 [Service]
-User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/storagepanel.sh $@

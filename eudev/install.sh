@@ -88,7 +88,7 @@ elif [ "${1}" = "late" ]; then
   /usr/sbin/modprobe kvm_amd || true   # kvm-amd.ko
 
   echo "Copy rules"
-  cp -vf /usr/lib/udev/rules.d/* /tmpRoot/usr/lib/udev/rules.d/
+  /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
