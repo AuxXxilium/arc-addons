@@ -82,15 +82,6 @@ jobs:
           zip -9 addons.zip -j *.addon VERSION
           sha256sum addons.zip >checksum.sha256
 
-      - name: Upload to Artifacts
-        if: success() && env.VERSION == ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: addons
-          path: |
-            addons.zip
-            checksum.sha256
-
       - name: Release
         if: success() && env.VERSION != ''
         uses: ncipollo/release-action@v1
@@ -104,3 +95,4 @@ jobs:
           artifacts: |
             addons.zip
             checksum.sha256
+            *.addon
