@@ -4,7 +4,6 @@ set -e
 
 TMP_PATH="/tmp"
 YQ_BIN="$(dirname $0)/yq"
-TOOLKIT_VER="7.1"
 
 ###############################################################################
 #
@@ -93,68 +92,6 @@ function compile-addon() {
     rm -rf "${OUT_PATH}/all"
   fi
 
-  # Now check files for individual models
-  unset AVAL_FOR
-  declare -a AVAL_FOR
-  for P in $(readConfigEntriesArray "available-for" "${MANIFEST}"); do
-    AVAL_FOR+=(${P})
-  done
-
-  # Loop in each available platform-kver
-  for P in ${AVAL_FOR[@]}; do
-    echo -e "\033[1;32m Processing '${P}' platform-kver section\033[0m"
-    HAS_FILES=0
-    # Get name of script to install, if defined. This script has high priority
-    INSTALL_SCRIPT="$(readConfigKey 'available-for."'${P}'".install-script' "${MANIFEST}")"
-    if [ -n "${INSTALL_SCRIPT}" ]; then
-      if [ -f "${1}/${INSTALL_SCRIPT}" ]; then
-        echo -e "\033[1;35m  Copying install script ${INSTALL_SCRIPT}\033[0m"
-        mkdir -p "${OUT_PATH}/${P}"
-        cp "${1}/${INSTALL_SCRIPT}" "${OUT_PATH}/${P}/install.sh"
-        HAS_FILES=1
-      else
-        echo -e "\033[1;33m  WARNING: install script '${INSTALL_SCRIPT}' not found\033[0m"
-      fi
-    fi
-    # Get folder name for copy
-    COPY_PATH="$(readConfigKey 'available-for."'${P}'".copy' "${MANIFEST}")"
-    # If folder exists, copy
-    if [ -n "${COPY_PATH}" ]; then
-      if [ -d "${1}/${COPY_PATH}" ]; then
-        echo -e "\033[1;35m  Copying folder '${COPY_PATH}'\033[0m"
-        mkdir -p "${OUT_PATH}/${P}/root"
-        cp -R "${1}/${COPY_PATH}/"* "${OUT_PATH}/${P}/root"
-        HAS_FILES=1
-      else
-        echo -e "\033[1;33m  WARNING: folder '${1}/${COPY_PATH}' not found\033[0m"
-      fi
-    fi
-    HAS_MODULES="$(readConfigKey 'available-for."'${P}'".modules' "${MANIFEST}")"
-    # Check if has modules for compile
-    if [ "${HAS_MODULES}" = "true" ]; then
-      echo "Compiling modules"
-      PLATFORM="$(echo ${P} | cut -d'-' -f1)"
-      KVER="$(echo ${P} | cut -d'-' -f2)"
-      # Compile using docker
-      rm -rf "${TMP_PATH}/${1}-mods"
-      mkdir -p "${TMP_PATH}/${1}-mods"
-#      docker run --rm -t -v "${TMP_PATH}/${1}-mods":/output \
-#        -v "${PWD}/${1}/src/${KVER}":/input fbelavenuto/syno-toolkit:${PLATFORM}-${TOOLKIT_VER} compile-module
-      docker run --rm -t --user $(id -u) -v "${TMP_PATH}/${1}-mods":/output \
-        -v "${PWD}/${1}/src/${KVER}":/input fbelavenuto/syno-compiler:${TOOLKIT_VER} compile-module ${PLATFORM}
-      mkdir -p "${OUT_PATH}/${P}/root/modules"
-      mv "${TMP_PATH}/${1}-mods/"*.ko "${OUT_PATH}/${P}/root/modules/"
-      rm -rf "${TMP_PATH}/${1}-mods"
-      HAS_FILES=1
-    fi
-    if [ ${HAS_FILES} -eq 1 ]; then
-      # Create tar gziped
-      tar caf "${OUT_PATH}/${P}.tgz" -C "${OUT_PATH}/${P}" .
-      echo -e "\033[1;36m  Created file '${P}.tgz' \033[0m"
-    fi
-    # Clean
-    rm -rf "${OUT_PATH}/${P}"
-  done
   # Create addon package
   tar caf "${1}.addon" -C "${OUT_PATH}" .
   rm -rf "${OUT_PATH}"
