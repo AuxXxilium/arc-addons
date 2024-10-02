@@ -23,18 +23,15 @@ if [ "${1}" = "late" ]; then
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_disk.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol_disk.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_cpu.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol_cpu.service"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-# All on
+  # All on
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
   cat <<EOF >${DEST}
 [Unit]
 Description=Adds uGreen LED control
-After=multi-user.target
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 
 [Service]
 Type=oneshot
@@ -51,10 +48,6 @@ elif [ "${1}" = "uninstall" ]; then
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_disk.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol_disk.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol_cpu.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol_cpu.service"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/ledcontrol.sh" >>/tmpRoot/usr/arc/revert.sh
