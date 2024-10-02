@@ -57,8 +57,8 @@ elif [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=Modify storage panel
-After=multi-user.target
-After=synoscgi.service
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 After=storagepanel.service
 
 [Service]
