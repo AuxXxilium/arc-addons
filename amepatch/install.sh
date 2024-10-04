@@ -20,9 +20,10 @@ Description=addon amepatch
 Wants=smpkg-custom-install.service
 After=smpkg-custom-install.service
 
-[Service]
-Type=oneshot
-RemainAfterExit=yes
+User=root
+Type=simple
+Restart=on-failure
+RestartSec=5
 ExecStart=/usr/bin/amepatch.sh
 
 [Install]
