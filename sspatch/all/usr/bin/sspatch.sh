@@ -18,7 +18,12 @@ function copy_file() {
     chown SurveillanceStation:SurveillanceStation "${target}/${file}"
     chmod "${mode}" "${target}/${file}"
   else
-    echo "sspatch: ${file} not found"
+    if [ "${file}" == "ssrtmpclientd" ]; then
+      echo "sspatch: ${file} not found, skipping"
+      return 0
+    fi
+    echo "sspatch: ${file} not found, aborting"
+    exit 1
   fi
 }
 
@@ -50,6 +55,11 @@ if [ -d "${SSPATH}" ]; then
     fi
   done
 
+  if [ -f "${SSPATH}/lib/license.patched" ]; then
+    echo "sspatch: SurveillanceStation already patched"
+    exit 0
+  fi
+
   /usr/syno/bin/synopkg stop SurveillanceStation
   sleep 5
 
@@ -71,18 +81,20 @@ if [ -d "${SSPATH}" ]; then
     SSPATCH="true"
   else
     echo "sspatch: SurveillanceStation Version not supported"
-    exit 1
+    exit 0
   fi
 
-if [ "${SSPATCH}" == "true" ]; then
-  copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATH}  0644
-  copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATH}  0755
-  copy_file ${SSPATH}/sbin sscored          ${PATCHPATH}  0755
-  copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755
-  copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATH}  0755
-  copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
-  copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}  0755
-fi
+  if [ "${SSPATCH}" == "true" ]; then
+    copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATH}  0644
+    copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin sscored          ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}  0755
+    copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATH}  0755
+    touch ${SSPATH}/lib/license.patched
+  fi
 
   sleep 5
   /usr/syno/bin/synopkg start SurveillanceStation
