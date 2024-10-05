@@ -21,8 +21,9 @@ if [ -d "/var/packages/CodecPack" ]; then
     lic_patched="/usr/arc/ame_license.patched"
 
     if [ -f "$lic_patched" ]; then
-        if "$ame_path/bin/synoame-bin-auto-install-needed-codec"; then
+        if "$ame_path/bin/synoame-bin-check-license" && "$ame_path/bin/synoame-bin-auto-install-needed-codec"; then
             echo -e "AME Patch: Already patched! -> Codec downloaded!"
+            echo "true" >"$lic_patched"
             exit 0
         else
             echo -e "AME Patch: Already patched! -> Codec download failed!"
@@ -70,12 +71,13 @@ if [ -d "/var/packages/CodecPack" ]; then
 
     if "$ame_path/bin/synoame-bin-check-license"; then
         echo -e "AME Patch: Downloading Codec!"
-        echo "true" >"${lic_patched}"
         if "$ame_path/bin/synoame-bin-auto-install-needed-codec"; then
             echo -e "AME Patch: Successful!"
+            echo "true" >"$lic_patched"
             exit 0
         else
             echo -e "AME Patch: Failed!"
+            rm -f "$lic_patched"
             exit 1
         fi
     else
