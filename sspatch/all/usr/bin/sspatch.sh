@@ -21,15 +21,17 @@ function copy_file() {
     if [ "${file}" == "ssrtmpclientd" ]; then
       echo "sspatch: ${file} not found, skipping"
       return 0
+    else
+      rm -f "${ss_lic_patched}"
+      echo "sspatch: ${file} not found, aborting"
+      exit 1
     fi
-    echo "sspatch: ${file} not found, aborting"
-    exit 1
   fi
 }
 
 SSPATH="/var/packages/SurveillanceStation/target"
 PATCHPATH="/usr/arc"
-lic_patched="${PATHPATH}/ss_license.patched"
+ss_lic_patched="${PATHPATH}/ss_license.patched"
 if [ -d "${SSPATH}" ]; then
   echo "sspatch: SurveillanceStation found"
   
@@ -56,7 +58,7 @@ if [ -d "${SSPATH}" ]; then
     fi
   done
 
-  if [ -f "${lic_patched}" ]; then
+  if [ -f "${ss_lic_patched}" ]; then
     echo "sspatch: SurveillanceStation already patched"
     exit 0
   fi
@@ -94,7 +96,7 @@ if [ -d "${SSPATH}" ]; then
     copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATH}  0755
-    touch ${lic_patched}
+    echo "true" >"${lic_patched}"
   fi
 
   sleep 5
