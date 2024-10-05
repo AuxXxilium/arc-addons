@@ -58,11 +58,6 @@ if [ -d "${SSPATH}" ]; then
     fi
   done
 
-  if [ -f "${ss_lic_patched}" ]; then
-    echo "sspatch: SurveillanceStation already patched"
-    exit 0
-  fi
-
   /usr/syno/bin/synopkg stop SurveillanceStation
   sleep 5
 
@@ -96,13 +91,10 @@ if [ -d "${SSPATH}" ]; then
     copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATH}  0755
-    echo "true" >"${ss_lic_patched}"
   fi
 
   sleep 5
   /usr/syno/bin/synopkg restart SurveillanceStation
-else
-  rm -f "${ss_lic_patched}"
 fi
 
 exit 0

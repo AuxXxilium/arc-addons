@@ -24,6 +24,7 @@ Wants=smpkg-custom-install.service
 After=smpkg-custom-install.service
 
 [Service]
+User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/sbin/scaling.sh ${2}
