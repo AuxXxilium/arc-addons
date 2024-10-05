@@ -18,7 +18,7 @@ if [ -d "/var/packages/CodecPack" ]; then
     so_backup="$ame_path/lib/libsynoame-license.so.orig"
     lic="/usr/syno/etc/license/data/ame/offline_license.json"
     lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
-    lic_patched="/usr/syno/etc/license/data/ame/offline_license.patched"
+    lic_patched="$ame_path/lib/license.patched"
 
     if [ ! -f "$so_backup" ]; then
         cp -p "$so" "$so_backup"
