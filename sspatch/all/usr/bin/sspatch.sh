@@ -100,7 +100,7 @@ if [ -d "${SSPATH}" ]; then
   fi
 
   sleep 5
-  /usr/syno/bin/synopkg start SurveillanceStation
+  /usr/syno/bin/synopkg restart SurveillanceStation
 else
   rm -f "${ss_lic_patched}"
 fi

@@ -22,7 +22,6 @@ if [ "${1}" = "late" ]; then
 [Unit]
 Description=addon sspatch
 After=multi-user.target
-After=amepatch.service
 
 [Service]
 User=root
