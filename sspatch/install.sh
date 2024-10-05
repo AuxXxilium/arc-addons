@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -21,19 +21,18 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=addon sspatch
-Wants=smpkg-custom-install.service
-After=smpkg-custom-install.service
+After=multi-user.target
+After=amepatch.service
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+User=root
+Type=simple
+Restart=on-failure
+RestartSec=5
 ExecStart=/usr/bin/sspatch.sh
 
 [Install]
 WantedBy=multi-user.target
-
-[X-Synology]
-Author=Virtualization Team
 EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/sspatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sspatch.service
