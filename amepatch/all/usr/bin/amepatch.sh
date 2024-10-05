@@ -18,19 +18,6 @@ if [ -d "/var/packages/CodecPack" ]; then
     so_backup="$ame_path/lib/libsynoame-license.so.orig"
     lic="/usr/syno/etc/license/data/ame/offline_license.json"
     lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
-    lic_patched="/usr/arc/ame_license.patched"
-
-    if [ -f "$lic_patched" ]; then
-        if "$ame_path/bin/synoame-bin-check-license" && "$ame_path/bin/synoame-bin-auto-install-needed-codec"; then
-            echo -e "AME Patch: Already patched! -> Codec downloaded!"
-            echo "true" >"$lic_patched"
-            exit 0
-        else
-            echo -e "AME Patch: Already patched! -> Codec download failed!"
-            rm -f "$lic_patched"
-            exit 1
-        fi
-    fi
 
     if [ ! -f "$so_backup" ]; then
         cp -p "$so" "$so_backup"
@@ -73,11 +60,9 @@ if [ -d "/var/packages/CodecPack" ]; then
         echo -e "AME Patch: Downloading Codec!"
         if "$ame_path/bin/synoame-bin-auto-install-needed-codec"; then
             echo -e "AME Patch: Successful!"
-            echo "true" >"$lic_patched"
             exit 0
         else
             echo -e "AME Patch: Failed!"
-            rm -f "$lic_patched"
             exit 1
         fi
     else
@@ -87,12 +72,10 @@ if [ -d "/var/packages/CodecPack" ]; then
         if [ -f "$lic_backup" ]; then
             mv -f "$lic_backup" "$lic"
         fi
-        rm -f "$lic_patched"
         echo -e "AME Patch: Backup restored!"
         exit 1
     fi
 else
     echo -e "AME Patch: CodecPack not found!"
-    rm -f "$lic_patched"
     exit 1
 fi

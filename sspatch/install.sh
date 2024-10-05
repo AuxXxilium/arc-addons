@@ -25,9 +25,8 @@ After=multi-user.target
 
 [Service]
 User=root
-Type=simple
-Restart=on-failure
-RestartSec=5
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/bin/sspatch.sh
 
 [Install]
