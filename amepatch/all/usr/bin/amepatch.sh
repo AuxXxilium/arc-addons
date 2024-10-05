@@ -26,6 +26,7 @@ if [ -d "/var/packages/CodecPack" ]; then
             exit 0
         else
             echo -e "AME Patch: Already patched! -> Codec download failed!"
+            rm -f "$lic_patched"
             exit 1
         fi
     fi
