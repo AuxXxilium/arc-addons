@@ -18,6 +18,7 @@ if [ -d "/var/packages/CodecPack" ]; then
     so_backup="$ame_path/lib/libsynoame-license.so.orig"
     lic="/usr/syno/etc/license/data/ame/offline_license.json"
     lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
+    lic_patched="/usr/syno/etc/license/data/ame/offline_license.patched"
 
     if [ ! -f "$so_backup" ]; then
         cp -p "$so" "$so_backup"
@@ -38,7 +39,13 @@ if [ -d "/var/packages/CodecPack" ]; then
         hex_values=('3718' '60A5' '60D1' '6111' '6137' 'B5F0')
         content='[{"attribute": {"codec": "hevc", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}, {"attribute": {"codec": "aac", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}]'
     else
-        echo "MD5 mismatch - Already patched or unsupported version!"
+        if [ -f "$lic_patched" ]; then
+            echo -e "AME Patch: Already patched!"
+            exit 0
+        else
+            echo -e "AME Patch: Unsupported version!"
+            exit 1
+        fi
     fi
 
     for ((i = 0; i < ${#hex_values[@]}; i++)); do
@@ -58,10 +65,12 @@ if [ -d "/var/packages/CodecPack" ]; then
     if "$ame_path/bin/synoame-bin-check-license"; then
         echo -e "AME Patch: Downloading Codec!"
         if "$ame_path/bin/synoame-bin-auto-install-needed-codec"; then
+            touch "$lic_patched"
             echo -e "AME Patch: Successful!"
             exit 0
         else
-            echo -e "AME Patch: Unsuccessful!"
+            rm -f "$lic_patched"
+            echo -e "AME Patch: Failed!"
             exit 1
         fi
     else
@@ -71,6 +80,7 @@ if [ -d "/var/packages/CodecPack" ]; then
         if [ -f "$lic_backup" ]; then
             mv -f "$lic_backup" "$lic"
         fi
+        rm -f "$lic_patched"
         echo -e "AME Patch: Backup restored!"
         exit 1
     fi
