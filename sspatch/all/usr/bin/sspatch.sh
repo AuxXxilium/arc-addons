@@ -29,6 +29,7 @@ function copy_file() {
 
 SSPATH="/var/packages/SurveillanceStation/target"
 PATCHPATH="/usr/arc"
+lic_patched="${PATHPATH}/ss_license.patched"
 if [ -d "${SSPATH}" ]; then
   echo "sspatch: SurveillanceStation found"
   
@@ -55,7 +56,7 @@ if [ -d "${SSPATH}" ]; then
     fi
   done
 
-  if [ -f "${SSPATH}/lib/license.patched" ]; then
+  if [ -f "${lic_patched}" ]; then
     echo "sspatch: SurveillanceStation already patched"
     exit 0
   fi
@@ -93,7 +94,7 @@ if [ -d "${SSPATH}" ]; then
     copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATH}  0755
-    touch ${SSPATH}/lib/license.patched
+    touch ${lic_patched}
   fi
 
   sleep 5
