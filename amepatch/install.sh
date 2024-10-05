@@ -17,11 +17,9 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=addon amepatch
-Wants=smpkg-custom-install.service
-After=smpkg-custom-install.service
+After=multi-user.target
 
 [Service]
-User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/amepatch.sh
