@@ -7,35 +7,33 @@
 #
 
 if [ -d "/var/packages/CodecPack" ]; then
+
+    # disable apparmor check for AME
+    [ -d "/var/packages/CodecPack/target/apparmor" ] && apparmor="/var/packages/CodecPack/target/apparmor"
     /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack
-
-    [ -f "/var/packages/CodecPack/target/apparmor" ] && mv -f "/var/packages/CodecPack/target/apparmor" "/var/packages/CodecPack/target/apparmor.bak"
-
-    ame_path="/var/packages/CodecPack/target/usr"
-    values=('669066909066906690' 'B801000000' '30')
-    indices=(0 1 1 1 1 2)
-    so="$ame_path/lib/libsynoame-license.so"
-    so_backup="$ame_path/lib/libsynoame-license.so.orig"
-    lic="/usr/syno/etc/license/data/ame/offline_license.json"
-    lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
-    lic_patched="/usr/arc/ame_license.patched"
-
-    if [ -f "$lic_patched" ]; then
-        if "$ame_path/bin/synoame-bin-auto-install-needed-codec"; then
-            echo -e "AME Patch: Already patched! -> Codec downloaded!"
-            exit 0
-        else
-            echo -e "AME Patch: Already patched! -> Codec download failed!"
-            rm -f "$lic_patched"
-            exit 1
-        fi
+    if [ -e "${apparmor}" ]; then
+        mv -f "${apparmor}" "${apparmor}.bak"
     fi
 
+    values=('669066909066906690' 'B801000000' '30')
+    hex_values=('1F28' '48F5' '4921' '4953' '4975' '9AC8')
+    indices=(0 1 1 1 1 2)
+    cp_usr_path='/var/packages/CodecPack/target/usr'
+    so="$cp_usr_path/lib/libsynoame-license.so"
+    so_backup="$cp_usr_path/lib/libsynoame-license.so.orig"
+    lic="/usr/syno/etc/license/data/ame/offline_license.json"
+    lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
+    licsig="/usr/syno/etc/license/data/ame/offline_license.sig"
+    licsig_backup="/usr/syno/etc/license/data/ame/offline_license.sig.orig"
+ 
     if [ ! -f "$so_backup" ]; then
         cp -p "$so" "$so_backup"
     fi
     if [ ! -f "$lic_backup" ]; then
         cp -p "$lic" "$lic_backup"
+    fi
+    if [ ! -f "$licsig_backup" ]; then
+        cp -p "$licsig" "$licsig_backup"
     fi
 
     hash_to_check="$(md5sum -b "$so" | awk '{print $1}')"
@@ -50,7 +48,7 @@ if [ -d "/var/packages/CodecPack" ]; then
         hex_values=('3718' '60A5' '60D1' '6111' '6137' 'B5F0')
         content='[{"attribute": {"codec": "hevc", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}, {"attribute": {"codec": "aac", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}]'
     else
-        echo -e "AME Patch: Unsupported version!"
+        echo "MD5 mismatch"
         exit 1
     fi
 
@@ -68,16 +66,9 @@ if [ -d "/var/packages/CodecPack" ]; then
     rm -f "${lic}"
     echo "${content}" >"${lic}"
 
-    if "$ame_path/bin/synoame-bin-check-license"; then
-        echo -e "AME Patch: Downloading Codec!"
-        echo "true" >"${lic_patched}"
-        if "$ame_path/bin/synoame-bin-auto-install-needed-codec"; then
-            echo -e "AME Patch: Successful!"
-            exit 0
-        else
-            echo -e "AME Patch: Failed!"
-            exit 1
-        fi
+	if "$cp_usr_path/bin/synoame-bin-check-license"; then
+        "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"
+        echo -e "AME Patch: Successful!"
     else
         if [ -f "$so_backup" ]; then
             mv -f "$so_backup" "$so"
@@ -85,12 +76,12 @@ if [ -d "/var/packages/CodecPack" ]; then
         if [ -f "$lic_backup" ]; then
             mv -f "$lic_backup" "$lic"
         fi
-        rm -f "$lic_patched"
-        echo -e "AME Patch: Backup restored!"
+        if [ -f "$licsig_backup" ]; then
+            mv -f "$licsig_backup" "$licsig"
+        fi
+        echo -e "AME Patch: Unsuccessful!"
         exit 1
-    fi
-else
-    echo -e "AME Patch: CodecPack not found!"
-    rm -f "$lic_patched"
-    exit 1
+   	fi
 fi
+
+exit 0

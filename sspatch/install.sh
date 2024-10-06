@@ -22,13 +22,11 @@ if [ "${1}" = "late" ]; then
 [Unit]
 Description=addon sspatch
 After=multi-user.target
-After=amepatch.service
 
 [Service]
 User=root
-Type=simple
-Restart=on-failure
-RestartSec=5
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/bin/sspatch.sh
 
 [Install]
