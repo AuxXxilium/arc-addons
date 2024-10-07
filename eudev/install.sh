@@ -69,6 +69,11 @@ elif [ "${1}" = "late" ]; then
       [ -z "${M}" -o -z "$(ls /usr/lib/modules/${M} 2>/dev/null)" ] && continue
       if [ "$(echo "${O}" | /tmpRoot/bin/sed 's/.*/\U&/')" = "F" ]; then
         /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+      elif [ "$(echo "${O}" | /tmpRoot/bin/sed 's/.*/\U&/')" = "C" ]; then
+        if echo "${M}" | grep -q "cpufreq_"; then
+          [ ! -f /tmp/cpufreq_governor ] && echo "${M}" | cut -d'_' -f2- | cut -d'.' -f1 >/tmp/cpufreq_governor
+          [ -f /usr/lib/modules/${M} ] && /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/ || rm -f /tmp/cpufreq_governor
+        fi
       else
         /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
       fi
@@ -86,6 +91,10 @@ elif [ "${1}" = "late" ]; then
   # Restore kvm module
   /usr/sbin/modprobe kvm_intel || true # kvm-intel.ko
   /usr/sbin/modprobe kvm_amd || true   # kvm-amd.ko
+
+  # Set cpufreq governor
+  GOVERNOR="$(cat /tmp/cpufreq_governor 2>/dev/null || echo "performance")"
+  echo "Setting cpufreq governor to ${GOVERNOR}"
 
   echo "Copy rules"
   /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
@@ -106,6 +115,25 @@ ExecStart=/usr/bin/udevadm control --reload-rules
 WantedBy=multi-user.target
 EOF
 
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  DEST="/tmpRoot/usr/lib/systemd/system/cpurules.service"
+  cat <<EOF >${DEST}
+[Unit]
+Description=Reload cpu rules
+After=multi-user.target
+
+[Service]
+User=root
+Type=simple
+Restart=on-failure
+RestartSec=5
+ExecStart=/usr/bin/bash -c '[ ! lsmod 2>/dev/null | grep ${GOVERNOR} ] && insmod /usr/lib/modules/cpufreq_${GOVERNOR}.ko'
+ExecStart=/usr/bin/bash -c '[ ! cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null | grep ${GOVERNOR} ] && /usr/bin/echo ${GOVERNOR} | /usr/bin/tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor'
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/udevrules.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/udevrules.service
+  ln -vsf /usr/lib/systemd/system/cpurules.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpurules.service
 fi
