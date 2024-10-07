@@ -69,6 +69,11 @@ elif [ "${1}" = "late" ]; then
       [ -z "${M}" -o -z "$(ls /usr/lib/modules/${M} 2>/dev/null)" ] && continue
       if [ "$(echo "${O}" | /tmpRoot/bin/sed 's/.*/\U&/')" = "F" ]; then
         /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+      elif [ "$(echo "${O}" | /tmpRoot/bin/sed 's/.*/\U&/')" = "C" ]; then
+        if echo "cpufreq_" | grep -q "${M}"; then
+          /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+          GOVERNOR="$(echo "${M}" | cut -d'_' -f2-)"
+        fi
       else
         /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
       fi
@@ -87,6 +92,16 @@ elif [ "${1}" = "late" ]; then
   /usr/sbin/modprobe kvm_intel || true # kvm-intel.ko
   /usr/sbin/modprobe kvm_amd || true   # kvm-amd.ko
 
+  # Set cpufreq governor
+  if [ -n "${GOVERNOR}" ]; then
+    echo "Setting cpufreq governor to ${GOVERNOR}"
+    /usr/sbin/modprobe cpufreq_${GOVERNOR} || true
+    echo ${GOVERNOR} | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+  else
+    echo "No cpufreq governor set"
+    GOVERNOR="performance"
+  fi
+
   echo "Copy rules"
   /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
 
@@ -101,6 +116,7 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/udevadm hwdb --update
 ExecStart=/usr/bin/udevadm control --reload-rules
+ExecStartPost=/usr/bin/echo ${GOVERNOR} | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 
 [Install]
 WantedBy=multi-user.target
