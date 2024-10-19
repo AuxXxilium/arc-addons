@@ -17,7 +17,7 @@ error=0
 # Load the correct cpufreq module
 if [ "${1}" = "ondemand" ] || [ "${1}" = "conservative" ]; then
   if [ -f "/usr/lib/modules/cpufreq_${1}.ko" ]; then
-    modprobe cpufreq_${1}
+    insmod /usr/lib/modules/cpufreq_${1}.ko
     echo "CPUFreqScaling: cpufreq_${1} loaded"
   else
     echo "CPUFreqScaling: cpufreq_${1} not found"
@@ -33,7 +33,7 @@ for i in $(seq 0 ${cpucorecount}); do
     echo "${1}" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor
   fi
 done
-sleep 10
+sleep 5
 # Check if the governor is set correctly
 for i in $(seq 0 ${cpucorecount}); do
   governor=$(cat /sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor)

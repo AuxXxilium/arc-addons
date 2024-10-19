@@ -14,7 +14,7 @@ if [ "${1}" = "late" ]; then
   cp -vf /usr/sbin/scaling.sh /tmpRoot/usr/sbin/scaling.sh
   [ ! -f "/tmpRoot/usr/bin/echo" ] && cp -vf /usr/bin/echo /tmpRoot/usr/bin/echo || true
   cp -f /usr/lib/modules/acpi_cpufreq.ko /tmpRoot/usr/lib/modules/acpi_cpufreq.ko
-  [ "${2}" != "schedutil" ] && cp -vf /usr/lib/modules/cpufreq_${2}.ko /tmpRoot/usr/lib/modules/cpufreq_${2}.ko && insmod cpufreq_${2} || true
+  [ "${2}" != "schedutil" ] && cp -vf /usr/lib/modules/cpufreq_${2}.ko /tmpRoot/usr/lib/modules/cpufreq_${2}.ko &&  modprobe cpufreq_${2} || true
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
   cat <<EOF >${DEST}
