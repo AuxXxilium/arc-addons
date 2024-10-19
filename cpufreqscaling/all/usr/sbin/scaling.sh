@@ -17,7 +17,7 @@ error=0
 # Load the correct cpufreq module
 if [ "${1}" = "ondemand" ] || [ "${1}" = "conservative" ]; then
   if [ -f "/usr/lib/modules/cpufreq_${1}.ko" ]; then
-    insmod /usr/lib/modules/cpufreq_${1}.ko
+    insmod /usr/lib/modules/cpufreq_${1}.ko || true
     echo "CPUFreqScaling: cpufreq_${1} loaded"
   else
     echo "CPUFreqScaling: cpufreq_${1} not found"
