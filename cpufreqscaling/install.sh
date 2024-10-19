@@ -11,18 +11,16 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  cp -vf /usr/sbin/scaling.sh /tmpRoot/usr/sbin/scaling.sh
+  cp -vf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/scaling.sh"
   [ ! -f "/tmpRoot/usr/bin/echo" ] && cp -vf /usr/bin/echo /tmpRoot/usr/bin/echo || true
-  cp -f /usr/lib/modules/acpi_cpufreq.ko /tmpRoot/usr/lib/modules/acpi_cpufreq.ko
-  [ "${2}" != "schedutil" ] && cp -vf /usr/lib/modules/cpufreq_${2}.ko /tmpRoot/usr/lib/modules/cpufreq_${2}.ko &&  modprobe cpufreq_${2} || true
+  cp -f "/usr/lib/modules/acpi_cpufreq.ko" "/tmpRoot/usr/lib/modules/acpi_cpufreq.ko"
+  [ "${2}" != "schedutil" ] && cp -vf "/usr/lib/modules/cpufreq_${2}.ko" "/tmpRoot/usr/lib/modules/cpufreq_${2}.ko"
+
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
   cat <<EOF >${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
-DefaultDependencies=no
-IgnoreOnIsolate=true
-After=multi-user.target
 After=udevrules.service
 
 [Service]
