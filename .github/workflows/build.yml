@@ -79,7 +79,7 @@ jobs:
           VERSION="${{ env.VERSION }}"
           sed -i "s/version:.*$/version: ${VERSION}/g" */manifest.yml
           ./compile-addons.sh
-          zip -9 addons.zip -j *.addon VERSION
+          zip -9 addons-${{ env.VERSION }}.zip -j *.addon VERSION
 
       - name: Release
         if: success() && env.VERSION != ''
@@ -92,5 +92,5 @@ jobs:
           body: |
             ${{ steps.Changelog.outputs.changelog }}
           artifacts: |
-            addons.zip
+            addons-*.zip
             *.addon
