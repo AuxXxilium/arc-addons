@@ -33,7 +33,7 @@ for i in $(seq 0 ${cpucorecount}); do
     echo "${1}" >/sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor
   fi
 done
-sleep 5
+sleep 10
 # Check if the governor is set correctly
 for i in $(seq 0 ${cpucorecount}); do
   governor=$(cat /sys/devices/system/cpu/cpu${i}/cpufreq/scaling_governor)
