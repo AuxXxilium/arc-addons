@@ -24,7 +24,6 @@ Description=addon sspatch
 After=multi-user.target
 
 [Service]
-User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/sspatch.sh

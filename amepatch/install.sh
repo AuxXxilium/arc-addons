@@ -20,8 +20,9 @@ Description=addon amepatch
 After=multi-user.target
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=simple
+Restart=on-failure
+RestartSec=10
 ExecStart=/usr/bin/amepatch.sh
 
 [Install]
