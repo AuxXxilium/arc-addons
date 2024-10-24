@@ -7,7 +7,7 @@
 #
 
 # usb.map
-FILE="/usr/syno/etc.defaults/usb.map"
+FILE="/usr/syno/etc/usb.map"
 if [ -f "${FILE}" ]; then
   STATUS=$(curl -kL -w "%{http_code}" "http://www.linux-usb.org/usb.ids" -o "/tmp/usb.map")
   if [ $? -ne 0 -o ${STATUS} -ne 200 ]; then
@@ -15,10 +15,6 @@ if [ -f "${FILE}" ]; then
   else
     [ ! -f "${FILE}.bak" ] && cp -f "${FILE}" "${FILE}.bak"
     cp -f "/tmp/usb.map" "${FILE}"
-    if [ -f "${FILE/\.defaults/}" ]; then
-      [ ! -f "${FILE/\.defaults/}.bak" ] && cp -f "${FILE/\.defaults/}" "${FILE/\.defaults/}.bak"
-      cp -f "/tmp/usb.map" "${FILE/\.defaults/}"
-    fi
   fi
 fi
 
