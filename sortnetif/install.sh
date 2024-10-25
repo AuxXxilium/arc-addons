@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -12,13 +12,12 @@ if [ "${1}" = "patches" ]; then
   ETHLIST=""
   ETHX="$(ls /sys/class/net/ 2>/dev/null | grep eth)" # real network cards list
   for ETH in ${ETHX}; do
-    MAC="$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/')"
     BUS="$(ethtool -i ${ETH} 2>/dev/null | grep bus-info | cut -d' ' -f2)"
-    ETHLIST="${ETHLIST}${BUS} ${MAC} ${ETH}\n"
+    ETHLIST="${ETHLIST}${BUS} ${ETH}\n"
   done
   ETHLISTTMPB="$(echo -e "${ETHLIST}" | sort)"
   ETHLIST="$(echo -e "${ETHLISTTMPB}" | grep -v '^$')"
-  ETHSEQ="$(echo -e "${ETHLIST}" | awk '{print $3}' | sed 's/eth//g')"
+  ETHSEQ="$(echo -e "${ETHLIST}" | awk '{print $2}' | sed 's/eth//g')"
   ETHNUM="$(echo -e "${ETHLIST}" | wc -l)"
 
   echo "${ETHSEQ}"
@@ -33,6 +32,6 @@ if [ "${1}" = "patches" ]; then
       ip link set dev tmp${i} name eth${I}
       I=$((${I} + 1))
     done
-    /etc/rc.network start
+    /etc/rc.network restart
   fi
 fi
