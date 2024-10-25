@@ -1,6 +1,6 @@
 version: 1
 name: sortnetif
-description: "Sort network interface names | empty: sorted by busid; mac1,mac2,...: sorted by macs sequence"
+description: "Sort network interface names: sorted by busid"
 system: false
 beta: false
 target: system
