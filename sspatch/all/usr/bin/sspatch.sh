@@ -18,7 +18,7 @@ function copy_file() {
     chown SurveillanceStation:SurveillanceStation "${target}/${file}"
     chmod "${mode}" "${target}/${file}"
   else
-    if [ "${file}" == "ssrtmpclientd" ]; then
+    if [ "${file}" == "ssrtmpclientd" ] || [ "${file}" == "libssutils.org.so" ]; then
       echo "sspatch: ${file} not found, skipping"
       return 0
     else
