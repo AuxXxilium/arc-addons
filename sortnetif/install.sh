@@ -16,16 +16,8 @@ if [ "${1}" = "patches" ]; then
     BUS="$(ethtool -i ${ETH} 2>/dev/null | grep bus-info | cut -d' ' -f2)"
     ETHLIST="${ETHLIST}${BUS} ${MAC} ${ETH}\n"
   done
-  ETHLISTTMPM=""
   ETHLISTTMPB="$(echo -e "${ETHLIST}" | sort)"
-  if [ -n "${2}" ]; then
-    MACS="$(echo "${2}" | sed 's/://g; s/,/ /g; s/.*/\L&/')"
-    for MACX in ${MACS}; do
-      ETHLISTTMPM="${ETHLISTTMPM}$(echo -e "${ETHLISTTMPB}" | grep "${MACX}")\n"
-      ETHLISTTMPB="$(echo -e "${ETHLISTTMPB}" | grep -v "${MACX}")\n"
-    done
-  fi
-  ETHLIST="$(echo -e "${ETHLISTTMPM}${ETHLISTTMPB}" | grep -v '^$')"
+  ETHLIST="$(echo -e "${ETHLISTTMPB}" | grep -v '^$')"
   ETHSEQ="$(echo -e "${ETHLIST}" | awk '{print $3}' | sed 's/eth//g')"
   ETHNUM="$(echo -e "${ETHLIST}" | wc -l)"
 
