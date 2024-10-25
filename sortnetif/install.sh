@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "patches" ]; then
+if [ "${1}" = "late" ]; then
   echo "Installing addon sortnetif - ${1}"
 
   ETHLIST=""
