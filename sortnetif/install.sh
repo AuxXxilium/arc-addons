@@ -19,7 +19,7 @@ if [ "${1}" = "patches" ]; then
   ETHLISTTMPM=""
   ETHLISTTMPB="$(echo -e "${ETHLIST}" | sort)"
   if [ -n "${2}" ]; then
-    MACS="$(echo "${2}" | sed 's/://g; s/,/ /g; s/.*/\L&/' | tr '[:lower:]' '[:upper:]')"
+    MACS="$(echo "${2}" | sed 's/://g; s/,/ /g; s/.*/\L&/')"
     for MACX in ${MACS}; do
       ETHLISTTMPM="${ETHLISTTMPM}$(echo -e "${ETHLISTTMPB}" | grep "${MACX}")\n"
       ETHLISTTMPB="$(echo -e "${ETHLISTTMPB}" | grep -v "${MACX}")\n"
