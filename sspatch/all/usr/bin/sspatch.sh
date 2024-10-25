@@ -22,7 +22,6 @@ function copy_file() {
       echo "sspatch: ${file} not found, skipping"
       return 0
     else
-      rm -f "${ss_lic_patched}"
       echo "sspatch: ${file} not found, aborting"
       exit 1
     fi
@@ -31,7 +30,6 @@ function copy_file() {
 
 SSPATH="/var/packages/SurveillanceStation/target"
 PATCHPATH="/usr/arc"
-ss_lic_patched="${PATCHPATH}/ss_license.patched"
 if [ -d "${SSPATH}" ]; then
   echo "sspatch: SurveillanceStation found"
   
@@ -84,6 +82,7 @@ if [ -d "${SSPATH}" ]; then
 
   if [ "${SSPATCH}" == "true" ]; then
     copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATH}  0644
+    copy_file ${SSPATH}/lib  libssutils.org.so    ${PATCHPATH}  0644
     copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin sscored          ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755

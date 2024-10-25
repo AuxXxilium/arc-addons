@@ -12,9 +12,15 @@ if [ "${1}" = "late" ]; then
   cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
 
   cp -vf "/usr/bin/sspatch.sh" "/tmpRoot/usr/bin/sspatch.sh"
-  cp -vf "/usr/lib/sspatch.tgz" "/tmpRoot/usr/arc/sspatch.tgz"
-  cp -vf "/usr/lib/sspatch-openvino.tgz" "/tmpRoot/usr/arc/sspatch-openvino.tgz"
-  cp -vf "/usr/lib/sspatch-3221.tgz" "/tmpRoot/usr/arc/sspatch-3221.tgz"
+  if [ "${2}" = "true" ]; then
+    cp -vf "/usr/lib/sspatch_60.tgz" "/tmpRoot/usr/arc/sspatch.tgz"
+    cp -vf "/usr/lib/sspatch-openvino_60.tgz" "/tmpRoot/usr/arc/sspatch-openvino.tgz"
+    cp -vf "/usr/lib/sspatch-3221_60.tgz" "/tmpRoot/usr/arc/sspatch-3221.tgz"
+  else
+    cp -vf "/usr/lib/sspatch_32.tgz" "/tmpRoot/usr/arc/sspatch.tgz"
+    cp -vf "/usr/lib/sspatch-openvino_32.tgz" "/tmpRoot/usr/arc/sspatch-openvino.tgz"
+    cp -vf "/usr/lib/sspatch-3221_32.tgz" "/tmpRoot/usr/arc/sspatch-3221.tgz"
+  fi
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/sspatch.service"
