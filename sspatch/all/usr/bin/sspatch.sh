@@ -18,7 +18,7 @@ function copy_file() {
     chown SurveillanceStation:SurveillanceStation "${target}/${file}"
     chmod "${mode}" "${target}/${file}"
   else
-    if [ "${file}" == "ssrtmpclientd" ] || [ "${file}" == "libssutils.org.so" ]; then
+    if [ "${file}" == "ssrtmpclientd" ]; then
       echo "sspatch: ${file} not found, skipping"
       return 0
     else
@@ -33,7 +33,24 @@ PATCHPATH="/usr/arc"
 if [ -d "${SSPATH}" ]; then
   echo "sspatch: SurveillanceStation found"
   
+  /usr/syno/bin/synopkg stop SurveillanceStation
+  sleep 5
+  
+  echo "sspatch: Checking for SurveillanceStation Backup"
+  if [ -f "${SSPATH}/lib/libssutils.so.bak" ]; then
+    echo "sspatch: SurveillanceStation Backup found"
+    cp -vf "${SSPATH}/lib/libssutils.so.bak" "${SSPATH}/lib/libssutils.so"
+    [ -f "${SSPATH}/sbin/sscmshostd.bak" ] && cp -vf "${SSPATH}/sbin/sscmshostd.bak" "${SSPATH}/sbin/sscmshostd"
+    [ -f "${SSPATH}/sbin/sscored.bak" ] && cp -vf "${SSPATH}/sbin/sscored.bak" "${SSPATH}/sbin/sscored"
+    [ -f "${SSPATH}/sbin/ssdaemonmonitord.bak" ] && cp -vf "${SSPATH}/sbin/ssdaemonmonitord.bak" "${SSPATH}/sbin/ssdaemonmonitord"
+    [ -f "${SSPATH}/sbin/ssexechelperd.bak" ] && cp -vf "${SSPATH}/sbin/ssexechelperd.bak" "${SSPATH}/sbin/ssexechelperd"
+    [ -f "${SSPATH}/sbin/ssroutined.bak" ] && cp -vf "${SSPATH}/sbin/ssroutined.bak" "${SSPATH}/sbin/ssroutined"
+    [ -f "${SSPATH}/sbin/ssmessaged.bak" ] && cp -vf "${SSPATH}/sbin/ssmessaged.bak" "${SSPATH}/sbin/ssmessaged"
+    [ -f "${SSPATH}/sbin/ssrtmpclientd.bak" ] && cp -vf "${SSPATH}/sbin/ssrtmpclientd.bak" "${SSPATH}/sbin/ssrtmpclientd"
+  fi
+
   # Define the hosts entries to be added
+  echo "sspatch: Adding hosts entries"
   ENTRIES=("0.0.0.0 synosurveillance.synology.com")
   for ENTRY in "${ENTRIES[@]}"
   do
@@ -56,11 +73,9 @@ if [ -d "${SSPATH}" ]; then
     fi
   done
 
-  /usr/syno/bin/synopkg stop SurveillanceStation
-  sleep 5
-
   # Check Sha256sum for Patch
   [ -f "${SSPATH}/lib/libssutils.org.so" ] && CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.org.so | cut -d' ' -f1)" || CHECKSUM="$(sha256sum ${SSPATH}/lib/libssutils.so | cut -d' ' -f1)"
+  [ ! -f "${SSPATH}/lib/libssutils.org.so" ] && cp -vf "${SSPATH}/lib/libssutils.so" "${SSPATH}/lib/libssutils.org.so" || echo "sspatch: libssutils.org.so already exists"
   SSPATCH="false"
   if [ "${CHECKSUM}" = "b0fafefe820aa8ecd577313dff2ae22cf41a6ddf44051f01670c3b92ee04224d" ]; then
     echo "sspatch: SurveillanceStation 9.2.0-11289"
@@ -77,12 +92,10 @@ if [ -d "${SSPATH}" ]; then
     SSPATCH="true"
   else
     echo "sspatch: SurveillanceStation Version not supported"
-    exit 0
   fi
 
   if [ "${SSPATCH}" == "true" ]; then
     copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATH}  0644
-    copy_file ${SSPATH}/lib  libssutils.org.so    ${PATCHPATH}  0644
     copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin sscored          ${PATCHPATH}  0755
     copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}  0755
