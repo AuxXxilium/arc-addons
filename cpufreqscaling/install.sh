@@ -36,6 +36,19 @@ WantedBy=multi-user.target
 EOF
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
+
+  if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+    echo "copy esynoscheduler.db"
+    mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
+    cp -vf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+  fi
+  echo "insert scaling... task to esynoscheduler.db"
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+DELETE FROM task WHERE task_name LIKE 'CPUFreqscaling';
+INSERT INTO task VALUES('CPUFreqscaling', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/scaling.sh ${2}', 'script', '{}', '', '', '{}', '{}');
+EOF
+
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing cpufreqscalingscaling - ${1}"
 
