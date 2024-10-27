@@ -11,6 +11,7 @@ set -euo pipefail
 
 # Load the correct cpufreq module
 cerror=0
+governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 if [ "${1}" == "ondemand" ] || [ "${1}" == "conservative" ]; then
   insmod /usr/lib/modules/cpufreq_${1}.ko || cerror=1
 fi
