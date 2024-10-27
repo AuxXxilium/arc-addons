@@ -21,8 +21,7 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
-Wants=smpkg-custom-install.service
-After=smpkg-custom-install.service
+After=multi-user.target
 
 [Service]
 User=root
