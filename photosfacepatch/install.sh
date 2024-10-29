@@ -23,7 +23,6 @@ Wants=smpkg-custom-install.service pkgctl-StorageManager.service
 After=smpkg-custom-install.service
 
 [Service]
-User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/photosfacepatch.sh
