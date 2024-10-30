@@ -19,8 +19,7 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=Enable face recognition in Synology Photos
-Wants=smpkg-custom-install.service pkgctl-StorageManager.service
-After=smpkg-custom-install.service
+After=multi-user.target
 
 [Service]
 Type=oneshot
