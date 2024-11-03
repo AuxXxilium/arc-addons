@@ -11,7 +11,7 @@ function copy_file() {
   local file="${2}"
   local input="${3}"
   local mode="${4}"
-  if [ -f "${input}/${file}" ]; then
+  if [ -f "${input}/${file}" ] && [ -f "${target}/${file}" ]; then
     echo "sspatch: Copying ${file} to ${target}"
     cp -vf "${input}/${file}" "${target}/${file}"
     chown SurveillanceStation:SurveillanceStation "${target}/${file}"
