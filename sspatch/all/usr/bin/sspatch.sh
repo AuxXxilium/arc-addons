@@ -11,7 +11,7 @@ function copy_file() {
   local file="${2}"
   local input="${3}"
   local mode="${4}"
-  if [ -f "${input}/${file}" ]; then
+  if [ -f "${input}/${file}" ] && [ -f "${target}/${file}" ]; then
     echo "sspatch: Copying ${file} to ${target}"
     cp -vf "${input}/${file}" "${target}/${file}"
     chown SurveillanceStation:SurveillanceStation "${target}/${file}"
@@ -82,7 +82,7 @@ if [ -d "${SSPATH}" ]; then
     copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATHSS}  0755
     copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATHSS}  0755
     copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATHSS}  0755
-    copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATHSS}  0755
+    # copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATHSS}  0755
   fi
 
   sleep 5
