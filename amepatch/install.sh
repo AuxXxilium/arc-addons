@@ -17,12 +17,11 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=addon amepatch
-After=multi-user.target
+After=syno-volume.target syno-space.target
 
 [Service]
-Type=simple
-Restart=on-failure
-RestartSec=10
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/bin/amepatch.sh
 
 [Install]

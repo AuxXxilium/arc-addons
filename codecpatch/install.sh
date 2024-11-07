@@ -18,7 +18,7 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=addon codecpatch
-After=multi-user.target
+echo "After=syno-volume.target syno-space.target"
 
 [Service]
 Type=oneshot

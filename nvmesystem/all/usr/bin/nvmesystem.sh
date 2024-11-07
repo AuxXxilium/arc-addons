@@ -30,6 +30,8 @@ fi
 
 gzip -dc "${FILE_GZ}" >"${FILE_JS}"
 sed -i "s/e.portType||e.isCacheTray()/e.portType||false/" "${FILE_JS}"
+sed -i 's/notSupportM2Pool_addOnCard:this.T("disk_info","disk_reason_m2_add_on_card"),//g' "${FILE_JS}"
+sed -i 's/},{isConditionInvalid:0<this.pciSlot,invalidReason:"notSupportM2Pool_addOnCard"//g' "${FILE_JS}"
 gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
 exit 0

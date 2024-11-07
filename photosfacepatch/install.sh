@@ -19,7 +19,7 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=Enable face recognition in Synology Photos
-After=multi-user.target
+After=syno-volume.target syno-space.target
 
 [Service]
 Type=oneshot
