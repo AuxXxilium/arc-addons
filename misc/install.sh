@@ -94,11 +94,11 @@ MSG="\${MSG}\n"
 MSG="\${MSG}Warning: Data should only be stored in shared folders. Data stored elsewhere\n"
 MSG="\${MSG}may be deleted when the system is updated/restarted.\n"
 MSG="\${MSG}\n"
+MSG="\${MSG}'System partition(/dev/md0) mounted to': /tmpRoot\n"
 MSG="\${MSG}To 'Force re-install DSM': http://<ip>:5000/web_install.html\n"
 MSG="\${MSG}To 'Reboot to Config Mode': http://<ip>:5000/webman/reboot_to_loader.cgi\n"
 MSG="\${MSG}To 'Show Boot Log': http://<ip>:5000/webman/get_logs.cgi\n"
 MSG="\${MSG}To 'Reboot Loader' : exec reboot\n"
-MSG="\${MSG}To 'Modify system files' : mount /dev/md0\n"
 echo -e "\${MSG}" > /etc/motd
 
 /usr/bin/killall ttyd 2>/dev/null || true
@@ -110,6 +110,8 @@ echo "Starting dufs ..."
 
 cp -f /usr/syno/web/web_index.html /usr/syno/web/web_install.html
 cp -f /addons/web_index.html /usr/syno/web/web_index.html
+mkdir -p /tmpRoot
+mount /dev/md0 /tmpRoot
 echo "Arc Recovery mode is ready"
 EOF
   chmod +x /usr/syno/web/webman/recovery.cgi
