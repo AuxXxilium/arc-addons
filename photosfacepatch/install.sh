@@ -9,10 +9,10 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon photosfacepatch - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  cp -vf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
-  cp -vf /usr/bin/photosfacepatch.sh /tmpRoot/usr/bin/photosfacepatch.sh
+  cp -pf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
+  cp -pf /usr/bin/photosfacepatch.sh /tmpRoot/usr/bin/photosfacepatch.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/photosfacepatch.service"

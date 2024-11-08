@@ -9,19 +9,19 @@
 if [ "${1}" = "late" ]; then
   echo "Installing cpufreqscalingscaling - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  cp -vf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/scaling.sh"
-  [ ! -f "/tmpRoot/usr/bin/echo" ] && cp -vf /usr/bin/echo /tmpRoot/usr/bin/echo || true
-  cp -f "/usr/lib/modules/acpi_cpufreq.ko" "/tmpRoot/usr/lib/modules/acpi_cpufreq.ko"
-  [ "${2}" != "schedutil" ] && cp -vf "/usr/lib/modules/cpufreq_${2}.ko" "/tmpRoot/usr/lib/modules/cpufreq_${2}.ko"
+  cp -pf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/scaling.sh"
+  [ ! -f "/tmpRoot/usr/bin/echo" ] && cp -pf /usr/bin/echo /tmpRoot/usr/bin/echo || true
+  cp -pf "/usr/lib/modules/acpi_cpufreq.ko" "/tmpRoot/usr/lib/modules/acpi_cpufreq.ko"
+  [ "${2}" != "schedutil" ] && cp -pf "/usr/lib/modules/cpufreq_${2}.ko" "/tmpRoot/usr/lib/modules/cpufreq_${2}.ko"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
   cat <<EOF >${DEST}
 [Unit]
 Description=Enable CPU Freq scaling
-After=multi-user.target
+After=syno-volume.target syno-space.target
 
 [Service]
 User=root
@@ -33,13 +33,13 @@ ExecStart=/usr/sbin/scaling.sh ${2}
 [Install]
 WantedBy=multi-user.target
 EOF
-    mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+    mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
 
   if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
     echo "copy esynoscheduler.db"
     mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-    cp -vf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+    cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
   fi
   echo "insert scaling... task to esynoscheduler.db"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib

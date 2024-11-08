@@ -9,10 +9,10 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon updatenotify - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  cp -vf /usr/bin/pup /tmpRoot/usr/bin/pup
-  cp -vf /usr/bin/arc-updatenotify.sh /tmpRoot/usr/bin/arc-updatenotify.sh
+  cp -pf /usr/bin/pup /tmpRoot/usr/bin/pup
+  cp -pf /usr/bin/arc-updatenotify.sh /tmpRoot/usr/bin/arc-updatenotify.sh
   
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/arc-updatenotify.service"
@@ -30,7 +30,7 @@ ExecStart=/usr/bin/arc-updatenotify.sh create
 WantedBy=multi-user.target
 EOF
 
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/arc-updatenotify.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arc-updatenotify.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon arc-updatenotify - ${1}"

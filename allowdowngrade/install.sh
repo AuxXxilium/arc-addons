@@ -9,9 +9,9 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon allowdowngrade - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  cp -vf /usr/bin/allowdowngrade.sh /tmpRoot/usr/bin/allowdowngrade.sh
+  cp -pf /usr/bin/allowdowngrade.sh /tmpRoot/usr/bin/allowdowngrade.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/allowdowngrade.service"
@@ -30,7 +30,7 @@ ExecStart=/usr/bin/allowdowngrade.sh
 WantedBy=multi-user.target
 EOF
 
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/allowdowngrade.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/allowdowngrade.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon allowdowngrade - ${1}"

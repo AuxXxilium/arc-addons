@@ -13,7 +13,7 @@ function copy_file() {
   local mode="${4}"
   if [ -f "${input}/${file}" ] && [ -f "${target}/${file}" ]; then
     echo "sspatch: Copying ${file} to ${target}"
-    cp -vf "${input}/${file}" "${target}/${file}"
+    cp -pf "${input}/${file}" "${target}/${file}"
     chown SurveillanceStation:SurveillanceStation "${target}/${file}"
     chmod "${mode}" "${target}/${file}"
   fi
@@ -26,7 +26,7 @@ if [ -d "${SSPATH}" ]; then
   echo "sspatch: SurveillanceStation found"
   
   /usr/syno/bin/synopkg stop SurveillanceStation
-  sleep 5
+  sleep 10
 
   # Define the hosts entries to be added
   echo "sspatch: Adding hosts entries"
@@ -85,7 +85,7 @@ if [ -d "${SSPATH}" ]; then
     # copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATHSS}  0755
   fi
 
-  sleep 5
+  sleep 10
   /usr/syno/bin/synopkg restart SurveillanceStation
 fi
 

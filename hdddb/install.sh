@@ -9,9 +9,9 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon hdddb - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  cp -vf /usr/bin/hdddb.sh /tmpRoot/usr/bin/hdddb.sh
+  cp -pf /usr/bin/hdddb.sh /tmpRoot/usr/bin/hdddb.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/hdddb.service"
@@ -29,7 +29,7 @@ ExecStart=/usr/bin/hdddb.sh -nrwpeS
 [Install]
 WantedBy=multi-user.target
 EOF
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/hdddb.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/hdddb.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon hdddb - ${1}"

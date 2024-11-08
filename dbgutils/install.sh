@@ -37,12 +37,12 @@ function getlog() {
   ls -l /sys/class/scsi_host >"${DEST_PATH}/disk-scsi_host.log" || true
   cat /sys/block/*/device/syno_block_info >"${DEST_PATH}/disk-syno_block_info.log" || true
 
-  [ -f "/addons/addons.sh" ] && cp -f "/addons/addons.sh" "${DEST_PATH}/addons.sh" || true
-  [ -f "/addons/model.dts" ] && cp -f "/addons/model.dts" "${DEST_PATH}/model.dts" || true
+  [ -f "/addons/addons.sh" ] && cp -pf "/addons/addons.sh" "${DEST_PATH}/addons.sh" || true
+  [ -f "/addons/model.dts" ] && cp -pf "/addons/model.dts" "${DEST_PATH}/model.dts" || true
 
-  [ -f "/var/log/messages" ] && cp -f "/var/log/messages" "${DEST_PATH}/messages" || true
-  [ -f "/var/log/linuxrc.syno.log" ] && cp -f "/var/log/linuxrc.syno.log" "${DEST_PATH}/linuxrc.syno.log" || true
-  [ -f "/tmp/installer_sh.log" ] && cp -f "/tmp/installer_sh.log" "${DEST_PATH}/installer_sh.log" || true
+  [ -f "/var/log/messages" ] && cp -pf "/var/log/messages" "${DEST_PATH}/messages" || true
+  [ -f "/var/log/linuxrc.syno.log" ] && cp -pf "/var/log/linuxrc.syno.log" "${DEST_PATH}/linuxrc.syno.log" || true
+  [ -f "/tmp/installer_sh.log" ] && cp -pf "/tmp/installer_sh.log" "${DEST_PATH}/installer_sh.log" || true
   
   sync
   umount "${WORK_PATH}"

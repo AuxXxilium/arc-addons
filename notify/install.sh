@@ -9,8 +9,8 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon notify - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
-  cp -vf /usr/bin/notify.sh /tmpRoot/usr/bin/notify.sh
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf /usr/bin/notify.sh /tmpRoot/usr/bin/notify.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/notify.service"
@@ -28,7 +28,7 @@ ExecStart=/usr/bin/notify.sh
 WantedBy=multi-user.target
 EOF
 
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/notify.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/notify.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon notify - ${1}"

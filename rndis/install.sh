@@ -13,9 +13,9 @@ if [ "${1}" = "rcExit" ]; then
 elif [ "${1}" = "late" ]; then
   echo "Installing addon rndis - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  cp -vf /usr/bin/rndis.sh /tmpRoot/usr/bin/rndis.sh
+  cp -pf /usr/bin/rndis.sh /tmpRoot/usr/bin/rndis.sh
 
   mkdir -p /tmpRoot/usr/lib/udev/rules.d
   echo 'SUBSYSTEMS=="net", KERNEL=="usb*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="rndis.service"' >/tmpRoot/usr/lib/udev/rules.d/99-rndis.rules

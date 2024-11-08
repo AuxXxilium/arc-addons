@@ -9,11 +9,11 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon setrootpw - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   mkdir -p /tmpRoot/usr/lib/openssh
-  cp -vf /usr/lib/openssh/sftp-server /tmpRoot/usr/lib/openssh/sftp-server
-  [ ! -f "/tmpRoot/usr/lib/libcrypto.so.3" ] && cp -vf /usr/lib/libcrypto.so.3 /tmpRoot/usr/lib/libcrypto.so.3
+  cp -pf /usr/lib/openssh/sftp-server /tmpRoot/usr/lib/openssh/sftp-server
+  [ ! -f "/tmpRoot/usr/lib/libcrypto.so.3" ] && cp -pf /usr/lib/libcrypto.so.3 /tmpRoot/usr/lib/libcrypto.so.3
 
   FILE="/tmpRoot/etc/ssh/sshd_config"
   [ ! -f "${FILE}.bak" ] && cp -f "${FILE}" "${FILE}.bak"
@@ -26,7 +26,7 @@ if [ "${1}" = "late" ]; then
   if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
     echo "copy esynoscheduler.db"
     mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-    cp -vf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+    cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
   fi
   echo "insert setrootpw task to esynoscheduler.db"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib

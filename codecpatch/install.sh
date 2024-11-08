@@ -9,16 +9,16 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon codecpatch - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  cp -vf /usr/bin/codecpatch.sh /tmpRoot/usr/bin/codecpatch.sh
+  cp -pf /usr/bin/codecpatch.sh /tmpRoot/usr/bin/codecpatch.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/codecpatch.service"
   cat <<EOF >${DEST}
 [Unit]
 Description=addon codecpatch
-echo "After=syno-volume.target syno-space.target"
+After=syno-volume.target syno-space.target
 
 [Service]
 Type=oneshot
@@ -29,7 +29,7 @@ ExecStart=/usr/bin/codecpatch.sh
 WantedBy=multi-user.target
 EOF
 
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/codecpatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/codecpatch.service
 fi
 elif [ "${1}" = "uninstall" ]; then

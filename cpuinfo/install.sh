@@ -9,9 +9,9 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon cpuinfo - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  cp -vf /usr/bin/cpuinfo.sh /tmpRoot/usr/bin/cpuinfo.sh
+  cp -pf /usr/bin/cpuinfo.sh /tmpRoot/usr/bin/cpuinfo.sh
 
   shift
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
@@ -30,7 +30,7 @@ ExecStart=/usr/bin/cpuinfo.sh $@
 WantedBy=multi-user.target
 EOF
 
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/cpuinfo.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon cpuinfo - ${1}"

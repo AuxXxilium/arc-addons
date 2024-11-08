@@ -9,10 +9,10 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon arcdns - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  cp -vf /usr/bin/arcdns.php /tmpRoot/usr/bin/arcdns.php
-  cp -vf /usr/bin/arcdns.sh /tmpRoot/usr/bin/arcdns.sh
+  cp -pf /usr/bin/arcdns.php /tmpRoot/usr/bin/arcdns.php
+  cp -pf /usr/bin/arcdns.sh /tmpRoot/usr/bin/arcdns.sh
   
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/arcdns.service"
@@ -22,7 +22,6 @@ Description=addon arcdns
 After=multi-user.target
 
 [Service]
-User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/arcdns.sh
@@ -30,7 +29,7 @@ ExecStart=/usr/bin/arcdns.sh
 [Install]
 WantedBy=multi-user.target
 EOF
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/arcdns.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arcdns.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon arcdns - ${1}"

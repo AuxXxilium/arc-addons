@@ -9,10 +9,10 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon powersched - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  [ ! -f "/tmpRoot/usr/sbin/powersched.bak" -a -f "/tmpRoot/usr/sbin/powersched" ] && cp -vf "/tmpRoot/usr/sbin/powersched" "/tmpRoot/usr/sbin/powersched.bak"
-  cp -vf "/usr/sbin/powersched" "/tmpRoot/usr/sbin/powersched"
+  [ ! -f "/tmpRoot/usr/sbin/powersched.bak" -a -f "/tmpRoot/usr/sbin/powersched" ] && cp -pf "/tmpRoot/usr/sbin/powersched" "/tmpRoot/usr/sbin/powersched.bak"
+  cp -pf "/usr/sbin/powersched" "/tmpRoot/usr/sbin/powersched"
   chmod 755 "/tmpRoot/usr/sbin/powersched"
   # Clean old entries
   [ ! -f "/tmpRoot/etc/crontab.bak" -a -f "/tmpRoot/etc/crontab" ] && cp -f "/tmpRoot/etc/crontab" "/tmpRoot/etc/crontab.bak"

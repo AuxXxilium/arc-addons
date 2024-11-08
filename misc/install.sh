@@ -10,7 +10,7 @@ if [ "${1}" = "early" ]; then
 
   # [CREATE][failed] Raidtool initsys
   SO_FILE="/usr/syno/bin/scemd"
-  [ ! -f "${SO_FILE}.bak" ] && cp -vf "${SO_FILE}" "${SO_FILE}.bak"
+  [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -f "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
     sed "s/2d6520302e39/2d6520312e32/" |
@@ -177,7 +177,7 @@ elif [ "${1}" = "late" ]; then
     else
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
-      cp -vf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
+      cp -pf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
     fi
   fi
   modprobe -r acpi-cpufreq
@@ -254,30 +254,30 @@ elif [ "${1}" = "late" ]; then
   mkdir -p /tmpRoot/etc/sysconfig/network-scripts
   mkdir -p /tmpRoot/etc.defaults/sysconfig/network-scripts
   for I in $(ls /etc/sysconfig/network-scripts/ifcfg-eth*); do
-    [ ! -f "/tmpRoot/${I}" ] && cp -vf "${I}" "/tmpRoot/${I}"
-    [ ! -f "/tmpRoot/${I/etc/etc.defaults}" ] && cp -vf "${I}" "/tmpRoot/${I/etc/etc.defaults}"
+    [ ! -f "/tmpRoot/${I}" ] && cp -pf "${I}" "/tmpRoot/${I}"
+    [ ! -f "/tmpRoot/${I/etc/etc.defaults}" ] && cp -pf "${I}" "/tmpRoot/${I/etc/etc.defaults}"
   done
   if grep -q 'network.' /proc/cmdline && [ -f "/etc/ifcfgs" ]; then
     for ETH in $(cat /etc/ifcfgs); do
       echo "Copy ifcfg-${ETH}"
       if [ -f "/etc/sysconfig/network-scripts/ifcfg-${ETH}" ]; then
         rm -vf /tmpRoot/etc/sysconfig/network-scripts/ifcfg-* /tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-*
-        cp -vf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc/sysconfig/network-scripts/
-        cp -vf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/
+        cp -pf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc/sysconfig/network-scripts/
+        cp -pf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/
       fi
     done
   fi
 
   # syslog-ng
   if [ -f /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf ]; then
-    cp -vfp /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf.bak
+    cp -pfp /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf.bak
     sed -i 's/destination(d_scemd)/flags(final)/g' /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf
   else
     echo "scemd.conf does not exist."
   fi
 
   if [ -f /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf ]; then
-    cp -vfp /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf.bak
+    cp -pfp /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf.bak
     sed -i 's/destination(d_synosystemd)/flags(final)/g; s/destination(d_systemd)/flags(final)/g' /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf
   else
     echo "synosystemd.conf does not exist."
@@ -290,6 +290,6 @@ elif [ "${1}" = "late" ]; then
   fi
 
   # Copy Loader Reboot
-  cp -vf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
-  cp -vf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
+  cp -pf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
+  cp -pf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
 fi

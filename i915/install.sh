@@ -38,8 +38,7 @@ if [ "${1}" = "patches" ]; then
     GPU_DEF="86800000923e0000"
     GPU_BIN="${GPU:2:2}${GPU:0:2}0000${GPU:6:2}${GPU:4:2}0000"
     echo "GPU:${GPU} GPU_BIN:${GPU_BIN}"
-    cp -vf "${KO_FILE}" "${KO_FILE}.bak"
-    cp -f "${KO_FILE}" "${KO_FILE}.tmp"
+    cp -pf "${KO_FILE}" "${KO_FILE}.tmp"
     xxd -c $(xxd -p "${KO_FILE}.tmp" 2>/dev/null | wc -c) -p "${KO_FILE}.tmp" 2>/dev/null |
       sed "s/${GPU_DEF}/${GPU_BIN}/; s/308201f706092a86.*70656e6465647e0a//" |
       xxd -r -p >"${KO_FILE}" 2>/dev/null
@@ -49,11 +48,11 @@ if [ "${1}" = "patches" ]; then
 elif [ "${1}" = "late" ]; then
   echo "Installing addon i915 - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
-  [ ! -f "${KO_FILE}.bak" ] && cp -vf "${KO_FILE}" "${KO_FILE}.bak"
-  cp -vf "/usr/lib/modules/i915.ko" "${KO_FILE}"
+  [ ! -f "${KO_FILE}.bak" ] && cp -pf "${KO_FILE}" "${KO_FILE}.bak"
+  cp -pf "/usr/lib/modules/i915.ko" "${KO_FILE}"
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon i915 - ${1}"
 

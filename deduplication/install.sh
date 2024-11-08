@@ -9,9 +9,9 @@
 if [ "${1}" = "late" ]; then
   echo "Creating service to exec deduplication"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  cp -vf /usr/bin/deduplication.sh /tmpRoot/usr/bin/deduplication.sh
+  cp -pf /usr/bin/deduplication.sh /tmpRoot/usr/bin/deduplication.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"  
   DEST="/tmpRoot/usr/lib/systemd/system/deduplication.service"
@@ -29,7 +29,7 @@ ExecStart=/usr/bin/deduplication.sh -s -e --hdd
 [Install]
 WantedBy=multi-user.target
 EOF
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/deduplication.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/deduplication.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon deduplication - ${1}"

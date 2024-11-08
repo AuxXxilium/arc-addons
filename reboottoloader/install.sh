@@ -9,15 +9,15 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon rebootto... - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  cp -vf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin
-  cp -vf /usr/bin/grub-editenv /tmpRoot/usr/bin
+  cp -pf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin
+  cp -pf /usr/bin/grub-editenv /tmpRoot/usr/bin
 
   if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
     echo "copy esynoscheduler.db"
     mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-    cp -vf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+    cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
   fi
   echo "insert rebootto... task to esynoscheduler.db"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
