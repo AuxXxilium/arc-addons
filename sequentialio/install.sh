@@ -9,9 +9,9 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon sequentialio - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  cp -vf /usr/bin/sequentialio.sh /tmpRoot/usr/bin/sequentialio.sh
+  cp -pf /usr/bin/sequentialio.sh /tmpRoot/usr/bin/sequentialio.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/sequentialio.service"

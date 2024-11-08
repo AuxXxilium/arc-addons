@@ -9,14 +9,13 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon addincards - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
   FILE="/tmpRoot/usr/syno/etc/adapter_cards.conf"
 
   [ ! -f "${FILE}.bak" ] && cp -f "${FILE}" "${FILE}.bak"
-
-  cp -f "${FILE}" "${FILE}.tmp"
+  cp -pf "${FILE}" "${FILE}.tmp"
   echo -n "" >"${FILE}"
   for N in $(cat "${FILE}.tmp" 2>/dev/null | grep '\['); do
     echo "${N}" >>"${FILE}"

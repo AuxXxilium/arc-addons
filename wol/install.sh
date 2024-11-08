@@ -14,10 +14,10 @@ if [ "${1}" = "jrExit" ]; then
 elif [ "${1}" = "late" ]; then
   echo "Installing addon wol - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  [ ! -f "/tmpRoot/usr/bin/ethtool" ] && cp -vf /usr/bin/ethtool /tmpRoot/usr/bin/ethtool
-  cp -vf /usr/bin/wol.sh /tmpRoot/usr/bin/wol.sh
+  [ ! -f "/tmpRoot/usr/bin/ethtool" ] && cp -pf /usr/bin/ethtool /tmpRoot/usr/bin/ethtool
+  cp -pf /usr/bin/wol.sh /tmpRoot/usr/bin/wol.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/wol.service"
@@ -27,7 +27,6 @@ Description=Force WOL on ethN
 After=multi-user.target
 
 [Service]
-User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/wol.sh
@@ -36,7 +35,7 @@ ExecStart=/usr/bin/wol.sh
 WantedBy=multi-user.target
 EOF
 
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/wol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/wol.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon wol - ${1}"

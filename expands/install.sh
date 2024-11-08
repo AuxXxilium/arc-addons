@@ -9,9 +9,9 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon expands - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  cp -vf /usr/bin/expands.sh /tmpRoot/usr/bin/expands.sh
+  cp -pf /usr/bin/expands.sh /tmpRoot/usr/bin/expands.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/expands.service"
@@ -29,7 +29,7 @@ ExecStart=/usr/bin/expands.sh
 WantedBy=multi-user.target
 EOF
 
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/expands.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/expands.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon expands - ${1}"

@@ -34,6 +34,9 @@ elif [ "${1}" = "modules" ]; then
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
   /usr/bin/killall udevd
+  # modprobe pcspeaker, pcspkr
+  /usr/sbin/modprobe pcspeaker
+  /usr/sbin/modprobe pcspkr
   # Remove kvm module
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_intel && /usr/sbin/modprobe -r kvm_intel || true # kvm-intel.ko
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_amd && /usr/sbin/modprobe -r kvm_amd || true     # kvm-amd.ko
@@ -51,12 +54,12 @@ elif [ "${1}" = "late" ]; then
   if cat /proc/version 2>/dev/null | grep -q 'RR@RR'; then
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
-      /tmpRoot/bin/cp -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
+      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     else
       echo "Custom - backup modules."
-      /tmpRoot/bin/cp -rf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
+      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
     fi
-    /tmpRoot/bin/cp -rf /usr/lib/modules/* /tmpRoot/usr/lib/modules
+    /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules
     echo "true" >/tmp/modulesChange
   else
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
