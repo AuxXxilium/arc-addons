@@ -9,16 +9,16 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon sensors - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
   mv -f /tmpRoot/usr/etc/sensors* /tmpRoot/etc
-  cp -vf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
+  cp -pf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
 
   if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
     echo "copy esynoscheduler.db"
     mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-    cp -vf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+    cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
   fi
   echo "insert sensors task to esynoscheduler.db"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib

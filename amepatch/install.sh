@@ -9,8 +9,9 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon amepatch - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
-  cp -vf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
+
+  cp -pf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/amepatch.service"
@@ -27,7 +28,7 @@ ExecStart=/usr/bin/amepatch.sh
 [Install]
 WantedBy=multi-user.target
 EOF
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon amepatch - ${1}"

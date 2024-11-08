@@ -9,7 +9,7 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon ups - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
   FILE="/tmpRoot/usr/syno/bin/synoups"
   [ ! -f "${FILE}.bak" ] && cp -f "${FILE}" "${FILE}.bak"
