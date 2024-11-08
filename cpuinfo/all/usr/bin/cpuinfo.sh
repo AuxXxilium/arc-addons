@@ -27,10 +27,8 @@ restoreCpuinfo() {
     rm -f "${FILE_JS}" "${FILE_GZ}"
     mv -f "${FILE_GZ}.bak" "${FILE_GZ}"
     gzip -dc "${FILE_GZ}" >"${FILE_JS}"
-    chmod a+r "${FILE_JS}" "${FILE_GZ}"
   elif [ -f "${FILE_JS}.bak" ]; then
     mv -f "${FILE_JS}.bak" "${FILE_JS}"
-    chmod a+r "${FILE_JS}"
   fi
 }
 
@@ -101,16 +99,16 @@ CORES="${CORES:-1}"
 SPEED="${SPEED:-0}"
 
 if [ -f "${FILE_GZ}" ]; then
-  [ ! -f "${FILE_GZ}.bak" ] && cp -f "${FILE_GZ}" "${FILE_GZ}.bak" && chmod a+r "${FILE_GZ}.bak"
+  [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
 else
-  [ ! -f "${FILE_JS}.bak" ] && cp -f "${FILE_JS}" "${FILE_JS}.bak" && chmod a+r "${FILE_JS}.bak"
+  [ ! -f "${FILE_JS}.bak" ] && cp -pf "${FILE_JS}" "${FILE_JS}.bak"
 fi
 
 rm -f "${FILE_JS}"
 if [ -f "${FILE_GZ}.bak" ]; then
   gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
 else
-  cp -f "${FILE_JS}.bak" "${FILE_JS}"
+  cp -pf "${FILE_JS}.bak" "${FILE_JS}"
 fi
 
 echo "CPU Info set to: \"TEMP:${TEMP}\" \"${VENDOR}\" \"${FAMILY}\" \"${SERIES}\" \"${CORES}\" \"${SPEED}\""
@@ -143,7 +141,6 @@ fi
 
 if [ -f "${FILE_GZ}.bak" ]; then
   gzip -c "${FILE_JS}" >"${FILE_GZ}"
-  chmod a+r "${FILE_GZ}"
 fi
 
 exit 0

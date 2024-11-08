@@ -13,8 +13,8 @@ if [ -f "${FILE}" ]; then
   if [ $? -ne 0 -o ${STATUS} -ne 200 ]; then
     echo "usb.ids download error!"
   else
-    [ ! -f "${FILE}.bak" ] && cp -f "${FILE}" "${FILE}.bak"
-    cp -f "/tmp/usb.map" "${FILE}"
+    [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
+    cp -pf "/tmp/usb.map" "${FILE}"
   fi
 fi
 
@@ -25,8 +25,8 @@ if [ -f "${FILE}" ]; then
   if [ $? -ne 0 -o ${STATUS} -ne 200 ]; then
     echo "ca-certificates.crt download error!"
   else
-    [ ! -f "${FILE}.bak" ] && cp -f "${FILE}" "${FILE}.bak"
-    cp -f "/tmp/cacert.pem" "${FILE}"
+    [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
+    cp -pf "/tmp/cacert.pem" "${FILE}"
   fi
 fi
 

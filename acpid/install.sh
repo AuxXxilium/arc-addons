@@ -9,13 +9,13 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon acpid - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/usr/ ./bin ./sbin ./lib
   tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/ ./etc
   sed -i '/^Exec/s|=/|=/|g' /tmpRoot/usr/lib/systemd/system/acpid.service
   if [ -f /usr/lib/modules/button.ko ]; then
-    cp -vf /usr/lib/modules/button.ko /tmpRoot/usr/lib/modules/button.ko
+    cp -pf /usr/lib/modules/button.ko /tmpRoot/usr/lib/modules/button.ko
   else
     echo "No button.ko found"
   fi

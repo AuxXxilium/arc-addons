@@ -48,7 +48,7 @@ if [ "${1}" = "patches" ]; then
 elif [ "${1}" = "late" ]; then
   echo "Installing addon nvmecache - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   #
   # |       models      |     1st      |     2nd      |
@@ -68,7 +68,7 @@ elif [ "${1}" = "late" ]; then
   fi
 
   SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
-  [ ! -f "${SO_FILE}.bak" ] && cp -vf "${SO_FILE}" "${SO_FILE}.bak"
+  [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
 
   # Replace the device path.
   cp -f "${SO_FILE}.bak" "${SO_FILE}"

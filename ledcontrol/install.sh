@@ -9,17 +9,17 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon ledcontrol - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -vf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  cp -vf /usr/bin/ledcontrol.sh /tmpRoot/usr/bin/ledcontrol.sh
-  cp -vf /usr/bin/ugreen_leds_cli /tmpRoot/usr/bin/ugreen_leds_cli
-  cp -vf /usr/bin/ugreen-diskiomon /tmpRoot/usr/bin/ugreen-diskiomon
-  cp -vf /usr/bin/ugreen-netdevmon /tmpRoot/usr/bin/ugreen-netdevmon
-  cp -vf /usr/bin/ugreen-probe-leds /tmpRoot/usr/bin/ugreen-probe-leds
-  cp -vf /usr/bin/led.conf /tmpRoot/usr/bin/led.conf
-  cp -vf /usr/bin/modules/i2c-algo-bit.ko /tmpRoot/usr/bin/modules/i2c-algo-bit.ko
-  cp -vf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/i2c-i801.ko
-  cp -vf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/i2c-smbus.ko
+  cp -pf /usr/bin/ledcontrol.sh /tmpRoot/usr/bin/ledcontrol.sh
+  cp -pf /usr/bin/ugreen_leds_cli /tmpRoot/usr/bin/ugreen_leds_cli
+  cp -pf /usr/bin/ugreen-diskiomon /tmpRoot/usr/bin/ugreen-diskiomon
+  cp -pf /usr/bin/ugreen-netdevmon /tmpRoot/usr/bin/ugreen-netdevmon
+  cp -pf /usr/bin/ugreen-probe-leds /tmpRoot/usr/bin/ugreen-probe-leds
+  cp -pf /usr/bin/led.conf /tmpRoot/usr/bin/led.conf
+  cp -pf /usr/bin/modules/i2c-algo-bit.ko /tmpRoot/usr/bin/modules/i2c-algo-bit.ko
+  cp -pf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/i2c-i801.ko
+  cp -pf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/i2c-smbus.ko
 
   insmod i2c-algo-bit
   insmod i2c-i801
@@ -45,7 +45,7 @@ ExecStart=/usr/bin/ledcontrol.sh
 [Install]
 WantedBy=multi-user.target
 EOF
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/ledcontrol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon ledcontrol - ${1}"
