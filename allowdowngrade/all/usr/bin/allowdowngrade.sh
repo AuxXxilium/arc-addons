@@ -25,15 +25,15 @@
 
 # Prevent AME from updating
 if [ -d "/var/packages/CodecPack" ]; then
-    /usr/syno/bin/synosetkeyvalue "/var/packages/CodecPack/INFO version" "30.1.0-3005"
+    /usr/syno/bin/synosetkeyvalue "/var/packages/CodecPack/INFO" version "30.1.0-3005"
 fi
 # Prevent VideoStation from updating
 if [ -d "/var/packages/VideoStation" ]; then
-    /usr/syno/bin/synosetkeyvalue "/var/packages/VideoStation/INFO version" "30.1.0-3153"
+    /usr/syno/bin/synosetkeyvalue "/var/packages/VideoStation/INFO" version "30.1.0-3153"
 fi
 # Prevent Surveillance Station from updating
 if [ -d "/var/packages/SurveillanceStation" ]; then
-    /usr/syno/bin/synosetkeyvalue "/var/packages/SurveillanceStation/INFO version" "90.2.0-11289"
+    /usr/syno/bin/synosetkeyvalue "/var/packages/SurveillanceStation/INFO" version "90.2.0-11289"
 fi
 # Prevent Media Server from updating
 if [ -d "/var/packages/MediaServer" ]; then
