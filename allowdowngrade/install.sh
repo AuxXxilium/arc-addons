@@ -18,9 +18,10 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=addon allowdowngrade
-After=syno-volume.target syno-space.target
+After=multi-user.target
 
 [Service]
+User=root
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/allowdowngrade.sh

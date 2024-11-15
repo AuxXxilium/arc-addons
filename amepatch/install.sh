@@ -18,7 +18,7 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >${DEST}
 [Unit]
 Description=addon amepatch
-After=syno-volume.target syno-space.target
+After=multi-user.target
 
 [Service]
 Type=oneshot
