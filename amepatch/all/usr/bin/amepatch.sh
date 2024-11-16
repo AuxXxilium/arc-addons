@@ -67,8 +67,7 @@ if [ -d "/var/packages/CodecPack" ]; then
     rm -f "${lic}"
     echo "${content}" >"${lic}"
 
-	if "$cp_usr_path/bin/synoame-bin-check-license"; then
-        "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"
+    if [ "$cp_usr_path/bin/synoame-bin-check-license" ] && [ "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec" ]; then
         echo -e "AME Patch: Successful!"
     else
         if [ -f "$so_backup" ]; then
