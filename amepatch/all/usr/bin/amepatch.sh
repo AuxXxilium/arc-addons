@@ -43,13 +43,7 @@ if [ -d "/var/packages/CodecPack" ]; then
         hex_values=('3718' '60A5' '60D1' '6111' '6137' 'B5F0')
         content='[{"attribute": {"codec": "hevc", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}, {"attribute": {"codec": "aac", "type": "free"}, "status": "valid", "extension_gid": null, "expireTime": 0, "appName": "ame", "follow": ["device"], "duration": 1576800000, "appType": 14, "licenseContent": 1, "registered_at": 1649315995, "server_time": 1685421618, "firstActTime": 1649315995, "licenseCode": "0"}]'
     else
-        echo "MD5 mismatch"
-        if [ -f "$so_backup" ]; then
-            mv -f "$so_backup" "$so"
-        fi
-        if [ -f "$lic_backup" ]; then
-            mv -f "$lic_backup" "$lic"
-        fi
+        echo "MD5 mismatch - already patched or unsupported version!"
         exit 1
     fi
 
@@ -67,7 +61,8 @@ if [ -d "/var/packages/CodecPack" ]; then
     rm -f "${lic}"
     echo "${content}" >"${lic}"
 
-	if "$cp_usr_path/bin/synoame-bin-check-license"; then
+    if "$cp_usr_path/bin/synoame-bin-check-license"; then
+        sleep 3
         "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"
         echo -e "AME Patch: Successful!"
     else
