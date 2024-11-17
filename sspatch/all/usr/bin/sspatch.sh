@@ -74,7 +74,7 @@ if [ -d "${SSPATH}" ]; then
     echo "sspatch: SurveillanceStation Version not supported"
   fi
 
-  if [ "${SSPATCH}" == "true" ]; then
+  if [ "${SSPATCH}" = "true" ]; then
     copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATHSS}  0644
     copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATHSS}  0755
     copy_file ${SSPATH}/sbin sscored          ${PATCHPATHSS}  0755
