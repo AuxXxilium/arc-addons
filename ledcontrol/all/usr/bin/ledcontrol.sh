@@ -44,11 +44,12 @@ else
     ${UGREEN_LEDS_CLI} power -on -color 255 255 255 -brightness 255 >/dev/null 2>&1
 
     # Disks
-    devices=$(ls -d /dev/sata*[1-9] 2>/dev/null | grep -v 'p')
+    devices=$(($(ls -d /dev/sata*[1-9] 2>/dev/null | grep -v 'p' | wc -l) - 1))
     disk_number=0
-    for i in ${devices}; do
-        disk_number=$((${disk_number} + 1))  # Disknummer für die LED-Steuerung (disk1, disk2, etc.)
+    while true; do
+        disk_number=$((disk_number + 1))
         ${UGREEN_LEDS_CLI} disk${disk_number} -on -color 0 255 0 -brightness 255 >/dev/null 2>&1
+        [ ${disk_number} -eq ${devices} ] && break
     done
 
 fi
