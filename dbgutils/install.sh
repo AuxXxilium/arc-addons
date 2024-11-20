@@ -7,15 +7,23 @@
 #
 
 function getlog() {
-  [ -z "${1}" ] && echo "Usage: ${0} {early|jrExit|rcExit|late|dsm}" && exit 1
+  if [ -z "${1}" ]; then
+    echo "Usage: ${0} {early|jrExit|rcExit|late|dsm}"
+    exit 1
+  fi
 
   WORK_PATH="/mnt/p1"
   mkdir -p "${WORK_PATH}"
 
   if ! mount | grep -q "${WORK_PATH}"; then
     LOADER_DISK_PART1="$(blkid -L ARC1)"
-    [ -z "${LOADER_DISK_PART1}" -a -b "/dev/synoboot1" ] && LOADER_DISK_PART1="/dev/synoboot1"
-    [ -z "${LOADER_DISK_PART1}" ] && echo "Boot disk not found" && exit 1
+    if [ -z "${LOADER_DISK_PART1}" ] && [ -b "/dev/synoboot1" ]; then
+      LOADER_DISK_PART1="/dev/synoboot1"
+    fi
+    if [ -z "${LOADER_DISK_PART1}" ]; then
+      echo "Boot disk not found"
+      exit 1
+    fi
 
     modprobe vfat
     echo 1 >/proc/sys/kernel/syno_install_flag

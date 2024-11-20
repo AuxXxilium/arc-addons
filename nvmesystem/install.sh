@@ -35,8 +35,8 @@ if [ "${1}" = "early" ]; then
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon nvmesystem - ${1}"
-  mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
+  mkdir -p "/tmpRoot/usr/rr/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/rr/addons/"
 
   # disk/shared_disk_info_enum.c::84 Failed to allocate list in SharedDiskInfoEnum, errno=0x900.
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
@@ -49,26 +49,27 @@ elif [ "${1}" = "late" ]; then
   rm -f "${SO_FILE}.tmp"
 
   # Create storage pool page without RAID type.
-  cp -pf /usr/bin/nvmesystem.sh /tmpRoot/usr/bin/nvmesystem.sh
-  [ ! -f "/tmpRoot/usr/bin/gzip" ] && cp -pf /usr/bin/gzip /tmpRoot/usr/bin/gzip
+  cp -vpf /usr/bin/nvmesystem.sh /tmpRoot/usr/bin/nvmesystem.sh
+
+  [ ! -f "/tmpRoot/usr/bin/gzip" ] && cp -vpf /usr/bin/gzip /tmpRoot/usr/bin/gzip
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
-  cat <<EOF >${DEST}
-[Unit]
-Description=Modify storage panel
-Wants=smpkg-custom-install.service pkgctl-StorageManager.service
-After=smpkg-custom-install.service
-After=storagepanel.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/nvmesystem.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
+  {
+    echo "[Unit]"
+    echo "Description=Modify storage panel(nvmesystem)"
+    echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
+    echo "After=smpkg-custom-install.service"
+    echo "After=storagepanel.service" # storagepanel
+    echo
+    echo "[Service]"
+    echo "Type=oneshot"
+    echo "RemainAfterExit=yes"
+    echo "ExecStart=/usr/bin/nvmesystem.sh"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/nvmesystem.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmesystem.service
@@ -77,12 +78,19 @@ EOF
   if cat /proc/version 2>/dev/null | grep -q 'RR@RR'; then
     ONBOOTUP=""
     ONBOOTUP="${ONBOOTUP}systemctl restart systemd-udev-trigger.service\n"
-    ONBOOTUP="${ONBOOTUP}echo \"DELETE FROM task WHERE task_name LIKE ''ARCONBOOTUPARC_UDEV'';\" | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db\n"
-    echo "insert ARCONBOOTUPARC_UDEV task to esynoscheduler.db"
+    ONBOOTUP="${ONBOOTUP}echo \"DELETE FROM task WHERE task_name LIKE ''RRONBOOTUPRR_UDEV'';\" | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db\n"
+
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
-DELETE FROM task WHERE task_name LIKE 'ARCONBOOTUPARC_UDEV';
-INSERT INTO task VALUES('ARCONBOOTUPARC_UDEV', '', 'bootup', '', 1, 0, 0, 0, '', 0, '$(echo -e ${ONBOOTUP})', 'script', '{}', '', '', '{}', '{}');
+    ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+    if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -qw "task"; then
+      echo "copy esynoscheduler.db"
+      mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
+      cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
+    fi
+    echo "insert RRONBOOTUPRR_UDEV task to esynoscheduler.db"
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+DELETE FROM task WHERE task_name LIKE 'RRONBOOTUPRR_UDEV';
+INSERT INTO task VALUES('RRONBOOTUPRR_UDEV', '', 'bootup', '', 1, 0, 0, 0, '', 0, '$(echo -e ${ONBOOTUP})', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
 

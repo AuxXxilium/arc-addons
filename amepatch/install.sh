@@ -15,19 +15,19 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/amepatch.service"
-  cat <<EOF >${DEST}
-[Unit]
-Description=addon amepatch
-After=syno-volume.target syno-space.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/amepatch.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
+  {
+    echo "[Unit]"
+    echo "Description=addon amepatch"
+    echo "After=syno-volume.target syno-space.target"
+    echo
+    echo "[Service]"
+    echo "Type=oneshot"
+    echo "RemainAfterExit=yes"
+    echo "ExecStart=/usr/bin/amepatch.sh"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
 elif [ "${1}" = "uninstall" ]; then

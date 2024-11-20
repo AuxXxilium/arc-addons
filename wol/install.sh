@@ -21,20 +21,19 @@ elif [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/wol.service"
-  cat <<EOF >${DEST}
-[Unit]
-Description=Force WOL on ethN
-After=multi-user.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/wol.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
+  {
+    echo "[Unit]"
+    echo "Description=Force WOL on ethN"
+    echo "After=multi-user.target"
+    echo
+    echo "[Service]"
+    echo "Type=oneshot"
+    echo "RemainAfterExit=yes"
+    echo "ExecStart=/usr/bin/wol.sh"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/wol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/wol.service
 elif [ "${1}" = "uninstall" ]; then

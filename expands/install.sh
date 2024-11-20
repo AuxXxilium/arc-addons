@@ -15,20 +15,19 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/expands.service"
-  cat <<EOF >${DEST}
-[Unit]
-Description=Expanded miscellaneous
-After=multi-user.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/expands.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
+  {
+    echo "[Unit]"
+    echo "Description=Expanded miscellaneous"
+    echo "After=multi-user.target"
+    echo
+    echo "[Service]"
+    echo "Type=oneshot"
+    echo "RemainAfterExit=yes"
+    echo "ExecStart=/usr/bin/expands.sh"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/expands.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/expands.service
 elif [ "${1}" = "uninstall" ]; then

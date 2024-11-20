@@ -15,20 +15,20 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/hdddb.service"
-  cat <<EOF >${DEST}
-[Unit]
-Description=HDDs/SSDs drives databases
-Wants=smpkg-custom-install.service pkgctl-StorageManager.service
-After=smpkg-custom-install.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/hdddb.sh -nrwpeS
-
-[Install]
-WantedBy=multi-user.target
-EOF
+  {
+    echo "[Unit]"
+    echo "Description=HDDs/SSDs drives databases"
+    echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
+    echo "After=smpkg-custom-install.service"
+    echo
+    echo "[Service]"
+    echo "Type=oneshot"
+    echo "RemainAfterExit=yes"
+    echo "ExecStart=/usr/bin/hdddb.sh -nrwpeS"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/hdddb.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/hdddb.service
 elif [ "${1}" = "uninstall" ]; then

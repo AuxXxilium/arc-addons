@@ -16,20 +16,19 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/photosfacepatch.service"
-  cat <<EOF >${DEST}
-[Unit]
-Description=Enable face recognition in Synology Photos
-After=syno-volume.target syno-space.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/photosfacepatch.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
+  {
+    echo "[Unit]"
+    echo "Description=Enable face recognition in Synology Photos"
+    echo "After=syno-volume.target syno-space.target"
+    echo
+    echo "[Service]"
+    echo "Type=oneshot"
+    echo "RemainAfterExit=yes"
+    echo "ExecStart=/usr/bin/photosfacepatch.sh"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/photosfacepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/photosfacepatch.service
 elif [ "${1}" = "uninstall" ]; then
