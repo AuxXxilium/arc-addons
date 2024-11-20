@@ -13,7 +13,9 @@ if [ "${1}" = "late" ]; then
 
   cp -pf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/scaling.sh"
   [ ! -f "/tmpRoot/usr/bin/echo" ] && cp -pf /usr/bin/echo /tmpRoot/usr/bin/echo || true
-  cp -pf "/usr/lib/modules/acpi_cpufreq.ko" "/tmpRoot/usr/lib/modules/acpi_cpufreq.ko"
+  if [ "${2}" = "schedutil" ] || [ "${2}" = "ondemand" ] || [ "${2}" = "conservative" ]; then
+    cp -pf "/usr/lib/modules/acpi_cpufreq.ko" "/tmpRoot/usr/lib/modules/acpi_cpufreq.ko"
+  fi
   [ "${2}" != "schedutil" ] && cp -pf "/usr/lib/modules/cpufreq_${2}.ko" "/tmpRoot/usr/lib/modules/cpufreq_${2}.ko"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
@@ -21,7 +23,7 @@ if [ "${1}" = "late" ]; then
   {
     echo "[Unit]"
     echo "Description=Enable CPU Freq scaling"
-    echo "After=syno-volume.target syno-space.target"
+    echo "After=multi-user.target"
     echo
     echo "[Service]"
     echo "User=root"
@@ -35,18 +37,19 @@ if [ "${1}" = "late" ]; then
   } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
-
-  if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
-    echo "copy esynoscheduler.db"
-    mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-    cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
-  fi
-  echo "insert scaling... task to esynoscheduler.db"
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+  if [ "${2}" = "schedutil" ] || [ "${2}" = "ondemand" ] || [ "${2}" = "conservative" ]; then
+    if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+      echo "copy esynoscheduler.db"
+      mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
+      cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+    fi
+    echo "insert scaling... task to esynoscheduler.db"
+    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+      /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
 DELETE FROM task WHERE task_name LIKE 'CPUFreqscaling';
 INSERT INTO task VALUES('CPUFreqscaling', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/scaling.sh ${2}', 'script', '{}', '', '', '{}', '{}');
 EOF
+  fi
 
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing cpufreqscalingscaling - ${1}"
