@@ -7,20 +7,23 @@
 #
 
 TEMP="on"
-VENDOR=""                                                                                     # str
-FAMILY=""                                                                                     # str
-SERIES="$(echo $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2))"       # str
-CORES="$(grep 'cpu cores' /proc/cpuinfo 2>/dev/null | wc -l)"                                 # str
+VENDOR=""                                                                                  # str
+FAMILY=""                                                                                  # str
+SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)"          # str
+CORES="$(grep -c 'cpu cores' /proc/cpuinfo 2>/dev/null)"                                   # str
 SPEED="$(dmidecode 2>/dev/null | grep MHz | head -1 | cut -d: -f2 | cut -d ' ' -f2))" # int
 if [ -z "${SPEED}" ] || [[ ! "${SPEED}" =~ ^[0-9]+$ ]]; then
-  SPEED="$(echo $(grep 'MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | cut -d. -f1))" # int
+  SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)"    # int
 fi
 
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
 
-[ ! -f "${FILE_JS}" -a ! -f "${FILE_GZ}" ] && echo "File ${FILE_JS} does not exist" && exit 0
+if [ ! -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ]; then
+  echo "File ${FILE_JS} does not exist"
+  exit 0
+fi
 
 restoreCpuinfo() {
   if [ -f "${FILE_GZ}.bak" ]; then
@@ -121,7 +124,7 @@ sed -i "s/\(\(,\)\|\((\)\).\.cpu_clock_speed/\1${SPEED//\"/}/g" "${FILE_JS}"
 
 CARDN=$(ls -d /sys/class/drm/card* 2>/dev/null | head -1)
 if [ -d "${CARDN}" ]; then
-  PCIDN="$(cat "${CARDN}/device/uevent" 2>/dev/null | grep -oP 'DEVNAME=\K.*')"
+  PCIDN="$(awk -F= '/DEVNAME/ {print $2}' "${CARDN}/device/uevent" 2>/dev/null)"
   LNAME="$(lspci -Q -s ${PCIDN:-"99:99.9"} 2>/dev/null | sed "s/.*: //")"
   # LABLE="$(cat "/sys/class/drm/card0/device/label" 2>/dev/null)"
   CLOCK="$(cat "${CARDN}/gt_max_freq_mhz" 2>/dev/null)"
@@ -139,8 +142,6 @@ if [ "${TEMP^^}" = "ON" ]; then
   sed -i 's/,C,D);/,C,D+" \| "+t.gpu.temperature_c+" °C");/g' "${FILE_JS}"
 fi
 
-if [ -f "${FILE_GZ}.bak" ]; then
-  gzip -c "${FILE_JS}" >"${FILE_GZ}"
-fi
+[ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
 exit 0

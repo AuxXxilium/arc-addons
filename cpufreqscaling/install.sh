@@ -18,23 +18,23 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
-  cat <<EOF >${DEST}
-[Unit]
-Description=Enable CPU Freq scaling
-After=syno-volume.target syno-space.target
-
-[Service]
-User=root
-Type=simple
-Restart=on-failure
-RestartSec=10
-ExecStart=/usr/sbin/scaling.sh ${2}
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-    ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
+  {
+    echo "[Unit]"
+    echo "Description=Enable CPU Freq scaling"
+    echo "After=syno-volume.target syno-space.target"
+    echo
+    echo "[Service]"
+    echo "User=root"
+    echo "Type=simple"
+    echo "Restart=on-failure"
+    echo "RestartSec=10"
+    echo "ExecStart=/usr/sbin/scaling.sh ${2}"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
 
   if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
     echo "copy esynoscheduler.db"

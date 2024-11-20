@@ -23,21 +23,20 @@ elif [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/rndis.service"
-  cat <<EOF >${DEST}
-[Unit]
-Description=Android USB Network Adapter
-After=multi-user.target
-ConditionPathExists=/sys/class/net/usb0
-
-[Service]
-Type=simple
-Restart=always
-ExecStart=/usr/bin/rndis.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
+  {
+    echo "[Unit]"
+    echo "Description=Android USB Network Adapter"
+    echo "After=multi-user.target"
+    echo "ConditionPathExists=/sys/class/net/usb0"
+    echo
+    echo "[Service]"
+    echo "Type=simple"
+    echo "Restart=always"
+    echo "ExecStart=/usr/bin/rndis.sh"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/rndis.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/rndis.service
 elif [ "${1}" = "uninstall" ]; then

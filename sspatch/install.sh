@@ -19,19 +19,19 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/sspatch.service"
-  cat <<EOF >${DEST}
-[Unit]
-Description=addon sspatch
-After=multi-user.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/sspatch.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
+  {
+    echo "[Unit]"
+    echo "Description=addon sspatch"
+    echo "After=multi-user.target"
+    echo
+    echo "[Service]"
+    echo "Type=oneshot"
+    echo "RemainAfterExit=yes"
+    echo "ExecStart=/usr/bin/sspatch.sh"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/sspatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sspatch.service
 elif [ "${1}" = "uninstall" ]; then

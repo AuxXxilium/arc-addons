@@ -31,21 +31,21 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   # All on
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
-  cat <<EOF >${DEST}
-[Unit]
-Description=Adds uGreen LED control
-Wants=smpkg-custom-install.service pkgctl-StorageManager.service
-After=smpkg-custom-install.service
-
-[Service]
-User=root
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/ledcontrol.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
+  {
+    echo "[Unit]"
+    echo "Description=Adds uGreen LED control"
+    echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
+    echo "After=smpkg-custom-install.service"
+    echo
+    echo "[Service]"
+    echo "User=root"
+    echo "Type=oneshot"
+    echo "RemainAfterExit=yes"
+    echo "ExecStart=/usr/bin/ledcontrol.sh"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/ledcontrol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service
 elif [ "${1}" = "uninstall" ]; then
