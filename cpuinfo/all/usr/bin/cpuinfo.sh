@@ -11,10 +11,7 @@ VENDOR=""                                                                       
 FAMILY=""                                                                                  # str
 SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)"          # str
 CORES="$(grep -c 'cpu cores' /proc/cpuinfo 2>/dev/null)"                                   # str
-SPEED="$(dmidecode 2>/dev/null | grep MHz | head -1 | cut -d: -f2 | cut -d ' ' -f2))" # int
-if [ -z "${SPEED}" ] || [[ ! "${SPEED}" =~ ^[0-9]+$ ]]; then
-  SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)"    # int
-fi
+SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)"    # int
 
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
