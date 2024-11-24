@@ -10,7 +10,7 @@ args=()
 
 HBA=false
 for argv in "$@"; do
-  if [ -e "${argv}" ] && readlink -f "/sys/block/$(basename "${argv}")/device" 2>/dev/null | grep -q "expander"; then
+  if [ -e "${argv}" ] && ! readlink -f "/sys/block/$(basename "${argv}")/device" 2>/dev/null | grep -q "/ata"; then
     HBA=true
   fi
 done

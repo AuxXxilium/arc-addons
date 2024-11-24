@@ -7,11 +7,11 @@
 #
 
 TEMP="on"
-VENDOR=""                                                                                  # str
-FAMILY=""                                                                                  # str
-SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)"          # str
-CORES="$(grep -c 'cpu cores' /proc/cpuinfo 2>/dev/null)"                                   # str
-SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)"    # int
+VENDOR=""                                                                               # str
+FAMILY=""                                                                               # str
+SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)"       # str
+CORES="$(grep -c 'cpu cores' /proc/cpuinfo 2>/dev/null)"                                # str
+SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)" # int
 
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
@@ -30,6 +30,12 @@ restoreCpuinfo() {
   elif [ -f "${FILE_JS}.bak" ]; then
     mv -f "${FILE_JS}.bak" "${FILE_JS}"
   fi
+  if ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
+    pkill -f "/usr/sbin/synoscgiproxy"
+  fi
+  [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
+  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
+  systemctl reload nginx
 }
 
 if options="$(getopt -o t:v:f:s:c:p:rh --long temp:,vendor:,family:,series:,cores:,speed:,restore,help -- "$@")"; then
@@ -113,6 +119,11 @@ fi
 
 echo "CPU Info set to: \"TEMP:${TEMP}\" \"${VENDOR}\" \"${FAMILY}\" \"${SERIES}\" \"${CORES}\" \"${SPEED}\""
 
+if [ "${TEMP^^}" = "ON" ]; then
+  sed -i 's/,t,i,s)}/,t,i,s+" \| "+e.sys_temp+" °C")}/g' "${FILE_JS}"
+  sed -i 's/,C,D);/,C,D+" \| "+t.gpu.temperature_c+" °C");/g' "${FILE_JS}"
+fi
+
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}"
@@ -134,11 +145,24 @@ if [ -d "${CARDN}" ]; then
   fi
 fi
 
-if [ "${TEMP^^}" = "ON" ]; then
-  sed -i 's/,t,i,s)}/,t,i,s+" \| "+e.sys_temp+" °C")}/g' "${FILE_JS}"
-  sed -i 's/,C,D);/,C,D+" \| "+t.gpu.temperature_c+" °C");/g' "${FILE_JS}"
-fi
-
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
+
+if "/usr/sbin/synoscgiproxy" -t >/dev/null 2>&1; then
+  if ! ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
+    "/usr/sbin/synoscgiproxy" &
+    [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_arc.sock;|' /etc/nginx/nginx.conf
+    [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
+    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_arc.sock;|' /usr/syno/share/nginx/nginx.mustache
+    systemctl reload nginx
+  fi
+else
+  if ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
+    pkill -f "/usr/sbin/synoscgiproxy"
+  fi
+  [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
+  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
+  systemctl reload nginx
+fi
 
 exit 0
