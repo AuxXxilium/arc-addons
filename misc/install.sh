@@ -166,6 +166,9 @@ elif [ "${1}" = "late" ]; then
   echo "Killing dufs ..."
   /usr/bin/killall dufs 2>/dev/null || true
 
+  cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
+  cp -vpdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/
+
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
   # CPU Scaling Driver
