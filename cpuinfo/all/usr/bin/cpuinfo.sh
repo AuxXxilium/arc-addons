@@ -22,6 +22,9 @@ if [ ! -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ]; then
   exit 0
 fi
 
+[ -f "/etc/nginx/nginx.conf.bak" ] && cp -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
+[ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
+
 restoreCpuinfo() {
   if [ -f "${FILE_GZ}.bak" ]; then
     rm -f "${FILE_JS}" "${FILE_GZ}"
