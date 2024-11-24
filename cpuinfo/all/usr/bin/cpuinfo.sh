@@ -151,9 +151,9 @@ if "/usr/sbin/synoscgiproxy" -t >/dev/null 2>&1; then
   if ! ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
     "/usr/sbin/synoscgiproxy" &
     [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_arc.sock;|' /etc/nginx/nginx.conf
+    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' /etc/nginx/nginx.conf
     [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
-    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_arc.sock;|' /usr/syno/share/nginx/nginx.mustache
+    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' /usr/syno/share/nginx/nginx.mustache
     systemctl reload nginx
   fi
 else
