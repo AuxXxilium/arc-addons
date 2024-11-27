@@ -292,6 +292,15 @@ elif [ "${1}" = "late" ]; then
     echo '[{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/tmpRoot/usr/syno/etc/packages/feeds
   fi
 
+  # logger
+  SO_FILE="/tmpRoot/usr/lib/libsynosata.so.1"
+  [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
+  cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
+  xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
+    sed "s/8d15ba160000bf03000000e8c0c8ffff/8d15ba160000bf030000009090909090/" |
+    xxd -r -p >"${SO_FILE}" 2>/dev/null
+  rm -f "${SO_FILE}.tmp"
+
   # Copy Loader Reboot
   cp -pf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -pf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
