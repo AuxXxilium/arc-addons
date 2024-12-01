@@ -34,8 +34,7 @@ if [ "${1}" = "late" ]; then
   {
     echo "[Unit]"
     echo "Description=Adds uGreen LED control"
-    echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
-    echo "After=smpkg-custom-install.service"
+    echo "After=multi-user.target"
     echo
     echo "[Service]"
     echo "User=root"
