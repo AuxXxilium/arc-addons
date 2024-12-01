@@ -38,7 +38,6 @@ if [ "${1}" = "late" ]; then
     echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
     echo "After=smpkg-custom-install.service"
     echo "After=storagepanel.service" # storagepanel
-    echo "After=nvmesystem.service"   # nvmesystem
     echo
     echo "[Service]"
     echo "Type=oneshot"
