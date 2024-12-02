@@ -1,6 +1,6 @@
 version: 1
-name: beep
-description: "Beep at startup and shutdown (requires motherboard with buzzer)"
+name: additional
+description: "Additional unnecessary stuff"
 system: false
 beta: false
 target: system

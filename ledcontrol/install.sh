@@ -13,13 +13,11 @@ if [ "${1}" = "late" ]; then
   
   cp -pf /usr/bin/ledcontrol.sh /tmpRoot/usr/bin/ledcontrol.sh
   cp -pf /usr/bin/ugreen_leds_cli /tmpRoot/usr/bin/ugreen_leds_cli
-  cp -pf /usr/bin/ugreen-diskiomon /tmpRoot/usr/bin/ugreen-diskiomon
-  cp -pf /usr/bin/ugreen-netdevmon /tmpRoot/usr/bin/ugreen-netdevmon
-  cp -pf /usr/bin/ugreen-probe-leds /tmpRoot/usr/bin/ugreen-probe-leds
-  cp -pf /usr/bin/led.conf /tmpRoot/usr/bin/led.conf
   cp -pf /usr/bin/modules/i2c-algo-bit.ko /tmpRoot/usr/bin/modules/i2c-algo-bit.ko
   cp -pf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/i2c-i801.ko
   cp -pf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/i2c-smbus.ko
+  chmod a+x /tmpRoot/usr/bin/ledcontrol.sh
+  chmod a+x /tmpRoot/usr/bin/ugreen_leds_cli
 
   insmod i2c-algo-bit
   insmod i2c-i801
@@ -40,7 +38,7 @@ if [ "${1}" = "late" ]; then
     echo "User=root"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/ledcontrol.sh"
+    echo "ExecStart=/usr/bin/ledcontrol.sh ${2}"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
