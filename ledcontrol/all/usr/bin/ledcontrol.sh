@@ -7,6 +7,7 @@
 #
 
 UGREEN_LEDS_CLI="/usr/bin/ugreen_leds_cli"
+LEDFAIL=0
 
 if [ "${1}" = "on" ]; then
     echo "Enable Ugreen LED"
@@ -22,11 +23,12 @@ else
 
     # Check network status, red blinking alert for network disconnection
     echo "Checking network status..."
-    gw=$(ip route | awk '/default/ { print $3 }')
-    if ping -q -c 1 -W 1 $gw >/dev/null; then
+    gw=$(ip route | awk '/default/ {print$3}')
+    if ping -q -c 1 -W 1 ${gw} >/dev/null; then
         devices[1]=w
     else
         devices[1]=r
+        LEDFAIL=1
     fi
 
     # Map sataX to hardware devices
@@ -34,29 +36,29 @@ else
 
     echo "Mapping devices..."
     for devpath in /sys/block/sata*; do
-        dev=$(basename $devpath)
-        hctl=$(basename $(readlink $devpath/device))
+        dev=$(basename ${devpath})
+        hctl=$(basename $(readlink ${devpath}/device))
         hwmap[$dev]=${hctl:0:1}
-        echo "Mapped $dev to ${hctl:0:1}"
+        echo "Mapped ${dev} to ${hctl:0:1}"
     done
 
     # Print hardware mapping (hwmap) for verification
     echo "Hardware mapping (hwmap):"
     for key in "${!hwmap[@]}"; do
-        echo "$key: ${hwmap[$key]}"
+        echo "${key}: ${hwmap[$key]}"
     done
 
     # Check disk status and update device status array
     echo "Checking disk status..."
     for dev in "${!hwmap[@]}"; do
         # Use udevadm to check disk status
-        if udevadm info --query=all --name=/dev/$dev &> /dev/null; then
+        if udevadm info --query=all --name=/dev/${dev} &> /dev/null; then
             status="ONLINE"
         else
             status="OFFLINE"
         fi
         index=$((${hwmap[$dev]} + 2))
-        echo "Device $dev status $status mapped to index $index"
+        echo "Device ${dev} status ${status} mapped to index ${index}"
 
         if [ $status = "ONLINE" ]; then
             devices[$index]=b
@@ -69,8 +71,9 @@ else
     cpu_temp=$(sensors | awk '/Core 0/ {print$3}' | cut -c2- | cut -d'.' -f1)
 
     # Set power LED status based on CPU temperature, red blinking alert for 90 degrees
-    if [ "$cpu_temp" -ge 90 ]; then
+    if [ ${cpu_temp} -ge 90 ]; then
         devices[0]=r
+        LEDFAIL=1
     else
         devices[0]=g
     fi
@@ -79,8 +82,9 @@ else
     for i in "${!hwmap[@]}"; do
         index=$((${hwmap[$i]} + 2))
         hdd_temp=$(cat /run/synostorage/disks/sata$((${hwmap[$i]} + 1))/temperature)
-        if [ "$hdd_temp" -ge 50 ]; then
+        if [ ${hdd_temp} -ge 50 ]; then
             devices[$index]=r
+            LEDFAIL=1
         else
             devices[$index]=b
         fi
@@ -114,4 +118,4 @@ else
         esac
     done
 fi
-exit 0
+[ ${LEDFAIL} -eq 1 ] && exit 1 || exit 0
