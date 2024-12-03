@@ -7,7 +7,7 @@
 #
 
 if [ "${1}" = "late" ]; then
-  echo "Installing addon additional - ${1}"
+  echo "Installing addon optional - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
@@ -21,7 +21,7 @@ if [ "${1}" = "late" ]; then
   rm -f "${SO_FILE}.tmp"
   
 elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon additional - ${1}"
+  echo "Installing addon optional - ${1}"
 
   SO_FILE="/tmpRoot/usr/lib/libsynosata.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -pf "${SO_FILE}.bak" "${SO_FILE}"
