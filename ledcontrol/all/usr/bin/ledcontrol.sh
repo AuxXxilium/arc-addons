@@ -23,7 +23,7 @@ else
 
     # Check network status, red blinking alert for network disconnection
     echo "Checking network status..."
-    gw=$(ip route | awk '/default/ {print$3}')
+    gw=$(ip route | awk '/default/ {print $3}')
     if ping -q -c 1 -W 1 ${gw} >/dev/null; then
         devices[1]=w
     else
@@ -70,7 +70,7 @@ else
     if [ -f "/usr/bin/sensors" ]; then
         echo "Checking CPU temperature..."
         # Get CPU temperature (requires sensors plugin)
-        cpu_temp=$(sensors | awk '/Core 0/ {print$3}' | cut -c2- | cut -d'.' -f1)
+        cpu_temp=$(sensors | awk '/Core 0/ {print $3}' | cut -c2- | cut -d'.' -f1)
 
         # Set power LED status based on CPU temperature, red blinking alert for 90 degrees
         if [ ${cpu_temp} -ge 90 ]; then
