@@ -67,15 +67,21 @@ else
         fi
     done
 
-    # Get CPU temperature (requires sensors plugin)
-    cpu_temp=$(sensors | awk '/Core 0/ {print$3}' | cut -c2- | cut -d'.' -f1)
+    if [ -f "/usr/bin/sensors" ]; then
+        echo "Checking CPU temperature..."
+        # Get CPU temperature (requires sensors plugin)
+        cpu_temp=$(sensors | awk '/Core 0/ {print$3}' | cut -c2- | cut -d'.' -f1)
 
-    # Set power LED status based on CPU temperature, red blinking alert for 90 degrees
-    if [ ${cpu_temp} -ge 90 ]; then
-        devices[0]=r
-        LEDFAIL=1
+        # Set power LED status based on CPU temperature, red blinking alert for 90 degrees
+        if [ ${cpu_temp} -ge 90 ]; then
+            devices[0]=r
+            LEDFAIL=1
+        else
+            devices[0]=g
+        fi
     else
-        devices[0]=g
+        echo "Skipping CPU temperature check..."
+        devices[0]=w
     fi
 
     # Set disk LED status based on disk temperature, red blinking alert for 50 degrees
