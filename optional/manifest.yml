@@ -1,6 +1,6 @@
 version: 1
-name: additional
-description: "Additional unnecessary stuff"
+name: optional
+description: "Optional unnecessary stuff"
 system: false
 beta: false
 target: system
