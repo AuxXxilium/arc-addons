@@ -10,19 +10,19 @@ UGREEN_LEDS_CLI="/usr/bin/ugreen_leds_cli"
 
 if [ "${1}" = "on" ]; then
     echo "Enable Ugreen LED"
-    ${UGREEN_LEDS_CLI} all -on -color 255 255 255 -brightness 255
+    ${UGREEN_LEDS_CLI} all -on -color 255 255 255 -brightness 26
 elif [ "${1}" = "off" ]; then
     echo "Disable Ugreen LED"
     ${UGREEN_LEDS_CLI} all -off
 else
     # Initialize device status array
-    devices=(p f x x x x x x x x)
+    devices=(w x x x x x x x x x)
     # Initialize device mapping
     map=(power netdev disk1 disk2 disk3 disk4 disk5 disk6 disk7 disk8)
 
     # Check network status, red blinking alert for network disconnection
     echo "Checking network status..."
-    gw=$(ip route | awk '/default/ { print$3 }')
+    gw=$(ip route | awk '/default/ { print $3 }')
     if ping -q -c 1 -W 1 $gw >/dev/null; then
         devices[1]=w
     else
@@ -43,7 +43,7 @@ else
     # Print hardware mapping (hwmap) for verification
     echo "Hardware mapping (hwmap):"
     for key in "${!hwmap[@]}"; do
-        echo "$key:${hwmap[$key]}"
+        echo "$key: ${hwmap[$key]}"
     done
 
     # Check disk status and update device status array
@@ -61,7 +61,7 @@ else
         if [ $status = "ONLINE" ]; then
             devices[$index]=b
         else
-            devices[$index]=o
+            devices[$index]=x
         fi
     done
 
@@ -89,7 +89,7 @@ else
     # Output final device status and control LED lights
     echo "Final device status:"
     for i in "${!devices[@]}"; do
-        echo "$i:${devices[$i]}"
+        echo "$i: ${devices[$i]}"
         case "${devices[$i]}" in
             r)
                 echo "Set ${map[$i]} to red blinking"
@@ -107,7 +107,7 @@ else
                 echo "Set ${map[$i]} to white solid"
                 ${UGREEN_LEDS_CLI} ${map[$i]} -color 255 255 255 -on -brightness 64
                 ;;
-            o)
+            x)
                 echo "Turn off ${map[$i]}"
                 ${UGREEN_LEDS_CLI} ${map[$i]} -off
                 ;;
