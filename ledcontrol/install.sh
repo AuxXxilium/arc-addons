@@ -36,8 +36,9 @@ if [ "${1}" = "late" ]; then
     echo
     echo "[Service]"
     echo "User=root"
-    echo "Type=oneshot"
-    echo "RemainAfterExit=yes"
+    echo "Type=simple"
+    echo "Restart=on-failure"
+    echo "RestartSec=10"
     echo "ExecStart=/usr/bin/ledcontrol.sh ${2}"
     echo
     echo "[Install]"
