@@ -306,6 +306,27 @@ function dtModel() {
       echo "    };" >>${DEST}
     done
     echo "};" >>${DEST}
+  else
+    MAXDISKS=$(grep -c "internal_slot@" "${DEST}" 2>/dev/null)
+    if _check_post_k "rd" "maxdisks"; then
+      MAXDISKS=$(($(_get_conf_kv rd maxdisks)))
+      echo "get maxdisks=${MAXDISKS}"
+    else
+      # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
+      # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
+      [ ${MAXDISKS:-0} -lt 26 ] && MAXDISKS=26
+    fi
+    # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
+    if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
+      MAXDISKS=26
+      echo "set maxdisks=26 [${MAXDISKS}]"
+    fi
+    _set_conf_kv rd "maxdisks" "${MAXDISKS}"
+    echo "maxdisks=${MAXDISKS}"
+    if grep -q "nvme_slot@" "${DEST}" 2>/dev/null; then
+      _set_conf_kv rd "supportnvme" "yes"
+      _set_conf_kv rd "support_m2_pool" "yes"
+    fi
   fi
   dtc -I dts -O dtb ${DEST} >/etc/model.dtb
   cp -pf /etc/model.dtb /run/model.dtb
