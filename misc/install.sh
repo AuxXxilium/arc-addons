@@ -139,10 +139,10 @@ elif [ "${1}" = "patches" ]; then
   # Set static IP from cmdline
   if grep -q 'network.' /proc/cmdline; then
     for I in $(grep -oE 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
-      MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/' | tr '[:lower:]' '[:upper:]')"
+      MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/' | tr '[:upper:]' '[:lower:]')"
       IPRS="$(echo "${I}" | cut -d= -f2)"
       for ETH in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
-        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/' | tr '[:lower:]' '[:upper:]')
+        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/' | tr '[:upper:]' '[:lower:]')
         if [ "${MACR}" = "${MACX}" ]; then
           echo "Setting IP for ${ETH} to ${IPRS}"
           mkdir -p /etc/sysconfig/network-scripts
@@ -166,8 +166,8 @@ elif [ "${1}" = "late" ]; then
   echo "Killing dufs ..."
   /usr/bin/killall dufs 2>/dev/null || true
 
-  cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
-  cp -vpdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/
+  cp -pf /usr/bin/beep /tmpRoot/usr/bin/beep
+  cp -pdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/
 
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
@@ -245,6 +245,15 @@ elif [ "${1}" = "late" ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege
   fi
 
+  # Arc Control Fix
+  if [ -d /tmpRoot/var/packages/arc-control ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege
+    chmod u+s /usr/bin/smartctl
+    chmod u+s /usr/bin/hdparm
+    chmod u+s /usr/sbin/nvme
+    chmod u+s /usr/syno/bin/synodisk
+  fi
+
   # SD Card
   [ ! -f /tmpRoot/usr/lib/udev/script/sdcard.sh.bak ] && cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
   echo -en '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
@@ -275,6 +284,6 @@ elif [ "${1}" = "late" ]; then
   fi
 
   # Copy Loader Reboot
-  cp -pf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
-  cp -pf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
+  cp -f /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
+  cp -f /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
 fi
