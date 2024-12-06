@@ -173,7 +173,7 @@ elif [ "${1}" = "late" ]; then
   modprobe acpi-cpufreq
   # CPU Scaling Driver
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
-    CPUFREQ=$(ls -ltr /sys/devices/system/cpu/cpufreq/* 2>/dev/null | wc -l)
+    CPUFREQ=$(ls -l /sys/devices/system/cpu/cpufreq/*/* 2>/dev/null | wc -l)
     if [ ${CPUFREQ} -eq 0 ]; then
       echo "CPU does NOT support CPU Performance Scaling, disabling"
       sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
@@ -188,16 +188,14 @@ elif [ "${1}" = "late" ]; then
 
   # CPU Crypto Support Check
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf ]; then
-    CPUFLAGS=$(cat /proc/cpuinfo 2>/dev/null | grep flags | grep sse4_2 | wc -l)
-    if [ ${CPUFLAGS} -gt 0 ]; then
+    if grep flags /proc/cpuinfo 2>/dev/null | grep -qw sse4_2; then
       echo "CPU Supports SSE4.2, crc32c-intel should load"
     else
       echo "CPU does NOT support SSE4.2, crc32c-intel will not load, disabling"
       sed -i 's/^crc32c-intel/# crc32c-intel/g' /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf
     fi
 
-    CPUFLAGS=$(cat /proc/cpuinfo 2>/dev/null | grep flags | grep aes | wc -l)
-    if [ ${CPUFLAGS} -gt 0 ]; then
+    if grep flags /proc/cpuinfo 2>/dev/null | grep -qw aes; then
       echo "CPU Supports AES, aesni-intel should load"
     else
       echo "CPU does NOT support AES, aesni-intel will not load, disabling"
@@ -208,8 +206,7 @@ elif [ "${1}" = "late" ]; then
 
   # Nvidia GPU Check
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf ]; then
-    NVIDIADEV=$(cat /proc/bus/pci/devices 2>/dev/null | grep -i 10de | wc -l)
-    if [ ${NVIDIADEV} -eq 0 ]; then
+    if ! grep -iq 10de /proc/bus/pci/devices 2>/dev/null; then
       echo "NVIDIA GPU is not detected, disabling "
       sed -i 's/^nvidia/# nvidia/g' /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf
       sed -i 's/^nvidia-uvm/# nvidia-uvm/g' /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf
@@ -269,21 +266,6 @@ elif [ "${1}" = "late" ]; then
         cp -pf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/
       fi
     done
-  fi
-
-  # syslog-ng
-  if [ -f /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf ]; then
-    cp -pfp /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf.bak
-    sed -i 's/destination(d_scemd)/flags(final)/g' /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf
-  else
-    echo "scemd.conf does not exist."
-  fi
-
-  if [ -f /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf ]; then
-    cp -pfp /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf.bak
-    sed -i 's/destination(d_synosystemd)/flags(final)/g; s/destination(d_systemd)/flags(final)/g' /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf
-  else
-    echo "synosystemd.conf does not exist."
   fi
 
   # Community Packages
