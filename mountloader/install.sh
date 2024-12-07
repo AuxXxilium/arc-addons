@@ -29,7 +29,7 @@ if [ "${1}" = "late" ]; then
 DELETE FROM task WHERE task_name LIKE 'MountLoaderDisk';
 INSERT INTO task VALUES('MountLoaderDisk', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh mountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'UnMountLoaderDisk';
-INSERT INTO task VALUES('UnMountLoaderDisk', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh unmountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('UnMountLoaderDisk', '', 'shutdown', '', 1, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh unmountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
 EOF
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon mountloader - ${1}"
