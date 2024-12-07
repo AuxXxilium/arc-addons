@@ -248,10 +248,10 @@ elif [ "${1}" = "late" ]; then
   # Arc Control Fix
   if [ -d /tmpRoot/var/packages/arc-control ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege
-    chmod u+s /usr/bin/smartctl
-    chmod u+s /usr/bin/hdparm
-    chmod u+s /usr/sbin/nvme
-    chmod u+s /usr/syno/bin/synodisk
+    chmod u+s /tmpRoot/usr/bin/smartctl
+    chmod u+s /tmpRoot/usr/bin/hdparm
+    chmod u+s /tmpRoot/usr/sbin/nvme
+    chmod u+s /tmpRoot/usr/syno/bin/synodisk
   fi
 
   # SD Card
