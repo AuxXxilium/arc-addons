@@ -250,6 +250,7 @@ elif [ "${1}" = "late" ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege
     chmod u+s /tmpRoot/usr/bin/smartctl
     chmod u+s /tmpRoot/usr/bin/hdparm
+    chmod u+s /tmpRoot/usr/bin/lspci
     chmod u+s /tmpRoot/usr/sbin/nvme
     chmod u+s /tmpRoot/usr/syno/bin/synodisk
   fi
