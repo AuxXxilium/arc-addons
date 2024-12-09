@@ -12,8 +12,6 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   cp -pf /usr/bin/yq /tmpRoot/usr/bin/yq
-  cp -pf /usr/bin/cpio /tmpRoot/usr/bin/cpio
-  cp -pf /usr/bin/unzip /tmpRoot/usr/bin/unzip
   cp -pf /usr/bin/arc-loaderdisk.sh /tmpRoot/usr/bin/arc-loaderdisk.sh
   
   rm -f /tmpRoot/usr/arc/.mountloader
@@ -29,14 +27,11 @@ if [ "${1}" = "late" ]; then
 DELETE FROM task WHERE task_name LIKE 'MountLoaderDisk';
 INSERT INTO task VALUES('MountLoaderDisk', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh mountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'UnMountLoaderDisk';
-INSERT INTO task VALUES('UnMountLoaderDisk', '', 'shutdown', '', 1, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh unmountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('UnMountLoaderDisk', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh unmountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
 EOF
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon mountloader - ${1}"
 
-  #rm -f "/tmpRoot/usr/bin/yq"
-  #rm -f "/tmpRoot/lib/usr/bin/cpio"
-  #rm -f "/tmpRoot/lib/usr/bin/unzip"
   rm -f "/tmpRoot/usr/bin/arc-loaderdisk.sh"
 
   if [ -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then

@@ -13,7 +13,7 @@ if [ "${1}" = "late" ]; then
 
   # logger
   SO_FILE="/tmpRoot/usr/lib/libsynosata.so.1"
-  [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
+  [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
     sed "s/8d15ba160000bf03000000e8c0c8ffff/8d15ba160000bf030000009090909090/" |
