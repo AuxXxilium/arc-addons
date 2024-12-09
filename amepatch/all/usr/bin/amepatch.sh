@@ -25,10 +25,10 @@ if [ -d "/var/packages/CodecPack" ]; then
     lic_backup="/usr/syno/etc/license/data/ame/offline_license.json.orig"
  
     if [ ! -f "$so_backup" ]; then
-        cp -p "$so" "$so_backup"
+        cp -pf "$so" "$so_backup"
     fi
     if [ ! -f "$lic_backup" ]; then
-        cp -p "$lic" "$lic_backup"
+        cp -pf "$lic" "$lic_backup"
     fi
 
     hash_to_check="$(md5sum -b "$so" | awk '{print $1}')"
@@ -61,16 +61,16 @@ if [ -d "/var/packages/CodecPack" ]; then
     rm -f "${lic}"
     echo "${content}" >"${lic}"
 
-    if "$cp_usr_path/bin/synoame-bin-check-license"; then
+    if $cp_usr_path/bin/synoame-bin-check-license; then
         sleep 3
-        "$cp_usr_path/bin/synoame-bin-auto-install-needed-codec"
+        $cp_usr_path/bin/synoame-bin-auto-install-needed-codec
         echo -e "AME Patch: Successful!"
     else
         if [ -f "$so_backup" ]; then
-            mv -f "$so_backup" "$so"
+            cp -pf "$so_backup" "$so"
         fi
         if [ -f "$lic_backup" ]; then
-            mv -f "$lic_backup" "$lic"
+            cp -pf "$lic_backup" "$lic"
         fi
         echo -e "AME Patch: Unsuccessful!"
         exit 1

@@ -16,7 +16,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
+  SO_FILE="/tmpRoot/usr/lib64/libhwcontrol.so.1"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
 
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
@@ -28,7 +28,7 @@ if [ "${1}" = "late" ]; then
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon nvmevolume - ${1}"
 
-  SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
+  SO_FILE="/tmpRoot/usr/lib64/libhwcontrol.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
