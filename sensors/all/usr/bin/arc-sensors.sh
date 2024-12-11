@@ -34,14 +34,14 @@ echo "$@" | grep -qw "\-f" && rm -f /etc/fancontrol
 if [ ! -f /etc/fancontrol ]; then
   # Or use pwmconfig to generate /etc/fancontrol interactively.
   local DEVPATH DEVNAME FCTEMPS FCFANS MINTEMP MAXTEMP MINSTART MINSTOP
-  local CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | sed -n -e 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
+  local CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
   for P in $(find "/sys/devices/platform/" -name "temp1_input"); do
-    D="$(echo "${P}" | sed -n -e 's|.*/\(devices/platform/[^/]*\)/.*|\1|p')"
-    I="$(echo "${P}" | sed -n -e 's|.*hwmon\([0-9]\).*|\1|p')"
+    D="$(echo "${P}" | sed -n 's|.*/\(devices/platform/[^/]*\)/.*|\1|p')"
+    I="$(echo "${P}" | sed -n 's|.*hwmon\([0-9]\).*|\1|p')"
     DEVPATH="${DEVPATH} hwmon${I}=${D}"
     DEVNAME="${DEVNAME} hwmon${I}=$(cat /sys/${D}/*/*/name)"
     for F in $(find "/sys/${D}" -name "fan[0-9]_input"); do
-      local IDX="$(echo "${F}" | sed -n -e 's|.*fan\([0-9]\)_input|\1|p')"
+      local IDX="$(echo "${F}" | sed -n 's|.*fan\([0-9]\)_input|\1|p')"
       FCTEMPS="${FCTEMPS} hwmon${I}/pwm${IDX}=${CORETEMP}"
       FCFANS="${FCFANS} hwmon${I}/pwm${IDX}=hwmon${I}/fan${IDX}_input"
       MINTEMP="${MINTEMP} hwmon${I}/pwm${IDX}=30"
