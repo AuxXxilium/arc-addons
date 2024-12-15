@@ -1,0 +1,20 @@
+version: 1
+name: arccontrol
+description: "Arc Control - System Monitoring Tool (Not compatible if WebStation is installed)"
+system: false
+beta: true
+target: app
+all:
+  install-script: "install.sh"
+  copy: "all"
+apollolake: true
+broadwell: true
+broadwellnk: true
+broadwellnkv2: true
+broadwellntbap: true
+denverton: true
+geminilake: true
+purley: true
+v1000: true
+r1000: true
+epyc7002: true
