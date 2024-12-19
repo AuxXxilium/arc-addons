@@ -11,9 +11,9 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  cp -pf /usr/bin/arccontrol.sh /tmpRoot/usr/bin/arccontrol.sh
-  cp -pf /usr/arc/addons/arc-control.spk /tmpRoot/usr/arc/addons/arc-control.spk
-  cp -pf /usr/arc/addons/python-3.11.spk /tmpRoot/usr/arc/addons/python-3.11.spk
+  cp -pf "/usr/bin/arccontrol.sh" "/tmpRoot/usr/bin/arccontrol.sh"
+  cp -pf "/addons/arc-control.spk" "/tmpRoot/usr/arc/addons/arc-control.spk"
+  cp -pf "/addons/python-3.11.spk" "/tmpRoot/usr/arc/addons/python-3.11.spk"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/arccontrol.service"

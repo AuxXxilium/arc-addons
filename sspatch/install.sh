@@ -12,10 +12,8 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   cp -pf "/usr/bin/sspatch.sh" "/tmpRoot/usr/bin/sspatch.sh"
-
-  cp -pf "/usr/lib/sspatch.tgz" "/tmpRoot/usr/arc/sspatch.tgz"
-  cp -pf "/usr/lib/sspatch-openvino.tgz" "/tmpRoot/usr/arc/sspatch-openvino.tgz"
-  cp -pf "/usr/lib/sspatch-3221.tgz" "/tmpRoot/usr/arc/sspatch-3221.tgz"
+  mkdir -p "/tmpRoot/usr/arc/addons/sspatch"
+  cp -prf "/addons/sspatch" "/tmpRoot/usr/arc/addons/"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/sspatch.service"
