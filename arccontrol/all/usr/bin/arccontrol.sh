@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-APPUPDATE="1.1-16"
+APPUPDATE="1.1-17"
 APPVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/arc-control/INFO)"
 
 # Function to install Arc Control
