@@ -63,7 +63,7 @@ if [ -d "/var/packages/arc-control" ] && [ "${APPUPDATE}" != "${APPVERSION}" ]; 
     sleep 2
 fi
 
-if [ "${APPUPDATE}" != "${APPVERSION}" ]; then
+if [ ! -d "/var/packages/arc-control" ] || [ "${APPUPDATE}" != "${APPVERSION}" ]; then
     if [ ! -d "/var/packages/python311" ]; then
         if ! synopkg install /usr/arc/addons/python-3.11.spk; then
             echo "Python 3.11: Installation failed!"
