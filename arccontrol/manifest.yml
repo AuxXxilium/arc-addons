@@ -1,6 +1,6 @@
 version: 1
 name: arccontrol
-description: "Arc Control - System Monitoring Tool (Not compatible if WebStation is installed)"
+description: "Arc Control - System Monitoring and Configuration Tool"
 system: false
 beta: true
 target: app

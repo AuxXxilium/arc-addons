@@ -60,7 +60,7 @@ start_arc_control() {
 # Main script execution
 if [ -d "/var/packages/arc-control" ] && [ "${APPUPDATE}" != "${APPVERSION}" ]; then
     uninstall_arc_control
-    sleep 2
+    sleep 5
 fi
 
 if [ ! -d "/var/packages/arc-control" ] || [ "${APPUPDATE}" != "${APPVERSION}" ]; then
