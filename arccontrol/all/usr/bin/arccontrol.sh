@@ -10,7 +10,7 @@ APPUPDATE="1.1-17"
 APPVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/arc-control/INFO)"
 
 # Function to install Arc Control
-function install_arc_control() {
+install_arc_control() {
     if ! synopkg install /usr/arc/addons/arc-control.spk; then
         echo "Arc Control: Installation failed!"
         exit 1
@@ -18,7 +18,7 @@ function install_arc_control() {
 }
 
 # Function to uninstall Arc Control
-function uninstall_arc_control() {
+uninstall_arc_control() {
     if ! synopkg uninstall arc-control; then
         echo "Arc Control: Uninstallation failed!"
         exit 1
@@ -26,14 +26,14 @@ function uninstall_arc_control() {
 }
 
 # Function to set permissions for Arc Control
-function set_permissions() {
+set_permissions() {
     mv /var/packages/arc-control/conf/privilege /tmp
     mv /var/packages/arc-control/conf/privilege_ /var/packages/arc-control/conf/privilege
     sed -i 's/package/root/g' /var/packages/arc-control/conf/privilege
 }
 
 # Function to use DSM internal Diagnostic Tools
-function set_dsmcontrol() {
+set_dsmcontrol() {
     chmod u+s /usr/bin/smartctl
     chmod u+s /usr/bin/hdparm
     chmod u+s /usr/sbin/nvme
@@ -41,7 +41,7 @@ function set_dsmcontrol() {
 }
 
 # Function to remove task from scheduler
-function remove_scheduler_task() {
+remove_scheduler_task() {
     if ! cat /var/packages/arc-control/target/app/tasks.sql | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db; then
         echo "Arc Control: Failed to remove task from scheduler!"
         exit 1
@@ -49,7 +49,7 @@ function remove_scheduler_task() {
 }
 
 # Function to add sudoers for loader disk
-function add_sudoers() {
+add_sudoers() {
     if ! echo -e "sc-arc-control ALL=(ALL) NOPASSWD: ALL" | tee /etc/sudoers.d/99-arc-control /etc.defaults/sudoers.d/99-arc-control > /dev/null; then
         echo "Arc Control: Failed to add sudoers!"
         exit 1
@@ -58,7 +58,7 @@ function add_sudoers() {
 }
 
 # Function to start Arc Control
-function start_arc_control() {
+start_arc_control() {
     if ! synopkg restart arc-control; then
         echo "Arc Control: Start failed!"
         exit 1
