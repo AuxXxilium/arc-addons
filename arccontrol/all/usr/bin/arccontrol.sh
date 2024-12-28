@@ -10,7 +10,7 @@ APPUPDATE="1.1-17"
 APPVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/arc-control/INFO)"
 
 # Function to install Arc Control
-install_arc_control() {
+function install_arc_control() {
     if ! synopkg install /usr/arc/addons/arc-control.spk; then
         echo "Arc Control: Installation failed!"
         exit 1
@@ -18,7 +18,7 @@ install_arc_control() {
 }
 
 # Function to uninstall Arc Control
-uninstall_arc_control() {
+function uninstall_arc_control() {
     if ! synopkg uninstall arc-control; then
         echo "Arc Control: Uninstallation failed!"
         exit 1
@@ -26,14 +26,22 @@ uninstall_arc_control() {
 }
 
 # Function to set permissions for Arc Control
-set_permissions() {
+function set_permissions() {
     mv /var/packages/arc-control/conf/privilege /tmp
     mv /var/packages/arc-control/conf/privilege_ /var/packages/arc-control/conf/privilege
     sed -i 's/package/root/g' /var/packages/arc-control/conf/privilege
 }
 
+# Function to use DSM internal Diagnostic Tools
+function set_dsmcontrol() {
+    chmod u+s /usr/bin/smartctl
+    chmod u+s /usr/bin/hdparm
+    chmod u+s /usr/sbin/nvme
+    chmod u+s /usr/syno/bin/synodisk
+}
+
 # Function to remove task from scheduler
-remove_scheduler_task() {
+function remove_scheduler_task() {
     if ! cat /var/packages/arc-control/target/app/tasks.sql | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db; then
         echo "Arc Control: Failed to remove task from scheduler!"
         exit 1
@@ -41,7 +49,7 @@ remove_scheduler_task() {
 }
 
 # Function to add sudoers for loader disk
-add_sudoers() {
+function add_sudoers() {
     if ! echo -e "sc-arc-control ALL=(ALL) NOPASSWD: ALL" | tee /etc/sudoers.d/99-arc-control /etc.defaults/sudoers.d/99-arc-control > /dev/null; then
         echo "Arc Control: Failed to add sudoers!"
         exit 1
@@ -50,7 +58,7 @@ add_sudoers() {
 }
 
 # Function to start Arc Control
-start_arc_control() {
+function start_arc_control() {
     if ! synopkg restart arc-control; then
         echo "Arc Control: Start failed!"
         exit 1
@@ -81,6 +89,7 @@ if [ ! -d "/var/packages/arc-control" ] || [ "${APPUPDATE}" != "${APPVERSION}" ]
     if [ ! -d "/var/packages/arc-control" ]; then
         install_arc_control
         set_permissions
+        set_dsmcontrol
         remove_scheduler_task
         add_sudoers
     fi

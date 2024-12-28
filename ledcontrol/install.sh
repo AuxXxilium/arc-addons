@@ -17,19 +17,15 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/i2c-i801.ko
   cp -pf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/i2c-smbus.ko
   if [ -f "/tmpRoot/usr/bin/ledcontrol.sh" ]; then
-    chmod a+x /tmpRoot/usr/bin/ledcontrol.sh
     chmod u+s /tmpRoot/usr/bin/ledcontrol.sh
   fi
   if [ -f "/tmpRoot/usr/bin/ugreen_leds_cli" ]; then
-    chmod a+x /tmpRoot/usr/bin/ugreen_leds_cli
     chmod u+s /tmpRoot/usr/bin/ugreen_leds_cli
   fi
   if [ -f "/tmpRoot/usr/bin/ping" ]; then
-    chmod a+x /tmpRoot/usr/bin/ping
     chmod u+s /tmpRoot/usr/bin/ping
   fi
   if [ -f "/tmpRoot/usr/bin/sensors" ]; then
-    chmod a+x /tmpRoot/usr/bin/sensors
     chmod u+s /tmpRoot/usr/bin/sensors
   fi
 
