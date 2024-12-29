@@ -24,8 +24,8 @@ if [ "${1}" = "late" ]; then
     echo
     echo "[Service]"
     echo "User=root"
-    echo "Type=oneshot"
-    echo "RemainAfterExit=yes"
+    echo "Type=simple"
+    echo "Restart=on-failure"
     echo "ExecStart=/usr/bin/arccontrol.sh"
     echo
     echo "[Install]"

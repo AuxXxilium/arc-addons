@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-APPUPDATE="1.1-18"
+APPUPDATE="1.1-19"
 APPVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/arc-control/INFO | head -n1)"
 
 # Function to install Arc Control
@@ -26,35 +26,11 @@ uninstall_arc_control() {
 }
 
 # Function to set permissions for Arc Control
-set_permissions() {
-    mv /var/packages/arc-control/conf/privilege /tmp
-    mv /var/packages/arc-control/conf/privilege_ /var/packages/arc-control/conf/privilege
-    sed -i 's/package/root/g' /var/packages/arc-control/conf/privilege
-}
-
-# Function to use DSM internal Diagnostic Tools
-set_dsmcontrol() {
-    chmod u+s /usr/bin/smartctl
-    chmod u+s /usr/bin/hdparm
-    chmod u+s /usr/sbin/nvme
-    chmod u+s /usr/syno/bin/synodisk
-}
-
-# Function to remove task from scheduler
-remove_scheduler_task() {
-    if ! cat /var/packages/arc-control/target/app/tasks.sql | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db; then
-        echo "Arc Control: Failed to remove task from scheduler!"
+set_arc_permissions() {
+    if ! /var/packages/arc-control/target/app/install.sh; then
+        echo "Arc Control: Setting permissions failed!"
         exit 1
     fi
-}
-
-# Function to add sudoers for loader disk
-add_sudoers() {
-    if ! echo -e "sc-arc-control ALL=(ALL) NOPASSWD: ALL" | tee /etc/sudoers.d/99-arc-control /etc.defaults/sudoers.d/99-arc-control > /dev/null; then
-        echo "Arc Control: Failed to add sudoers!"
-        exit 1
-    fi
-    chmod 0440 /etc/sudoers.d/99-arc-control /etc.defaults/sudoers.d/99-arc-control
 }
 
 # Function to start Arc Control
@@ -66,6 +42,7 @@ start_arc_control() {
 }
 
 # Main script execution
+[ -f "/usr/arc/addons/python-3.11.spk" ] && rm -f "/usr/arc/addons/python-3.11.spk" || true
 if [ -d "/var/packages/arc-control" ] && [ "${APPUPDATE}" != "${APPVERSION}" ]; then
     uninstall_arc_control
     sleep 5
@@ -73,28 +50,26 @@ fi
 
 if [ ! -d "/var/packages/arc-control" ] || [ "${APPUPDATE}" != "${APPVERSION}" ]; then
     if [ ! -d "/var/packages/python311" ]; then
-        if ! synopkg install /usr/arc/addons/python-3.11.spk; then
+        if ! synopkg install /usr/arc/addons/python311.spk; then
             echo "Python 3.11: Installation failed!"
             exit 1
         fi
     fi
-    sleep 2
+    sleep 3
     if [ -d "/var/packages/python311" ]; then
         if ! synopkg restart python311; then
             echo "Python 3.11: Start failed!"
             exit 1
         fi
     fi
-    sleep 2
+    sleep 3
     if [ ! -d "/var/packages/arc-control" ]; then
         install_arc_control
-        set_permissions
-        set_dsmcontrol
-        remove_scheduler_task
-        add_sudoers
-    fi
-    sleep 2
-    if [ -d "/var/packages/arc-control" ]; then
-        start_arc_control
+        set_arc_permissions
     fi
 fi
+sleep 3
+if [ -d "/var/packages/arc-control" ]; then
+    start_arc_control
+fi
+exit 0
