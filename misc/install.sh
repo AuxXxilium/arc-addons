@@ -117,13 +117,13 @@ EOF
   chmod +x /usr/syno/web/webman/recovery.cgi
 
   # Start: Recovery Mode
-  if [ -n "$(grep force_junior /proc/cmdline 2>/dev/null)" ] && [ -n "$(grep recovery /proc/cmdline 2>/dev/null)" ]; then
+  if grep -Eq 'force_junior|recovery' /proc/cmdline 2>/dev/null; then
     /usr/syno/web/webman/recovery.cgi
   fi
 
 elif [ "${1}" = "patches" ]; then
   # Start getty
-  for I in $(cat /proc/cmdline 2>/dev/null | grep -oE 'getty=[^ ]+' | sed 's/getty=//'); do
+  for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
     TTYN="$(echo "${I}" | cut -d',' -f1)"
     BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
     echo "ttyS0 ttyS1 ttyS2" | grep -qw "${TTYN}" && continue
@@ -138,7 +138,7 @@ elif [ "${1}" = "patches" ]; then
   done
   # Set static IP from cmdline
   if grep -q 'network.' /proc/cmdline; then
-    for I in $(grep -oE 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
+    for I in $(grep -Eo 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
       MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/' | tr '[:upper:]' '[:lower:]')"
       IPRS="$(echo "${I}" | cut -d= -f2)"
       for ETH in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
@@ -188,14 +188,14 @@ elif [ "${1}" = "late" ]; then
 
   # CPU Crypto Support Check
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf ]; then
-    if grep flags /proc/cpuinfo 2>/dev/null | grep -qw sse4_2; then
+    if grep flags /proc/cpuinfo 2>/dev/null | grep -wq sse4_2; then
       echo "CPU Supports SSE4.2, crc32c-intel should load"
     else
       echo "CPU does NOT support SSE4.2, crc32c-intel will not load, disabling"
       sed -i 's/^crc32c-intel/# crc32c-intel/g' /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf
     fi
 
-    if grep flags /proc/cpuinfo 2>/dev/null | grep -qw aes; then
+    if grep flags /proc/cpuinfo 2>/dev/null | grep -wq aes; then
       echo "CPU Supports AES, aesni-intel should load"
     else
       echo "CPU does NOT support AES, aesni-intel will not load, disabling"
@@ -220,10 +220,10 @@ elif [ "${1}" = "late" ]; then
   sed -i 's|ExecStart=/|ExecStart=/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service ${SERVICE_PATH}/syno_update_disk_logs.service
 
   # getty
-  for I in $(cat /proc/cmdline 2>/dev/null | grep -oE 'getty=[^ ]+' | sed 's/getty=//'); do
+  for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
     TTYN="$(echo "${I}" | cut -d',' -f1)"
     BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
-    echo "ttyS0 ttyS1 ttyS2" | grep -qw "${TTYN}" && continue
+    echo "ttyS0 ttyS1 ttyS2" | grep -wq "${TTYN}" && continue
 
     mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
     if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then

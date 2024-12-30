@@ -12,28 +12,28 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   mkdir -p /tmpRoot/usr/lib/openssh
-  cp -pf /usr/lib/openssh/sftp-server /tmpRoot/usr/lib/openssh/sftp-server
-  [ ! -f "/tmpRoot/usr/lib/libcrypto.so.3" ] && cp -pf /usr/lib/libcrypto.so.3 /tmpRoot/usr/lib/libcrypto.so.3
+  cp -vpf /usr/lib/openssh/sftp-server /tmpRoot/usr/lib/openssh/sftp-server
+  [ ! -f "/tmpRoot/usr/lib/libcrypto.so.3" ] && cp -vpf /usr/lib/libcrypto.so.3 /tmpRoot/usr/lib/libcrypto.so.3
 
   FILE="/tmpRoot/etc/ssh/sshd_config"
-  [ ! -f "${FILE}.bak" ] && cp -f "${FILE}" "${FILE}.bak"
+  [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
 
-  SED_PATH='/tmpRoot/usr/bin/sed'
-  cp -f "${FILE}.bak" "${FILE}"
-  ${SED_PATH} -i 's|^.*PermitRootLogin.*$|PermitRootLogin yes|' ${FILE}
-  ${SED_PATH} -i 's|^Subsystem.*$|Subsystem	sftp	/usr/lib/openssh/sftp-server|' ${FILE}
+  cp -pf "${FILE}.bak" "${FILE}"
+  sed -i 's|^.*PermitRootLogin.*$|PermitRootLogin yes|' ${FILE}
+  sed -i 's|^Subsystem.*$|Subsystem	sftp	/usr/lib/openssh/sftp-server|' ${FILE}
 
-  if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
-    echo "copy esynoscheduler.db"
-    mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-    cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
-  fi
-  echo "insert setrootpw task to esynoscheduler.db"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db | grep -q "SetRootPw||bootup||1|0|0|0||0|"; then
-    echo "SetRootPw task already exists and it is enabled"
+  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
+    echo "copy esynoscheduler.db"
+    mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
+    cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
+  fi
+  if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "SetRootPw||bootup||1|0|0|0||0|"; then
+    echo "setrootpw task already exists and it is enabled"
   else
-    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+    echo "insert setrootpw task to esynoscheduler.db"
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'SetRootPw';
 INSERT INTO task VALUES('SetRootPw', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
 PW=""    # Please change to the password you need.
@@ -51,10 +51,11 @@ elif [ "${1}" = "uninstall" ]; then
   FILE="/tmpRoot/etc/ssh/sshd_config"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
 
-  if [ -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete setrootpw task from esynoscheduler.db"
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'SetRootPw';
 EOF
   fi

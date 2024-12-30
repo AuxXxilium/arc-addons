@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -12,11 +12,12 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   cp -pf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/scaling.sh"
-  [ ! -f "/tmpRoot/usr/bin/echo" ] && cp -pf /usr/bin/echo /tmpRoot/usr/bin/echo || true
-  if [ "${2}" = "schedutil" ] || [ "${2}" = "ondemand" ] || [ "${2}" = "conservative" ]; then
-    cp -pf "/usr/lib/modules/acpi_cpufreq.ko" "/tmpRoot/usr/lib/modules/acpi_cpufreq.ko"
+  GOVERNOR=$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)
+  if [ -n "${GOVERNOR}" ]; then
+    if [ -f "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" ]; then
+      cp -pf "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" "/tmpRoot/usr/lib/modules/cpufreq_${GOVERNOR}.ko"
+    fi
   fi
-  [ "${2}" != "schedutil" ] && cp -pf "/usr/lib/modules/cpufreq_${2}.ko" "/tmpRoot/usr/lib/modules/cpufreq_${2}.ko"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
@@ -30,26 +31,28 @@ if [ "${1}" = "late" ]; then
     echo "Type=simple"
     echo "Restart=on-failure"
     echo "RestartSec=10"
-    echo "ExecStart=/usr/sbin/scaling.sh ${2}"
+    echo "ExecStart=/usr/sbin/scaling.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
   } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
-  if [ "${2}" = "schedutil" ] || [ "${2}" = "ondemand" ] || [ "${2}" = "conservative" ]; then
-    if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
-      echo "copy esynoscheduler.db"
-      mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-      cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
-    fi
-    echo "insert scaling... task to esynoscheduler.db"
+  if [ "${GOVERNOR}" = "schedutil" ] || [ "${GOVERNOR}" = "ondemand" ] || [ "${GOVERNOR}" = "conservative" ]; then
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-      /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+    ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+    if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
+      echo "copy esynoscheduler.db"
+      mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
+      cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
+    fi
+    echo "insert start/stop ScsiTarget task to esynoscheduler.db"
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'CPUFreqscaling';
-INSERT INTO task VALUES('CPUFreqscaling', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/scaling.sh ${2}', 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('CPUFreqscaling', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/scaling.sh', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
+fi
 
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing cpufreqscalingscaling - ${1}"
