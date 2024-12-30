@@ -13,7 +13,7 @@ if [ "${1}" = "late" ]; then
 
   cp -pf /usr/sbin/arccontrol.sh /tmpRoot/usr/sbin/arccontrol.sh
   cp -pf /addons/arc-control.spk /tmpRoot/usr/arc/addons/arc-control.spk
-  cp -pf /addons/python311.spk /tmpRoot/usr/arc/addons/python311.spk
+  cp -pf /addons/python-3.11.spk /tmpRoot/usr/arc/addons/python-3.11.spk
   [ -f "/tmpRoot/usr/bin/arccontrol.sh" ] && rm -f "/tmpRoot/usr/bin/arccontrol.sh" || true
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
