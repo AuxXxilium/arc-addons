@@ -6,11 +6,14 @@
 # See /LICENSE for more information.
 #
 
-APPUPDATE="1.1-21"
+APPUPDATE="1.3-0"
 APPVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/arc-control/INFO | head -n1)"
 
 # Function to install Arc Control
 install_arc_control() {
+    if [ -d "/var/packages/WebStation" ] && synopkg status WebStation | grep -q '"status":"running"'; then
+        synopkg stop WebStation
+    fi
     synopkg install /usr/arc/addons/arc-control.spk
 }
 
@@ -24,6 +27,9 @@ uninstall_arc_control() {
 
 # Function to install Python 3.11
 install_python3() {
+    if [ -d "/var/packages/WebStation" ] && synopkg status WebStation | grep -q '"status":"running"'; then
+        synopkg stop WebStation
+    fi
     synopkg install /usr/arc/addons/python-3.11.spk
 }
 
@@ -59,11 +65,8 @@ start_arc_control() {
 if [ "${APPUPDATE}" != "${APPVERSION}" ]; then
     if [ -d "/var/packages/arc-control" ]; then
         uninstall_arc_control
-        sleep 2
     fi
-fi
-
-if [ "${APPUPDATE}" != "${APPVERSION}" ]; then
+    sleep 2
     if [ ! -d "/var/packages/python311" ]; then
         install_python3
     fi
@@ -80,5 +83,9 @@ fi
 sleep 2
 if [ -d "/var/packages/arc-control" ]; then
     start_arc_control
+fi
+sleep 2
+if [ -d "/var/packages/WebStation" ]; then
+    synopkg start WebStation
 fi
 exit 0
