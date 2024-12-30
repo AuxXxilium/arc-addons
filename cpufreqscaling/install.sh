@@ -38,20 +38,19 @@ if [ "${1}" = "late" ]; then
   } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
-  if [ "${GOVERNOR}" = "schedutil" ] || [ "${GOVERNOR}" = "ondemand" ] || [ "${GOVERNOR}" = "conservative" ]; then
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-    if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
-      echo "copy esynoscheduler.db"
-      mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
-      cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
-    fi
-    echo "insert start/stop ScsiTarget task to esynoscheduler.db"
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
+    echo "copy esynoscheduler.db"
+    mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
+    cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
+  fi
+  echo "insert cpufreqscaling task to esynoscheduler.db"
+  /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'CPUFreqscaling';
 INSERT INTO task VALUES('CPUFreqscaling', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/scaling.sh', 'script', '{}', '', '', '{}', '{}');
 EOF
-  fi
 fi
 
 elif [ "${1}" = "uninstall" ]; then
