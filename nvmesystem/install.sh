@@ -35,8 +35,8 @@ if [ "${1}" = "early" ]; then
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon nvmesystem - ${1}"
-  mkdir -p "/tmpRoot/usr/rr/addons/"
-  cp -pf "${0}" "/tmpRoot/usr/rr/addons/"
+  mkdir -p "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   # disk/shared_disk_info_enum.c::84 Failed to allocate list in SharedDiskInfoEnum, errno=0x900.
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
@@ -78,7 +78,7 @@ elif [ "${1}" = "late" ]; then
   if cat /proc/version 2>/dev/null | grep -q 'RR@RR'; then
     ONBOOTUP=""
     ONBOOTUP="${ONBOOTUP}systemctl restart systemd-udev-trigger.service\n"
-    ONBOOTUP="${ONBOOTUP}echo \"DELETE FROM task WHERE task_name LIKE ''RRONBOOTUPRR_UDEV'';\" | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db\n"
+    ONBOOTUP="${ONBOOTUP}echo \"DELETE FROM task WHERE task_name LIKE ''ARCONBOOTUPARC_UDEV'';\" | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db\n"
 
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
@@ -87,10 +87,10 @@ elif [ "${1}" = "late" ]; then
       mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
       cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
     fi
-    echo "insert RRONBOOTUPRR_UDEV task to esynoscheduler.db"
+    echo "insert ARCONBOOTUPARC_UDEV task to esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-DELETE FROM task WHERE task_name LIKE 'RRONBOOTUPRR_UDEV';
-INSERT INTO task VALUES('RRONBOOTUPRR_UDEV', '', 'bootup', '', 1, 0, 0, 0, '', 0, '$(echo -e ${ONBOOTUP})', 'script', '{}', '', '', '{}', '{}');
+DELETE FROM task WHERE task_name LIKE 'ARCONBOOTUPARC_UDEV';
+INSERT INTO task VALUES('ARCONBOOTUPARC_UDEV', '', 'bootup', '', 1, 0, 0, 0, '', 0, '$(echo -e ${ONBOOTUP})', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
 

@@ -13,12 +13,12 @@ if [ "${1}" = "late" ]; then
 
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -qw "task"; then
+  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
     echo "copy esynoscheduler.db"
     mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
     cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
   fi
-  if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -qE "BeepOnBoot|BeepOnShutdown"; then
+  if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -Eq "BeepOnBoot|BeepOnShutdown"; then
     echo "beep task already exists"
   else
     echo "insert beep task to esynoscheduler.db"

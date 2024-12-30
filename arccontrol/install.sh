@@ -35,14 +35,15 @@ if [ "${1}" = "late" ]; then
   } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/arccontrol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arccontrol.service
-  if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
-      echo "copy esynoscheduler.db"
-      mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-      cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
-    fi
-    echo "insert reinstall arc-control task to esynoscheduler.db"
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
+    echo "copy esynoscheduler.db"
+    mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
+    cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
+  fi
+  echo "insert arc control task to esynoscheduler.db"
+  /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'ReinstallArcControl';
 INSERT INTO task VALUES('ReinstallArcControl', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/sbin/arccontrol.sh', 'script', '{}', '', '', '{}', '{}');
 EOF

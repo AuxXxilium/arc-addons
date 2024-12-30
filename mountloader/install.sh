@@ -16,14 +16,15 @@ if [ "${1}" = "late" ]; then
   
   rm -f /tmpRoot/usr/arc/.mountloader
 
-  if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
     echo "copy esynoscheduler.db"
-    mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-    cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+    mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
+    cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
   fi
   echo "insert mountloader task to esynoscheduler.db"
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+  /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'MountLoaderDisk';
 INSERT INTO task VALUES('MountLoaderDisk', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh mountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'UnMountLoaderDisk';
