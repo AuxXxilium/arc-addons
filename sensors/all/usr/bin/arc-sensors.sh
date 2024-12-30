@@ -26,11 +26,11 @@ modprobe -q coretemp
 modprobe -q k10temp
 
 echo 'Y' | sensors-detect --auto >"/tmp/sensors.log"
-grep -oE 'Driver\s*:\s*\w+' "/tmp/sensors.log" | awk -F': ' '{print $2}'
+grep -Eo 'Driver\s*:\s*\w+' "/tmp/sensors.log" | awk -F': ' '{print $2}'
 
 sensors
 
-echo "$@" | grep -qw "\-f" && rm -f /etc/fancontrol
+echo "$@" | grep -wq "\-f" && rm -f /etc/fancontrol
 if [ ! -f /etc/fancontrol ]; then
   # Or use pwmconfig to generate /etc/fancontrol interactively.
   local DEVPATH DEVNAME FCTEMPS FCFANS MINTEMP MAXTEMP MINSTART MINSTOP

@@ -38,8 +38,8 @@ function Check() {
 
   URL="https://github.com/AuxXxilium/arc"
   TAG=""
-  if echo "$@" | grep -qw "\-p"; then
-    TAG="$(curl -skL --connect-timeout 10 "${URL}/tags" | grep /refs/tags/.*\.zip | head -1 | sed -E 's/.*\/refs\/tags\/(.*)\.zip.*$/\1/')"
+  if echo "$@" | grep -wq "\-p"; then
+    TAG="$(curl -skL --connect-timeout 10 "${URL}/tags" | grep "/refs/tags/.*\.zip" | head -1 | sed -E 's/.*\/refs\/tags\/(.*)\.zip.*$/\1/')"
   else
     LATESTURL="$(curl -skL --connect-timeout 10 -w %{url_effective} -o /dev/null "${URL}/releases/latest")"
     TAG="${LATESTURL##*/}"

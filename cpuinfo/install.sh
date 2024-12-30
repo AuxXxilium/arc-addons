@@ -44,7 +44,7 @@ if [ "${1}" = "late" ]; then
   # DEST="/tmpRoot/usr/lib/systemd/system/synoscgiproxy.service"
   # {
   #   echo "[Unit]"
-  #   echo "Description=RR addon synoscgiproxy daemon"
+  #   echo "Description=ARC addon synoscgiproxy daemon"
   #   echo "After=network.target"
   #   echo
   #   echo "[Service]"
