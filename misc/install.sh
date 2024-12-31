@@ -255,6 +255,12 @@ elif [ "${1}" = "late" ]; then
     chmod u+s /tmpRoot/usr/syno/bin/synodisk
   fi
 
+  # Cleanup old Arc Control
+  [ -f /tmpRoot/usr/lib/systemd/system/arccontrol.service ] && rm -f /tmpRoot/usr/lib/systemd/system/arccontrol.service
+  [ -f /tmpRoot/usr/sbin/arccontrol.sh ] && rm -f /tmpRoot/usr/sbin/arccontrol.sh
+  [ -f /tmpRoot/usr/arc/addons/arc-control.spk ] && rm -f /tmpRoot/usr/arc/addons/arc-control.spk
+  [ -f /tmpRoot/usr/arc/addons/python-3.11.spk ] && rm -f /tmpRoot/usr/arc/addons/python-3.11.spk
+
   # SD Card
   [ ! -f /tmpRoot/usr/lib/udev/script/sdcard.sh.bak ] && cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
   echo -en '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
