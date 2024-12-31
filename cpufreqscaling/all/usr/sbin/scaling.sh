@@ -15,7 +15,7 @@ if lsmod | grep -q acpi_cpufreq || modprobe acpi_cpufreq; then
   GOVERNOR=$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)
   SYSGOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
   if [ "${GOVERNOR}" = "ondemand" ] || [ "${GOVERNOR}" = "conservative" ]; then
-    modprobe "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" || cerror=1
+    insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" || cerror=1
   fi
   # Set correct cpufreq governor to allow frequency scaling
   if [ "${SYSGOVERNOR}" != "${GOVERNOR}" ]; then

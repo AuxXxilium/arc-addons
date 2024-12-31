@@ -13,10 +13,8 @@ if [ "${1}" = "late" ]; then
 
   cp -pf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/scaling.sh"
   GOVERNOR=$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)
-  if [ -n "${GOVERNOR}" ]; then
-    if [ -f "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" ]; then
-      cp -pf "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" "/tmpRoot/usr/lib/modules/cpufreq_${GOVERNOR}.ko"
-    fi
+  if [ -f "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" ]; then
+    cp -pf "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" "/tmpRoot/usr/lib/modules/cpufreq_${GOVERNOR}.ko"
   fi
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
