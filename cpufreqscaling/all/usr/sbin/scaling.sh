@@ -14,12 +14,19 @@ cerror="false"
 if grep -qv "^flags.*hypervisor.*" /proc/cpuinfo; then
   GOVERNOR="$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)"
   SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
-  if insmod /usr/lib/modules/cpufreq_${GOVERNOR}.ko; then
+  if ! lsmod | grep -q "cpufreq_${GOVERNOR}"; then
+    if [ -f "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" ]; then
+      insmod /usr/lib/modules/cpufreq_${GOVERNOR}.ko
+    else
+      echo "CPUFreqScaling: Governor module cpufreq_${GOVERNOR}.ko not found"
+    fi
+  fi
+  if lsmod | grep -q "cpufreq_${GOVERNOR}"; then
     # Set correct cpufreq governor to allow frequency scaling
     echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
     sleep 5
     # Check if the governor is set correctly
-    SYSGOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+    SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
     if [ "${SYSGOVERNOR}" = "${GOVERNOR}" ]; then
       echo "CPUFreqScaling: Governor set to ${GOVERNOR}"
     else
@@ -31,8 +38,4 @@ if grep -qv "^flags.*hypervisor.*" /proc/cpuinfo; then
     cerror="true"
   fi
 fi
-if [ "${cerror}" = "true" ]; then
-  exit 1
-else
-  exit 0
-fi
+[ "${cerror}" = "true" ] && exit 1 || exit 0
