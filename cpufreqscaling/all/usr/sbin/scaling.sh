@@ -14,14 +14,19 @@ cerror="false"
 if grep -qv "^flags.*hypervisor.*" /proc/cpuinfo; then
   GOVERNOR="$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)"
   SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
-  if ! lsmod | grep -q "cpufreq_${GOVERNOR}"; then
-    if [ -f "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" ]; then
-      insmod /usr/lib/modules/cpufreq_${GOVERNOR}.ko
-    else
-      echo "CPUFreqScaling: Governor module cpufreq_${GOVERNOR}.ko not found"
+  if [ "${GOVERNOR}" != "schedutil" ]; then
+    if ! lsmod | grep -q "cpufreq_${GOVERNOR}"; then
+      if [ -f "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" ]; then
+        insmod /usr/lib/modules/cpufreq_${GOVERNOR}.ko
+        echo "CPUFreqScaling: Governor module cpufreq_${GOVERNOR}.ko loaded"
+      else
+        echo "CPUFreqScaling: Governor module cpufreq_${GOVERNOR}.ko not found"
+      fi
     fi
+  else
+    echo "CPUFreqScaling: Using schedutil governor"
   fi
-  if lsmod | grep -q "cpufreq_${GOVERNOR}"; then
+  if lsmod | grep -q "cpufreq_${GOVERNOR}" || [ "${GOVERNOR}" = "schedutil" ]; then
     # Set correct cpufreq governor to allow frequency scaling
     echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
     sleep 5
