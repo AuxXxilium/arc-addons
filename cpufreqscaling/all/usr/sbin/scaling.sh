@@ -12,9 +12,9 @@ set -euo pipefail
 # Load the correct cpufreq module
 cerror="false"
 if grep -qv "^flags.*hypervisor.*" /proc/cpuinfo; then
-  GOVERNOR=$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)
-  SYSGOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-  if insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko"; then
+  GOVERNOR="$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)"
+  SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
+  if insmod /usr/lib/modules/cpufreq_${GOVERNOR}.ko; then
     # Set correct cpufreq governor to allow frequency scaling
     echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
     sleep 5
