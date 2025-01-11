@@ -13,7 +13,7 @@ touch "/tmp/scaling.log"
 [ -f "/tmp/scaling.count" ] && SCALINGRETRY=$(cat /tmp/scaling.count) || echo "${SCALINGRETRY}" > "/tmp/scaling.count"
 [ -n "${1}" ] && GOVERNOR=${1} || GOVERNOR=$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)
 SYSGOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-if [ "${GOVERNOR}" = "ondemand" ] || [ "${GOVERNOR}" = "conservative" ]; then
+if [[ "${GOVERNOR}" = "ondemand" || "${GOVERNOR}" = "conservative" ]] && ! lsmod | grep -oP "${GOVERNOR}"; then
   insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko"  >> /tmp/scaling.log || SCALINGERROR=1
 fi
 # Set correct cpufreq governor to allow frequency scaling
@@ -23,7 +23,7 @@ if [ "${SYSGOVERNOR}" != "${GOVERNOR}" ] && [ ${SCALINGERROR} -eq 0 ]; then
 fi
 # Check if the governor is set correctly
 SYSGOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-if [ "${SYSGOVERNOR}" = "${GOVERNOR}" ]; then
+if [ "${SYSGOVERNOR}" = "${GOVERNOR}" ] && [ ${SCALINGERROR} -eq 0 ]; then
   echo "CPUFreqScaling: Governor set to ${GOVERNOR}" >> "/tmp/scaling.log"
 else
   echo "CPUFreqScaling: Failed to set governor to ${GOVERNOR}" >> "/tmp/scaling.log"
