@@ -181,30 +181,6 @@ elif [ "${1}" = "late" ]; then
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
       cp -pf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
-      # CPU Governor
-      GOVERNOR="$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)"
-      SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
-      if [ "${GOVERNOR}" = "schedutil" ]; then
-        echo "CPUFreqScaling: Using schedutil governor"
-      else
-        if modprobe cpufreq_${GOVERNOR}; then
-          echo "CPUFreqScaling: Governor module cpufreq_${GOVERNOR} loaded"
-          if ! grep -q "cpufreq_${GOVERNOR}" /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf; then
-            echo "cpufreq_${GOVERNOR}" >> /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
-          fi
-        else
-          echo "CPUFreqScaling: Governor module cpufreq_${GOVERNOR} not found"
-        fi
-      fi
-      # Set correct cpufreq governor to allow frequency scaling
-      echo "${GOVERNOR}" | tee /tmpRoot/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-      # Check if the governor is set correctly
-      SYSGOVERNOR="$(cat /tmpRoot/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
-      if [ "${SYSGOVERNOR}" = "${GOVERNOR}" ]; then
-        echo "CPUFreqScaling: Governor set to ${GOVERNOR}"
-      else
-        echo "CPUFreqScaling: Failed to set governor to ${GOVERNOR}"
-      fi
     fi
   fi
   modprobe -r acpi-cpufreq
