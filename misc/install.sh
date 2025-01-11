@@ -181,6 +181,30 @@ elif [ "${1}" = "late" ]; then
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
       cp -pf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
+      # CPU Governor
+      GOVERNOR="$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)"
+      SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
+      if [ "${GOVERNOR}" = "schedutil" ]; then
+        echo "CPUFreqScaling: Using schedutil governor"
+      else
+        if modprobe cpufreq_${GOVERNOR}; then
+          echo "CPUFreqScaling: Governor module cpufreq_${GOVERNOR} loaded"
+          if ! grep -q "cpufreq_${GOVERNOR}" /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf; then
+            echo "cpufreq_${GOVERNOR}" >> /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
+          fi
+        else
+          echo "CPUFreqScaling: Governor module cpufreq_${GOVERNOR} not found"
+        fi
+      fi
+      # Set correct cpufreq governor to allow frequency scaling
+      echo "${GOVERNOR}" | tee /tmpRoot/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      # Check if the governor is set correctly
+      SYSGOVERNOR="$(cat /tmpRoot/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
+      if [ "${SYSGOVERNOR}" = "${GOVERNOR}" ]; then
+        echo "CPUFreqScaling: Governor set to ${GOVERNOR}"
+      else
+        echo "CPUFreqScaling: Failed to set governor to ${GOVERNOR}"
+      fi
     fi
   fi
   modprobe -r acpi-cpufreq
@@ -235,32 +259,6 @@ elif [ "${1}" = "late" ]; then
     fi
   done
 
-  # Open-VM-Tools Fix
-  if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege
-  fi
-
-  # Qemu-Guest-Agent Fix
-  if [ -d /tmpRoot/var/packages/qemu-ga ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege
-  fi
-
-  # Arc Control Fix
-  if [ -d /tmpRoot/var/packages/arc-control ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege
-    chmod u+s /tmpRoot/usr/bin/smartctl
-    chmod u+s /tmpRoot/usr/bin/hdparm
-    chmod u+s /tmpRoot/usr/bin/lspci
-    chmod u+s /tmpRoot/usr/sbin/nvme
-    chmod u+s /tmpRoot/usr/syno/bin/synodisk
-  fi
-
-  # Cleanup old Arc Control
-  [ -f /tmpRoot/usr/lib/systemd/system/arccontrol.service ] && rm -f /tmpRoot/usr/lib/systemd/system/arccontrol.service
-  [ -f /tmpRoot/usr/sbin/arccontrol.sh ] && rm -f /tmpRoot/usr/sbin/arccontrol.sh
-  [ -f /tmpRoot/usr/arc/addons/arc-control.spk ] && rm -f /tmpRoot/usr/arc/addons/arc-control.spk
-  [ -f /tmpRoot/usr/arc/addons/python-3.11.spk ] && rm -f /tmpRoot/usr/arc/addons/python-3.11.spk
-
   # SD Card
   [ ! -f /tmpRoot/usr/lib/udev/script/sdcard.sh.bak ] && cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
   echo -en '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
@@ -293,4 +291,25 @@ elif [ "${1}" = "late" ]; then
   # Copy Loader Reboot
   cp -f /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -f /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
+
+    # Open-VM-Tools Fix
+  if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege
+  fi
+
+  # Qemu-Guest-Agent Fix
+  if [ -d /tmpRoot/var/packages/qemu-ga ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege
+  fi
+
+  # Arc Control Fix
+  if [ -d /tmpRoot/var/packages/arc-control ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege
+    chmod u+s /tmpRoot/usr/bin/smartctl
+    chmod u+s /tmpRoot/usr/bin/hdparm
+    chmod u+s /tmpRoot/usr/bin/lspci
+    chmod u+s /tmpRoot/usr/sbin/nvme
+    chmod u+s /tmpRoot/usr/syno/bin/synodisk
+    /var/packages/arc-control/target/ui/install.sh
+  fi
 fi
