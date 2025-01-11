@@ -235,32 +235,6 @@ elif [ "${1}" = "late" ]; then
     fi
   done
 
-  # Open-VM-Tools Fix
-  if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege
-  fi
-
-  # Qemu-Guest-Agent Fix
-  if [ -d /tmpRoot/var/packages/qemu-ga ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege
-  fi
-
-  # Arc Control Fix
-  if [ -d /tmpRoot/var/packages/arc-control ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege
-    chmod u+s /tmpRoot/usr/bin/smartctl
-    chmod u+s /tmpRoot/usr/bin/hdparm
-    chmod u+s /tmpRoot/usr/bin/lspci
-    chmod u+s /tmpRoot/usr/sbin/nvme
-    chmod u+s /tmpRoot/usr/syno/bin/synodisk
-  fi
-
-  # Cleanup old Arc Control
-  [ -f /tmpRoot/usr/lib/systemd/system/arccontrol.service ] && rm -f /tmpRoot/usr/lib/systemd/system/arccontrol.service
-  [ -f /tmpRoot/usr/sbin/arccontrol.sh ] && rm -f /tmpRoot/usr/sbin/arccontrol.sh
-  [ -f /tmpRoot/usr/arc/addons/arc-control.spk ] && rm -f /tmpRoot/usr/arc/addons/arc-control.spk
-  [ -f /tmpRoot/usr/arc/addons/python-3.11.spk ] && rm -f /tmpRoot/usr/arc/addons/python-3.11.spk
-
   # SD Card
   [ ! -f /tmpRoot/usr/lib/udev/script/sdcard.sh.bak ] && cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
   echo -en '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
@@ -293,4 +267,25 @@ elif [ "${1}" = "late" ]; then
   # Copy Loader Reboot
   cp -f /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -f /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
+
+    # Open-VM-Tools Fix
+  if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege
+  fi
+
+  # Qemu-Guest-Agent Fix
+  if [ -d /tmpRoot/var/packages/qemu-ga ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege
+  fi
+
+  # Arc Control Fix
+  if [ -d /tmpRoot/var/packages/arc-control ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege
+    chmod u+s /tmpRoot/usr/bin/smartctl
+    chmod u+s /tmpRoot/usr/bin/hdparm
+    chmod u+s /tmpRoot/usr/bin/lspci
+    chmod u+s /tmpRoot/usr/sbin/nvme
+    chmod u+s /tmpRoot/usr/syno/bin/synodisk
+    /var/packages/arc-control/target/ui/install.sh
+  fi
 fi
