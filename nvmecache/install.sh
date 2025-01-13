@@ -33,15 +33,9 @@ if [ "${1}" = "patches" ]; then
       echo "bootloader: ${P}"
       continue
     fi
-    PCIEPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'/' -f4)"
+    PCIEPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2 | awk -F'/' '{if (NF == 4) print $NF; else if (NF > 4) print $(NF-1)}')"
     if [ -n "${PCIEPATH}" ]; then
-      # TODO: Need check?
-      MULTIPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'/' -f5)"
-      if [ -z "${MULTIPATH}" ]; then
-        echo "${PCIEPATH} does not support!"
-        continue
-      fi
-      echo "${PCIEPATH}" >>/etc/nvmePorts
+      grep -q "${PCIEPATH}" /etc/nvmePorts && continue
     fi
   done
   [ -f /etc/nvmePorts ] && cat /etc/nvmePorts
