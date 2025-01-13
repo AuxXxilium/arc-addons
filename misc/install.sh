@@ -166,21 +166,28 @@ elif [ "${1}" = "late" ]; then
   echo "Killing dufs ..."
   /usr/bin/killall dufs 2>/dev/null || true
 
-  cp -pf /usr/bin/beep /tmpRoot/usr/bin/beep
-  cp -pdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/
+  cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
+  cp -vpdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/
 
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
-  # CPU Scaling Driver
+  # CPU performance scaling
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
+    CPUFREQ_FILE="/tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf"
     CPUFREQ=$(ls -l /sys/devices/system/cpu/cpufreq/*/* 2>/dev/null | wc -l)
     if [ ${CPUFREQ} -eq 0 ]; then
       echo "CPU does NOT support CPU Performance Scaling, disabling"
-      sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
+      sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' "${CPUFREQ_FILE}"
     else
       echo "CPU supports CPU Performance Scaling, enabling"
-      sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
-      cp -pf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
+      sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' "${CPUFREQ_FILE}"
+      cp -vpf /usr/lib/modules/cpufreq_*.ko /tmpRoot/usr/lib/modules/
+      # Get a list of all cpufreq_ modules with .ko extension and add them to the configuration file if not already present
+      find /lib/modules/$(uname -r) -type f -name 'cpufreq_*.ko' -exec basename {} .ko \; | while read -r module; do
+        if ! grep -q "^${module}$" "${CPUFREQ_FILE}"; then
+          echo "${module}" >> "${CPUFREQ_FILE}"
+        fi
+      done
     fi
   fi
   modprobe -r acpi-cpufreq
