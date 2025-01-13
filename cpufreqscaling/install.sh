@@ -11,9 +11,8 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  cp -pf "/usr/bin/scaling.sh" "/tmpRoot/usr/bin/scaling.sh"
-  [ -f /usr/sbin/scaling.sh ] && rm -f "/usr/sbin/scaling.sh"
-  [ -f /tmpRoot/usr/sbin/scaling.sh ] && rm -f "/tmpRoot/usr/sbin/scaling.sh"
+  rm -f "/tmpRoot/usr/bin/scaling.sh"
+  cp -pf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/scaling.sh"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
@@ -23,22 +22,20 @@ if [ "${1}" = "late" ]; then
     echo "After=multi-user.target"
     echo
     echo "[Service]"
-    echo "User=root"
-    echo "Type=simple"
+    echo "Type=forking"
     echo "Restart=on-failure"
     echo "RestartSec=10"
-    echo "ExecStart=/usr/bin/scaling.sh"
+    echo "ExecStart=/usr/sbin/scaling.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
   } >"${DEST}"
-  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/cpufreqscaling.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service
+  mkdir -p "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
+  ln -vsf "/usr/lib/systemd/system/cpufreqscaling.service" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service"
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing cpufreqscalingscaling - ${1}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
-
-  rm -f /tmpRoot/usr/bin/scaling.sh
+  rm -f "/tmpRoot/usr/sbin/scaling.sh"
 fi
