@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -413,7 +413,7 @@ function nondtModel() {
   _set_conf_kv rd "maxdisks" "${MAXDISKS}"
   printf "set maxdisks=%d\n" "${MAXDISKS}"
 
-  if [ "${1}" = "true" ]; then
+  if [ "${1}" = "false" ]; then
     echo "TODO: no-DT's sort!!!"
   fi
 
@@ -425,14 +425,8 @@ function nondtModel() {
       echo "bootloader: ${P}"
       continue
     fi
-    PCIEPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'/' -f4)"
+    PCIEPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2 | awk -F'/' '{if (NF == 4) print $NF; else if (NF > 4) print $(NF-1)}')"
     if [ -n "${PCIEPATH}" ]; then
-      # TODO: Need check?
-      # MULTIPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'/' -f5)"
-      # if [ -z "${MULTIPATH}" ]; then
-      #   echo "${PCIEPATH} does not support!"
-      #   continue
-      # fi
       grep -q "=\"${PCIEPATH}\"" /etc/extensionPorts && continue # An nvme controller only recognizes one disk
       echo "pci${COUNT}=\"${PCIEPATH}\"" >>/etc/extensionPorts
       COUNT=$((${COUNT} + 1))
