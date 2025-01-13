@@ -16,17 +16,16 @@ touch /tmp/scaling.log
 GOVERNOR=$(grep -oP '(?<=governor=)\w+' /proc/cmdline 2>/dev/null)
 SYSGOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 if [ "${SYSGOVERNOR}" != "${GOVERNOR}" ]; then
-  if [[ "${GOVERNOR}" = "ondemand" || "${GOVERNOR}" = "conservative" ]] && ! lsmod | grep -q "${GOVERNOR}"; then
-    if modprobe "cpufreq_${GOVERNOR}"; then
+  if [[ "${GOVERNOR}" = "ondemand" || "${GOVERNOR}" = "conservative" ]] && ! lsmod | grep -q "cpufreq_${GOVERNOR}"; then
+    if insmod "/usr/lib/modules/cpufreq_governor.ko" && insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko"; then
       echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-      sleep 10
     else
       echo "CPUFreqScaling: Failed to load ${GOVERNOR} module" >> /tmp/scaling.log
     fi
-  elif [ "${GOVERNOR}" = "schedutil" ] || lsmod | grep -q "${GOVERNOR}"; then
+  elif [ "${GOVERNOR}" = "schedutil" ] || lsmod | grep -q "cpufreq_${GOVERNOR}"; then
     echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-    sleep 10
   fi
+  sleep 10
   # Check if the governor is set correctly
   SYSGOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
   if [ "${SYSGOVERNOR}" = "${GOVERNOR}" ]; then
