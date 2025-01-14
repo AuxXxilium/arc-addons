@@ -1,0 +1,3 @@
+event=button/power
+action=/etc/acpi/power.sh
+
