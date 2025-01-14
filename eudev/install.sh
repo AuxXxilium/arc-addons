@@ -72,15 +72,15 @@ elif [ "${1}" = "late" ]; then
       M=$(echo "${L}" | awk '{print $2}')
       [ -z "${M}" ] || [ -z "$(ls /usr/lib/modules/${M} 2>/dev/null)" ] && continue
       if [ "$(echo "${O}" | /tmpRoot/bin/sed 's/.*/\U&/')" = "F" ]; then
-      /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+        /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
       else
-      /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+        /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
       fi
       isChange=true
     done
   fi
   echo "isChange: ${isChange}"
-  [ "${isChange}" = "true" ] && /usr/sbin/depmod -a -b /tmpRoot
+  [ "${isChange}" = "true" ] && /usr/sbin/depmod -A -b /tmpRoot
 
   # Restore kvm module
   /usr/sbin/modprobe kvm_intel || true # kvm-intel.ko
