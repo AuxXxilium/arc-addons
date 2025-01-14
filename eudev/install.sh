@@ -50,7 +50,11 @@ elif [ "${1}" = "late" ]; then
   echo "copy modules"
   isChange="false"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  
+  # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
+  
+  # Check for custom kernel
   if grep -q 'RR@RR' /proc/version 2>/dev/null; then
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
@@ -67,6 +71,7 @@ elif [ "${1}" = "late" ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
+    # Read and copy specific modules from modulelist
     for L in $(/tmpRoot/bin/sed -n '/^\s*$/d; /^\s*#/d; p' /addons/modulelist 2>/dev/null); do
       O=$(echo "${L}" | awk '{print $1}')
       M=$(echo "${L}" | awk '{print $2}')
@@ -79,8 +84,11 @@ elif [ "${1}" = "late" ]; then
       echo "true" >/tmp/modulesChange
     done
   fi
+  
   isChange="$(cat /tmp/modulesChange 2>/dev/null || echo "false")"
   echo "isChange: ${isChange}"
+  
+  # Update module dependencies if changes were made
   if [ "${isChange}" = "true" ]; then
     chown -R root:root /tmpRoot/usr/lib/modules/
     /usr/sbin/depmod -a -b /tmpRoot
