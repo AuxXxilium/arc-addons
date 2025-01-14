@@ -11,7 +11,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  local files=(
+  files=(
     "/usr/bin/acpi_listen"
     "/usr/bin/acpitool"
     "/usr/sbin/acpid"
@@ -20,18 +20,13 @@ if [ "${1}" = "late" ]; then
   
   for file in "${files[@]}"; do
     dest="/tmpRoot${file}"
-    cp -f "$file" "$dest"
-    chown root:root "$dest"
+    cp -vf "$file" "$dest"
   done
   
-  mkdir -p /tmpRoot/usr/etc/acpi
-  chmod 755 /tmpRoot/usr/etc/acpi
-  chown root:root /tmpRoot/usr/etc/acpi
-  
-  cp -rf /usr/etc/acpi/* /tmpRoot/usr/etc/acpi/
-  chown root:root /tmpRoot/usr/etc/acpi/*
+  mkdir -vp /tmpRoot/usr/etc/acpi
+  cp -vrf /usr/etc/acpi/* /tmpRoot/usr/etc/acpi/
 
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  mkdir -vp "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/acpid.service"
   {
     echo "[Unit]"
