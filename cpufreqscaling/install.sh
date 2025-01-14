@@ -22,7 +22,8 @@ if [ "${1}" = "late" ]; then
     echo "After=multi-user.target"
     echo
     echo "[Service]"
-    echo "Type=forking"
+    echo "User=root"
+    echo "Type=simple"
     echo "Restart=on-failure"
     echo "RestartSec=10"
     echo "ExecStart=/usr/sbin/scaling.sh"
