@@ -26,7 +26,7 @@ if [ "${1}" = "late" ]; then
   mkdir -vp /tmpRoot/usr/etc/acpi
   cp -vrf /usr/etc/acpi/* /tmpRoot/usr/etc/acpi/
 
-  mkdir -vp "/tmpRoot/usr/lib/systemd/system"
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/acpid.service"
   {
     echo "[Unit]"

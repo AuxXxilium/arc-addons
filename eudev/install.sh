@@ -90,7 +90,6 @@ elif [ "${1}" = "late" ]; then
   
   # Update module dependencies if changes were made
   if [ "${isChange}" = "true" ]; then
-    chown -R root:root /tmpRoot/usr/lib/modules/
     /usr/sbin/depmod -a -b /tmpRoot
   fi
 
