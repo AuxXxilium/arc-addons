@@ -97,9 +97,12 @@ elif [ "${1}" = "late" ]; then
   /usr/sbin/modprobe kvm_intel || true # kvm-intel.ko
   /usr/sbin/modprobe kvm_amd || true   # kvm-amd.ko
 
+  # CPUFreqScaling
+  GOVERNOR="$(grep -o 'governor=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
+  /tmproot/usr/bin/test -f \"/tmpRoot/usr/lib/modules/${GOVERNOR}.ko\" && /tmpRoot/usr/sbin/insmod \"/tmpRoot/usr/lib/modules/${GOVERNOR}.ko\" || true
+
   echo "Copy rules"
   /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
-  GOVERNOR="$(grep -o 'governor=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
   echo 'SUBSYSTEM=="cpu", KERNEL=="cpu[0-9]|cpu[0-9][0-9]", ACTION=="add", ATTR{cpufreq/scaling_governor}="'${GOVERNOR}'"' >/tmpRoot/usr/lib/udev/rules.d/50-cpufreq-scaling.rules
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
@@ -112,7 +115,7 @@ elif [ "${1}" = "late" ]; then
     echo "RemainAfterExit=yes"
     echo "ExecStart=/usr/bin/udevadm hwdb --update"
     echo "ExecStart=/usr/bin/udevadm control --reload-rules"
-    echo "ExecStart=/usr/sbin/insmod \"/usr/lib/modules/${GOVERNOR}.ko\" && /usr/bin/udevadm trigger --action=add"
+    echo "ExecStart=/usr/bin/udevadm trigger --action=add"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
