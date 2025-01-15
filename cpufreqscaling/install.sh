@@ -22,7 +22,6 @@ if [ "${1}" = "late" ]; then
     echo "After=multi-user.target"
     echo
     echo "[Service]"
-    echo "User=root"
     echo "Type=simple"
     echo "Restart=on-failure"
     echo "RestartSec=10"
