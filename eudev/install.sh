@@ -72,14 +72,14 @@ elif [ "${1}" = "late" ]; then
       /tmpRoot/bin/mv -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
     # Read and copy specific modules from modulelist
-    for L in $(/tmpRoot/bin/sed -n '/^\s*$/d; /^\s*#/d; p' /addons/modulelist 2>/dev/null); do
-      O=$(echo "${L}" | awk '{print $1}')
-      M=$(echo "${L}" | awk '{print $2}')
-      [ -z "${M}" ] || [ -z "$(ls /usr/lib/modules/${M} 2>/dev/null)" ] && continue
-      if [ "$(echo "${O}" | /tmpRoot/bin/sed 's/.*/\U&/')" = "F" ]; then
-        /tmpRoot/bin/cp -vrf "/usr/lib/modules/${M}" "/tmpRoot/usr/lib/modules/"
+    for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
+      O=$(echo "${L}" | awk -F'###' '{print $1}')
+      M=$(echo "${L}" | awk -F'###' '{print $2}')
+      [ -z "${M}" ] || [ ! -f "/usr/lib/modules/${M}" ] && continue
+      if [ "$(echo "${O:0:1}" | sed 's/.*/\U&/')" = "F" ]; then
+        /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
       else
-        /tmpRoot/bin/cp -vrn "/usr/lib/modules/${M}" "/tmpRoot/usr/lib/modules/"
+        /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
       fi
       echo "true" >/tmp/modulesChange
     done
