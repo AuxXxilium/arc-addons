@@ -22,7 +22,7 @@ if [ "${SYSGOVERNOR}" != "${GOVERNOR}" ]; then
     else
       echo "CPUFreqScaling: Failed to load ${GOVERNOR} module" >> /tmp/scaling.log
     fi
-  elif [[ "${GOVERNOR}" = "schedutil" ]]; then
+  elif [[ "${GOVERNOR}" = "schedutil" || "${GOVERNOR}" = "powersave" ]]; then
     echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
   fi
 
