@@ -17,6 +17,7 @@ SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
 
 if [ "${SYSGOVERNOR}" != "${GOVERNOR}" ]; then
   if [[ "${GOVERNOR}" = "ondemand" || "${GOVERNOR}" = "conservative" ]]; then
+    /usr/sbin/modprobe "cpufreq_governor" 2>/dev/null
     if /usr/sbin/modprobe "cpufreq_${GOVERNOR}"; then
       echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
     else
