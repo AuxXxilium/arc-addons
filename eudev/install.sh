@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -111,7 +111,6 @@ elif [ "${1}" = "late" ]; then
     echo "RemainAfterExit=yes"
     echo "ExecStart=/usr/bin/udevadm hwdb --update"
     echo "ExecStart=/usr/bin/udevadm control --reload-rules"
-    echo "ExecStartPost=/usr/sbin/depmod -A"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
