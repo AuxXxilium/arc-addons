@@ -23,27 +23,32 @@ fi
 if [ "${SYSGOVERNOR}" != "${GOVERNOR}" ]; then
   case "${GOVERNOR}" in
     ondemand|conservative)
-      /usr/sbin/modprobe "cpufreq_governor" 2>/dev/null
-      if /usr/sbin/modprobe "cpufreq_${GOVERNOR}"; then
-        echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-      else
-        echo "CPUFreqScaling: Failed to load ${GOVERNOR} module" >> /tmp/scaling.log
-      fi
+      insmod "/usr/lib/modules/cpufreq_governor.ko"
+      insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko"
+      echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
       ;;
     schedutil|powersave)
       echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
       ;;
   esac
+  sleep 3
+  SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
+  if [ "${SYSGOVERNOR}" = "${GOVERNOR}" ]; then
+    echo "CPUFreqScaling: governor set to ${GOVERNOR}" >> /tmp/scaling.log
+  else
+    echo "CPUFreqScaling: failed to set governor to ${GOVERNOR}" >> /tmp/scaling.log
+    exit 1
+  fi
 
-  sleep 20
-  echo "CPUFreqScaling: Checking governor" >> /tmp/scaling.log
+  sleep 17
+  echo "CPUFreqScaling: ReChecking governor" >> /tmp/scaling.log
 
   SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
   if [ "${SYSGOVERNOR}" = "${GOVERNOR}" ]; then
     echo "CPUFreqScaling: governor set to ${GOVERNOR}" >> /tmp/scaling.log
     exit 0
   else
-    echo "CPUFreqScaling: Failed to set governor to ${GOVERNOR}" >> /tmp/scaling.log
+    echo "CPUFreqScaling: failed to set governor to ${GOVERNOR}" >> /tmp/scaling.log
   fi
 fi
 exit 1

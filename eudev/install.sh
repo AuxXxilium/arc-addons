@@ -111,7 +111,6 @@ elif [ "${1}" = "late" ]; then
     echo "RemainAfterExit=yes"
     echo "ExecStart=/usr/bin/udevadm hwdb --update"
     echo "ExecStart=/usr/bin/udevadm control --reload-rules"
-    echo "ExecStartPost=/usr/sbin/depmod -A"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
