@@ -20,19 +20,20 @@ function mountLoaderDisk() {
       for i in {1..3}; do
         rm -rf "/mnt/p${i}"
         mkdir -p "/mnt/p${i}"
-        mount -o rw "/dev/synoboot${i}" "/mnt/p${i}" || {
+        mount "/dev/synoboot${i}" "/mnt/p${i}" || {
           echo "Can't mount /dev/synoboot${i}."
           break 2
         }
       done
 
-      mkdir -p /usr/arc
       {
         echo "export LOADER_DISK=\"/dev/synoboot\""
         echo "export LOADER_DISK_PART1=\"/dev/synoboot1\""
         echo "export LOADER_DISK_PART2=\"/dev/synoboot2\""
         echo "export LOADER_DISK_PART3=\"/dev/synoboot3\""
       } >"/usr/arc/.mountloader"
+
+      sync
 
       break
     done
@@ -50,6 +51,8 @@ function mountLoaderDisk() {
 function unmountLoaderDisk() {
   if [ -f "/usr/arc/.mountloader" ]; then
     rm -f "/usr/arc/.mountloader"
+
+    sync
 
     export LOADER_DISK=
     export LOADER_DISK_PART1=
