@@ -293,6 +293,6 @@ elif [ "${1}" = "late" ]; then
     chmod u+s /tmpRoot/usr/bin/lspci
     chmod u+s /tmpRoot/usr/sbin/nvme
     chmod u+s /tmpRoot/usr/syno/bin/synodisk
-    /var/packages/arc-control/target/ui/install.sh
+    /var/packages/arc-control/target/ui/install.sh >/dev/null 2>&1 || true
   fi
 fi
