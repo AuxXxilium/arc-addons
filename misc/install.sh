@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -11,7 +11,7 @@ if [ "${1}" = "early" ]; then
   # [CREATE][failed] Raidtool initsys
   SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
-  cp -f "${SO_FILE}" "${SO_FILE}.tmp"
+  cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
     sed "s/2d6520302e39/2d6520312e32/" |
     xxd -r -p >"${SO_FILE}" 2>/dev/null
@@ -258,9 +258,9 @@ elif [ "${1}" = "late" ]; then
     for ETH in $(cat /etc/ifcfgs); do
       echo "Copy ifcfg-${ETH}"
       if [ -f "/etc/sysconfig/network-scripts/ifcfg-${ETH}" ]; then
-        rm -vf /tmpRoot/etc/sysconfig/network-scripts/ifcfg-* /tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-*
-        cp -pf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc/sysconfig/network-scripts/
-        cp -pf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/
+        rm -vf /tmpRoot/etc/sysconfig/network-scripts/ifcfg-*${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-*${ETH}
+        cp -vpf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc/sysconfig/network-scripts/
+        cp -vpf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/
       fi
     done
   fi
@@ -277,22 +277,22 @@ elif [ "${1}" = "late" ]; then
 
     # Open-VM-Tools Fix
   if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege
+    sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege >/dev/null 2>&1 || true
   fi
 
   # Qemu-Guest-Agent Fix
   if [ -d /tmpRoot/var/packages/qemu-ga ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege
+    sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege >/dev/null 2>&1 || true
   fi
 
   # Arc Control Fix
   if [ -d /tmpRoot/var/packages/arc-control ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege
+    sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege >/dev/null 2>&1 || true
     chmod u+s /tmpRoot/usr/bin/smartctl
     chmod u+s /tmpRoot/usr/bin/hdparm
     chmod u+s /tmpRoot/usr/bin/lspci
     chmod u+s /tmpRoot/usr/sbin/nvme
     chmod u+s /tmpRoot/usr/syno/bin/synodisk
-    /var/packages/arc-control/target/ui/install.sh
+    /var/packages/arc-control/target/ui/install.sh >/dev/null 2>&1 || true
   fi
 fi
