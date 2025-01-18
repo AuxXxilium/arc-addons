@@ -12,6 +12,8 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
   cp -pf /usr/bin/hdddb.sh /tmpRoot/usr/bin/hdddb.sh
+  cp -pf /usr/sbin/dtc /tmpRoot/usr/sbin/dtc
+  cp -pf /usr/syno/sbin/dhm_tool /tmpRoot/usr/syno/sbin/dhm_tool
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/hdddb.service"
