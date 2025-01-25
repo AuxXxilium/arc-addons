@@ -25,33 +25,6 @@ if [ "${1}" = "late" ]; then
     xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
-  # Create storage pool page without RAID type.
-  cp -vpf /usr/bin/nvmevolume.sh /tmpRoot/usr/bin/nvmevolume.sh
-
-  [ ! -f "/tmpRoot/usr/bin/gzip" ] && cp -vpf /usr/bin/gzip /tmpRoot/usr/bin/gzip
-
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/nvmevolume.service"
-  {
-    echo "[Unit]"
-    echo "Description=Arc nvmevolume daemon"
-    echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
-    echo "After=smpkg-custom-install.service"
-    echo "After=storagepanel.service" # storagepanel
-    echo "After=nvmesystem.service"   # nvmesystem
-    echo
-    echo "[Service]"
-    echo "Type=oneshot"
-    echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/nvmevolume.sh -n"
-    echo
-    echo "[Install]"
-    echo "WantedBy=multi-user.target"
-  } >"${DEST}"
-
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/nvmevolume.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmevolume.service
-
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon nvmevolume - ${1}"
 

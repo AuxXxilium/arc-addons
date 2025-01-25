@@ -5,6 +5,8 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
+# From：https://github.com/007revad/Synology_HDD_db
+# 
 
 if [ "${1}" = "late" ]; then
   echo "Installing addon hdddb - ${1}"
@@ -26,7 +28,7 @@ if [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/hdddb.sh -nrwpeSI"
+    echo "ExecStart=/usr/bin/hdddb.sh -nweSI"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
