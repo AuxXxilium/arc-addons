@@ -144,7 +144,7 @@ function getUsbPorts() {
 
 #
 function dtModel() {
-  DEST="/etc/model.dts"
+  DEST="/addons/model.dts"
   UNIQUE=$(_get_conf_kv rd unique)
   if [ ! -f "${DEST}" ]; then # Users can put their own dts.
     {
@@ -413,7 +413,7 @@ function nondtModel() {
   _set_conf_kv rd "maxdisks" "${MAXDISKS}"
   printf "set maxdisks=%d\n" "${MAXDISKS}"
 
-  if [ "${1}" = "false" ]; then
+  if [ "${1}" = "true" ]; then
     echo "TODO: no-DT's sort!!!"
   fi
 
