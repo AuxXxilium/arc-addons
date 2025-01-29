@@ -5,6 +5,8 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
+# From：https://github.com/007revad/Synology_HDD_db
+# 
 
 if [ "${1}" = "late" ]; then
   echo "Installing addon hdddb - ${1}"
@@ -17,20 +19,20 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/hdddb.service"
-  {
-    echo "[Unit]"
-    echo "Description=HDDs/SSDs drives databases"
-    echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
-    echo "After=smpkg-custom-install.service"
-    echo
-    echo "[Service]"
-    echo "Type=oneshot"
-    echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/hdddb.sh -nrwpeSI"
-    echo
-    echo "[Install]"
-    echo "WantedBy=multi-user.target"
-  } >"${DEST}"
+  cat <<EOF >"${DEST}"
+[Unit]
+Description=HDDs/SSDs drives databases
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/hdddb.sh -nweSI
+
+[Install]
+WantedBy=multi-user.target
+EOF
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/hdddb.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/hdddb.service
 elif [ "${1}" = "uninstall" ]; then

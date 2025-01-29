@@ -18,7 +18,7 @@ if [ "${1}" = "late" ]; then
   {
     echo "[Unit]"
     echo "Description=addon amepatch"
-    echo "After=multi-user.target"
+    echo "After=syno-volume.target syno-space.target"
     echo
     echo "[Service]"
     echo "Type=oneshot"
