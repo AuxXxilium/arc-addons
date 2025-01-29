@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -18,6 +18,7 @@ function copy_file() {
       echo "sspatch: ${file} already patched"
     else
       echo "sspatch: Patching ${file}"
+      rm -f "${target}/${file}"
       cp -f "${input}/${file}" "${target}/${file}"
       chown SurveillanceStation:SurveillanceStation "${target}/${file}"
       chmod "${mode}" "${target}/${file}"
@@ -32,13 +33,13 @@ if [ -d "${SSPATH}" ]; then
   SSMODEL="$(grep -oP '(?<=model=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1)"
 
   if [ "${SSVERSION}" = "9.2.0-11289" ]; then
-    [ "${SSMODEL}" = "synology_geminilake_dva1622" ] && SSVERSION="${SSVERSION}-dva1622" || true
+    [ "${SSMODEL}" = "synology_geminilake_dva1622" ] && SSVERSION="${SSVERSION}-openvino" || true
     [ "${SSMODEL}" = "synology_denverton_dva3221" ] && SSVERSION="${SSVERSION}-dva3221" || true
   fi
   echo "sspatch: SurveillanceStation found - ${SSVERSION}"
+  tar -xzf "${PATCHPATH}/${SSVERSION}.tar.gz" -C "${PATCHPATH}" > /dev/null 2>&1
 
   /usr/syno/bin/synopkg stop SurveillanceStation > /dev/null 2>&1
-  sleep 5
 
   # Define the hosts entries to be added
   echo "sspatch: Adding hosts entries"
@@ -64,16 +65,15 @@ if [ -d "${SSPATH}" ]; then
     fi
   done
 
-  copy_file ${SSPATH}/lib  libssutils.so    ${PATCHPATH}/${SSVERSION}  0644
-  copy_file ${SSPATH}/sbin sscmshostd       ${PATCHPATH}/${SSVERSION}  0755
-  copy_file ${SSPATH}/sbin sscored          ${PATCHPATH}/${SSVERSION}  0755
-  copy_file ${SSPATH}/sbin ssdaemonmonitord ${PATCHPATH}/${SSVERSION}  0755
-  copy_file ${SSPATH}/sbin ssexechelperd    ${PATCHPATH}/${SSVERSION}  0755
-  copy_file ${SSPATH}/sbin ssroutined       ${PATCHPATH}/${SSVERSION}  0755
-  copy_file ${SSPATH}/sbin ssmessaged       ${PATCHPATH}/${SSVERSION}  0755
-  # copy_file ${SSPATH}/sbin ssrtmpclientd    ${PATCHPATH}/${SSVERSION}  0755
+  copy_file "${SSPATH}"/lib libssutils.so "${PATCHPATH}/${SSVERSION}" 0644
+  copy_file "${SSPATH}"/sbin sscmshostd "${PATCHPATH}/${SSVERSION}" 0755
+  copy_file "${SSPATH}"/sbin sscored "${PATCHPATH}/${SSVERSION}" 0755
+  copy_file "${SSPATH}"/sbin ssdaemonmonitord "${PATCHPATH}/${SSVERSION}" 0755
+  copy_file "${SSPATH}"/sbin ssexechelperd "${PATCHPATH}/${SSVERSION}" 0755
+  copy_file "${SSPATH}"/sbin ssroutined "${PATCHPATH}/${SSVERSION}" 0755
+  copy_file "${SSPATH}"/sbin ssmessaged "${PATCHPATH}/${SSVERSION}" 0755
+  # copy_file "${SSPATH}"/sbin ssrtmpclientd "${PATCHPATH}/${SSVERSION}" 0755
 
-  sleep 5
   /usr/syno/bin/synopkg restart SurveillanceStation > /dev/null 2>&1
 else
   echo "sspatch: SurveillanceStation not found"
