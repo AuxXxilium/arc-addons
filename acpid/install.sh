@@ -13,7 +13,6 @@ if [ "${1}" = "late" ]; then
 
   tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/usr/ ./bin ./sbin ./lib
   tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/ ./etc
-  sed -i '/^Exec/s|=/|=/|g' /tmpRoot/usr/lib/systemd/system/acpid.service
 
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon acpid - ${1}"
