@@ -20,7 +20,6 @@ if [ "${1}" = "late" ]; then
     echo "[Unit]"
     echo "Description=Adds correct CPU Info"
     echo "After=multi-user.target"
-    echo "After=synoscgi.service nginx.service"
     echo
     echo "[Service]"
     echo "Type=oneshot"
