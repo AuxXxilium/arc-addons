@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -26,6 +26,7 @@ function mountLoaderDisk() {
         }
       done
 
+      mkdir -p /usr/arc
       {
         echo "export LOADER_DISK=\"/dev/synoboot\""
         echo "export LOADER_DISK_PART1=\"/dev/synoboot1\""
