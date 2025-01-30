@@ -12,8 +12,6 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   cp -vpf /usr/bin/yq /tmpRoot/usr/bin/yq
-  cp -vpf /usr/bin/cpio /tmpRoot/usr/bin/cpio
-  cp -vpf /usr/bin/unzip /tmpRoot/usr/bin/unzip
   cp -pf /usr/bin/arc-loaderdisk.sh /tmpRoot/usr/bin/arc-loaderdisk.sh
   
   rm -f /tmpRoot/usr/arc/.mountloader
