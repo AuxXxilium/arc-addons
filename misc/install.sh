@@ -12,9 +12,7 @@ if [ "${1}" = "early" ]; then
   SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
-  xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
-    sed "s/2d6520302e39/2d6520312e32/" |
-    xxd -r -p >"${SO_FILE}" 2>/dev/null
+  xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null | sed "s/2d6520302e39/2d6520312e32/" | xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
 elif [ "${1}" = "rcExit" ]; then
@@ -183,10 +181,12 @@ elif [ "${1}" = "late" ]; then
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' "${CPUFREQ_FILE}"
       cp -vpf /usr/lib/modules/cpufreq_*.ko /tmpRoot/usr/lib/modules/
       # Get a list of all cpufreq_ modules with .ko extension and add them to the configuration file if not already present
-      find /tmpRoot/usr/lib/modules/$(uname -r) -type f -name 'cpufreq_*.ko' -exec basename {} .ko \; | while read -r module; do
-        if ! grep -q "^${module}$" "${CPUFREQ_FILE}"; then
-          echo "${module}" >> "${CPUFREQ_FILE}"
-        fi
+      find /tmpRoot/usr/lib/modules -type f -name 'cpufreq_*.ko' -exec basename {} .ko \; | while read -r module; do
+          if [[ "${module}" == "cpufreq_powersave" || "${module}" == "cpufreq_conservative" || "${module}" == "cpufreq_ondemand" ]]; then
+              if ! grep -q "^${module}$" "${CPUFREQ_FILE}"; then
+                  echo "${module}" >> "${CPUFREQ_FILE}"
+              fi
+          fi
       done
     fi
   fi
