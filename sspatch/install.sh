@@ -20,7 +20,7 @@ if [ "${1}" = "late" ]; then
   {
     echo "[Unit]"
     echo "Description=addon sspatch"
-    echo "After=syno-volume.target syno-space.target"
+    echo "After=multi-user.target"
     echo
     echo "[Service]"
     echo "Type=oneshot"
