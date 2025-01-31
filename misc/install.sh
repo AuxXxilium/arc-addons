@@ -165,7 +165,8 @@ elif [ "${1}" = "late" ]; then
   /usr/bin/killall dufs 2>/dev/null || true
 
   cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
-  cp -vpdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/
+  cp -vpdf /usr/lib/libubsan.* /tmpRoot/usr/lib/
+  cp -vpdf /usr/lib/libblkid.* /tmpRoot/usr/lib/
 
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
@@ -179,9 +180,10 @@ elif [ "${1}" = "late" ]; then
     else
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' "${CPUFREQ_FILE}"
+      # Copy cpufreq_ modules to the destination directory
       cp -vpf /usr/lib/modules/cpufreq_*.ko /tmpRoot/usr/lib/modules/
       # Get a list of all cpufreq_ modules with .ko extension and add them to the configuration file if not already present
-      find /tmpRoot/usr/lib/modules -type f -name 'cpufreq_*.ko' -exec basename {} .ko \; | while read -r module; do
+      ls /tmpRoot/usr/lib/modules/cpufreq_*.ko 2>/dev/null | grep -o 'cpufreq_[^/]*' | while read -r module; do
           if [[ "${module}" == "cpufreq_powersave" || "${module}" == "cpufreq_conservative" || "${module}" == "cpufreq_ondemand" ]]; then
               if ! grep -q "^${module}$" "${CPUFREQ_FILE}"; then
                   echo "${module}" >> "${CPUFREQ_FILE}"
