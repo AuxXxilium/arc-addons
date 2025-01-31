@@ -284,15 +284,4 @@ elif [ "${1}" = "late" ]; then
   if [ -d /tmpRoot/var/packages/qemu-ga ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege >/dev/null 2>&1 || true
   fi
-
-  # Arc Control Fix
-  if [ -d /tmpRoot/var/packages/arc-control ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege >/dev/null 2>&1 || true
-    chmod u+s /tmpRoot/usr/bin/smartctl
-    chmod u+s /tmpRoot/usr/bin/hdparm
-    chmod u+s /tmpRoot/usr/bin/lspci
-    chmod u+s /tmpRoot/usr/sbin/nvme
-    chmod u+s /tmpRoot/usr/syno/bin/synodisk
-    /var/packages/arc-control/target/ui/install.sh >/dev/null 2>&1 || true
-  fi
 fi
