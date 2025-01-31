@@ -7,21 +7,21 @@
 #
 
 function copy_file() {
-  local target="${1}"
-  local file="${2}"
-  local input="${3}"
-  local mode="${4}"
-  if [ -f "${input}/${file}" ] && [ -f "${target}/${file}" ]; then
-    local HASHIN="$(sha256sum "${input}/${file}" | cut -d' ' -f1)"
-    local HASHOUT="$(sha256sum "${target}/${file}" | cut -d' ' -f1)"
-    if [ "${HASHIN}" = "${HASHOUT}" ]; then
-      echo "sspatch: ${file} already patched"
+  local SS_TARGET="${1}"
+  local SS_FILE="${2}"
+  local SS_INPUT="${3}"
+  local SS_MODE="${4}"
+  if [ -f "${SS_INPUT}/${SS_FILE}" ] && [ -f "${SS_TARGET}/${SS_FILE}" ]; then
+    local SS_HASHIN="$(sha256sum "${SS_INPUT}/${SS_FILE}" | cut -d' ' -f1)"
+    local SS_HASHOUT="$(sha256sum "${SS_TARGET}/${SS_FILE}" | cut -d' ' -f1)"
+    if [ "${SS_HASHIN}" = "${SS_HASHOUT}" ]; then
+      echo "sspatch: ${SS_FILE} already patched"
     else
-      echo "sspatch: Patching ${file}"
-      rm -f "${target}/${file}"
-      cp -f "${input}/${file}" "${target}/${file}"
-      chown SurveillanceStation:SurveillanceStation "${target}/${file}"
-      chmod "${mode}" "${target}/${file}"
+      echo "sspatch: Patching ${SS_FILE}"
+      rm -f "${SS_TARGET}/${SS_FILE}"
+      cp -f "${SS_INPUT}/${SS_FILE}" "${SS_TARGET}/${SS_FILE}"
+      chown SurveillanceStation:SurveillanceStation "${SS_TARGET}/${SS_FILE}"
+      chmod "${SS_MODE}" "${SS_TARGET}/${SS_FILE}"
     fi
   fi
 }
@@ -29,18 +29,6 @@ function copy_file() {
 SSPATH="/var/packages/SurveillanceStation/target"
 PATCHPATH="/usr/arc/addons/sspatch"
 if [ -d "${SSPATH}" ]; then
-  SSVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1 | sed -E 's/^0*([0-9])0/\1/')"
-  SSMODEL="$(grep -oP '(?<=model=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1)"
-
-  if [ "${SSVERSION}" = "9.2.0-11289" ]; then
-    [ "${SSMODEL}" = "synology_geminilake_dva1622" ] && SSVERSION="${SSVERSION}-openvino" || true
-    [ "${SSMODEL}" = "synology_denverton_dva3221" ] && SSVERSION="${SSVERSION}-dva3221" || true
-  fi
-  echo "sspatch: SurveillanceStation found - ${SSVERSION}"
-  tar -xzf "${PATCHPATH}/${SSVERSION}.tar.gz" -C "${PATCHPATH}" > /dev/null 2>&1
-
-  /usr/syno/bin/synopkg stop SurveillanceStation > /dev/null 2>&1
-
   # Define the hosts entries to be added
   echo "sspatch: Adding hosts entries"
   ENTRIES=("0.0.0.0 synosurveillance.synology.com")
@@ -65,16 +53,33 @@ if [ -d "${SSPATH}" ]; then
     fi
   done
 
-  copy_file "${SSPATH}"/lib libssutils.so "${PATCHPATH}/${SSVERSION}" 0644
-  copy_file "${SSPATH}"/sbin sscmshostd "${PATCHPATH}/${SSVERSION}" 0755
-  copy_file "${SSPATH}"/sbin sscored "${PATCHPATH}/${SSVERSION}" 0755
-  copy_file "${SSPATH}"/sbin ssdaemonmonitord "${PATCHPATH}/${SSVERSION}" 0755
-  copy_file "${SSPATH}"/sbin ssexechelperd "${PATCHPATH}/${SSVERSION}" 0755
-  copy_file "${SSPATH}"/sbin ssroutined "${PATCHPATH}/${SSVERSION}" 0755
-  copy_file "${SSPATH}"/sbin ssmessaged "${PATCHPATH}/${SSVERSION}" 0755
-  # copy_file "${SSPATH}"/sbin ssrtmpclientd "${PATCHPATH}/${SSVERSION}" 0755
-
-  /usr/syno/bin/synopkg restart SurveillanceStation > /dev/null 2>&1
+  SSVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1 | sed -E 's/^0*([0-9])0/\1/')"
+  SSMODEL="$(grep -oP '(?<=model=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1)"
+  
+  if [ "${SSVERSION}" = "9.2.0-11289" ]; then
+    [ "${SSMODEL}" = "synology_geminilake_dva1622" ] && SSVERSION="${SSVERSION}-openvino" || true
+    [ "${SSMODEL}" = "synology_denverton_dva3221" ] && SSVERSION="${SSVERSION}-dva3221" || true
+  fi
+  
+  tar -xzf "${PATCHPATH}/${SSVERSION}.tar.gz" -C "${PATCHPATH}" > /dev/null 2>&1 || true
+  SS_HASHIN="$(sha256sum "${PATCHPATH}/${SSVERSION}/libssutils.so" | cut -d' ' -f1)"
+  SS_HASHOUT="$(sha256sum "${SSPATH}/lib/libssutils.so" | cut -d' ' -f1)"
+  
+  if [ "${SS_HASHIN}" != "${SS_HASHOUT}" ]; then
+    echo "sspatch: SurveillanceStation found - ${SSVERSION}"
+    /usr/syno/bin/synopkg stop SurveillanceStation > /dev/null 2>&1 || true
+  
+    copy_file "${SSPATH}"/lib libssutils.so "${PATCHPATH}/${SSVERSION}" 0644
+    copy_file "${SSPATH}"/sbin sscmshostd "${PATCHPATH}/${SSVERSION}" 0755
+    copy_file "${SSPATH}"/sbin sscored "${PATCHPATH}/${SSVERSION}" 0755
+    copy_file "${SSPATH}"/sbin ssdaemonmonitord "${PATCHPATH}/${SSVERSION}" 0755
+    copy_file "${SSPATH}"/sbin ssexechelperd "${PATCHPATH}/${SSVERSION}" 0755
+    copy_file "${SSPATH}"/sbin ssroutined "${PATCHPATH}/${SSVERSION}" 0755
+    copy_file "${SSPATH}"/sbin ssmessaged "${PATCHPATH}/${SSVERSION}" 0755
+    # copy_file "${SSPATH}"/sbin ssrtmpclientd "${PATCHPATH}/${SSVERSION}" 0755
+  
+    /usr/syno/bin/synopkg restart SurveillanceStation > /dev/null 2>&1 || true
+  fi
 else
   echo "sspatch: SurveillanceStation not found"
 fi
