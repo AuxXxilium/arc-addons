@@ -26,15 +26,12 @@ function mountLoaderDisk() {
         }
       done
 
-      mkdir -p /usr/arc
       {
         echo "export LOADER_DISK=\"/dev/synoboot\""
         echo "export LOADER_DISK_PART1=\"/dev/synoboot1\""
         echo "export LOADER_DISK_PART2=\"/dev/synoboot2\""
         echo "export LOADER_DISK_PART3=\"/dev/synoboot3\""
       } >"/usr/arc/.mountloader"
-
-      sync
 
       break
     done
