@@ -61,7 +61,8 @@ if [ -d "${SSPATH}" ]; then
     [ "${SSMODEL}" = "synology_denverton_dva3221" ] && SSVERSION="${SSVERSION}-dva3221" || true
   fi
   
-  tar -xzf "${PATCHPATH}/${SSVERSION}.tar.gz" -C "${PATCHPATH}" > /dev/null 2>&1 || true
+  mkdir -p "${PATCHPATH}/${SSVERSION}"
+  tar -xzf "${PATCHPATH}/${SSVERSION}.tar.gz" -C "${PATCHPATH}/${SSVERSION}" > /dev/null 2>&1 || true
   SS_HASHIN="$(sha256sum "${PATCHPATH}/${SSVERSION}/libssutils.so" | cut -d' ' -f1)"
   SS_HASHOUT="$(sha256sum "${SSPATH}/lib/libssutils.so" | cut -d' ' -f1)"
   
