@@ -172,24 +172,14 @@ elif [ "${1}" = "late" ]; then
   modprobe acpi-cpufreq
   # CPU performance scaling
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
-    CPUFREQ_FILE="/tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf"
     CPUFREQ=$(ls -l /sys/devices/system/cpu/cpufreq/*/* 2>/dev/null | wc -l)
     if [ ${CPUFREQ} -eq 0 ]; then
       echo "CPU does NOT support CPU Performance Scaling, disabling"
-      sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' "${CPUFREQ_FILE}"
+      sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
     else
       echo "CPU supports CPU Performance Scaling, enabling"
-      sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' "${CPUFREQ_FILE}"
-      # Copy cpufreq_ modules to the destination directory
-      cp -vpf /usr/lib/modules/cpufreq_*.ko /tmpRoot/usr/lib/modules/
-      # Get a list of all cpufreq_ modules with .ko extension and add them to the configuration file if not already present
-      ls /tmpRoot/usr/lib/modules/cpufreq_*.ko 2>/dev/null | grep -o 'cpufreq_[^/]*' | while read -r module; do
-          if [[ "${module}" == "cpufreq_powersave" || "${module}" == "cpufreq_conservative" || "${module}" == "cpufreq_ondemand" ]]; then
-              if ! grep -q "^${module}$" "${CPUFREQ_FILE}"; then
-                  echo "${module}" >> "${CPUFREQ_FILE}"
-              fi
-          fi
-      done
+      sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
+      cp -vpf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
     fi
   fi
   modprobe -r acpi-cpufreq
