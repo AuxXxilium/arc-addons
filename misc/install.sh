@@ -115,8 +115,8 @@ EOF
   chmod +x /usr/syno/web/webman/recovery.cgi
 
   # Start: Recovery Mode
-  if grep -Eq 'force_junior|recovery' /proc/cmdline 2>/dev/null; then
-    /usr/syno/web/webman/recovery.cgi
+  if grep -q 'force_junior' /proc/cmdline 2>/dev/null && grep -q 'recovery' /proc/cmdline 2>/dev/null; then
+      /usr/syno/web/webman/recovery.cgi
   fi
 
 elif [ "${1}" = "patches" ]; then
