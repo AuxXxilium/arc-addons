@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+install_sspatch() {
   echo "Installing addon sspatch - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -16,7 +16,7 @@ if [ "${1}" = "late" ]; then
   cp -prf "/addons/sspatch" "/tmpRoot/usr/arc/addons/"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/sspatch.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/sspatch.service"
   {
     echo "[Unit]"
     echo "Description=addon sspatch"
@@ -32,7 +32,22 @@ if [ "${1}" = "late" ]; then
   } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/sspatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sspatch.service
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon sspatch - ${1}"
+}
+
+uninstall_sspatch() {
+  echo "Uninstalling addon sspatch - ${1}"
   # To-Do
-fi
+}
+
+case "${1}" in
+  late)
+    install_sspatch "${1}"
+    ;;
+  uninstall)
+    uninstall_sspatch "${1}"
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

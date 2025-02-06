@@ -5,58 +5,52 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-if [ "${1}" = "early" ]; then
-  echo "Installing addon misc - ${1}"
 
-  # [CREATE][failed] Raidtool initsys
+install_early() {
+  echo "Installing addon misc - early"
+
   SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null | sed "s/2d6520302e39/2d6520312e32/" | xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
+}
 
-elif [ "${1}" = "rcExit" ]; then
-  echo "Installing addon misc - ${1}"
+install_rcExit() {
+  echo "Installing addon misc - rcExit"
 
   mkdir -p /usr/syno/web/webman
-  # Create: Cleanup Disk
-  cat >/usr/syno/web/webman/clean_system_disk.cgi <<EOF
-#!/bin/sh
 
+  create_cgi() {
+    local name=$1
+    local content=$2
+    echo "${content}" >"/usr/syno/web/webman/${name}.cgi"
+    chmod +x "/usr/syno/web/webman/${name}.cgi"
+  }
+
+  create_cgi "clean_system_disk" '#!/bin/sh
 echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
 if [ -b /dev/md0 ]; then
   mkdir -p /mnt/md0
   mount /dev/md0 /mnt/md0/
-  rm -rf /mnt/md0/@autoupdate/*
-  rm -rf /mnt/md0/upd@te/*
-  rm -rf /mnt/md0/.log.junior/*
+  rm -rf /mnt/md0/@autoupdate/* /mnt/md0/upd@te/* /mnt/md0/.log.junior/*
   umount /mnt/md0/
   rm -rf /mnt/md0/
-  echo '{"success": true}'
+  echo "{\"success\": true}"
 else
-  echo '{"success": false}'
-fi
-EOF
-  chmod +x /usr/syno/web/webman/clean_system_disk.cgi
+  echo "{\"success\": false}"
+fi'
 
-  # Create: Reboot to Loader
-  cat >/usr/syno/web/webman/reboot_to_loader.cgi <<EOF
-#!/bin/sh
-
+  create_cgi "reboot_to_loader" '#!/bin/sh
 echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
 if [ -f /usr/bin/loader-reboot.sh ]; then
   /usr/bin/loader-reboot.sh config
-  echo '{"success": true}'
+  echo "{\"success\": true}"
 else
-  echo '{"success": false}'
-fi
-EOF
-  chmod +x /usr/syno/web/webman/reboot_to_loader.cgi
+  echo "{\"success\": false}"
+fi'
 
-  # Get Boot Logs
-  cat >/usr/syno/web/webman/get_logs.cgi <<EOF
-#!/bin/sh
-
+  create_cgi "get_logs" '#!/bin/sh
 echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
 echo "==== proc cmdline ===="
 cat /proc/cmdline 
@@ -65,39 +59,32 @@ cat /var/log/linuxrc.syno.log
 echo "==== Installerlog ===="
 cat /tmp/installer_sh.log
 echo "==== Messages log ===="
-cat /var/log/messages
-EOF
-  chmod +x /usr/syno/web/webman/get_logs.cgi
+cat /var/log/messages'
 
-  # Error message if bootloader disk is not mounted
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
     sed -i 's/c("welcome","desc_install")/"Error: The bootloader disk is not successfully mounted, the installation will fail."/' /usr/syno/web/main.js
   fi
 
-  # Create: Recovery Mode
-  cat >/usr/syno/web/webman/recovery.cgi <<EOF
-#!/bin/sh
-
+  create_cgi "recovery" '#!/bin/sh
 echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
-
 echo "Starting ttyd ..."
 MSG=""
-MSG="\${MSG}Arc Recovery Mode\n"
-MSG="\${MSG}\n"
-MSG="\${MSG}Using terminal commands to modify system configs, execute external binary\n"
-MSG="\${MSG}files, add files, or install unauthorized third-party apps may lead to system\n"
-MSG="\${MSG}damages or unexpected behavior, or cause data loss. Make sure you are aware of\n"
-MSG="\${MSG}the consequences of each command and proceed at your own risk.\n"
-MSG="\${MSG}\n"
-MSG="\${MSG}Warning: Data should only be stored in shared folders. Data stored elsewhere\n"
-MSG="\${MSG}may be deleted when the system is updated/restarted.\n"
-MSG="\${MSG}\n"
-MSG="\${MSG}'System partition(/dev/md0) mounted to': /tmpRoot\n"
-MSG="\${MSG}To 'Force re-install DSM': http://<ip>:5000/web_install.html\n"
-MSG="\${MSG}To 'Reboot to Config Mode': http://<ip>:5000/webman/reboot_to_loader.cgi\n"
-MSG="\${MSG}To 'Show Boot Log': http://<ip>:5000/webman/get_logs.cgi\n"
-MSG="\${MSG}To 'Reboot Loader' : exec reboot\n"
-echo -e "\${MSG}" > /etc/motd
+MSG="${MSG}Arc Recovery Mode\n"
+MSG="${MSG}\n"
+MSG="${MSG}Using terminal commands to modify system configs, execute external binary\n"
+MSG="${MSG}files, add files, or install unauthorized third-party apps may lead to system\n"
+MSG="${MSG}damages or unexpected behavior, or cause data loss. Make sure you are aware of\n"
+MSG="${MSG}the consequences of each command and proceed at your own risk.\n"
+MSG="${MSG}\n"
+MSG="${MSG}Warning: Data should only be stored in shared folders. Data stored elsewhere\n"
+MSG="${MSG}may be deleted when the system is updated/restarted.\n"
+MSG="${MSG}\n"
+MSG="${MSG}'System partition(/dev/md0) mounted to': /tmpRoot\n"
+MSG="${MSG}To 'Force re-install DSM': http://<ip>:5000/web_install.html\n"
+MSG="${MSG}To 'Reboot to Config Mode': http://<ip>:5000/webman/reboot_to_loader.cgi\n"
+MSG="${MSG}To 'Show Boot Log': http://<ip>:5000/webman/get_logs.cgi\n"
+MSG="${MSG}To 'Reboot Loader' : exec reboot\n"
+echo -e "${MSG}" > /etc/motd
 
 /usr/bin/killall ttyd 2>/dev/null || true
 /usr/sbin/ttyd -W -t titleFixed="Arc Recovery" login -f root >/dev/null 2>&1 &
@@ -110,17 +97,16 @@ cp -f /usr/syno/web/web_index.html /usr/syno/web/web_install.html
 cp -f /addons/web_index.html /usr/syno/web/web_index.html
 mkdir -p /tmpRoot
 mount /dev/md0 /tmpRoot
-echo "Arc Recovery mode is ready"
-EOF
-  chmod +x /usr/syno/web/webman/recovery.cgi
+echo "Arc Recovery mode is ready"'
 
-  # Start: Recovery Mode
   if grep -q 'force_junior' /proc/cmdline 2>/dev/null && grep -q 'recovery' /proc/cmdline 2>/dev/null; then
-      /usr/syno/web/webman/recovery.cgi
+    /usr/syno/web/webman/recovery.cgi
   fi
+}
 
-elif [ "${1}" = "patches" ]; then
-  # Start getty
+install_patches() {
+  echo "Installing addon misc - patches"
+
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
     TTYN="$(echo "${I}" | cut -d',' -f1)"
     BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
@@ -134,7 +120,7 @@ elif [ "${1}" = "patches" ]; then
       fi
     fi
   done
-  # Set static IP from cmdline
+
   if grep -q 'network.' /proc/cmdline; then
     for I in $(grep -Eo 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
       MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/' | tr '[:upper:]' '[:lower:]')"
@@ -155,8 +141,10 @@ elif [ "${1}" = "patches" ]; then
       done
     done
   fi
-elif [ "${1}" = "late" ]; then
-  echo "Installing addon misc - ${1}"
+}
+
+install_late() {
+  echo "Installing addon misc - late"
 
   echo "Killing ttyd ..."
   /usr/bin/killall ttyd 2>/dev/null || true
@@ -170,7 +158,7 @@ elif [ "${1}" = "late" ]; then
 
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
-  # CPU performance scaling
+
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
     CPUFREQ=$(ls -l /sys/devices/system/cpu/cpufreq/*/* 2>/dev/null | wc -l)
     if [ ${CPUFREQ} -eq 0 ]; then
@@ -185,7 +173,6 @@ elif [ "${1}" = "late" ]; then
   modprobe -r acpi-cpufreq
   umount /sys
 
-  # CPU Crypto Support Check
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf ]; then
     if grep flags /proc/cpuinfo 2>/dev/null | grep -wq sse4_2; then
       echo "CPU Supports SSE4.2, crc32c-intel should load"
@@ -203,10 +190,9 @@ elif [ "${1}" = "late" ]; then
     fi
   fi
 
-  # Nvidia GPU Check
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf ]; then
     if ! grep -iq 10de /proc/bus/pci/devices 2>/dev/null; then
-      echo "NVIDIA GPU is not detected, disabling "
+      echo "NVIDIA GPU is not detected, disabling"
       sed -i 's/^nvidia/# nvidia/g' /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf
       sed -i 's/^nvidia-uvm/# nvidia-uvm/g' /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf
     else
@@ -214,11 +200,9 @@ elif [ "${1}" = "late" ]; then
     fi
   fi
 
-  # service
   SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
   sed -i 's|ExecStart=/|ExecStart=/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service ${SERVICE_PATH}/syno_update_disk_logs.service
 
-  # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
     TTYN="$(echo "${I}" | cut -d',' -f1)"
     BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
@@ -226,19 +210,17 @@ elif [ "${1}" = "late" ]; then
 
     mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
     if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
-      echo "Make getty\@${TTYN}.service"
-      cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@${TTYN}.service
-      sed -i "s|^ExecStart=.*|ExecStart=/sbin/agetty %I ${BAUD:-115200} linux|" /tmpRoot/usr/lib/systemd/system/getty\@${TTYN}.service
+      echo "Make getty@${TTYN}.service"
+      cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty@.service /tmpRoot/usr/lib/systemd/system/getty@${TTYN}.service
+      sed -i "s|^ExecStart=.*|ExecStart=/sbin/agetty %I ${BAUD:-115200} linux|" /tmpRoot/usr/lib/systemd/system/getty@${TTYN}.service
       mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
-      ln -vsf /usr/lib/systemd/system/getty\@${TTYN}.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@${TTYN}.service
+      ln -vsf /usr/lib/systemd/system/getty@${TTYN}.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty@${TTYN}.service
     fi
   done
 
-  # SD Card
   [ ! -f /tmpRoot/usr/lib/udev/script/sdcard.sh.bak ] && cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
   echo -en '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
 
-  # Network Init
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
   mkdir -p /tmpRoot/etc/sysconfig/network-scripts
   mkdir -p /tmpRoot/etc.defaults/sysconfig/network-scripts
@@ -257,23 +239,38 @@ elif [ "${1}" = "late" ]; then
     done
   fi
 
-  # Community Packages
   if [ ! -f /tmpRoot/usr/syno/etc/packages/feeds ]; then
     mkdir -p /tmpRoot/usr/syno/etc/packages
     echo '[{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/tmpRoot/usr/syno/etc/packages/feeds
   fi
 
-  # Copy Loader Reboot
   cp -f /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -f /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
 
-    # Open-VM-Tools Fix
   if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege >/dev/null 2>&1 || true
   fi
 
-  # Qemu-Guest-Agent Fix
   if [ -d /tmpRoot/var/packages/qemu-ga ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege >/dev/null 2>&1 || true
   fi
-fi
+}
+
+case "${1}" in
+  early)
+    install_early
+    ;;
+  rcExit)
+    install_rcExit
+    ;;
+  patches)
+    install_patches
+    ;;
+  late)
+    install_late
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

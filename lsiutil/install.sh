@@ -6,14 +6,27 @@
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+install_lsiutil() {
   echo "Installing addon lsiutil - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
-  
   cp -pf /usr/sbin/lsiutil /tmpRoot/usr/sbin/lsiutil
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon lsiutil - ${1}"
+}
 
+uninstall_lsiutil() {
+  echo "Uninstalling addon lsiutil - ${1}"
   rm -f "/tmpRoot/usr/sbin/lsiutil"
-fi
+}
+
+case "${1}" in
+  late)
+    install_lsiutil "${1}"
+    ;;
+  uninstall)
+    uninstall_lsiutil "${1}"
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+install_mountloader() {
   echo "Installing addon mountloader - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -26,14 +26,16 @@ if [ "${1}" = "late" ]; then
     cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
   fi
   echo "insert mountloader task to esynoscheduler.db"
-  /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+  /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULERER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'MountLoaderDisk';
 INSERT INTO task VALUES('MountLoaderDisk', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh mountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'UnMountLoaderDisk';
 INSERT INTO task VALUES('UnMountLoaderDisk', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh unmountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
 EOF
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon mountloader - ${1}"
+}
+
+uninstall_mountloader() {
+  echo "Uninstalling addon mountloader - ${1}"
 
   rm -f "/tmpRoot/usr/bin/arc-loaderdisk.sh"
 
@@ -45,4 +47,17 @@ DELETE FROM task WHERE task_name LIKE 'MountLoaderDisk';
 DELETE FROM task WHERE task_name LIKE 'UnMountLoaderDisk';
 EOF
   fi
-fi
+}
+
+case "${1}" in
+  late)
+    install_mountloader "${1}"
+    ;;
+  uninstall)
+    uninstall_mountloader "${1}"
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

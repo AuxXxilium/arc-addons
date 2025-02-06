@@ -1,30 +1,46 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+install_addincards() {
   echo "Installing addon addincards - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
+  local MODEL
   MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
-  FILE="/tmpRoot/usr/syno/etc/adapter_cards.conf"
+  local FILE="/tmpRoot/usr/syno/etc/adapter_cards.conf"
 
   [ ! -f "${FILE}.bak" ] && cp -f "${FILE}" "${FILE}.bak"
   cp -pf "${FILE}" "${FILE}.tmp"
   echo -n "" >"${FILE}"
-  for N in $(cat "${FILE}.tmp" 2>/dev/null | grep '\['); do
+  grep '\[' "${FILE}.tmp" | while read -r N; do
     echo "${N}" >>"${FILE}"
     echo "${MODEL}=yes" >>"${FILE}"
   done
   rm -f "${FILE}.tmp"
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon addincards - ${1}"
+}
 
-  FILE="/tmpRoot/usr/syno/etc/adapter_cards.conf"
+uninstall_addincards() {
+  echo "Uninstalling addon addincards - ${1}"
+
+  local FILE="/tmpRoot/usr/syno/etc/adapter_cards.conf"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
-fi
+}
+
+case "${1}" in
+  late)
+    install_addincards "${1}"
+    ;;
+  uninstall)
+    uninstall_addincards "${1}"
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

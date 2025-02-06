@@ -1,12 +1,12 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+install_setrootpw() {
   echo "Installing addon setrootpw - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -15,7 +15,7 @@ if [ "${1}" = "late" ]; then
   cp -vpf /usr/lib/openssh/sftp-server /tmpRoot/usr/lib/openssh/sftp-server
   [ ! -f "/tmpRoot/usr/lib/libcrypto.so.3" ] && cp -vpf /usr/lib/libcrypto.so.3 /tmpRoot/usr/lib/libcrypto.so.3
 
-  FILE="/tmpRoot/etc/ssh/sshd_config"
+  local FILE="/tmpRoot/etc/ssh/sshd_config"
   [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
 
   cp -pf "${FILE}.bak" "${FILE}"
@@ -23,7 +23,7 @@ if [ "${1}" = "late" ]; then
   sed -i 's|^Subsystem.*$|Subsystem	sftp	/usr/lib/openssh/sftp-server|' ${FILE}
 
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  local ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
     echo "copy esynoscheduler.db"
     mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
@@ -42,21 +42,36 @@ synowebapi --exec api=SYNO.Core.Terminal method=set version=3 enable_ssh=true ss
 ', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon setrootpw - ${1}"
+}
+
+uninstall_setrootpw() {
+  echo "Uninstalling addon setrootpw - ${1}"
 
   rm -f /tmpRoot/usr/lib/openssh/sftp-server
   # rm -f /tmpRoot/usr/lib/libcrypto.so.3
 
-  FILE="/tmpRoot/etc/ssh/sshd_config"
+  local FILE="/tmpRoot/etc/ssh/sshd_config"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
 
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  local ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete setrootpw task from esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'SetRootPw';
 EOF
   fi
-fi
+}
+
+case "${1}" in
+  late)
+    install_setrootpw "${1}"
+    ;;
+  uninstall)
+    uninstall_setrootpw "${1}"
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

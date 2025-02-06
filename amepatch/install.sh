@@ -1,12 +1,12 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+install_amepatch() {
   echo "Installing addon amepatch - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -14,7 +14,7 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/amepatch.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/amepatch.service"
   {
     echo "[Unit]"
     echo "Description=addon amepatch"
@@ -30,8 +30,10 @@ if [ "${1}" = "late" ]; then
   } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon amepatch - ${1}"
+}
+
+uninstall_amepatch() {
+  echo "Uninstalling addon amepatch - ${1}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/amepatch.service"
@@ -39,4 +41,17 @@ elif [ "${1}" = "uninstall" ]; then
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/amepatch.sh" >>/tmpRoot/usr/arc/revert.sh
-fi
+}
+
+case "${1}" in
+  late)
+    install_amepatch "${1}"
+    ;;
+  uninstall)
+    uninstall_amepatch "${1}"
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

@@ -13,13 +13,25 @@ if ! echo "${PLATFORMS}" | grep -qw "${PLATFORM}"; then
   exit 0
 fi
 
-if [ "${1}" = "early" ]; then
-  echo "Installing addon redpill - ${1}"
-
+install_redpill_early() {
+  echo "Installing addon redpill - early"
   insmod /usr/lib/modules/rp.ko
+}
 
-elif [ "${1}" = "jrExit" ]; then
-  echo "Installing addon redpill - ${1}"
-
+install_redpill_jrExit() {
+  echo "Installing addon redpill - jrExit"
   #rmmod redpill
-fi
+}
+
+case "${1}" in
+  early)
+    install_redpill_early
+    ;;
+  jrExit)
+    install_redpill_jrExit
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

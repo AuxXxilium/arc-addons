@@ -6,9 +6,9 @@
 # See /LICENSE for more information.
 #
 # From：https://github.com/007revad/Synology_HDD_db
-# 
+#
 
-if [ "${1}" = "late" ]; then
+install_hdddb() {
   echo "Installing addon hdddb - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -18,7 +18,7 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/syno/sbin/dhm_tool /tmpRoot/usr/syno/sbin/dhm_tool
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/hdddb.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/hdddb.service"
   {
     echo "[Unit]"
     echo "Description=HDDs/SSDs drives databases"
@@ -35,8 +35,10 @@ if [ "${1}" = "late" ]; then
   } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/hdddb.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/hdddb.service
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon hdddb - ${1}"
+}
+
+uninstall_hdddb() {
+  echo "Uninstalling addon hdddb - ${1}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/hdddb.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/hdddb.service"
@@ -44,4 +46,17 @@ elif [ "${1}" = "uninstall" ]; then
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/hdddb.sh --restore" >> /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/hdddb.sh" >> /tmpRoot/usr/arc/revert.sh
-fi
+}
+
+case "${1}" in
+  late)
+    install_hdddb "${1}"
+    ;;
+  uninstall)
+    uninstall_hdddb "${1}"
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

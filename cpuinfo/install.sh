@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+install_cpuinfo() {
   echo "Installing addon cpuinfo - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -15,7 +15,7 @@ if [ "${1}" = "late" ]; then
 
   shift
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/cpuinfo.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/cpuinfo.service"
   {
     echo "[Unit]"
     echo "Description=Adds correct CPU Info"
@@ -35,37 +35,10 @@ if [ "${1}" = "late" ]; then
 
   # synoscgiproxy
   cp -vpf /usr/sbin/synoscgiproxy /tmpRoot/usr/sbin/synoscgiproxy
+}
 
-  # for FILE in "/tmpRoot/etc/nginx/nginx.conf" "/tmpRoot/usr/syno/share/nginx/nginx.mustache"; do
-  #   [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
-  #   sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' "${FILE}"
-  # done
-  # 
-  # mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  # DEST="/tmpRoot/usr/lib/systemd/system/synoscgiproxy.service"
-  # {
-  #   echo "[Unit]"
-  #   echo "Description=ARC addon synoscgiproxy daemon"
-  #   echo "After=network.target"
-  #   echo
-  #   echo "[Service]"
-  #   echo "Type=simple"
-  #   echo "ExecStart=/usr/sbin/synoscgiproxy"
-  #   echo "ExecReload=/bin/kill -HUP \$MAINPID"
-  #   echo "Restart=always"
-  #   echo "RestartSec=3"
-  #   echo "StartLimitInterval=60"
-  #   echo "StartLimitBurst=3"
-  #   echo
-  #   echo "[Install]"
-  #   echo "WantedBy=multi-user.target"
-  # } >"${DEST}"
-  # 
-  # mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  # ln -vsf /usr/lib/systemd/system/synoscgiproxy.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/synoscgiproxy.service
-
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon cpuinfo - ${1}"
+uninstall_cpuinfo() {
+  echo "Uninstalling addon cpuinfo - ${1}"
 
   # cpuinfo
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo.service"
@@ -77,12 +50,17 @@ elif [ "${1}" = "uninstall" ]; then
 
   # synoscgiproxy
   rm -f /tmpRoot/usr/sbin/synoscgiproxy
+}
 
-  # for FILE in "/tmpRoot/etc/nginx/nginx.conf" "/tmpRoot/usr/syno/share/nginx/nginx.mustache"; do
-  #   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
-  # done
-  #
-  # rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/synoscgiproxy.service"
-  # rm -f "/tmpRoot/usr/lib/systemd/system/synoscgiproxy.service"
-  # 
-fi
+case "${1}" in
+  late)
+    install_cpuinfo "${1}"
+    ;;
+  uninstall)
+    uninstall_cpuinfo "${1}"
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

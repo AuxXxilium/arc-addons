@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-MODELS="DS918+ RS1619xs+ DS1019+ DS718+ DS1621xs+"
+MODELS="DS918+ RS1619xs+ DS1019+ DS719+ DS1621xs+"
 MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
 
 if ! echo "${MODELS}" | grep -wq "${MODEL}"; then
@@ -14,8 +14,8 @@ if ! echo "${MODELS}" | grep -wq "${MODEL}"; then
   exit 0
 fi
 
-if [ "${1}" = "patches" ]; then
-  echo "Installing addon nvmecache - ${1}"
+install_patches() {
+  echo "Installing addon nvmecache - patches"
 
   BOOTDISK_PART3_PATH="$(blkid -L ARC3 2>/dev/null)"
   [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
@@ -36,41 +36,31 @@ if [ "${1}" = "patches" ]; then
     PCIEPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2 | awk -F'/' '{if (NF == 4) print $NF; else if (NF > 4) print $(NF-1)}')"
     if [ -n "${PCIEPATH}" ]; then
       grep -q "${PCIEPATH}" /etc/nvmePorts && continue
+      echo "${PCIEPATH}" >> /etc/nvmePorts
     fi
   done
   [ -f /etc/nvmePorts ] && cat /etc/nvmePorts
-elif [ "${1}" = "late" ]; then
-  echo "Installing addon nvmecache - ${1}"
+}
+
+install_late() {
+  echo "Installing addon nvmecache - late"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  #
-  # |       models      |     1st      |     2nd      |
-  # | DS918+            | 0000:00:13.1 | 0000:00:13.2 |
-  # | RS1619xs+         | 0000:00:03.2 | 0000:00:03.3 |
-  # | DS419+, DS1019+   | 0000:00:14.1 |              |
-  # | DS718+, DS1621xs+ | 0000:00:01.1 | 0000:00:01.0 |
-  #
-  # In the late stage, the /sys/ directory does not exist, and the device path cannot be obtained.
-  # (/dev/ does exist, but there is no useful information.)
-  # (The information obtained by lspci is incomplete and an error will be reported.)
-  # Therefore, the device path is obtained in the early stage and stored in /etc/nvmePorts.
-
   if [ ! -f /etc/nvmePorts ]; then
-    echo "/etc/nvmePorts is not exist"
+    echo "/etc/nvmePorts does not exist"
     exit 0
   fi
 
   SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
 
-  # Replace the device path.
   cp -pf "${SO_FILE}.bak" "${SO_FILE}"
   sed -i "s/0000:00:13.1/0000:99:99.0/; s/0000:00:03.2/0000:99:99.0/; s/0000:00:14.1/0000:99:99.0/; s/0000:00:01.1/0000:99:99.0/" "${SO_FILE}"
   sed -i "s/0000:00:13.2/0000:99:99.1/; s/0000:00:03.3/0000:99:99.1/; s/0000:00:99.9/0000:99:99.1/; s/0000:00:01.0/0000:99:99.1/" "${SO_FILE}"
 
   idx=0
-  for N in $(cat /etc/nvmePorts 2>/dev/null); do
+  while read -r N; do
     echo "${idx} - ${N}"
     if [ ${idx} -eq 0 ]; then
       sed -i "s/0000:99:99.0/${N}/g" "${SO_FILE}"
@@ -80,10 +70,28 @@ elif [ "${1}" = "late" ]; then
       break
     fi
     idx=$((idx + 1))
-  done
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon nvmecache - ${1}"
+  done < /etc/nvmePorts
+}
+
+uninstall_nvmecache() {
+  echo "Uninstalling addon nvmecache"
 
   SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
-fi
+}
+
+case "${1}" in
+  patches)
+    install_patches
+    ;;
+  late)
+    install_late
+    ;;
+  uninstall)
+    uninstall_nvmecache
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac

@@ -8,15 +8,15 @@
 # From：https://github.com/007revad/Synology_enable_Deduplication
 #
 
-if [ "${1}" = "late" ]; then
+install_deduplication() {
   echo "Creating service to exec deduplication"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
   cp -pf /usr/bin/deduplication.sh /tmpRoot/usr/bin/deduplication.sh
 
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"  
-  DEST="/tmpRoot/usr/lib/systemd/system/deduplication.service"
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  local DEST="/tmpRoot/usr/lib/systemd/system/deduplication.service"
   {
     echo "[Unit]"
     echo "Description=Enable Deduplication"
@@ -32,8 +32,10 @@ if [ "${1}" = "late" ]; then
   } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/deduplication.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/deduplication.service
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon deduplication - ${1}"
+}
+
+uninstall_deduplication() {
+  echo "Uninstalling addon deduplication - ${1}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/deduplication.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/deduplication.service"
@@ -41,4 +43,17 @@ elif [ "${1}" = "uninstall" ]; then
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/deduplication.sh --restore" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/deduplication.sh" >>/tmpRoot/usr/arc/revert.sh
-fi
+}
+
+case "${1}" in
+  late)
+    install_deduplication "${1}"
+    ;;
+  uninstall)
+    uninstall_deduplication "${1}"
+    ;;
+  *)
+    echo "Invalid argument: ${1}"
+    exit 1
+    ;;
+esac
