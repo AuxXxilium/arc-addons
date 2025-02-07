@@ -5,11 +5,12 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
+
 if [ "${1}" = "early" ]; then
   echo "Installing addon misc - ${1}"
 
   # [CREATE][failed] Raidtool initsys
-  SO_FILE="/usr/syno/bin/scemd"
+  local SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null | sed "s/2d6520302e39/2d6520312e32/" | xxd -r -p >"${SO_FILE}" 2>/dev/null
@@ -19,6 +20,7 @@ elif [ "${1}" = "rcExit" ]; then
   echo "Installing addon misc - ${1}"
 
   mkdir -p /usr/syno/web/webman
+
   # Create: Cleanup Disk
   cat >/usr/syno/web/webman/clean_system_disk.cgi <<EOF
 #!/bin/sh
@@ -122,8 +124,8 @@ EOF
 elif [ "${1}" = "patches" ]; then
   # Start getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
-    TTYN="$(echo "${I}" | cut -d',' -f1)"
-    BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
+    local TTYN="$(echo "${I}" | cut -d',' -f1)"
+    local BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
     echo "ttyS0 ttyS1 ttyS2" | grep -qw "${TTYN}" && continue
     if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
       echo "Starting getty on ${TTYN}"
@@ -134,27 +136,31 @@ elif [ "${1}" = "patches" ]; then
       fi
     fi
   done
+
   # Set static IP from cmdline
   if grep -q 'network.' /proc/cmdline; then
     for I in $(grep -Eo 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
-      MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/' | tr '[:upper:]' '[:lower:]')"
-      IPRS="$(echo "${I}" | cut -d= -f2)"
+      local MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/' | tr '[:upper:]' '[:lower:]')"
+      local IPRS="$(echo "${I}" | cut -d= -f2)"
       for ETH in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
-        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/' | tr '[:upper:]' '[:lower:]')
+        local MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/' | tr '[:upper:]' '[:lower:]')
         if [ "${MACR}" = "${MACX}" ]; then
           echo "Setting IP for ${ETH} to ${IPRS}"
           mkdir -p /etc/sysconfig/network-scripts
-          echo "DEVICE=${ETH}" >/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "IPADDR=$(echo "${IPRS}" | cut -d/ -f1)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "NETMASK=$(echo "${IPRS}" | cut -d/ -f2)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "GATEWAY=$(echo "${IPRS}" | cut -d/ -f3)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          {
+            echo "DEVICE=${ETH}"
+            echo "BOOTPROTO=static"
+            echo "ONBOOT=yes"
+            echo "IPADDR=$(echo "${IPRS}" | cut -d/ -f1)"
+            echo "NETMASK=$(echo "${IPRS}" | cut -d/ -f2)"
+            echo "GATEWAY=$(echo "${IPRS}" | cut -d/ -f3)"
+          } >/etc/sysconfig/network-scripts/ifcfg-${ETH}
           echo "${ETH}" >>/etc/ifcfgs
         fi
       done
     done
   fi
+
 elif [ "${1}" = "late" ]; then
   echo "Installing addon misc - ${1}"
 
@@ -170,9 +176,10 @@ elif [ "${1}" = "late" ]; then
 
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
+
   # CPU performance scaling
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
-    CPUFREQ=$(ls -l /sys/devices/system/cpu/cpufreq/*/* 2>/dev/null | wc -l)
+    local CPUFREQ=$(ls -l /sys/devices/system/cpu/cpufreq/*/* 2>/dev/null | wc -l)
     if [ ${CPUFREQ} -eq 0 ]; then
       echo "CPU does NOT support CPU Performance Scaling, disabling"
       sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
@@ -215,22 +222,22 @@ elif [ "${1}" = "late" ]; then
   fi
 
   # service
-  SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
+  local SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
   sed -i 's|ExecStart=/|ExecStart=/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service ${SERVICE_PATH}/syno_update_disk_logs.service
 
   # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
-    TTYN="$(echo "${I}" | cut -d',' -f1)"
-    BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
+    local TTYN="$(echo "${I}" | cut -d',' -f1)"
+    local BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
     echo "ttyS0 ttyS1 ttyS2" | grep -wq "${TTYN}" && continue
 
     mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
     if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
-      echo "Make getty\@${TTYN}.service"
-      cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@${TTYN}.service
-      sed -i "s|^ExecStart=.*|ExecStart=/sbin/agetty %I ${BAUD:-115200} linux|" /tmpRoot/usr/lib/systemd/system/getty\@${TTYN}.service
+      echo "Make getty@${TTYN}.service"
+      cp -fv /tmpRoot/usr/lib/systemd/system/serial-getty@.service /tmpRoot/usr/lib/systemd/system/getty@${TTYN}.service
+      sed -i "s|^ExecStart=.*|ExecStart=/sbin/agetty %I ${BAUD:-115200} linux|" /tmpRoot/usr/lib/systemd/system/getty@${TTYN}.service
       mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
-      ln -vsf /usr/lib/systemd/system/getty\@${TTYN}.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@${TTYN}.service
+      ln -vsf /usr/lib/systemd/system/getty@${TTYN}.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty@${TTYN}.service
     fi
   done
 
@@ -267,7 +274,7 @@ elif [ "${1}" = "late" ]; then
   cp -f /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -f /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
 
-    # Open-VM-Tools Fix
+  # Open-VM-Tools Fix
   if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege >/dev/null 2>&1 || true
   fi

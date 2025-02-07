@@ -15,7 +15,7 @@ if [ "${1}" = "late" ]; then
 
   shift
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/cpuinfo.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/cpuinfo.service"
   {
     echo "[Unit]"
     echo "Description=Adds correct CPU Info"

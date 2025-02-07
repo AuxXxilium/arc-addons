@@ -23,7 +23,7 @@ if [ "${1}" = "late" ]; then
 
   if [ ! "$(cat "/tmpRoot/usr/arc/revert.sh")" = '#!/usr/bin/env bash' ]; then
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
-    DEST="/tmpRoot/usr/lib/systemd/system/revert.service"
+    local DEST="/tmpRoot/usr/lib/systemd/system/revert.service"
     {
       echo "[Unit]"
       echo "Description=revert"

@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -14,7 +14,7 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/bin/codecpatch.sh /tmpRoot/usr/bin/codecpatch.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/codecpatch.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/codecpatch.service"
   {
     echo "[Unit]"
     echo "Description=addon codecpatch"

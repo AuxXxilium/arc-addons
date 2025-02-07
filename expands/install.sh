@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -14,7 +14,7 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/bin/expands.sh /tmpRoot/usr/bin/expands.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/expands.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/expands.service"
   {
     echo "[Unit]"
     echo "Description=Expanded miscellaneous"
@@ -36,8 +36,8 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/expands.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/expands.service"
 
-  FILE="/tmpRoot/usr/syno/etc/usb.map"
+  local FILE="/tmpRoot/usr/syno/etc/usb.map"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
-  FILE="/tmpRoot/etc/ssl/certs/ca-certificates.crt"
+  local FILE="/tmpRoot/etc/ssl/certs/ca-certificates.crt"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
 fi

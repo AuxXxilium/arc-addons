@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -14,30 +14,33 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin
   cp -pf /usr/bin/grub-editenv /tmpRoot/usr/bin
 
-  if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+  local ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  if [ ! -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "copy esynoscheduler.db"
-    mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
-    cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+    mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
+    cp -pf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
   fi
   echo "insert rebootto... task to esynoscheduler.db"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+  /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'RebootToLoader';
 INSERT INTO task VALUES('RebootToLoader', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/bin/loader-reboot.sh "config"', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'RebootToUpdate';
 INSERT INTO task VALUES('RebootToUpdate', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/bin/loader-reboot.sh "update"', 'script', '{}', '', '', '{}', '{}');
 EOF
 elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon rebootto... - ${1}"
+  echo "Uninstalling addon rebootto... - ${1}"
 
   rm -f /tmpRoot/usr/bin/loader-reboot.sh
   rm -f /tmpRoot/usr/bin/grub-editenv
 
-  if [ -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+  local ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete rebootto... task from esynoscheduler.db"
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'RebootToLoader';
+DELETE FROM task WHERE task_name LIKE 'RebootToUpdate';
 EOF
   fi
 fi

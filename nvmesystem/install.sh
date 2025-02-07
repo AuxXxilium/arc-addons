@@ -1,17 +1,12 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-# PLATFORMS="epyc7002"
-# PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
-# if ! echo "${PLATFORMS}" | grep -qw "${PLATFORM}"; then
-#   echo "${PLATFORM} is not supported nvmesystem addon!"
-#   exit 0
-# fi
+local _BUILD
 _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
 if [ ${_BUILD:-64570} -lt 69057 ]; then
   echo "${_BUILD} is not supported nvmesystem addon!"
@@ -25,7 +20,7 @@ if [ "${1}" = "early" ]; then
   sed -i "s/support_ssd_cache=.*/support_ssd_cache=\"no\"/" /etc/synoinfo.conf /etc.defaults/synoinfo.conf
 
   # [CREATE][failed] Raidtool initsys
-  SO_FILE="/usr/syno/bin/scemd"
+  local SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -f "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
@@ -39,7 +34,7 @@ elif [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   # disk/shared_disk_info_enum.c::84 Failed to allocate list in SharedDiskInfoEnum, errno=0x900.
-  SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
+  local SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
 
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
@@ -54,7 +49,7 @@ elif [ "${1}" = "late" ]; then
   [ ! -f "/tmpRoot/usr/bin/gzip" ] && cp -vpf /usr/bin/gzip /tmpRoot/usr/bin/gzip
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
   {
     echo "[Unit]"
     echo "Description=Modify storage panel(nvmesystem)"
@@ -76,12 +71,12 @@ elif [ "${1}" = "late" ]; then
 
   # A bug in the custom kernel, the reason for which is currently unknown
   if cat /proc/version 2>/dev/null | grep -q 'RR@RR'; then
-    ONBOOTUP=""
+    local ONBOOTUP=""
     ONBOOTUP="${ONBOOTUP}systemctl restart systemd-udev-trigger.service\n"
     ONBOOTUP="${ONBOOTUP}echo \"DELETE FROM task WHERE task_name LIKE ''ARCONBOOTUPARC_UDEV'';\" | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db\n"
 
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+    local ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
     if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -qw "task"; then
       echo "copy esynoscheduler.db"
       mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
@@ -95,9 +90,9 @@ EOF
   fi
 
 elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon nvmesystem - ${1}"
+  echo "Uninstalling addon nvmesystem - ${1}"
 
-  SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
+  local SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmesystem.service"

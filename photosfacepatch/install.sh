@@ -15,7 +15,7 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/bin/photosfacepatch.sh /tmpRoot/usr/bin/photosfacepatch.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/photosfacepatch.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/photosfacepatch.service"
   {
     echo "[Unit]"
     echo "Description=Enable face recognition in Synology Photos"

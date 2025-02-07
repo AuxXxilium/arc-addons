@@ -15,7 +15,7 @@ if [ "${1}" = "late" ]; then
   cp -pf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/scaling.sh"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
   {
     echo "[Unit]"
     echo "Description=Enable CPU Freq scaling"

@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -11,7 +11,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
-  FILE="/tmpRoot/usr/syno/bin/synoups"
+  local FILE="/tmpRoot/usr/syno/bin/synoups"
   [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
 
   cp -pf "${FILE}.bak" "${FILE}"
@@ -19,13 +19,13 @@ if [ "${1}" = "late" ]; then
     sed -i "s|/usr/syno/sbin/synopoweroff.*$|/usr/syno/sbin/synopoweroff|g" "${FILE}"
   fi
   if [ "${2}" = "-e" ] || [ "${2}" = "-f" ]; then
-    EVENT_POWEROFF="/usr/syno/sbin/esynoscheduler --fireEvent event=shutdown"
+    local EVENT_POWEROFF="/usr/syno/sbin/esynoscheduler --fireEvent event=shutdown"
     if ! grep -q "${EVENT_POWEROFF}" "${FILE}"; then
       sed -i "/\/usr\/syno\/sbin\/synopoweroff/i\ \ \ \ ${EVENT_POWEROFF}" "${FILE}"
     fi
 
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+    local ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
     if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
       echo "copy esynoscheduler.db"
       mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
@@ -42,11 +42,11 @@ EOF
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon ups - ${1}"
 
-  FILE="/tmpRoot/usr/syno/bin/synoups"
+  local FILE="/tmpRoot/usr/syno/bin/synoups"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
 
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  local ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete start/stop ScsiTarget task from esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF

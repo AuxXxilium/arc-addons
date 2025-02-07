@@ -14,7 +14,7 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/bin/sequentialio.sh /tmpRoot/usr/bin/sequentialio.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/sequentialio.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/sequentialio.service"
   {
     echo "[Unit]"
     echo "Description=Sequential I/O SSD caches"

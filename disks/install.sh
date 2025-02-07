@@ -8,7 +8,7 @@
 
 # Get values in synoinfo.conf K=V file
 # Args: $1 rd|hd, $2 key
-function _get_conf_kv() {
+_get_conf_kv() {
   local ROOT FILE
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   FILE="${ROOT}/etc.defaults/synoinfo.conf"
@@ -17,8 +17,8 @@ function _get_conf_kv() {
 
 # Replace/add values in synoinfo.conf K=V file
 # Args: $1 rd|hd, $2 key, $3 val
-function _set_conf_kv() {
-  local ROOT FILE
+_set_conf_kv() {
+  local ROOT FILE SD
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   for SD in etc etc.defaults; do
     FILE="${ROOT}/${SD}/synoinfo.conf"
@@ -31,22 +31,22 @@ function _set_conf_kv() {
       continue
     fi
     echo "${2}=\"${3}\"" >>"${FILE}"
-    # continue
   done
 }
 
 # Check if the user has customized the key
 # Args: $1 rd|hd, $2 key
-function _check_post_k() {
+_check_post_k() {
   local ROOT
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   grep -Eq "^_set_conf_kv.*${2}.*" "${ROOT}/sbin/init.post"
 }
 
 # Check if the raid has been completed currently
-function _check_rootraidstatus() {
+_check_rootraidstatus() {
   [ "$(_get_conf_kv rd supportraid)" = "yes" ] || return 0
-  local STATE=$(cat /sys/block/md0/md/array_state 2>/dev/null)
+  local STATE
+  STATE=$(cat /sys/block/md0/md/array_state 2>/dev/null)
   [ $? -ne 0 ] && return 1
   case ${STATE} in
   "clear" | "inactive" | "suspended" | "readonly" | "read-auto") return 1 ;;
@@ -56,7 +56,7 @@ function _check_rootraidstatus() {
 
 # Convert disk name to integer
 # Args: $1 disk name
-function _atoi() {
+_atoi() {
   local DISKNAME=${1} NUM=0 IDX=0 N BIT
   while [ ${IDX} -lt ${#DISKNAME} ]; do
     N=$(($(printf '%d' "'${DISKNAME:${IDX}:1}") - $(printf '%d' "'a") + 1))
@@ -69,13 +69,7 @@ function _atoi() {
 
 # Generate linux kernel version code
 # Args: $1 version string
-# ex.
-#   KernelVersionCode "2.4.22"  => 132118
-#   KernelVersionCode "2.6"     => 132608
-#   KernelVersionCode "2.6.32"  => 132640
-#   KernelVersionCode "3"       => 196608
-#   KernelVersionCode "3.0.0"   => 196608
-function _kernelVersionCode() {
+_kernelVersionCode() {
   [ $# -eq 1 ] || return
 
   local _version_string _major_version _minor_version _revision
@@ -89,15 +83,14 @@ function _kernelVersionCode() {
 
 # Get current linux kernel version without extra version
 # format: VERSION.PATCHLEVEL.SUBLEVEL
-# ex. "2.6.32"
-function _kernelVersion() {
+_kernelVersion() {
   local _release
   _release=$(/bin/uname -r)
   /bin/echo ${_release%%[-+]*} | /usr/bin/cut -d'.' -f1-3
 }
 
 # synoboot
-function checkSynoboot() {
+checkSynoboot() {
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
     [ -z "${BOOTDISK}" ] && return
     if [ ! -b /dev/synoboot ] && [ -d /sys/block/${BOOTDISK} ]; then
@@ -114,7 +107,7 @@ function checkSynoboot() {
 }
 
 # USB ports
-function getUsbPorts() {
+getUsbPorts() {
   for I in $(ls -d /sys/bus/usb/devices/usb* 2>/dev/null); do
     local DCLASS SPEED RBUS RCHILDS HAVE_CHILD=0
     DCLASS=$(cat ${I}/bDeviceClass)
@@ -142,10 +135,9 @@ function getUsbPorts() {
   echo
 }
 
-#
-function dtModel() {
-  DEST="/addons/model.dts"
-  UNIQUE=$(_get_conf_kv rd unique)
+dtModel() {
+  local DEST="/addons/model.dts"
+  local UNIQUE=$(_get_conf_kv rd unique)
   if [ ! -f "${DEST}" ]; then # Users can put their own dts.
     {
       echo "/dts-v1/;"
@@ -157,8 +149,9 @@ function dtModel() {
     } >"${DEST}"
     # SATA ports
     if [ "${1}" = "true" ]; then
-      I=1
+      local I=1
       for P in $(lspci -d ::106 2>/dev/null | cut -d' ' -f1); do
+        local HOSTNUM PCIHEAD PCIPATH PCISUBS IDX
         HOSTNUM=$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | wc -l)
         PCIHEAD="$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | head -1)"
         PCIPATH=""
@@ -194,13 +187,14 @@ function dtModel() {
         done
       done
       for P in $(lspci -d ::107 2>/dev/null | cut -d' ' -f1) $(lspci -d ::104 2>/dev/null | cut -d' ' -f1) $(lspci -d ::100 2>/dev/null | cut -d' ' -f1); do
-        J=1
+        local J=1
         while true; do
           [ ! -d /sys/block/sata${J} ] && break
           if cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | grep -q "${P}"; then
             if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "$(cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
               echo "bootloader: /sys/block/sata${J}"
             else
+              local PCIEPATH ATAPORT
               PCIEPATH="$(grep 'pciepath' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
               ATAPORT="$(grep 'ata_port_no' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
               if [ -n "${PCIEPATH}" ] && [ -n "${ATAPORT}" ]; then
@@ -221,13 +215,13 @@ function dtModel() {
         done
       done
     else
-      I=1
-      J=1
+      local I=1 J=1
       while true; do
         [ ! -d /sys/block/sata${J} ] && break
         if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "$(cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
           echo "bootloader: /sys/block/sata${J}"
         else
+          local PCIEPATH ATAPORT
           PCIEPATH="$(grep 'pciepath' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
           ATAPORT="$(grep 'ata_port_no' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
           if [ -n "${PCIEPATH}" ] && [ -n "${ATAPORT}" ]; then
@@ -246,16 +240,13 @@ function dtModel() {
         J=$((${J} + 1))
       done
     fi
-    MAXDISKS=$((${I} - 1))
+    local MAXDISKS=$((${I} - 1))
     if _check_post_k "rd" "maxdisks"; then
       MAXDISKS=$(($(_get_conf_kv rd maxdisks)))
       echo "get maxdisks=${MAXDISKS}"
     else
-      # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-      # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
       [ ${MAXDISKS} -lt 26 ] && MAXDISKS=26
     fi
-    # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
     if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
       MAXDISKS=26
       echo "set maxdisks=26 [${MAXDISKS}]"
@@ -264,13 +255,13 @@ function dtModel() {
     echo "maxdisks=${MAXDISKS}"
 
     # NVME ports
-    COUNT=0
-    POWER_LIMIT=""
+    local COUNT=0 POWER_LIMIT=""
     for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
       if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
         echo "bootloader: ${P}"
         continue
       fi
+      local PCIEPATH
       PCIEPATH="$(grep 'pciepath' ${P}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
       if [ -n "${PCIEPATH}" ]; then
         grep -q "pcie_root = \"${PCIEPATH}\";" ${DEST} && continue # An nvme controller only recognizes one disk
@@ -292,7 +283,7 @@ function dtModel() {
     fi
 
     # USB ports
-    COUNT=0
+    local COUNT=0
     for I in $(getUsbPorts); do
       COUNT=$((${COUNT} + 1))
       {
@@ -308,16 +299,13 @@ function dtModel() {
     done
     echo "};" >>"${DEST}"
   else
-    MAXDISKS=$(grep -c "internal_slot@" "${DEST}" 2>/dev/null)
+    local MAXDISKS=$(grep -c "internal_slot@" "${DEST}" 2>/dev/null)
     if _check_post_k "rd" "maxdisks"; then
       MAXDISKS=$(($(_get_conf_kv rd maxdisks)))
       echo "get maxdisks=${MAXDISKS}"
     else
-      # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-      # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
       [ ${MAXDISKS:-0} -lt 26 ] && MAXDISKS=26
     fi
-    # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
     if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
       MAXDISKS=26
       echo "set maxdisks=26 [${MAXDISKS}]"
@@ -335,8 +323,7 @@ function dtModel() {
   /usr/syno/bin/syno_slot_mapping
 }
 
-#
-function nondtModel() {
+nondtModel() {
   MAXDISKS=0
   USBPORTCFG=0
   ESATAPORTCFG=0
@@ -433,7 +420,6 @@ function nondtModel() {
   done
 }
 
-#
 if [ "${1}" = "patches" ]; then
   echo "Installing addon disks - ${1}"
 

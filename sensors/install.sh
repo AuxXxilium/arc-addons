@@ -15,7 +15,7 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
 
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  local ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
     echo "copy esynoscheduler.db"
     mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
@@ -41,7 +41,7 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f /tmpRoot/usr/bin/arc-sensors.sh
 
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  local ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete sensors task from esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF

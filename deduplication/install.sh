@@ -16,7 +16,7 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/bin/deduplication.sh /tmpRoot/usr/bin/deduplication.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"  
-  DEST="/tmpRoot/usr/lib/systemd/system/deduplication.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/deduplication.service"
   {
     echo "[Unit]"
     echo "Description=Enable Deduplication"

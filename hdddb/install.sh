@@ -18,7 +18,7 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/syno/sbin/dhm_tool /tmpRoot/usr/syno/sbin/dhm_tool
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/hdddb.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/hdddb.service"
   {
     echo "[Unit]"
     echo "Description=HDDs/SSDs drives databases"

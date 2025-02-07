@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -12,7 +12,7 @@ function getlog() {
     exit 1
   fi
 
-  WORK_PATH="/mnt/p1"
+  local WORK_PATH="/mnt/p1"
   mkdir -p "${WORK_PATH}"
 
   if ! mount | grep -q "${WORK_PATH}"; then
@@ -30,7 +30,7 @@ function getlog() {
     mount "${LOADER_DISK_PART1}" "${WORK_PATH}"
   fi
 
-  DEST_PATH="${WORK_PATH}/logs/${1}"
+  local DEST_PATH="${WORK_PATH}/logs/${1}"
   rm -rf "${DEST_PATH}"
   mkdir -p "${DEST_PATH}"
 

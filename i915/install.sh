@@ -1,13 +1,13 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-PLATFORMS="apollolake geminilake"
-PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
+local PLATFORMS="apollolake geminilake"
+local PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
 
 if ! echo "${PLATFORMS}" | grep -qw "${PLATFORM}"; then
   echo "${PLATFORM} is not supported i915 addon!"
@@ -17,6 +17,7 @@ fi
 if [ "${1}" = "patches" ]; then
   echo "Installing addon i915le10th - ${1}"
 
+  local GPU
   if [ -n "${2}" ]; then
     GPU="$(echo "${2}" | sed 's/://g; s/.*/\L&/')"
   else
@@ -28,19 +29,19 @@ if [ "${1}" = "patches" ]; then
     exit 0
   fi
 
-  KO_FILE="/usr/lib/modules/i915.ko"
+  local KO_FILE="/usr/lib/modules/i915.ko"
   if [ ! -f "${KO_FILE}" ]; then
     echo "i915.ko does not exist"
     exit 0
   fi
 
-  isLoad=0
+  local isLoad=0
   if lsmod 2>/dev/null | grep -q "^i915"; then
     isLoad=1
     /usr/sbin/modprobe -r i915
   fi
-  GPU_DEF="86800000923e0000"
-  GPU_BIN="${GPU:2:2}${GPU:0:2}0000${GPU:6:2}${GPU:4:2}0000"
+  local GPU_DEF="86800000923e0000"
+  local GPU_BIN="${GPU:2:2}${GPU:0:2}0000${GPU:6:2}${GPU:4:2}0000"
   echo "GPU:${GPU} GPU_BIN:${GPU_BIN}"
   cp -pf "${KO_FILE}" "${KO_FILE}.tmp"
   xxd -c $(xxd -p "${KO_FILE}.tmp" 2>/dev/null | wc -c) -p "${KO_FILE}.tmp" 2>/dev/null |
@@ -54,12 +55,12 @@ elif [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
+  local KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
   [ ! -f "${KO_FILE}.bak" ] && cp -pf "${KO_FILE}" "${KO_FILE}.bak"
   cp -pf "/usr/lib/modules/i915.ko" "${KO_FILE}"
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon i915 - ${1}"
 
-  KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
+  local KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
   [ -f "${KO_FILE}.bak" ] && mv -f "${KO_FILE}.bak" "${KO_FILE}"
 fi

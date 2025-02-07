@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -16,8 +16,7 @@ if [ "${1}" = "late" ]; then
   chmod 755 "/tmpRoot/usr/sbin/powersched"
   # Clean old entries
   [ ! -f "/tmpRoot/etc/crontab.bak" -a -f "/tmpRoot/etc/crontab" ] && cp -f "/tmpRoot/etc/crontab" "/tmpRoot/etc/crontab.bak"
-  SED_PATH='/tmpRoot/usr/bin/sed'
-  ${SED_PATH} -i '/\/usr\/sbin\/powersched/d' /tmpRoot/etc/crontab
+  sed -i '/\/usr\/sbin\/powersched/d' /tmpRoot/etc/crontab
   # Add line to crontab, execute each minute
   echo "*       *       *       *       *       root    /usr/sbin/powersched #arpl powersched addon" >>/tmpRoot/etc/crontab
 elif [ "${1}" = "uninstall" ]; then

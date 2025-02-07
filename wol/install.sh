@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -20,7 +20,7 @@ elif [ "${1}" = "late" ]; then
   cp -pf /usr/bin/wol.sh /tmpRoot/usr/bin/wol.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/wol.service"
+  local DEST="/tmpRoot/usr/lib/systemd/system/wol.service"
   {
     echo "[Unit]"
     echo "Description=Force WOL on ethN"
@@ -37,7 +37,7 @@ elif [ "${1}" = "late" ]; then
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/wol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/wol.service
 elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon wol - ${1}"
+  echo "Uninstalling addon wol - ${1}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/wol.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/wol.service"
