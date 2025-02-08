@@ -83,7 +83,7 @@ MSG="${MSG}\n"
 MSG="${MSG}Warning: Data should only be stored in shared folders. Data stored elsewhere\n"
 MSG="${MSG}may be deleted when the system is updated/restarted.\n"
 MSG="${MSG}\n"
-MSG="${MSG}'System partition(/dev/md0) mounted to': /tmpRoot\n"
+MSG="${MSG}'System partition /dev/md0 mounted to': /tmpRoot\n"
 MSG="${MSG}To 'Force re-install DSM': http://<ip>:5000/web_install.html\n"
 MSG="${MSG}To 'Reboot to Config Mode': http://<ip>:5000/webman/reboot_to_loader.cgi\n"
 MSG="${MSG}To 'Show Boot Log': http://<ip>:5000/webman/get_logs.cgi\n"
@@ -123,21 +123,19 @@ install_patches() {
 
   if grep -q 'network.' /proc/cmdline; then
     for I in $(grep -Eo 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
-      MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/' | tr '[:upper:]' '[:lower:]')"
+      MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/')"
       IPRS="$(echo "${I}" | cut -d= -f2)"
       for ETH in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
-        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/' | tr '[:upper:]' '[:lower:]')
+        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/')
         if [ "${MACR}" = "${MACX}" ]; then
           echo "Setting IP for ${ETH} to ${IPRS}"
           mkdir -p /etc/sysconfig/network-scripts
-          {
-            echo "DEVICE=${ETH}"
-            echo "BOOTPROTO=static"
-            echo "ONBOOT=yes"
-            echo "IPADDR=$(echo "${IPRS}" | cut -d/ -f1)"
-            echo "NETMASK=$(echo "${IPRS}" | cut -d/ -f2)"
-            echo "GATEWAY=$(echo "${IPRS}" | cut -d/ -f3)"
-          } >/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "DEVICE=${ETH}" >/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "IPADDR=$(echo "${IPRS}" | cut -d/ -f1)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "NETMASK=$(echo "${IPRS}" | cut -d/ -f2)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
+          echo "GATEWAY=$(echo "${IPRS}" | cut -d/ -f3)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
           echo "${ETH}" >>/etc/ifcfgs
         fi
       done
@@ -227,8 +225,8 @@ install_late() {
   mkdir -p /tmpRoot/etc/sysconfig/network-scripts
   mkdir -p /tmpRoot/etc.defaults/sysconfig/network-scripts
   for I in $(ls /etc/sysconfig/network-scripts/ifcfg-eth*); do
-    [ ! -f "/tmpRoot/${I}" ] && cp -pf "${I}" "/tmpRoot/${I}"
-    [ ! -f "/tmpRoot/${I/etc/etc.defaults}" ] && cp -pf "${I}" "/tmpRoot/${I/etc/etc.defaults}"
+    [ ! -f "/tmpRoot/${I}" ] && cp -vpf "${I}" "/tmpRoot/${I}"
+    [ ! -f "/tmpRoot/${I/etc/etc.defaults}" ] && cp -vpf "${I}" "/tmpRoot/${I/etc/etc.defaults}"
   done
   if grep -q 'network.' /proc/cmdline && [ -f "/etc/ifcfgs" ]; then
     for ETH in $(cat /etc/ifcfgs); do
