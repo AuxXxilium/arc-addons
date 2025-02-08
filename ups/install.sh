@@ -1,12 +1,14 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+set -e
+
+install_addon() {
   echo "Installing addon ups - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -39,8 +41,10 @@ DELETE FROM task WHERE task_name LIKE 'StopScsiTarget';
 INSERT INTO task VALUES('StopScsiTarget', '', 'shutdown', '', 1, 0, 0, 0, '', 0, "synopkg stop ScsiTarget", 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon ups - ${1}"
+}
+
+uninstall_addon() {
+  echo "Uninstalling addon ups - ${1}"
 
   FILE="/tmpRoot/usr/syno/bin/synoups"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
@@ -54,4 +58,16 @@ DELETE FROM task WHERE task_name LIKE 'StartScsiTarget';
 DELETE FROM task WHERE task_name LIKE 'StopScsiTarget';
 EOF
   fi
-fi
+}
+
+case "${1}" in
+  late)
+    install_addon "${1}" "${2}"
+    ;;
+  uninstall)
+    uninstall_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

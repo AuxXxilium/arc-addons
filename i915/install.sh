@@ -1,24 +1,28 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-PLATFORMS="apollolake geminilake"
-PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
+set -e
 
-if ! echo "${PLATFORMS}" | grep -qw "${PLATFORM}"; then
-  echo "${PLATFORM} is not supported i915 addon!"
-  exit 0
-fi
+check_platform() {
+  PLATFORMS="apollolake geminilake"
+  PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
 
-if [ "${1}" = "patches" ]; then
-  echo "Installing addon i915le10th - ${1}"
+  if ! echo "${PLATFORMS}" | grep -qw "${PLATFORM}"; then
+    echo "${PLATFORM} is not supported i915 addon!"
+    exit 0
+  fi
+}
 
-  if [ -n "${2}" ]; then
-    GPU="$(echo "${2}" | sed 's/://g; s/.*/\L&/')"
+install_patches() {
+  echo "Installing addon i915le10th - patches"
+
+  if [ -n "${1}" ]; then
+    GPU="$(echo "${1}" | sed 's/://g; s/.*/\L&/')"
   else
     GPU="$(lspci -n 2>/dev/null | grep 0300 | grep 8086 | cut -d' ' -f3 | sed 's/://g')"
     grep -iq "${GPU}" "/addons/i915ids" 2>/dev/null || GPU=""
@@ -48,18 +52,39 @@ if [ "${1}" = "patches" ]; then
     xxd -r -p >"${KO_FILE}" 2>/dev/null
   rm -f "${KO_FILE}.tmp"
   [ "${isLoad}" = "1" ] && /usr/sbin/modprobe i915
+}
 
-elif [ "${1}" = "late" ]; then
-  echo "Installing addon i915 - ${1}"
+install_late() {
+  echo "Installing addon i915 - late"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
   [ ! -f "${KO_FILE}.bak" ] && cp -pf "${KO_FILE}" "${KO_FILE}.bak"
   cp -pf "/usr/lib/modules/i915.ko" "${KO_FILE}"
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon i915 - ${1}"
+}
+
+uninstall_addon() {
+  echo "Uninstalling addon i915"
 
   KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
   [ -f "${KO_FILE}.bak" ] && mv -f "${KO_FILE}.bak" "${KO_FILE}"
-fi
+}
+
+case "${1}" in
+  patches)
+    check_platform
+    install_patches "${2}"
+    ;;
+  late)
+    check_platform
+    install_late
+    ;;
+  uninstall)
+    uninstall_addon
+    ;;
+  *)
+    echo "Usage: ${0} {patches|late|uninstall}"
+    exit 1
+    ;;
+esac

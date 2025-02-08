@@ -8,8 +8,7 @@
 
 # Get values in synoinfo.conf K=V file
 # Args: $1 rd|hd, $2 key
-function _get_conf_kv() {
-  local ROOT FILE
+_get_conf_kv() {
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   FILE="${ROOT}/etc.defaults/synoinfo.conf"
   grep "^${2}=" "${FILE}" 2>/dev/null | cut -d'=' -f2- | sed 's/^"//;s/"$//' 2>/dev/null
@@ -17,8 +16,7 @@ function _get_conf_kv() {
 
 # Replace/add values in synoinfo.conf K=V file
 # Args: $1 rd|hd, $2 key, $3 val
-function _set_conf_kv() {
-  local ROOT FILE
+_set_conf_kv() {
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   for SD in etc etc.defaults; do
     FILE="${ROOT}/${SD}/synoinfo.conf"
@@ -31,22 +29,20 @@ function _set_conf_kv() {
       continue
     fi
     echo "${2}=\"${3}\"" >>"${FILE}"
-    # continue
   done
 }
 
 # Check if the user has customized the key
 # Args: $1 rd|hd, $2 key
-function _check_post_k() {
-  local ROOT
+_check_post_k() {
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   grep -Eq "^_set_conf_kv.*${2}.*" "${ROOT}/sbin/init.post"
 }
 
 # Check if the raid has been completed currently
-function _check_rootraidstatus() {
+_check_rootraidstatus() {
   [ "$(_get_conf_kv rd supportraid)" = "yes" ] || return 0
-  local STATE=$(cat /sys/block/md0/md/array_state 2>/dev/null)
+  STATE=$(cat /sys/block/md0/md/array_state 2>/dev/null)
   [ $? -ne 0 ] && return 1
   case ${STATE} in
   "clear" | "inactive" | "suspended" | "readonly" | "read-auto") return 1 ;;
@@ -56,8 +52,10 @@ function _check_rootraidstatus() {
 
 # Convert disk name to integer
 # Args: $1 disk name
-function _atoi() {
-  local DISKNAME=${1} NUM=0 IDX=0 N BIT
+_atoi() {
+  DISKNAME=${1}
+  NUM=0
+  IDX=0
   while [ ${IDX} -lt ${#DISKNAME} ]; do
     N=$(($(printf '%d' "'${DISKNAME:${IDX}:1}") - $(printf '%d' "'a") + 1))
     BIT=$((${#DISKNAME} - 1 - ${IDX}))
@@ -69,16 +67,10 @@ function _atoi() {
 
 # Generate linux kernel version code
 # Args: $1 version string
-# ex.
-#   KernelVersionCode "2.4.22"  => 132118
-#   KernelVersionCode "2.6"     => 132608
-#   KernelVersionCode "2.6.32"  => 132640
-#   KernelVersionCode "3"       => 196608
-#   KernelVersionCode "3.0.0"   => 196608
-function _kernelVersionCode() {
+_kernelVersionCode() {
   [ $# -eq 1 ] || return
 
-  local _version_string _major_version _minor_version _revision
+  _version_string _major_version _minor_version _revision
   _version_string="$(echo "$1" | /usr/bin/cut -d'_' -f1)."
   _major_version=$(echo "${_version_string}" | /usr/bin/cut -d'.' -f1)
   _minor_version=$(echo "${_version_string}" | /usr/bin/cut -d'.' -f2)
@@ -89,15 +81,14 @@ function _kernelVersionCode() {
 
 # Get current linux kernel version without extra version
 # format: VERSION.PATCHLEVEL.SUBLEVEL
-# ex. "2.6.32"
-function _kernelVersion() {
-  local _release
+_kernelVersion() {
+  _release
   _release=$(/bin/uname -r)
   /bin/echo ${_release%%[-+]*} | /usr/bin/cut -d'.' -f1-3
 }
 
 # synoboot
-function checkSynoboot() {
+checkSynoboot() {
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
     [ -z "${BOOTDISK}" ] && return
     if [ ! -b /dev/synoboot ] && [ -d /sys/block/${BOOTDISK} ]; then
@@ -114,9 +105,9 @@ function checkSynoboot() {
 }
 
 # USB ports
-function getUsbPorts() {
+getUsbPorts() {
   for I in $(ls -d /sys/bus/usb/devices/usb* 2>/dev/null); do
-    local DCLASS SPEED RBUS RCHILDS HAVE_CHILD=0
+    HAVE_CHILD=0
     DCLASS=$(cat ${I}/bDeviceClass)
     [ "${DCLASS}" != "09" ] && continue
     SPEED=$(cat ${I}/speed)
@@ -124,13 +115,13 @@ function getUsbPorts() {
     RBUS=$(cat ${I}/busnum)
     RCHILDS=$(cat ${I}/maxchild)
     for C in $(seq 1 ${RCHILDS}); do
-      local SUB="${RBUS}-${C}"
+      SUB="${RBUS}-${C}"
       if [ -d "${I}/${SUB}" ]; then
         DCLASS=$(cat ${I}/${SUB}/bDeviceClass)
         [ ! "${DCLASS}" = "09" ] && continue
         SPEED=$(cat ${I}/${SUB}/speed)
         [ ${SPEED} -lt 480 ] && continue
-        local CHILDS=$(cat ${I}/${SUB}/maxchild)
+        CHILDS=$(cat ${I}/${SUB}/maxchild)
         HAVE_CHILD=1
         for N in $(seq 1 ${CHILDS}); do
           echo -n "${RBUS}-${C}.${N} "
@@ -142,8 +133,7 @@ function getUsbPorts() {
   echo
 }
 
-#
-function dtModel() {
+dtModel() {
   DEST="/addons/model.dts"
   UNIQUE=$(_get_conf_kv rd unique)
   if [ ! -f "${DEST}" ]; then # Users can put their own dts.
@@ -251,11 +241,8 @@ function dtModel() {
       MAXDISKS=$(($(_get_conf_kv rd maxdisks)))
       echo "get maxdisks=${MAXDISKS}"
     else
-      # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-      # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
       [ ${MAXDISKS} -lt 26 ] && MAXDISKS=26
     fi
-    # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
     if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
       MAXDISKS=26
       echo "set maxdisks=26 [${MAXDISKS}]"
@@ -313,11 +300,8 @@ function dtModel() {
       MAXDISKS=$(($(_get_conf_kv rd maxdisks)))
       echo "get maxdisks=${MAXDISKS}"
     else
-      # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-      # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
       [ ${MAXDISKS:-0} -lt 26 ] && MAXDISKS=26
     fi
-    # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
     if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
       MAXDISKS=26
       echo "set maxdisks=26 [${MAXDISKS}]"
@@ -335,8 +319,7 @@ function dtModel() {
   /usr/syno/bin/syno_slot_mapping
 }
 
-#
-function nondtModel() {
+nondtModel() {
   MAXDISKS=0
   USBPORTCFG=0
   ESATAPORTCFG=0
@@ -433,7 +416,6 @@ function nondtModel() {
   done
 }
 
-#
 if [ "${1}" = "patches" ]; then
   echo "Installing addon disks - ${1}"
 

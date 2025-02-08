@@ -1,12 +1,14 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-function getlog() {
+set -e
+
+getlog() {
   if [ -z "${1}" ]; then
     echo "Usage: ${0} {early|jrExit|rcExit|late|dsm}"
     exit 1
@@ -16,6 +18,7 @@ function getlog() {
   mkdir -p "${WORK_PATH}"
 
   if ! mount | grep -q "${WORK_PATH}"; then
+    LOADER_DISK_PART1
     LOADER_DISK_PART1="$(blkid -L ARC1)"
     if [ -z "${LOADER_DISK_PART1}" ] && [ -b "/dev/synoboot1" ]; then
       LOADER_DISK_PART1="/dev/synoboot1"
@@ -40,7 +43,6 @@ function getlog() {
   ip addr >"${DEST_PATH}/ip-addr.log" || true
 
   ls -l /sys/class/net/*/device/driver >"${DEST_PATH}/net-driver.log" || true
-
   ls -l /sys/class/block >"${DEST_PATH}/disk-block.log" || true
   ls -l /sys/class/scsi_host >"${DEST_PATH}/disk-scsi_host.log" || true
   cat /sys/block/*/device/syno_block_info >"${DEST_PATH}/disk-syno_block_info.log" || true
@@ -57,16 +59,16 @@ function getlog() {
   rm -rf "${WORK_PATH}"
 }
 
-if [ "${1}" = "early" ]; then
+install_addon() {
   echo "Installing addon dbgutils - ${1}"
   getlog "${1}"
-elif [ "${1}" = "jrExit" ]; then
-  echo "Installing addon dbgutils - ${1}"
-  getlog "${1}"
-elif [ "${1}" = "rcExit" ]; then
-  echo "Installing addon dbgutils - ${1}"
-  getlog "${1}"
-elif [ "${1}" = "late" ]; then
-  echo "Installing addon dbgutils - ${1}"
-  getlog "${1}"
-fi
+}
+
+case "${1}" in
+  early|jrExit|rcExit|late)
+    install_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

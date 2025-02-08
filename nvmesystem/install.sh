@@ -1,25 +1,23 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-# PLATFORMS="epyc7002"
-# PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
-# if ! echo "${PLATFORMS}" | grep -qw "${PLATFORM}"; then
-#   echo "${PLATFORM} is not supported nvmesystem addon!"
-#   exit 0
-# fi
-_BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
-if [ ${_BUILD:-64570} -lt 69057 ]; then
-  echo "${_BUILD} is not supported nvmesystem addon!"
-  exit 0
-fi
+set -e
 
-if [ "${1}" = "early" ]; then
-  echo "Installing addon nvmesystem - ${1}"
+check_build() {
+  _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
+  if [ ${_BUILD:-64570} -lt 69057 ]; then
+    echo "${_BUILD} is not supported nvmesystem addon!"
+    exit 0
+  fi
+}
+
+install_early() {
+  echo "Installing addon nvmesystem - early"
 
   # System volume is assembled with SSD Cache only, please remove SSD Cache and then reboot
   sed -i "s/support_ssd_cache=.*/support_ssd_cache=\"no\"/" /etc/synoinfo.conf /etc.defaults/synoinfo.conf
@@ -32,9 +30,10 @@ if [ "${1}" = "early" ]; then
     sed "s/4584ed74b7488b4c24083b01/4584ed75b7488b4c24083b01/" |
     xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
+}
 
-elif [ "${1}" = "late" ]; then
-  echo "Installing addon nvmesystem - ${1}"
+install_late() {
+  echo "Installing addon nvmesystem - late"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
@@ -93,9 +92,10 @@ DELETE FROM task WHERE task_name LIKE 'ARCONBOOTUPARC_UDEV';
 INSERT INTO task VALUES('ARCONBOOTUPARC_UDEV', '', 'bootup', '', 1, 0, 0, 0, '', 0, '$(echo -e ${ONBOOTUP})', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
+}
 
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon nvmesystem - ${1}"
+uninstall_addon() {
+  echo "Uninstalling addon nvmesystem - ${1}"
 
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
@@ -107,4 +107,21 @@ elif [ "${1}" = "uninstall" ]; then
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/nvmesystem.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/nvmesystem.sh" >>/tmpRoot/usr/arc/revert.sh
-fi
+}
+
+case "${1}" in
+  early)
+    check_build
+    install_early
+    ;;
+  late)
+    check_build
+    install_late
+    ;;
+  uninstall)
+    uninstall_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

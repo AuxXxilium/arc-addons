@@ -1,12 +1,14 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+set -e
+
+install_addon() {
   echo "Installing addon remotefs - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -20,9 +22,23 @@ if [ "${1}" = "late" ]; then
   else
     echo "libsynosdk.so.7 not found"
   fi
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon remotefs - ${1}"
+}
+
+uninstall_addon() {
+  echo "Uninstalling addon remotefs - ${1}"
 
   SO_FILE="/tmpRoot/usr/lib/libsynosdk.so.7"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
-fi
+}
+
+case "${1}" in
+  late)
+    install_addon "${1}"
+    ;;
+  uninstall)
+    uninstall_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

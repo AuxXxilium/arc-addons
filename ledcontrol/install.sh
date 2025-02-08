@@ -1,12 +1,14 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+set -e
+
+install_addon() {
   echo "Installing addon ledcontrol - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -16,18 +18,10 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/bin/modules/i2c-algo-bit.ko /tmpRoot/usr/bin/modules/i2c-algo-bit.ko
   cp -pf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/i2c-i801.ko
   cp -pf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/i2c-smbus.ko
-  if [ -f "/tmpRoot/usr/bin/ledcontrol.sh" ]; then
-    chmod u+s /tmpRoot/usr/bin/ledcontrol.sh
-  fi
-  if [ -f "/tmpRoot/usr/bin/ugreen_leds_cli" ]; then
-    chmod u+s /tmpRoot/usr/bin/ugreen_leds_cli
-  fi
-  if [ -f "/tmpRoot/usr/bin/ping" ]; then
-    chmod u+s /tmpRoot/usr/bin/ping
-  fi
-  if [ -f "/tmpRoot/usr/bin/sensors" ]; then
-    chmod u+s /tmpRoot/usr/bin/sensors
-  fi
+
+  for file in /tmpRoot/usr/bin/ledcontrol.sh /tmpRoot/usr/bin/ugreen_leds_cli /tmpRoot/usr/bin/ping /tmpRoot/usr/bin/sensors; do
+    [ -f "${file}" ] && chmod u+s "${file}"
+  done
 
   insmod i2c-algo-bit
   insmod i2c-i801
@@ -37,7 +31,6 @@ if [ "${1}" = "late" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  # All on
   DEST="/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
   {
     echo "[Unit]"
@@ -56,8 +49,10 @@ if [ "${1}" = "late" ]; then
   } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/ledcontrol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon ledcontrol - ${1}"
+}
+
+uninstall_addon() {
+  echo "Uninstalling addon ledcontrol - ${1}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
@@ -65,4 +60,16 @@ elif [ "${1}" = "uninstall" ]; then
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/ledcontrol.sh" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/ledcontrol.sh" >>/tmpRoot/usr/arc/revert.sh
-fi
+}
+
+case "${1}" in
+  late)
+    install_addon "${1}" "${2}"
+    ;;
+  uninstall)
+    uninstall_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

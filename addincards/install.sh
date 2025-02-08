@@ -1,12 +1,14 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+set -e
+
+install_addon() {
   echo "Installing addon addincards - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -17,14 +19,28 @@ if [ "${1}" = "late" ]; then
   [ ! -f "${FILE}.bak" ] && cp -f "${FILE}" "${FILE}.bak"
   cp -pf "${FILE}" "${FILE}.tmp"
   echo -n "" >"${FILE}"
-  for N in $(cat "${FILE}.tmp" 2>/dev/null | grep '\['); do
+  while read -r N; do
     echo "${N}" >>"${FILE}"
     echo "${MODEL}=yes" >>"${FILE}"
-  done
+  done < <(grep '\[' "${FILE}.tmp" 2>/dev/null)
   rm -f "${FILE}.tmp"
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon addincards - ${1}"
+}
+
+uninstall_addon() {
+  echo "Uninstalling addon addincards - ${1}"
 
   FILE="/tmpRoot/usr/syno/etc/adapter_cards.conf"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
-fi
+}
+
+case "${1}" in
+  late)
+    install_addon "${1}"
+    ;;
+  uninstall)
+    uninstall_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

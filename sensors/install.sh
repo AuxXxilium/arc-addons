@@ -1,12 +1,14 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+set -e
+
+install_addon() {
   echo "Installing addon sensors - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -24,7 +26,7 @@ if [ "${1}" = "late" ]; then
   if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "Fancontrol||bootup||1|0|0|0||0|"; then
     echo "sensors task already exists and it is enabled"
   else
-      echo "insert sensors task to esynoscheduler.db"
+    echo "insert sensors task to esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'Fancontrol';
 INSERT INTO task VALUES('Fancontrol', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
@@ -34,8 +36,10 @@ INSERT INTO task VALUES('Fancontrol', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
 ', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon sensors - ${1}"
+}
+
+uninstall_addon() {
+  echo "Uninstalling addon sensors - ${1}"
   
   rm -rf /tmpRoot/etc/fancontrol
   rm -f /tmpRoot/usr/bin/arc-sensors.sh
@@ -48,4 +52,16 @@ elif [ "${1}" = "uninstall" ]; then
 DELETE FROM task WHERE task_name LIKE 'Fancontrol';
 EOF
   fi
-fi
+}
+
+case "${1}" in
+  late)
+    install_addon "${1}"
+    ;;
+  uninstall)
+    uninstall_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

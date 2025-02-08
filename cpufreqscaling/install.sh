@@ -6,12 +6,13 @@
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
-  echo "Installing cpufreqscalingscaling - ${1}"
+set -e
+
+install_addon() {
+  echo "Installing cpufreqscaling - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  rm -f "/tmpRoot/usr/bin/scaling.sh"
   cp -pf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/scaling.sh"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
@@ -33,10 +34,24 @@ if [ "${1}" = "late" ]; then
   } >"${DEST}"
   mkdir -p "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
   ln -vsf "/usr/lib/systemd/system/cpufreqscaling.service" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service"
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing cpufreqscalingscaling - ${1}"
+}
+
+uninstall_addon() {
+  echo "Uninstalling cpufreqscaling - ${1}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
   rm -f "/tmpRoot/usr/sbin/scaling.sh"
-fi
+}
+
+case "${1}" in
+  late)
+    install_addon "${1}"
+    ;;
+  uninstall)
+    uninstall_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

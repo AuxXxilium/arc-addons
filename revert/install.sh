@@ -1,12 +1,14 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+set -e
+
+install_addon() {
   echo "Installing addon revert - ${1}"
 
   mkdir -p "/tmpRoot/usr/arc/"
@@ -14,14 +16,15 @@ if [ "${1}" = "late" ]; then
   chmod +x "/tmpRoot/usr/arc/revert.sh"
   
   mkdir -p "/tmpRoot/usr/arc/addons/"
-  for F in $(ls /tmpRoot/usr/arc/addons/* 2>/dev/null); do
+  for F in /tmpRoot/usr/arc/addons/*; do
+    [ -e "$F" ] || continue
     if grep -q "/addons/${F##*/}" "/addons/addons.sh" 2>/dev/null; then continue; fi
     chmod +x "${F}" || true
     "${F}" "uninstall" || true
     rm -f "${F}" || true
   done
 
-  if [ ! "$(cat "/tmpRoot/usr/arc/revert.sh")" = '#!/usr/bin/env bash' ]; then
+  if [ "$(cat "/tmpRoot/usr/arc/revert.sh")" != '#!/usr/bin/env bash' ]; then
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     DEST="/tmpRoot/usr/lib/systemd/system/revert.service"
     {
@@ -52,8 +55,19 @@ if [ "${1}" = "late" ]; then
   fi
 
   # Version
-  echo "LOADERLABEL=\"${LOADERLABEL}\""      >"/tmpRoot/usr/arc/VERSION"
-  echo "LOADERVERSION=\"${LOADERVERSION}\"" >>"/tmpRoot/usr/arc/VERSION"
-  echo "LOADERBRANCH=\"${LOADERBRANCH}\"" >>"/tmpRoot/usr/arc/VERSION"
+  {
+    echo "LOADERLABEL=\"${LOADERLABEL}\""
+    echo "LOADERVERSION=\"${LOADERVERSION}\""
+    echo "LOADERBUILD=\"${LOADERBUILD}\""
+    echo "LOADERBRANCH=\"${LOADERBRANCH}\""
+  } >"/tmpRoot/usr/arc/VERSION"
+}
 
-fi
+case "${1}" in
+  late)
+    install_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac
