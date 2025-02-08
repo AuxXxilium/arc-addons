@@ -18,7 +18,6 @@ mountLoaderDisk() {
 
       # Make folders to mount partitions
       for i in {1..3}; do
-        rm -rf "/mnt/p${i}"
         mkdir -p "/mnt/p${i}"
         mount "/dev/synoboot${i}" "/mnt/p${i}" || {
           echo "Can't mount /dev/synoboot${i}."
@@ -62,7 +61,6 @@ unmountLoaderDisk() {
 
     for i in {1..3}; do
       umount "/mnt/p${i}"
-      rm -rf "/mnt/p${i}"
     done
 
     echo 0 >/proc/sys/kernel/syno_install_flag
