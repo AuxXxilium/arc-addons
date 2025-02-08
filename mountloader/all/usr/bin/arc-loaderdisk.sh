@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-function mountLoaderDisk() {
+mountLoaderDisk() {
   if [ ! -f "/usr/arc/.mountloader" ]; then
     while true; do
       if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
@@ -49,7 +49,7 @@ function mountLoaderDisk() {
   fi
 }
 
-function unmountLoaderDisk() {
+unmountLoaderDisk() {
   if [ -f "/usr/arc/.mountloader" ]; then
     rm -f "/usr/arc/.mountloader"
 

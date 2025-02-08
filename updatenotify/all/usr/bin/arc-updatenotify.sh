@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-function Create() {
-  if echo "$(cat /usr/syno/etc/synoschedule.d/root/*.task 2>/dev/null | grep '^name=' | cut -d'=' -f2)" | grep -q "Arc-UpdateNotify"; then
+Create() {
+  if grep -q "Arc-UpdateNotify" /usr/syno/etc/synoschedule.d/root/*.task 2>/dev/null; then
     echo "Existence tasks"
   else
     echo "Create tasks"
@@ -18,19 +18,18 @@ function Create() {
   exit 0
 }
 
-function Delete() {
-  for I in $(ls /usr/syno/etc/synoschedule.d/root/*.task); do
-    if [ "$(cat "${I}" 2>/dev/null | grep '^name=' | cut -d'=' -f2)" = "Arc-UpdateNotify" ]; then
-      id=$(cat "${I}" | grep '^id=' | cut -d'=' -f2)
+Delete() {
+  for I in /usr/syno/etc/synoschedule.d/root/*.task; do
+    if [ "$(grep '^name=' "${I}" 2>/dev/null | cut -d'=' -f2)" = "Arc-UpdateNotify" ]; then
+      id=$(grep '^id=' "${I}" | cut -d'=' -f2)
       [ -n "${id}" ] && synoschedtask --del id=${id}
     fi
   done
   exit 0
 }
 
-function Check() {
-
-  LOCALTAG="$(cat /usr/arc/VERSION 2>/dev/null | grep LOADERVERSION | cut -d'=' -f2 | sed 's/\"//g')"
+Check() {
+  LOCALTAG=$(grep LOADERVERSION /usr/arc/VERSION 2>/dev/null | cut -d'=' -f2 | sed 's/\"//g')
   if [ -z "${LOCALTAG}" ]; then
     echo "Unknown bootloader version!"
     exit 0
@@ -39,13 +38,13 @@ function Check() {
   URL="https://github.com/AuxXxilium/arc"
   TAG=""
   if echo "$@" | grep -wq "\-p"; then
-    TAG="$(curl -skL --connect-timeout 10 "${URL}/tags" | grep "/refs/tags/.*\.zip" | head -1 | sed -E 's/.*\/refs\/tags\/(.*)\.zip.*$/\1/')"
+    TAG=$(curl -skL --connect-timeout 10 "${URL}/tags" | grep "/refs/tags/.*\.zip" | head -1 | sed -E 's/.*\/refs\/tags\/(.*)\.zip.*$/\1/')
   else
-    LATESTURL="$(curl -skL --connect-timeout 10 -w %{url_effective} -o /dev/null "${URL}/releases/latest")"
+    LATESTURL=$(curl -skL --connect-timeout 10 -w %{url_effective} -o /dev/null "${URL}/releases/latest")
     TAG="${LATESTURL##*/}"
   fi
   [ "${TAG:0:1}" = "v" ] && TAG="${TAG:1}"
-  if [ -z "${TAG}" -o "${TAG}" = "latest" ]; then
+  if [ -z "${TAG}" ] || [ "${TAG}" = "latest" ]; then
     echo "Error checking new version - Your version is ${LOCALTAG}"
     exit 0
   fi
@@ -54,14 +53,8 @@ function Check() {
     exit 0
   fi
 
-  # NOTIFICATION="Arc Notify"
-  # synodsmnotify -e false -b false "@administrators" "arc_notify" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\"}"
-  # NOTIFICATION="Arc Update"
-  # SUBJECT="Arc <a href=\\\"${URL}/releases/tag/${TAG}\\\" target=blank>${TAG}</a> version has been released!"
-  # synodsmnotify -e false -b false "@administrators" "arc_notify_subject" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\", \"%SUBJECT%\": \"${SUBJECT}\"}"
-
   NOTIFICATION="Arc Release ${TAG}"
-  SUBJECT="$(curl -skL --connect-timeout 10 "${URL}/releases/tag/${TAG}" | pup 'div[data-test-selector="body-content"]')"
+  SUBJECT=$(curl -skL --connect-timeout 10 "${URL}/releases/tag/${TAG}" | pup 'div[data-test-selector="body-content"]')
   SUBJECT="${SUBJECT//\"/\\\\\\\"}"
   synodsmnotify -e false -b false "@administrators" "arc_notify_subject" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\", \"%SUBJECT%\": \"${SUBJECT}\"}"
 
@@ -72,16 +65,16 @@ ACTION="${1}"
 [ -z "${ACTION}" ] && ACTION="check"
 
 case "${ACTION,,}" in
-"create")
-  Create
-  ;;
-"delete")
-  Delete
-  ;;
-"check")
-  Check
-  ;;
-*)
-  echo "Unknown command!"
-  ;;
+  "create")
+    Create
+    ;;
+  "delete")
+    Delete
+    ;;
+  "check")
+    Check
+    ;;
+  *)
+    echo "Unknown command!"
+    ;;
 esac

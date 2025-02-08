@@ -13,7 +13,7 @@ fi
 
 MODES="config recovery junior automated update uefi"
 
-function use() {
+use() {
   echo "Use: ${0} [${MODES// /|}]"
   exit 1
 }

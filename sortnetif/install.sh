@@ -1,12 +1,14 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "patches" ]; then
+set -e
+
+install_addon() {
   echo "Installing addon sortnetif - ${1}"
 
   ETHLIST=""
@@ -34,4 +36,13 @@ if [ "${1}" = "patches" ]; then
     done
     /etc/rc.network restart
   fi
-fi
+}
+
+case "${1}" in
+  patches)
+    install_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

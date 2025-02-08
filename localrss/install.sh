@@ -1,25 +1,28 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
+set -e
+
 # External incoming required ${MLINK} and ${MCHECKSUM}
-if [ -z "${MLINK}" -o -z "${MCHECKSUM}" ]; then
+if [ -z "${MLINK}" ] || [ -z "${MCHECKSUM}" ]; then
   echo "MLINK or MCHECKSUM is null"
-  return
+  exit 1
 fi
 
-if [ "${1}" = "modules" ]; then
-  echo "Installing addon localrss - ${1}"
+install_modules() {
+  echo "Installing addon localrss - modules"
 
-  # MajorVersion=`/bin/get_key_value /etc.defaults/VERSION majorversion`
-  # MinorVersion=`/bin/get_key_value /etc.defaults/VERSION minorversion`
   . /etc.defaults/VERSION
 
-  cat >/usr/syno/web/localrss.json <<EOF
+  JSON_FILE="/usr/syno/web/localrss.json"
+  XML_FILE="/usr/syno/web/localrss.xml"
+
+  cat >"${JSON_FILE}" <<EOF
 {
   "version": "2.0",
   "channel": {
@@ -55,7 +58,7 @@ if [ "${1}" = "modules" ]; then
 }
 EOF
 
-  cat >/usr/syno/web/localrss.xml <<EOF
+  cat >"${XML_FILE}" <<EOF
 <?xml version="1.0"?>
 <rss version="2.0">
   <channel>
@@ -85,14 +88,21 @@ EOF
 </rss>
 EOF
 
-  if [ -f /usr/syno/web/localrss.xml ]; then
-    # cat /usr/syno/web/localrss.xml
+  if [ -f "${XML_FILE}" ]; then
     sed -i "s|rss_server=.*$|rss_server=\"http://localhost:5000/localrss.xml\"|g" "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"
     sed -i "s|rss_server_ssl=.*$|rss_server_ssl=\"http://localhost:5000/localrss.xml\"|g" "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"
   fi
-  if [ -f /usr/syno/web/localrss.json ]; then
-    # cat /usr/syno/web/localrss.json
+  if [ -f "${JSON_FILE}" ]; then
     sed -i "s|rss_server_v2=.*$|rss_server_v2=\"http://localhost:5000/localrss.json\"|g" "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"
   fi
   grep "rss_server" "/etc.defaults/synoinfo.conf"
-fi
+}
+
+case "${1}" in
+  modules)
+    install_modules
+    ;;
+  *)
+    exit 0
+    ;;
+esac

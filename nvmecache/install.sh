@@ -1,21 +1,25 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-MODELS="DS918+ RS1619xs+ DS1019+ DS718+ DS1621xs+"
-MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
+set -e
 
-if ! echo "${MODELS}" | grep -wq "${MODEL}"; then
-  echo "${MODEL} is not supported nvmecache addon!"
-  exit 0
-fi
+check_model() {
+  MODELS="DS918+ RS1619xs+ DS1019+ DS718+ DS1621xs+"
+  MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
 
-if [ "${1}" = "patches" ]; then
-  echo "Installing addon nvmecache - ${1}"
+  if ! echo "${MODELS}" | grep -wq "${MODEL}"; then
+    echo "${MODEL} is not supported nvmecache addon!"
+    exit 0
+  fi
+}
+
+install_patches() {
+  echo "Installing addon nvmecache - patches"
 
   BOOTDISK_PART3_PATH="$(blkid -L ARC3 2>/dev/null)"
   [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
@@ -36,28 +40,19 @@ if [ "${1}" = "patches" ]; then
     PCIEPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2 | awk -F'/' '{if (NF == 4) print $NF; else if (NF > 4) print $(NF-1)}')"
     if [ -n "${PCIEPATH}" ]; then
       grep -q "${PCIEPATH}" /etc/nvmePorts && continue
+      echo "${PCIEPATH}" >> /etc/nvmePorts
     fi
   done
   [ -f /etc/nvmePorts ] && cat /etc/nvmePorts
-elif [ "${1}" = "late" ]; then
-  echo "Installing addon nvmecache - ${1}"
+}
+
+install_late() {
+  echo "Installing addon nvmecache - late"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  #
-  # |       models      |     1st      |     2nd      |
-  # | DS918+            | 0000:00:13.1 | 0000:00:13.2 |
-  # | RS1619xs+         | 0000:00:03.2 | 0000:00:03.3 |
-  # | DS419+, DS1019+   | 0000:00:14.1 |              |
-  # | DS718+, DS1621xs+ | 0000:00:01.1 | 0000:00:01.0 |
-  #
-  # In the late stage, the /sys/ directory does not exist, and the device path cannot be obtained.
-  # (/dev/ does exist, but there is no useful information.)
-  # (The information obtained by lspci is incomplete and an error will be reported.)
-  # Therefore, the device path is obtained in the early stage and stored in /etc/nvmePorts.
-
   if [ ! -f /etc/nvmePorts ]; then
-    echo "/etc/nvmePorts is not exist"
+    echo "/etc/nvmePorts does not exist"
     exit 0
   fi
 
@@ -81,9 +76,28 @@ elif [ "${1}" = "late" ]; then
     fi
     idx=$((idx + 1))
   done
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon nvmecache - ${1}"
+}
+
+uninstall_addon() {
+  echo "Uninstalling addon nvmecache - ${1}"
 
   SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
-fi
+}
+
+case "${1}" in
+  patches)
+    check_model
+    install_patches
+    ;;
+  late)
+    check_model
+    install_late
+    ;;
+  uninstall)
+    uninstall_addon
+    ;;
+  *)
+    exit 0
+    ;;
+esac

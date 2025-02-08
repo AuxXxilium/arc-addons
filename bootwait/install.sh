@@ -1,12 +1,14 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "early" ]; then
+set -e
+
+install_addon() {
   echo "Installing addon bootwait - ${1}"
   wait_time=30 # maximum wait time in seconds
 
@@ -20,7 +22,7 @@ if [ "${1}" = "early" ]; then
   time_counter=0
   while [ ! -b /dev/synoboot ] && [ $time_counter -lt $wait_time ]; do
     sleep 1
-    echo "Still waiting for boot device (waited $((time_counter = time_counter + 1)) of ${wait_time} seconds)"
+    echo "Still waiting for boot device (waited $((time_counter++)) of ${wait_time} seconds)"
   done
 
   if [ ! -b /dev/synoboot ]; then
@@ -39,4 +41,13 @@ if [ "${1}" = "early" ]; then
   fi
 
   echo "Confirmed a valid-looking /dev/synoboot device"
-fi
+}
+
+case "${1}" in
+  early)
+    install_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

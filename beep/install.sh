@@ -1,12 +1,14 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+set -e
+
+install_addon() {
   echo "Installing addon beep - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -36,8 +38,10 @@ DELETE FROM task WHERE task_name LIKE 'BeepOnShutdown';
 INSERT INTO task VALUES('BeepOnShutdown', '', 'shutdown', '', 1, 0, 0, 0, '', 0, "${BS}", 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon beep - ${1}"
+}
+
+uninstall_addon() {
+  echo "Uninstalling addon beep - ${1}"
 
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
@@ -48,4 +52,16 @@ DELETE FROM task WHERE task_name LIKE 'BeepOnBoot';
 DELETE FROM task WHERE task_name LIKE 'BeepOnShutdown';
 EOF
   fi
-fi
+}
+
+case "${1}" in
+  late)
+    install_addon "${1}"
+    ;;
+  uninstall)
+    uninstall_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

@@ -9,15 +9,29 @@
 # sudo /volume1/scripts/syno_enable_dedupe.sh
 #-------------------------------------------------------------------------------
 
-scriptver="v1.3.25"
+# Added support for DSM 7.0.1 to 7.2 (untested)
+
+scriptver="v1.4.31"
 script=Synology_enable_Deduplication
 repo="007revad/Synology_enable_Deduplication"
 scriptname=syno_enable_dedupe
+
+# Prevent Entware or user edited PATH causing issues
+# shellcheck disable=SC2155  # Declare and assign separately to avoid masking return values
+export PATH=$(echo "$PATH" | sed -e 's/\/opt\/bin:\/opt\/sbin://')
 
 # Check BASH variable is bash
 if [ ! "$(basename "$BASH")" = bash ]; then
     echo "This is a bash script. Do not run it with $(basename "$BASH")"
     printf \\a
+    exit 1
+fi
+
+# Check script is running on a Synology NAS
+if ! /usr/bin/uname -a | grep -i synology >/dev/null; then
+    echo "This script is NOT running on a Synology NAS!"
+    echo "Copy the script to a folder on the Synology"
+    echo "and run it from there."
     exit 1
 fi
 
@@ -36,7 +50,9 @@ Options:
   -r, --restore         Undo all changes made by the script
   -t, --tiny            Enable tiny data deduplication (only needs 4GB RAM)
                           DSM 7.2.1 and later only
-      --hdd             Enable data deduplication for HDDs (dangerous)
+      --hdd             Enable data deduplication for HDDs.
+                          Can cause files to become more fragmented,
+                          resulting in decreased access performance.
   -e, --email           Disable colored text in output for scheduler emails
       --autoupdate=AGE  Auto update script (useful when script is scheduled)
                           AGE is how many days old a release must be before
@@ -296,7 +312,7 @@ cleanup_tmp(){
     fi
 
     # Add warning to DSM log
-    if [[ -z $cleanup_err ]]; then
+    if [[ $cleanup_err ]]; then
         syslog_set warn "$script update failed to delete tmp files"
     fi
 }
@@ -420,8 +436,17 @@ fi
 
 synoinfo="/etc.defaults/synoinfo.conf"
 synoinfo2="/etc/synoinfo.conf"
-strgmgr="/var/packages/StorageManager/target/ui/storage_panel.js"
+#strgmgr="/var/packages/StorageManager/target/ui/storage_panel.js"
 libhw="/usr/lib/libhwcontrol.so.1"
+
+if [[ $buildnumber -gt 64570 ]]; then
+    # DSM 7.2.1 and later
+    #strgmgr="/var/packages/StorageManager/target/ui/storage_panel.js"
+    strgmgr="/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js"
+else
+    # DSM 7.0.1 to 7.2
+    strgmgr="/usr/syno/synoman/webman/modules/StorageManager/storage_panel.js"
+fi
 
 if [[ ! -f ${libhw} ]]; then
     ding
@@ -452,6 +477,7 @@ reloadmsg(){
     echo -e "\nFinished"
     echo -e "\nIf you have DSM open in a browser you need to"
     echo "refresh the browser window or tab."
+    echo "You may also need to reboot."
     exit
 }
 
@@ -500,7 +526,7 @@ if [[ $restore == "yes" ]]; then
 
         # Restore storage_panel.js from backup
         if [[ -f "${strgmgr}.$storagemgrver" ]]; then
-            string1="(SYNO.SDS.StorageUtils.supportBtrfsDedupe)"
+            string1="(SYNO.SDS.StorageUtils.supportBtrfsDedupe,)"
             string2="(SYNO.SDS.StorageUtils.supportBtrfsDedupe&&e.dedup_info.show_config_btn)"
 
             if grep -o "$string1" "${strgmgr}" >/dev/null; then
@@ -708,12 +734,14 @@ if [[ $check == "yes" ]]; then
 
     # DSM 7.2.1 only and only if --hdd option used
     # Dedupe config button for HDDs and 2.5 inch SSDs in DSM 7.2.1
-    if [[ -f "$strgmgr" ]] && [[ $hdd == "yes" ]]; then
+#    if [[ -f "$strgmgr" ]] && [[ $hdd == "yes" ]]; then
+    if [[ -f "$strgmgr" ]]; then
         # StorageManager package is installed and --hdd option used
         if ! grep '&&e.dedup_info.show_config_btn' "$strgmgr" >/dev/null; then
-            echo -e "\nDedupe config menu for HDDs and 2.5\" SSDs already enabled."
+            echo -e "\nDedupe config menu for HDDs and 2.5\" SSDs is ${Cyan}enabled${Off}."
         else
             echo -e "\nDedupe config menu for HDDs and 2.5\" SSDs is ${Cyan}not${Off} enabled."
+            echo "Run the script with the --hdd option if you want it enabled."
         fi
     fi
 
@@ -957,6 +985,19 @@ if [[ -f "$strgmgr" ]] && [[ $hdd == "yes" ]]; then
     else
         echo -e "\nDedupe config menu for HDDs and 2.5\" SSDs already enabled."
     fi
+elif [[ -f "$strgmgr" ]]; then
+    if ! grep '&&e.dedup_info.show_config_btn' "$strgmgr" >/dev/null; then
+        echo -e "\nDedupe config menu for HDDs and 2.5\" SSDs is enabled."
+    else
+        echo -e "\nDedupe config menu for HDDs and 2.5\" SSDs not enabled."
+        echo "Run the script with the --hdd option if you want it enabled."
+    fi
+fi
+
+
+# Make sure xpe's storage_manager.js.gz includes our changes. Issue #88
+if [[ -f "${strgmgr}.gz" ]]; then
+    gzip -c "${strgmgr}" > "${strgmgr}.gz"
 fi
 
 

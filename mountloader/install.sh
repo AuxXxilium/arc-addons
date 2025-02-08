@@ -6,7 +6,9 @@
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "late" ]; then
+set -e
+
+install_addon() {
   echo "Installing addon mountloader - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -32,17 +34,32 @@ INSERT INTO task VALUES('MountLoaderDisk', '', 'bootup', '', 0, 0, 0, 0, '', 0, 
 DELETE FROM task WHERE task_name LIKE 'UnMountLoaderDisk';
 INSERT INTO task VALUES('UnMountLoaderDisk', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh unmountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
 EOF
-elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon mountloader - ${1}"
+}
+
+uninstall_addon() {
+  echo "Uninstalling addon mountloader - ${1}"
 
   rm -f "/tmpRoot/usr/bin/arc-loaderdisk.sh"
 
-  if [ -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+  ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
+  if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete mountloader task from esynoscheduler.db"
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    /tmpRoot/bin/sqlite3 /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db <<EOF
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'MountLoaderDisk';
 DELETE FROM task WHERE task_name LIKE 'UnMountLoaderDisk';
 EOF
   fi
-fi
+}
+
+case "${1}" in
+  late)
+    install_addon "${1}"
+    ;;
+  uninstall)
+    uninstall_addon "${1}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac

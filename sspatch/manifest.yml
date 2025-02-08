@@ -1,6 +1,6 @@
 version: 1
 name: sspatch
-description: "Dynamic License Patch for SS 9.2.x (Not for DVA 3219)"
+description: "Dynamic License Patch for SS 9.2.x (Not for DVA 3219) / 9.2.0=stable / 9.2.1/2=beta"
 system: false
 beta: true
 target: app
