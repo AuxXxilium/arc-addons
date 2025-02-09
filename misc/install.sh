@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 install_early() {
   echo "Installing addon misc - early"
 

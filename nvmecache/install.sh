@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 check_model() {
   MODELS="DS918+ RS1619xs+ DS1019+ DS718+ DS1621xs+"
   MODEL="$(cat /proc/sys/kernel/syno_hw_version)"

@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 # External incoming required ${MLINK} and ${MCHECKSUM}
 if [ -z "${MLINK}" ] || [ -z "${MCHECKSUM}" ]; then
   echo "MLINK or MCHECKSUM is null"

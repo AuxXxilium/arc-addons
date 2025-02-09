@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 install_addon() {
   echo "Installing addon bootwait - ${1}"
   wait_time=30 # maximum wait time in seconds

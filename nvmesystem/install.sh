@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 check_build() {
   _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
   if [ ${_BUILD:-64570} -lt 69057 ]; then

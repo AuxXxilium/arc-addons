@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 check_platform() {
   PLATFORMS="apollolake geminilake"
   PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
