@@ -18,6 +18,7 @@ mountLoaderDisk() {
 
       # Make folders to mount partitions
       for i in {1..3}; do
+        rm -rf "/mnt/p${i}"
         mkdir -p "/mnt/p${i}"
         mount "/dev/synoboot${i}" "/mnt/p${i}" || {
           echo "Can't mount /dev/synoboot${i}."
@@ -60,7 +61,16 @@ unmountLoaderDisk() {
     export LOADER_DISK_PART3=
 
     for i in {1..3}; do
-      umount "/mnt/p${i}"
+      umount "/mnt/p${i}" || {
+        echo "Failed to unmount /mnt/p${i}"
+        return 1
+      }
+      if [ -d "/mnt/p${i}" ]; then
+        rm -rf "/mnt/p${i}" || {
+          echo "Failed to remove directory /mnt/p${i}"
+          return 1
+        }
+      fi
     done
 
     echo 0 >/proc/sys/kernel/syno_install_flag
