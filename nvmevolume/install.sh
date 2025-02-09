@@ -6,8 +6,6 @@
 # From: https://github.com/PeterSuh-Q3/tcrp-addons/blob/main/nvmevolume-onthefly/src/install.sh
 #
 
-set -e
-
 check_nvmesystem() {
   if grep -wq "/addons/nvmesystem.sh" "/addons/addons.sh"; then
     echo "nvmevolume is not required if nvmesystem exists!"

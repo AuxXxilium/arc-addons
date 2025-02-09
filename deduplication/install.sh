@@ -8,8 +8,6 @@
 # From：https://github.com/007revad/Synology_enable_Deduplication
 #
 
-set -e
-
 install_addon() {
   echo "Creating service to exec deduplication"
   mkdir -p "/tmpRoot/usr/arc/addons/"

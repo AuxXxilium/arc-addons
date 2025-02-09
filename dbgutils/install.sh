@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 getlog() {
   WORK_PATH="/mnt/p1"
   mkdir -p "${WORK_PATH}"

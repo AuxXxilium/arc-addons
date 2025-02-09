@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 install_addon() {
   echo "Installing addon revert - ${1}"
 

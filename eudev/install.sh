@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 install_early() {
   echo "Installing addon eudev - early"
   tar -zxf /addons/eudev-7.1.tgz -C /

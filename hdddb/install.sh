@@ -8,8 +8,6 @@
 # From：https://github.com/007revad/Synology_HDD_db
 #
 
-set -e
-
 install_addon() {
   echo "Installing addon hdddb - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"

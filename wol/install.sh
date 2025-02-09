@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 install_jrExit() {
   echo "Installing addon wol - jrExit"
   for N in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
