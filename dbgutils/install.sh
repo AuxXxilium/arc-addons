@@ -9,23 +9,17 @@
 set -e
 
 getlog() {
-  if [ -z "${1}" ]; then
-    echo "Usage: ${0} {early|jrExit|rcExit|late|dsm}"
-    exit 1
-  fi
-
   WORK_PATH="/mnt/p1"
   mkdir -p "${WORK_PATH}"
 
   if ! mount | grep -q "${WORK_PATH}"; then
-    LOADER_DISK_PART1
     LOADER_DISK_PART1="$(blkid -L ARC1)"
     if [ -z "${LOADER_DISK_PART1}" ] && [ -b "/dev/synoboot1" ]; then
       LOADER_DISK_PART1="/dev/synoboot1"
     fi
     if [ -z "${LOADER_DISK_PART1}" ]; then
       echo "Boot disk not found"
-      exit 1
+      exit 0
     fi
 
     modprobe vfat
@@ -42,10 +36,13 @@ getlog() {
   lspci -Qnnk >"${DEST_PATH}/lspci.log" || true
   ip addr >"${DEST_PATH}/ip-addr.log" || true
 
-  ls -l /sys/class/net/*/device/driver >"${DEST_PATH}/net-driver.log" || true
-  ls -l /sys/class/block >"${DEST_PATH}/disk-block.log" || true
-  ls -l /sys/class/scsi_host >"${DEST_PATH}/disk-scsi_host.log" || true
-  cat /sys/block/*/device/syno_block_info >"${DEST_PATH}/disk-syno_block_info.log" || true
+  touch "${DEST_PATH}/net-driver.log"
+  for net_dir in /sys/class/net/*/device/driver; do
+    ls -l "${net_dir}" >>"${DEST_PATH}/net-driver.log" || true
+  done
+  [ -d "/sys/class/block" ] && ls -l /sys/class/block >"${DEST_PATH}/disk-block.log" || true
+  [ -d "/sys/class/scsi_host" ] && ls -l /sys/class/scsi_host >"${DEST_PATH}/disk-scsi_host.log" || true
+  [ -f "/sys/block/*/device/syno_block_info" ] && cat /sys/block/*/device/syno_block_info >"${DEST_PATH}/disk-syno_block_info.log" || true
 
   [ -f "/addons/addons.sh" ] && cp -pf "/addons/addons.sh" "${DEST_PATH}/addons.sh" || true
   [ -f "/addons/model.dts" ] && cp -pf "/addons/model.dts" "${DEST_PATH}/model.dts" || true
