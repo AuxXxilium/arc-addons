@@ -71,3 +71,4 @@ case "${1}" in
     exit 0
     ;;
 esac
+exit 0

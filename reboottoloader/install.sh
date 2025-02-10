@@ -6,6 +6,8 @@
 # See /LICENSE for more information.
 #
 
+export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib:/tmpRoot/bin:/tmpRoot/lib
+
 install_addon() {
   echo "Installing addon rebootto... - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
@@ -21,8 +23,7 @@ install_addon() {
     cp -pf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
   fi
   echo "insert rebootto... task to esynoscheduler.db"
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+  /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'RebootToLoader';
 INSERT INTO task VALUES('RebootToLoader', '', 'shutdown', '', 0, 0, 0, 0, '', 0, '/usr/bin/loader-reboot.sh "config"', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'RebootToUpdate';
@@ -39,8 +40,7 @@ uninstall_addon() {
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete rebootto... task from esynoscheduler.db"
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'RebootToLoader';
 DELETE FROM task WHERE task_name LIKE 'RebootToUpdate';
 EOF
@@ -58,3 +58,4 @@ case "${1}" in
     exit 0
     ;;
 esac
+exit 0

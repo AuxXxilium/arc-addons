@@ -30,3 +30,4 @@ install_addon() {
 }
 
 install_addon "${1}"
+exit 0
