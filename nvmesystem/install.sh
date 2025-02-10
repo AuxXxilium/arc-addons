@@ -6,6 +6,8 @@
 # See /LICENSE for more information.
 #
 
+export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib:/tmpRoot/bin:/tmpRoot/lib
+
 check_build() {
   _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
   if [ ${_BUILD:-64570} -lt 69057 ]; then
@@ -77,15 +79,14 @@ install_late() {
     ONBOOTUP="${ONBOOTUP}systemctl restart systemd-udev-trigger.service\n"
     ONBOOTUP="${ONBOOTUP}echo \"DELETE FROM task WHERE task_name LIKE ''ARCONBOOTUPARC_UDEV'';\" | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db\n"
 
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-    if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -qw "task"; then
+    if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -qw "task"; then
       echo "copy esynoscheduler.db"
       mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
       cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
     fi
     echo "insert ARCONBOOTUPARC_UDEV task to esynoscheduler.db"
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'ARCONBOOTUPARC_UDEV';
 INSERT INTO task VALUES('ARCONBOOTUPARC_UDEV', '', 'bootup', '', 1, 0, 0, 0, '', 0, '$(echo -e ${ONBOOTUP})', 'script', '{}', '', '', '{}', '{}');
 EOF
@@ -123,3 +124,4 @@ case "${1}" in
     exit 0
     ;;
 esac
+exit 0

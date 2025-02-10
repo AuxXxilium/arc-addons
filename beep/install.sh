@@ -6,19 +6,20 @@
 # See /LICENSE for more information.
 #
 
+export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib:/tmpRoot/bin:/tmpRoot/lib
+
 install_addon() {
   echo "Installing addon beep - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
+  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
     echo "copy esynoscheduler.db"
     mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
     cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
   fi
-  if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -Eq "BeepOnBoot|BeepOnShutdown"; then
+  if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -Eq "BeepOnBoot|BeepOnShutdown"; then
     echo "beep task already exists"
   else
     echo "insert beep task to esynoscheduler.db"
@@ -29,7 +30,7 @@ install_addon() {
       BB="beep -f 500 -l 500 -d 500 -r 1"
       BS="beep -f 500 -l 500 -d 500 -r 1"
     fi
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'BeepOnBoot';
 INSERT INTO task VALUES('BeepOnBoot', '', 'bootup', '', 1, 0, 0, 0, '', 0, "${BB}", 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'BeepOnShutdown';
@@ -41,11 +42,10 @@ EOF
 uninstall_addon() {
   echo "Uninstalling addon beep - ${1}"
 
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete beep task from esynoscheduler.db"
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'BeepOnBoot';
 DELETE FROM task WHERE task_name LIKE 'BeepOnShutdown';
 EOF
@@ -63,3 +63,4 @@ case "${1}" in
     exit 0
     ;;
 esac
+exit 0

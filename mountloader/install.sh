@@ -6,6 +6,8 @@
 # See /LICENSE for more information.
 #
 
+export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib:/tmpRoot/bin:/tmpRoot/lib
+
 install_addon() {
   echo "Installing addon mountloader - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
@@ -16,15 +18,14 @@ install_addon() {
   
   rm -f /tmpRoot/usr/arc/.mountloader
 
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
+  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
     echo "copy esynoscheduler.db"
     mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
     cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
   fi
   echo "insert mountloader task to esynoscheduler.db"
-  /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+  /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'MountLoaderDisk';
 INSERT INTO task VALUES('MountLoaderDisk', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/bin/arc-loaderdisk.sh mountLoaderDisk', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'UnMountLoaderDisk';
@@ -40,8 +41,7 @@ uninstall_addon() {
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete mountloader task from esynoscheduler.db"
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'MountLoaderDisk';
 DELETE FROM task WHERE task_name LIKE 'UnMountLoaderDisk';
 EOF
@@ -59,3 +59,4 @@ case "${1}" in
     exit 0
     ;;
 esac
+exit 0
