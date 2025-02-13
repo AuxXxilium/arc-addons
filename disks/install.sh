@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -9,6 +9,7 @@
 # Get values in synoinfo.conf K=V file
 # Args: $1 rd|hd, $2 key
 _get_conf_kv() {
+  local ROOT FILE
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   FILE="${ROOT}/etc.defaults/synoinfo.conf"
   grep "^${2}=" "${FILE}" 2>/dev/null | cut -d'=' -f2- | sed 's/^"//;s/"$//' 2>/dev/null
@@ -17,6 +18,7 @@ _get_conf_kv() {
 # Replace/add values in synoinfo.conf K=V file
 # Args: $1 rd|hd, $2 key, $3 val
 _set_conf_kv() {
+  local ROOT FILE
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   for SD in etc etc.defaults; do
     FILE="${ROOT}/${SD}/synoinfo.conf"
@@ -35,6 +37,7 @@ _set_conf_kv() {
 # Check if the user has customized the key
 # Args: $1 rd|hd, $2 key
 _check_post_k() {
+  local ROOT
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   grep -Eq "^_set_conf_kv.*${2}.*" "${ROOT}/sbin/init.post"
 }
@@ -42,7 +45,7 @@ _check_post_k() {
 # Check if the raid has been completed currently
 _check_rootraidstatus() {
   [ "$(_get_conf_kv rd supportraid)" = "yes" ] || return 0
-  STATE=$(cat /sys/block/md0/md/array_state 2>/dev/null)
+  local STATE=$(cat /sys/block/md0/md/array_state 2>/dev/null)
   [ $? -ne 0 ] && return 1
   case ${STATE} in
   "clear" | "inactive" | "suspended" | "readonly" | "read-auto") return 1 ;;
@@ -70,7 +73,7 @@ _atoi() {
 _kernelVersionCode() {
   [ $# -eq 1 ] || return
 
-  _version_string _major_version _minor_version _revision
+  local _version_string _major_version _minor_version _revision
   _version_string="$(echo "$1" | /usr/bin/cut -d'_' -f1)."
   _major_version=$(echo "${_version_string}" | /usr/bin/cut -d'.' -f1)
   _minor_version=$(echo "${_version_string}" | /usr/bin/cut -d'.' -f2)
@@ -82,7 +85,7 @@ _kernelVersionCode() {
 # Get current linux kernel version without extra version
 # format: VERSION.PATCHLEVEL.SUBLEVEL
 _kernelVersion() {
-  _release
+  local _release
   _release=$(/bin/uname -r)
   /bin/echo ${_release%%[-+]*} | /usr/bin/cut -d'.' -f1-3
 }
@@ -107,7 +110,7 @@ checkSynoboot() {
 # USB ports
 getUsbPorts() {
   for I in $(ls -d /sys/bus/usb/devices/usb* 2>/dev/null); do
-    HAVE_CHILD=0
+    local DCLASS SPEED RBUS RCHILDS HAVE_CHILD=0
     DCLASS=$(cat ${I}/bDeviceClass)
     [ "${DCLASS}" != "09" ] && continue
     SPEED=$(cat ${I}/speed)
@@ -115,13 +118,13 @@ getUsbPorts() {
     RBUS=$(cat ${I}/busnum)
     RCHILDS=$(cat ${I}/maxchild)
     for C in $(seq 1 ${RCHILDS}); do
-      SUB="${RBUS}-${C}"
+      local SUB="${RBUS}-${C}"
       if [ -d "${I}/${SUB}" ]; then
         DCLASS=$(cat ${I}/${SUB}/bDeviceClass)
         [ ! "${DCLASS}" = "09" ] && continue
         SPEED=$(cat ${I}/${SUB}/speed)
         [ ${SPEED} -lt 480 ] && continue
-        CHILDS=$(cat ${I}/${SUB}/maxchild)
+        local CHILDS=$(cat ${I}/${SUB}/maxchild)
         HAVE_CHILD=1
         for N in $(seq 1 ${CHILDS}); do
           echo -n "${RBUS}-${C}.${N} "
@@ -328,11 +331,13 @@ nondtModel() {
   hasUSB=false
   USBMINIDX=99
   USBMAXIDX=00
+  USB_COUNT=0  # Initialize USB disk counter
   for I in $(ls -d /sys/block/sd* 2>/dev/null); do
     IDX=$(_atoi ${I/\/sys\/block\/sd/})
     [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
     ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
     if [ -n "${ISUSB}" ]; then
+      USB_COUNT=$((USB_COUNT + 1))  # Increment USB disk counter
       if [ "${hasUSB}" = "false" ]; then
         [ ${IDX} -lt ${USBMINIDX} ] && USBMINIDX=${IDX}
         [ ${IDX} -gt ${USBMAXIDX} ] && USBMAXIDX=${IDX}
@@ -351,12 +356,37 @@ nondtModel() {
   fi
   [ $((${USBMAXIDX} + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMAXIDX} + 1))
 
+  # NVME
+  NVME_COUNT=0
+  COUNT=1
+  echo "[pci]" >/etc/extensionPorts
+  for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
+    if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
+      echo "bootloader: ${P}"
+      continue
+    fi
+    PCIEPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2 | awk -F'/' '{if (NF == 4) print $NF; else if (NF > 4) print $(NF-1)}')"
+    if [ -n "${PCIEPATH}" ]; then
+      grep -q "=\"${PCIEPATH}\"" /etc/extensionPorts && continue
+      echo "pci${COUNT}=\"${PCIEPATH}\"" >>/etc/extensionPorts
+      COUNT=$((${COUNT} + 1))
+      NVME_COUNT=$((${NVME_COUNT} + 1))
+  
+      _set_conf_kv rd "supportnvme" "yes"
+      _set_conf_kv rd "support_m2_pool" "yes"
+    fi
+  done
+
+  if grep -wq "usbinternal" /proc/cmdline 2>/dev/null; then
+    MAXDISKS=$((${MAXDISKS} + ${NVME_COUNT}))
+  else
+    MAXDISKS=$((${MAXDISKS}  + ${NVME_COUNT} - ${USB_COUNT}))
+  fi
+
   if _check_post_k "rd" "maxdisks"; then
     MAXDISKS=$(($(_get_conf_kv rd maxdisks)))
     printf "get maxdisks=%d\n" "${MAXDISKS}"
   else
-    # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-    # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
     printf "cal maxdisks=%d\n" "${MAXDISKS}"
   fi
 
@@ -395,25 +425,6 @@ nondtModel() {
   fi
   _set_conf_kv rd "maxdisks" "${MAXDISKS}"
   printf "set maxdisks=%d\n" "${MAXDISKS}"
-
-  # NVME
-  COUNT=1
-  echo "[pci]" >/etc/extensionPorts
-  for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
-    if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
-      echo "bootloader: ${P}"
-      continue
-    fi
-    PCIEPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2 | awk -F'/' '{if (NF == 4) print $NF; else if (NF > 4) print $(NF-1)}')"
-    if [ -n "${PCIEPATH}" ]; then
-      grep -q "=\"${PCIEPATH}\"" /etc/extensionPorts && continue # An nvme controller only recognizes one disk
-      echo "pci${COUNT}=\"${PCIEPATH}\"" >>/etc/extensionPorts
-      COUNT=$((${COUNT} + 1))
-
-      _set_conf_kv rd "supportnvme" "yes"
-      _set_conf_kv rd "support_m2_pool" "yes"
-    fi
-  done
 }
 
 if [ "${1}" = "patches" ]; then
