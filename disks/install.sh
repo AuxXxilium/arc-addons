@@ -1,6 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -9,6 +9,7 @@
 # Get values in synoinfo.conf K=V file
 # Args: $1 rd|hd, $2 key
 _get_conf_kv() {
+  local ROOT FILE
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   FILE="${ROOT}/etc.defaults/synoinfo.conf"
   grep "^${2}=" "${FILE}" 2>/dev/null | cut -d'=' -f2- | sed 's/^"//;s/"$//' 2>/dev/null
@@ -17,6 +18,7 @@ _get_conf_kv() {
 # Replace/add values in synoinfo.conf K=V file
 # Args: $1 rd|hd, $2 key, $3 val
 _set_conf_kv() {
+  local ROOT FILE SD
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   for SD in etc etc.defaults; do
     FILE="${ROOT}/${SD}/synoinfo.conf"
@@ -35,6 +37,7 @@ _set_conf_kv() {
 # Check if the user has customized the key
 # Args: $1 rd|hd, $2 key
 _check_post_k() {
+  local ROOT
   [ "$1" = "rd" ] && ROOT="" || ROOT="/tmpRoot"
   grep -Eq "^_set_conf_kv.*${2}.*" "${ROOT}/sbin/init.post"
 }
@@ -42,10 +45,11 @@ _check_post_k() {
 # Check if the raid has been completed currently
 _check_rootraidstatus() {
   [ "$(_get_conf_kv rd supportraid)" = "yes" ] || return 0
+  local STATE
   STATE=$(cat /sys/block/md0/md/array_state 2>/dev/null)
   [ $? -ne 0 ] && return 1
   case ${STATE} in
-  "clear" | "inactive" | "suspended" | "readonly" | "read-auto") return 1 ;;
+    "clear" | "inactive" | "suspended" | "readonly" | "read-auto") return 1 ;;
   esac
   return 0
 }
@@ -53,16 +57,22 @@ _check_rootraidstatus() {
 # Convert disk name to integer
 # Args: $1 disk name
 _atoi() {
-  DISKNAME=${1}
+  local DISKNAME NUM IDX N BIT ADD
+  DISKNAME="$1"
   NUM=0
   IDX=0
   while [ ${IDX} -lt ${#DISKNAME} ]; do
-    N=$(($(printf '%d' "'${DISKNAME:${IDX}:1}") - $(printf '%d' "'a") + 1))
-    BIT=$((${#DISKNAME} - 1 - ${IDX}))
-    NUM=$((NUM + (BIT == 0 ? N : 26 ** BIT * N)))
-    IDX=$((IDX + 1))
+    N=$(( $(printf '%d' "'${DISKNAME:${IDX}:1}") - $(printf '%d' "'a") + 1 ))
+    BIT=$(( ${#DISKNAME} - 1 - IDX ))
+    if [ ${BIT} -eq 0 ]; then
+      ADD=${N}
+    else
+      ADD=$(( 26 ** BIT * N ))
+    fi
+    NUM=$(( NUM + ADD ))
+    IDX=$(( IDX + 1 ))
   done
-  echo $((NUM - 1))
+  echo $(( NUM - 1 ))
 }
 
 # Generate linux kernel version code
@@ -70,7 +80,7 @@ _atoi() {
 _kernelVersionCode() {
   [ $# -eq 1 ] || return
 
-  _version_string _major_version _minor_version _revision
+  local _version_string _major_version _minor_version _revision
   _version_string="$(echo "$1" | /usr/bin/cut -d'_' -f1)."
   _major_version=$(echo "${_version_string}" | /usr/bin/cut -d'.' -f1)
   _minor_version=$(echo "${_version_string}" | /usr/bin/cut -d'.' -f2)
@@ -82,7 +92,7 @@ _kernelVersionCode() {
 # Get current linux kernel version without extra version
 # format: VERSION.PATCHLEVEL.SUBLEVEL
 _kernelVersion() {
-  _release
+  local _release
   _release=$(/bin/uname -r)
   /bin/echo ${_release%%[-+]*} | /usr/bin/cut -d'.' -f1-3
 }
@@ -107,7 +117,7 @@ checkSynoboot() {
 # USB ports
 getUsbPorts() {
   for I in $(ls -d /sys/bus/usb/devices/usb* 2>/dev/null); do
-    HAVE_CHILD=0
+    local DCLASS SPEED RBUS RCHILDS HAVE_CHILD=0
     DCLASS=$(cat ${I}/bDeviceClass)
     [ "${DCLASS}" != "09" ] && continue
     SPEED=$(cat ${I}/speed)
@@ -115,13 +125,13 @@ getUsbPorts() {
     RBUS=$(cat ${I}/busnum)
     RCHILDS=$(cat ${I}/maxchild)
     for C in $(seq 1 ${RCHILDS}); do
-      SUB="${RBUS}-${C}"
+      local SUB="${RBUS}-${C}"
       if [ -d "${I}/${SUB}" ]; then
         DCLASS=$(cat ${I}/${SUB}/bDeviceClass)
         [ ! "${DCLASS}" = "09" ] && continue
         SPEED=$(cat ${I}/${SUB}/speed)
         [ ${SPEED} -lt 480 ] && continue
-        CHILDS=$(cat ${I}/${SUB}/maxchild)
+        local CHILDS=$(cat ${I}/${SUB}/maxchild)
         HAVE_CHILD=1
         for N in $(seq 1 ${CHILDS}); do
           echo -n "${RBUS}-${C}.${N} "
@@ -134,6 +144,7 @@ getUsbPorts() {
 }
 
 dtModel() {
+  local DEST UNIQUE I HOSTNUM PCIHEAD PCIPATH PCISUBS IDX J
   DEST="/addons/model.dts"
   UNIQUE=$(_get_conf_kv rd unique)
   if [ ! -f "${DEST}" ]; then # Users can put their own dts.
@@ -153,22 +164,32 @@ dtModel() {
         PCIHEAD="$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | head -1)"
         PCIPATH=""
         if [ "$(_kernelVersionCode "$(_kernelVersion)")" -ge "$(_kernelVersionCode "5.10")" ]; then
-          PCIPATH="$(echo "${PCIHEAD}" | grep -Eo 'pci[0-9]{4}:[0-9]{2}' | sed 's/pci//')" # 5.10+ kernel
+          PCIPATH="$(echo "${PCIHEAD}" | grep -Eo 'pci[0-9]{4}:[0-9]{2}' | sed 's/pci//')"
         else
-          PCIPATH="$(echo "${PCIHEAD}" | grep -Eo 'pci[0-9]{4}:[0-9]{2}' | sed 's/pci//' | cut -d':' -f2)" # 5.10- kernel
+          PCIPATH="$(echo "${PCIHEAD}" | grep -Eo 'pci[0-9]{4}:[0-9]{2}' | sed 's/pci//' | cut -d':' -f2)"
         fi
         PCISUBS=""
-        for Q in $(echo "${PCIHEAD}" | grep -Eo ":..\.."); do PCISUBS="${PCISUBS},${Q//:/}"; done
+        for Q in $(echo "${PCIHEAD}" | grep -Eo ":..\.."); do
+          PCISUBS="${PCISUBS},${Q//:/}"
+        done
         [ -z "${PCISUBS}" ] && continue
         PCIPATH="${PCIPATH}:${PCISUBS:1}"
-
+  
         IDX=""
         if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && echo "${BOOTDISK_PHYSDEVPATH}" | grep -q "${P}"; then
           IDX=$(ls -l /sys/class/scsi_host 2>/dev/null | grep ${P} | sort -V | grep -n "${BOOTDISK_PHYSDEVPATH%%target*}" | head -1 | cut -d: -f1)
-          if [ -n "${IDX}" ] && echo "${IDX}" | grep -Eq '^[0-9]+$'; then if [ ${IDX} -gt 0 ]; then IDX=$((${IDX} - 1)); else IDX="0"; fi; else IDX=""; fi
+          if [ -n "${IDX}" ] && echo "${IDX}" | grep -Eq '^[0-9]+$'; then
+            if [ ${IDX} -gt 0 ]; then
+              IDX=$((${IDX} - 1))
+            else
+              IDX="0"
+            fi
+          else
+            IDX=""
+          fi
           echo "bootloader: PCIPATH:${PCIPATH}; IDX:${IDX}"
         fi
-
+  
         for J in $(seq 0 $((${HOSTNUM} - 1))); do
           [ "${J}" = "${IDX}" ] && continue
           {
@@ -191,6 +212,7 @@ dtModel() {
             if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "$(cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
               echo "bootloader: /sys/block/sata${J}"
             else
+              local PCIEPATH ATAPORT
               PCIEPATH="$(grep 'pciepath' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
               ATAPORT="$(grep 'ata_port_no' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
               if [ -n "${PCIEPATH}" ] && [ -n "${ATAPORT}" ]; then
@@ -218,6 +240,7 @@ dtModel() {
         if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "$(cat /sys/block/sata${J}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
           echo "bootloader: /sys/block/sata${J}"
         else
+          local PCIEPATH ATAPORT
           PCIEPATH="$(grep 'pciepath' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
           ATAPORT="$(grep 'ata_port_no' /sys/block/sata${J}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
           if [ -n "${PCIEPATH}" ] && [ -n "${ATAPORT}" ]; then
@@ -249,7 +272,7 @@ dtModel() {
     fi
     _set_conf_kv rd "maxdisks" "${MAXDISKS}"
     echo "maxdisks=${MAXDISKS}"
-
+  
     # NVME ports
     COUNT=0
     POWER_LIMIT=""
@@ -258,10 +281,11 @@ dtModel() {
         echo "bootloader: ${P}"
         continue
       fi
+      local PCIEPATH
       PCIEPATH="$(grep 'pciepath' ${P}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
       if [ -n "${PCIEPATH}" ]; then
-        grep -q "pcie_root = \"${PCIEPATH}\";" ${DEST} && continue # An nvme controller only recognizes one disk
-        [ $((${#POWER_LIMIT} - 1 + 2)) -gt 30 ] && break           # POWER_LIMIT string length limit 30 characters
+        grep -q "pcie_root = \"${PCIEPATH}\";" ${DEST} && continue
+        [ $((${#POWER_LIMIT} - 1 + 2)) -gt 30 ] && break
         COUNT=$((${COUNT} + 1))
         {
           echo "    nvme_slot@${COUNT} {"
@@ -277,7 +301,7 @@ dtModel() {
       _set_conf_kv rd "supportnvme" "yes"
       _set_conf_kv rd "support_m2_pool" "yes"
     fi
-
+  
     # USB ports
     COUNT=0
     for I in $(getUsbPorts); do
@@ -308,7 +332,7 @@ dtModel() {
     fi
     _set_conf_kv rd "maxdisks" "${MAXDISKS}"
     echo "maxdisks=${MAXDISKS}"
-
+  
     if grep -q "nvme_slot@" "${DEST}" 2>/dev/null; then
       _set_conf_kv rd "supportnvme" "yes"
       _set_conf_kv rd "support_m2_pool" "yes"
@@ -320,19 +344,23 @@ dtModel() {
 }
 
 nondtModel() {
+  local MAXDISKS USBPORTCFG ESATAPORTCFG INTERNALPORTCFG
+  local hasUSB USBMINIDX USBMAXIDX USB_COUNT NVME_COUNT COUNT I IDX ISUSB
   MAXDISKS=0
   USBPORTCFG=0
   ESATAPORTCFG=0
   INTERNALPORTCFG=0
-
+  
   hasUSB=false
   USBMINIDX=99
   USBMAXIDX=00
+  USB_COUNT=0
   for I in $(ls -d /sys/block/sd* 2>/dev/null); do
-    IDX=$(_atoi ${I/\/sys\/block\/sd/})
-    [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
+    IDX=$(_atoi "${I/\/sys\/block\/sd/}")
+    [ $((IDX + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((IDX + 1))
     ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
     if [ -n "${ISUSB}" ]; then
+      USB_COUNT=$((USB_COUNT + 1))
       if [ "${hasUSB}" = "false" ]; then
         [ ${IDX} -lt ${USBMINIDX} ] && USBMINIDX=${IDX}
         [ ${IDX} -gt ${USBMAXIDX} ] && USBMAXIDX=${IDX}
@@ -342,50 +370,80 @@ nondtModel() {
       fi
     fi
   done
-  # Define 6 is the minimum number of USB disks
   if [ "${hasUSB}" = "false" ]; then
     USBMINIDX=${MAXDISKS}
-    USBMAXIDX=$((${USBMINIDX} + 6 - 1))
+    USBMAXIDX=$((USBMINIDX + 6 - 1))
   else
-    [ $((${USBMAXIDX} - ${USBMINIDX})) -lt $((6 - 1)) ] && USBMAXIDX=$((${USBMINIDX} + 6 - 1))
+    [ $((USBMAXIDX - USBMINIDX)) -lt $((6 - 1)) ] && USBMAXIDX=$((USBMINIDX + 6 - 1))
   fi
-  [ $((${USBMAXIDX} + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((${USBMAXIDX} + 1))
-
+  [ $((USBMAXIDX + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((USBMAXIDX + 1))
+  
+  # NVME processing
+  NVME_COUNT=0
+  COUNT=1
+  echo "[pci]" >/etc/extensionPorts
+  for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
+    if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
+      echo "bootloader: ${P}"
+      continue
+    fi
+    local PCIEPATH
+    PCIEPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2 | awk -F'/' '{if (NF == 4) print $NF; else if (NF > 4) print $(NF-1)}')"
+    if [ -n "${PCIEPATH}" ]; then
+      grep -q "=\"${PCIEPATH}\"" /etc/extensionPorts && continue
+      echo "pci${COUNT}=\"${PCIEPATH}\"" >>/etc/extensionPorts
+      COUNT=$((COUNT + 1))
+      NVME_COUNT=$((NVME_COUNT + 1))
+  
+      _set_conf_kv rd "supportnvme" "yes"
+      _set_conf_kv rd "support_m2_pool" "yes"
+    fi
+  done
+  
+  if grep -wq "usbinternal" /proc/cmdline 2>/dev/null; then
+    MAXDISKS=$((MAXDISKS + NVME_COUNT))
+  else
+    MAXDISKS=$((MAXDISKS + NVME_COUNT - USB_COUNT))
+  fi
+  
   if _check_post_k "rd" "maxdisks"; then
-    MAXDISKS=$(($(_get_conf_kv rd maxdisks)))
+    MAXDISKS=$((_get_conf_kv rd maxdisks))
     printf "get maxdisks=%d\n" "${MAXDISKS}"
   else
-    # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-    # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
     printf "cal maxdisks=%d\n" "${MAXDISKS}"
   fi
 
   if grep -wq "usbinternal" /proc/cmdline 2>/dev/null; then
-    USBPORTCFG=0
-    _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
-    printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
+      USBPORTCFG=0
+      _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' "${USBPORTCFG}")"
+      printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
   elif _check_post_k "rd" "usbportcfg"; then
-    USBPORTCFG=$(($(_get_conf_kv rd usbportcfg)))
-    printf 'get usbportcfg=0x%.2x\n' "${USBPORTCFG}"
+      USBPORTCFG="$(_get_conf_kv rd usbportcfg)"
+      printf 'get usbportcfg=0x%.2x\n' "${USBPORTCFG}"
   else
-    USBPORTCFG=$(($((2 ** $((${USBMAXIDX} + 1)) - 1)) ^ $((2 ** ${USBMINIDX} - 1))))
-    _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
-    printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
+      USBPORTCFG=$(( (2 ** (USBMAXIDX + 1)) - 1 ))
+      USBPORTCFG=$(( USBPORTCFG ^ ((2 ** USBMINIDX) - 1) ))
+      _set_conf_kv rd "usbportcfg" "$(printf '0x%.2x' "${USBPORTCFG}")"
+      printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
   fi
+  
   if _check_post_k "rd" "esataportcfg"; then
-    ESATAPORTCFG=$(($(_get_conf_kv rd esataportcfg)))
-    printf 'get esataportcfg=0x%.2x\n' "${ESATAPORTCFG}"
+      ESATAPORTCFG="$(_get_conf_kv rd esataportcfg)"
+      printf 'get esataportcfg=0x%.2x\n' "${ESATAPORTCFG}"
   else
-    _set_conf_kv rd "esataportcfg" "$(printf "0x%.2x" ${ESATAPORTCFG})"
-    printf 'set esataportcfg=0x%.2x\n' "${ESATAPORTCFG}"
+      ESATAPORTCFG=0
+      _set_conf_kv rd "esataportcfg" "$(printf '0x%.2x' "${ESATAPORTCFG}")"
+      printf 'set esataportcfg=0x%.2x\n' "${ESATAPORTCFG}"
   fi
+  
   if _check_post_k "rd" "internalportcfg"; then
-    INTERNALPORTCFG=$(($(_get_conf_kv rd internalportcfg)))
-    printf 'get internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
+      INTERNALPORTCFG="$(_get_conf_kv rd internalportcfg)"
+      printf 'get internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   else
-    INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
-    _set_conf_kv rd "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
-    printf 'set internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
+      INTERNALPORTCFG=$(( (2 ** MAXDISKS) - 1 ))
+      INTERNALPORTCFG=$(( INTERNALPORTCFG ^ USBPORTCFG ^ ESATAPORTCFG ))
+      _set_conf_kv rd "internalportcfg" "$(printf '0x%.2x' "${INTERNALPORTCFG}")"
+      printf 'set internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   fi
 
   # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
@@ -395,25 +453,6 @@ nondtModel() {
   fi
   _set_conf_kv rd "maxdisks" "${MAXDISKS}"
   printf "set maxdisks=%d\n" "${MAXDISKS}"
-
-  # NVME
-  COUNT=1
-  echo "[pci]" >/etc/extensionPorts
-  for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
-    if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" ]; then
-      echo "bootloader: ${P}"
-      continue
-    fi
-    PCIEPATH="$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2 | awk -F'/' '{if (NF == 4) print $NF; else if (NF > 4) print $(NF-1)}')"
-    if [ -n "${PCIEPATH}" ]; then
-      grep -q "=\"${PCIEPATH}\"" /etc/extensionPorts && continue # An nvme controller only recognizes one disk
-      echo "pci${COUNT}=\"${PCIEPATH}\"" >>/etc/extensionPorts
-      COUNT=$((${COUNT} + 1))
-
-      _set_conf_kv rd "supportnvme" "yes"
-      _set_conf_kv rd "support_m2_pool" "yes"
-    fi
-  done
 }
 
 if [ "${1}" = "patches" ]; then
