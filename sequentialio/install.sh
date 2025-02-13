@@ -1,7 +1,6 @@
 #!/usr/bin/env ash
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
-#
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
@@ -24,7 +23,7 @@ install_addon() {
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/sequentialio.sh \$@"
+    echo "ExecStart=/usr/bin/sequentialio.sh ${2}"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
@@ -46,7 +45,7 @@ uninstall_addon() {
 
 case "${1}" in
   late)
-    install_addon "${1}"
+    install_addon "${1}" "${2}"
     ;;
   uninstall)
     uninstall_addon "${1}"
