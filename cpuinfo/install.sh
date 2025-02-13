@@ -24,7 +24,7 @@ install_addon() {
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/cpuinfo.sh $@"
+    echo "ExecStart=/usr/bin/cpuinfo.sh ${2}"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
@@ -53,7 +53,7 @@ uninstall_addon() {
 
 case "${1}" in
   late)
-    install_addon "${1}"
+    install_addon "${1}" "${2}"
     ;;
   uninstall)
     uninstall_addon "${1}"
