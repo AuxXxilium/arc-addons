@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib:/tmpRoot/bin:/tmpRoot/lib
+export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
 
 check_build() {
   _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
