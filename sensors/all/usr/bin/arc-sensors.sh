@@ -16,14 +16,14 @@ if ! command -v perl &>/dev/null; then
   exit 1
 fi
 
-modprobe -q hwmon-vid
-modprobe -q it87
-modprobe -q adt7470
-modprobe -q adt7475
-modprobe -q nct6683
-modprobe -q nct6775
-modprobe -q coretemp
-modprobe -q k10temp
+modprobe hwmon-vid
+modprobe it87
+modprobe adt7470
+modprobe adt7475
+modprobe nct6683
+modprobe nct6775
+modprobe coretemp
+modprobe k10temp
 
 echo 'Y' | sensors-detect --auto >"/tmp/sensors.log"
 grep -Eo 'Driver\s*:\s*\w+' "/tmp/sensors.log" | awk -F': ' '{print $2}'
