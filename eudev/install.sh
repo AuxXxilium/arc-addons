@@ -42,7 +42,7 @@ install_late() {
 
   echo "copy modules"
   isChange="false"
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
   
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   
