@@ -10,10 +10,11 @@ install_addon() {
   echo "Installing addon revert - ${1}"
 
   mkdir -p "/tmpRoot/usr/arc/"
+  mkdir -p "/tmpRoot/usr/arc/addons/"
+
   echo '#!/usr/bin/env bash' >"/tmpRoot/usr/arc/revert.sh"
   chmod +x "/tmpRoot/usr/arc/revert.sh"
   
-  mkdir -p "/tmpRoot/usr/arc/addons/"
   for F in /tmpRoot/usr/arc/addons/*; do
     [ -e "$F" ] || continue
     if grep -q "/addons/${F##*/}" "/addons/addons.sh" 2>/dev/null; then continue; fi
@@ -58,7 +59,7 @@ install_addon() {
     echo "LOADERVERSION=\"${LOADERVERSION}\""
     echo "LOADERBUILD=\"${LOADERBUILD}\""
     echo "LOADERBRANCH=\"${LOADERBRANCH}\""
-  } >"/tmpRoot/usr/arc/VERSION"
+  } | tee "/tmpRoot/usr/arc/VERSION" >/dev/null
 }
 
 case "${1}" in
