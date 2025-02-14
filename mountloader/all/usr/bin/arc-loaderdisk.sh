@@ -6,6 +6,8 @@
 # See /LICENSE for more information.
 #
 
+[ -f "/sbin/arcsu" ] && ARC_SUDO="/sbin/arcsu" || ARC_SUDO=""
+
 mountLoaderDisk() {
   if [ ! -f "/usr/arc/.mountloader" ]; then
     while true; do
@@ -14,13 +16,18 @@ mountLoaderDisk() {
         break
       fi
 
-      echo 1 >/proc/sys/kernel/syno_install_flag
+      echo 1 | ${ARC_SUDO} tee /proc/sys/kernel/syno_install_flag >/dev/null
+
+      # Check partitions and ignore errors
+      [ -f "/sbin/fsck.vfat" ] && ${ARC_SUDO} fsck.vfat -aw "/dev/synoboot1" >/dev/null 2>&1 || true
+      [ -f "/sbin/fsck.ext2" ] && ${ARC_SUDO} fsck.ext2 -p "/dev/synoboot2" >/dev/null 2>&1 || true
+      [ -f "/sbin/fsck.ext4" ] && ${ARC_SUDO} fsck.ext4 -p "/dev/synoboot3" >/dev/null 2>&1 || true
 
       # Make folders to mount partitions
       for i in {1..3}; do
-        rm -rf "/mnt/p${i}"
-        mkdir -p "/mnt/p${i}"
-        mount "/dev/synoboot${i}" "/mnt/p${i}" || {
+        ${ARC_SUDO} rm -rf "/mnt/p${i}"
+        ${ARC_SUDO} mkdir -p "/mnt/p${i}"
+        ${ARC_SUDO} mount "/dev/synoboot${i}" "/mnt/p${i}" || {
           echo "Can't mount /dev/synoboot${i}."
           break 2
         }
@@ -32,7 +39,8 @@ mountLoaderDisk() {
         echo "export LOADER_DISK_PART1=\"/dev/synoboot1\""
         echo "export LOADER_DISK_PART2=\"/dev/synoboot2\""
         echo "export LOADER_DISK_PART3=\"/dev/synoboot3\""
-      } >"/usr/arc/.mountloader"
+      } | ${ARC_SUDO} tee "/usr/arc/.mountloader" >/dev/null
+      ${ARC_SUDO} chmod 755 "/usr/arc/.mountloader"
 
       sync
 
@@ -44,36 +52,31 @@ mountLoaderDisk() {
     return 1
   else
     echo "Loader disk mount success!"
-    . "/usr/arc/.mountloader"
+    ${ARC_SUDO} "/usr/arc/.mountloader"
     return 0
   fi
 }
 
 unmountLoaderDisk() {
   if [ -f "/usr/arc/.mountloader" ]; then
-    rm -f "/usr/arc/.mountloader"
+    {
+      echo "export LOADER_DISK=\"\""
+      echo "export LOADER_DISK_PART1=\"\""
+      echo "export LOADER_DISK_PART2=\"\""
+      echo "export LOADER_DISK_PART3=\"\""
+    } | ${ARC_SUDO} tee "/usr/arc/.mountloader" >/dev/null
+    ${ARC_SUDO} chmod 755 "/usr/arc/.mountloader"
+    ${ARC_SUDO} "/usr/rr/.mountloader"
+    ${ARC_SUDO} rm -f "/usr/arc/.mountloader"
 
     sync
 
-    export LOADER_DISK=
-    export LOADER_DISK_PART1=
-    export LOADER_DISK_PART2=
-    export LOADER_DISK_PART3=
-
     for i in {1..3}; do
-      umount "/mnt/p${i}" || {
-        echo "Failed to unmount /mnt/p${i}"
-        return 1
-      }
-      if [ -d "/mnt/p${i}" ]; then
-        rm -rf "/mnt/p${i}" || {
-          echo "Failed to remove directory /mnt/p${i}"
-          return 1
-        }
-      fi
+      ${ARC_SUDO} umount "/mnt/p${i}"
+      ${ARC_SUDO} rm -rf "/mnt/p${i}"
     done
 
-    echo 0 >/proc/sys/kernel/syno_install_flag
+    echo 0 | ${ARC_SUDO} tee /proc/sys/kernel/syno_install_flag >/dev/null
   fi
   echo "Loader disk umount success!"
   return 0

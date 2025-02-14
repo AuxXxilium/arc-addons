@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib:/tmpRoot/bin:/tmpRoot/lib
+export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
 
 install_addon() {
   echo "Installing addon synoconfbkp - ${1}"

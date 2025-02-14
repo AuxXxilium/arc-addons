@@ -354,13 +354,11 @@ nondtModel() {
   hasUSB=false
   USBMINIDX=99
   USBMAXIDX=00
-  USB_COUNT=0
   for I in $(ls -d /sys/block/sd* 2>/dev/null); do
     IDX=$(_atoi "${I/\/sys\/block\/sd/}")
     [ $((IDX + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((IDX + 1))
     ISUSB="$(cat ${I}/uevent 2>/dev/null | grep PHYSDEVPATH | grep usb)"
     if [ -n "${ISUSB}" ]; then
-      USB_COUNT=$((USB_COUNT + 1))
       if [ "${hasUSB}" = "false" ]; then
         [ ${IDX} -lt ${USBMINIDX} ] && USBMINIDX=${IDX}
         [ ${IDX} -gt ${USBMAXIDX} ] && USBMAXIDX=${IDX}
@@ -379,7 +377,6 @@ nondtModel() {
   [ $((USBMAXIDX + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((USBMAXIDX + 1))
   
   # NVME processing
-  NVME_COUNT=0
   COUNT=1
   echo "[pci]" >/etc/extensionPorts
   for P in $(ls -d /sys/block/nvme* 2>/dev/null); do
@@ -393,18 +390,11 @@ nondtModel() {
       grep -q "=\"${PCIEPATH}\"" /etc/extensionPorts && continue
       echo "pci${COUNT}=\"${PCIEPATH}\"" >>/etc/extensionPorts
       COUNT=$((COUNT + 1))
-      NVME_COUNT=$((NVME_COUNT + 1))
   
       _set_conf_kv rd "supportnvme" "yes"
       _set_conf_kv rd "support_m2_pool" "yes"
     fi
   done
-  
-  if grep -wq "usbinternal" /proc/cmdline 2>/dev/null; then
-    MAXDISKS=$((MAXDISKS + NVME_COUNT))
-  else
-    MAXDISKS=$((MAXDISKS + NVME_COUNT - USB_COUNT))
-  fi
   
   if _check_post_k "rd" "maxdisks"; then
     MAXDISKS=$((_get_conf_kv rd maxdisks))
