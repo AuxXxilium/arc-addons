@@ -40,6 +40,8 @@ install_late() {
   [ ! -L "/tmpRoot/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modinfo
   [ ! -L "/tmpRoot/usr/sbin/depmod" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/depmod
 
+  [ ! -f "/tmpRoot/usr/bin/eject" ] && cp -vpf /usr/bin/eject /tmpRoot/usr/bin/eject
+
   echo "copy modules"
   isChange="false"
   export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib

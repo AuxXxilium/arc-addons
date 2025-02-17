@@ -20,6 +20,15 @@ install_addon() {
     xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
+  # libsynonvme.so.1
+  SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
+  [! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
+  cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
+  xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
+    sed "s/8D15CA400000BF03808080E820C3FF90/8D15CA400000BF030000009090C39090/; s/8D15DA1A0000BF03000000E8309DFFFF/8D15DA1A0000BF030000009090909090/" |
+    xxd -r -p >"${SO_FILE}" 2>/dev/null
+  rm -f "${SO_FILE}.tmp"
+
   # libhwcontrol.so.1
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
