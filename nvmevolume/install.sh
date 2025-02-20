@@ -2,8 +2,8 @@
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
-# From：https://github.com/007revad/Synology_enable_M2_volume
-# From: https://github.com/PeterSuh-Q3/tcrp-addons/blob/main/nvmevolume-onthefly/src/install.sh
+# https://github.com/007revad/Synology_enable_M2_volume
+# https://github.com/PeterSuh-Q3/tcrp-addons/blob/main/nvmevolume-onthefly/src/install.sh
 #
 
 check_nvmesystem() {

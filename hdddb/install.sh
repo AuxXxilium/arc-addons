@@ -5,7 +5,7 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-# From：https://github.com/007revad/Synology_HDD_db
+# https://github.com/007revad/Synology_HDD_db
 #
 
 install_addon() {
