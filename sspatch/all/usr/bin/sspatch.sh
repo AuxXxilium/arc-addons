@@ -12,9 +12,9 @@ copy_file() {
   SS_INPUT="${3}"
   SS_MODE="${4}"
   if [ -f "${SS_INPUT}/${SS_FILE}" ] && [ -f "${SS_TARGET}/${SS_FILE}" ]; then
-    SS_HASHIN
+    local SS_HASHIN
     SS_HASHIN="$(sha256sum "${SS_INPUT}/${SS_FILE}" | cut -d' ' -f1)"
-    SS_HASHOUT
+    local SS_HASHOUT
     SS_HASHOUT="$(sha256sum "${SS_TARGET}/${SS_FILE}" | cut -d' ' -f1)"
     if [ "${SS_HASHIN}" = "${SS_HASHOUT}" ]; then
       echo "sspatch: ${SS_FILE} already patched"
@@ -54,9 +54,9 @@ if [ -d "${SSPATH}" ]; then
     fi
   done
 
-  SSVERSION
+  local SSVERSION
   SSVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1 | sed -E 's/^0*([0-9])0/\1/')"
-  SSMODEL
+  local SSMODEL
   SSMODEL="$(grep -oP '(?<=model=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1)"
   
   if [ "${SSVERSION}" = "9.2.0-11289" ]; then
