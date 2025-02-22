@@ -12,8 +12,8 @@ if [ -z "${MLINK}" ] || [ -z "${MCHECKSUM}" ]; then
   exit 1
 fi
 
-install_modules() {
-  echo "Installing addon localrss - modules"
+install_patches() {
+  echo "Installing addon localrss - patches"
 
   . /etc.defaults/VERSION
 
@@ -97,8 +97,8 @@ EOF
 }
 
 case "${1}" in
-  modules)
-    install_modules
+  patches)
+    install_patches
     ;;
   *)
     exit 0
