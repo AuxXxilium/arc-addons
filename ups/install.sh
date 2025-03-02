@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
-
 install_addon() {
   echo "Installing addon ups - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
@@ -26,6 +24,7 @@ install_addon() {
       sed -i "/\/usr\/syno\/sbin\/synopoweroff/i\ \ \ \ ${EVENT_POWEROFF}" "${FILE}"
     fi
 
+    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
     if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
       echo "copy esynoscheduler.db"
@@ -48,6 +47,7 @@ uninstall_addon() {
   FILE="/tmpRoot/usr/syno/bin/synoups"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
 
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete start/stop ScsiTarget task from esynoscheduler.db"

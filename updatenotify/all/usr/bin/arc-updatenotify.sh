@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-Create() {
+create() {
   if grep -q "Arc-UpdateNotify" /usr/syno/etc/synoschedule.d/root/*.task 2>/dev/null; then
     echo "Existence tasks"
   else
@@ -18,7 +18,7 @@ Create() {
   exit 0
 }
 
-Delete() {
+delete() {
   for I in /usr/syno/etc/synoschedule.d/root/*.task; do
     if [ "$(grep '^name=' "${I}" 2>/dev/null | cut -d'=' -f2)" = "Arc-UpdateNotify" ]; then
       id=$(grep '^id=' "${I}" | cut -d'=' -f2)
@@ -28,7 +28,7 @@ Delete() {
   exit 0
 }
 
-Check() {
+check() {
   LOCALTAG=$(grep LOADERVERSION /usr/arc/VERSION 2>/dev/null | cut -d'=' -f2 | sed 's/\"//g')
   if [ -z "${LOCALTAG}" ]; then
     echo "Unknown bootloader version!"
@@ -40,8 +40,7 @@ Check() {
   if echo "$@" | grep -wq "\-p"; then
     TAG=$(curl -skL --connect-timeout 10 "${URL}/tags" | grep "/refs/tags/.*\.zip" | head -1 | sed -E 's/.*\/refs\/tags\/(.*)\.zip.*$/\1/')
   else
-    LATESTURL=$(curl -skL --connect-timeout 10 -w %{url_effective} -o /dev/null "${URL}/releases/latest")
-    TAG="${LATESTURL##*/}"
+    TAG="$(curl -skL --connect-timeout 10 -w %{url_effective} -o /dev/null "${URL}/releases/latest" | awk -F'/' '{print $NF}')"
   fi
   [ "${TAG:0:1}" = "v" ] && TAG="${TAG:1}"
   if [ -z "${TAG}" ] || [ "${TAG}" = "latest" ]; then

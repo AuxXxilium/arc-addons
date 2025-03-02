@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
-
 check_build() {
   _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
   if [ ${_BUILD:-64570} -lt 69057 ]; then
@@ -79,6 +77,7 @@ install_late() {
     ONBOOTUP="${ONBOOTUP}systemctl restart systemd-udev-trigger.service\n"
     ONBOOTUP="${ONBOOTUP}echo \"DELETE FROM task WHERE task_name LIKE ''ARCONBOOTUPARC_UDEV'';\" | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db\n"
 
+    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
     if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -qw "task"; then
       echo "copy esynoscheduler.db"
