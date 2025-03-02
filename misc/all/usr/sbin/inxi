@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 ## infobash: Copyright (C) 2005-2007  Michiel de Boer aka locsmif
-## inxi: Copyright (C) 2008-2024 Harald Hope
+## inxi: Copyright (C) 2008-2025 Harald Hope
 ## Additional features (C) Scott Rogers - kde, cpu info
 ## Parse::EDID (C):  2005-2010 by Mandriva SA, Pascal Rigaux, Anssi Hannula
 ## Further fixes (listed as known): Horst Tritremmel <hjt at sidux.com>
@@ -49,8 +49,8 @@ use POSIX qw(ceil uname strftime ttyname);
 
 ## INXI INFO ##
 my $self_name='inxi';
-my $self_version='3.3.36';
-my $self_date='2024-09-04';
+my $self_version='3.3.37';
+my $self_date='2025-01-06';
 my $self_patch='00';
 ## END INXI INFO ##
 
@@ -674,7 +674,7 @@ sub set_user_paths {
 		$user_data_dir="$ENV{'HOME'}/.$self_name";
 	}
 	# note, this used to be created/checked in specific instance, but we'll just 
-	# do it universally so it's done at script start.
+	# do it universally so it's done at start.
 	if (! -d $user_data_dir){
 		mkdir $user_data_dir;
 		# system "echo", "Made: $user_data_dir";
@@ -1982,11 +1982,14 @@ sub display_data {
 	['clinfo',''],
 	['clinfo','--list'],
 	['clinfo','--raw'], # machine friendly
-	['eglinfo',''],
-	['eglinfo','-B'],
+	# ['eglinfo',''], # egl is set below to allow --no-egl flag use for old Intel
+	# ['eglinfo','-B'],
 	['es2_info',''],
+	['gnome-randr',''],
 	['glxinfo',''],
 	['glxinfo','-B'],
+	['kscreen-console','outputs'], # this may create a screen type session
+	['kscreen-doctor','--outputs'],
 	['kded','--version'],
 	['kded1','--version'],
 	['kded2','--version'],
@@ -2018,6 +2021,7 @@ sub display_data {
 	['swaymsg','-t get_tree'],
 	['swaymsg','-t get_workspaces -p'],
 	['swaymsg','-t get_workspaces -r'],
+	['swaymsg','--version'],
 	['switcherooctl','list'],
 	['twin','--version'], # TDE
 	['vainfo',''],
@@ -2029,7 +2033,7 @@ sub display_data {
 	['weston-info',''], 
 	['wmctrl','-m'],
 	['weston','--version'],
-	['wlr-randr',''],
+	['wlr-randr',''], # no --version
 	['xdpyinfo',''],
 	['xdriinfo',''],
 	['Xfbdev','-version'],
@@ -2042,6 +2046,9 @@ sub display_data {
 	['Xvesa','-listmodes'],
 	['Xwayland','-version'],
 	);
+	if (!$force{'no-egl'}){
+		push(@cmds,['eglinfo',''],['eglinfo','-B']);
+	}
 	run_commands(\@cmds,'display');
 }
 
@@ -2780,7 +2787,7 @@ sub get_file_http_tiny {
 	my %headers = ($ua) ? ('agent' => $ua) : ();
 	my $tiny = HTTP::Tiny->new(%headers);
 	# note: default is no verify, so default here actually is to verify unless overridden
-	$tiny->verify_SSL => 1 if !$use{'no-ssl'};
+	$tiny->verify_SSL => 1 if !$force{'no-ssl'};
 	my $response = $tiny->get($url);
 	my $return = 1;
 	my $debug = 0;
@@ -2895,7 +2902,7 @@ sub set_downloader {
 		$dl{'dl'} = '';
 	}
 	# $use{'no-ssl' is set to 1 with --no-ssl, when false, unset to ''
-	$dl{'no-ssl'} = '' if !$use{'no-ssl'};
+	$dl{'no-ssl'} = '' if !$force{'no-ssl'};
 	eval $end if $b_log;
 }
 
@@ -3128,13 +3135,13 @@ sub check_items {
 	}
 	elsif ($type eq 'recommended display information programs'){
 		if ($bsd_type){
-			@data = qw(eglinfo glxinfo vulkaninfo wayland-info wmctrl xdpyinfo xprop 
-			xdriinfo xrandr);
+			@data = qw(eglinfo glxinfo vulkaninfo wayland-info wlr-randr wmctrl
+			xdpyinfo xprop xdriinfo xrandr);
 			$info_os = 'info-bsd';
 		}
 		else {
-			@data = qw(eglinfo glxinfo vulkaninfo wayland-info wmctrl xdpyinfo xprop 
-			xdriinfo xrandr);
+			@data = qw(eglinfo glxinfo vulkaninfo wayland-info wlr-randr wmctrl 
+			xdpyinfo xprop xdriinfo xrandr);
 		}
 		$b_program = 1;
 		$item = 'Program';
@@ -3706,6 +3713,14 @@ sub set_item_data {
 	'pkgtool' => 'wayland-utils',
 	'rpm' => 'wayland-utils',
 	},
+	'wlr-randr' => {
+	'info' => '-G (Wayland, wlroots based) monitors(s) data',
+	'info-bsd' => '-G (Wayland, wlroots based) monitors(s) data',
+	'apt' => 'wlr-randr',
+	'pacman' => 'wlr-randr',
+	'pkgtool' => 'wlr-randr (?)',
+	'rpm' => 'wlr-randr',
+	},
 	'wmctrl' => {
 	'info' => '-S active window manager (fallback)',
 	'info-bsd' => '-S active window manager (fallback)',
@@ -4254,7 +4269,7 @@ sub update_me {
 				update_man($self_download,$download_id);
 			}
 			else {
-				print "Skipping man download because branch version is being used.\n";
+				print "Skipping man download.\n";
 			}
 			exit 0;
 		}
@@ -4448,21 +4463,8 @@ sub get {
 	'D|disk' => sub {
 		$show{'short'} = 0;
 		$show{'disk'} = 1;},
-	'E|bluetooth' => sub {
-		$show{'short'} = 0;
-		$show{'bluetooth'} = 1; 
-		$show{'bluetooth-forced'} = 1;},
-	'edid' => sub {
-		$b_admin = 1;
-		$show{'short'} = 0;
-		$show{'edid'} = 1;
-		$show{'graphic'} = 1;
-		$show{'graphic-full'} = 1;},
-	'f|flags|flag' => sub {
-		$show{'short'} = 0;
-		$show{'cpu'} = 1;
-		$show{'cpu-flag'} = 1;},
-	'F|full' => sub {
+	# Note: to show deprecation warnings will need to create separate F|full item.
+	'e|F|expanded|full' => sub {
 		$show{'short'} = 0;
 		$show{'audio'} = 1;
 		$show{'battery'} = 1;
@@ -4481,6 +4483,20 @@ sub get {
 		$show{'sensor'} = 1;
 		$show{'swap'} = 1;
 		$show{'system'} = 1;},
+	'E|bluetooth' => sub {
+		$show{'short'} = 0;
+		$show{'bluetooth'} = 1; 
+		$show{'bluetooth-forced'} = 1;},
+	'edid' => sub {
+		$b_admin = 1;
+		$show{'short'} = 0;
+		$show{'edid'} = 1;
+		$show{'graphic'} = 1;
+		$show{'graphic-full'} = 1;},
+	'f|flags|flag' => sub {
+		$show{'short'} = 0;
+		$show{'cpu'} = 1;
+		$show{'cpu-flag'} = 1;},
 	'gpu|nvidia|nv' => sub {
 		main::error_handler('option-removed', '--gpu/--nvidia/--nv','-Ga');},
 	'G|graphics|graphic' => sub {
@@ -4940,7 +4956,7 @@ sub get {
 	'debug-width|debug-y:i' => sub { 
 		my ($opt,$arg) = @_;
 		$arg ||= 80;
-		if ($arg =~ /^\d+$/ && ($arg == 1 || $arg >= 80)){
+		if ($arg =~ /^\d+$/ && ($arg == 1 || $arg >= 50)){
 			$debugger{'width'} = $arg;
 		}
 		else {
@@ -4949,7 +4965,7 @@ sub get {
 	'debug-zy|debug-yz:i' => sub { 
 		my ($opt,$arg) = @_;
 		$arg ||= 80;
-		if ($arg =~ /^\d+$/ && ($arg == 1 || $arg >= 80)){
+		if ($arg =~ /^\d+$/ && ($arg == 1 || $arg >= 50)){
 			$debugger{'width'} = $arg;
 			$debugger{'filter'} = 1;
 		}
@@ -4957,7 +4973,7 @@ sub get {
 			main::error_handler('bad-arg', $opt, $arg);
 		}},
 	'dig' => sub {
-		$force{'no-dig'} = 0;},
+		$force{'dig'} = 0;},
 	'display:s' => sub { 
 		my ($opt,$arg) = @_;
 		if ($arg =~ /^:?([0-9\.]+)?$/){
@@ -4995,11 +5011,14 @@ sub get {
 		else {
 			main::error_handler('bad-arg', $opt, $arg);
 		}},
+	'egl' => sub {
+		$force{'egl'} = 1;},
 	'fake:s' => sub {
 		my ($opt,$arg) = @_;
 		if ($arg){
 			my $wl = 'bluetooth|compiler|cpu|dboot|dmidecode|egl|elbrus|glx|';
-			$wl .= 'iomem|ip-if|ipmi|logical|lspci|partitions|pciconf|pcictl|pcidump|';
+			$wl .= 'iomem|ip-if|ipmi|kscreen|logical|lspci|';
+			$wl .= 'partitions|pciconf|pcictl|pcidump|';
 			$wl .= 'raid-btrfs|raid-hw|raid-lvm|raid-md|raid-soft|raid-zfs|';
 			$wl .= 'sensors|sensors-sys|swaymsg|sys-mem|sysctl|';
 			$wl .= 'udevadm|uptime|usbconfig|usbdevs|vmstat|vulkan|wl-info|wlr-randr|';
@@ -5027,10 +5046,11 @@ sub get {
 	'force:s' => sub {
 		my ($opt,$arg) = @_;
 		if ($arg){
-			my $wl = 'bluetoothctl|bt-adapter|btmgmt|colors|cpuinfo|display|dmidecode|';
-			$wl .= 'hciconfig|hddtemp|ip|ifconfig|lsusb|man|meminfo|';
-			$wl .= 'no-dig|no-doas|no-html-wan|no-sudo|pkg|rfkill|rpm|sensors-sys|';
-			$wl .= 'udevadm|usb-sys|vmstat|wayland|wmctrl';
+			my $wl = 'bluetoothctl|bt-adapter|btmgmt|colors|cpuinfo|dig|display|dmidecode|';
+			$wl .= 'egl|hciconfig|hddtemp|html-wan|ip|ifconfig|kscreen|lsusb|man|meminfo|';
+			$wl .= 'no-dig|no-doas|no-egl|no-graphics-api|no-html-wan|no-man|no-opengl|';
+			$wl .= 'no-ssl|no-sudo|no-vulkan|pkg|rfkill|rpm|sensors-sys|swaymsg|udevadm|';
+			$wl .= 'usb-sys|vmstat|wayland|wl-info|wlr-randr|wmctrl';
 			for (split(',',$arg)){
 				if ($_ =~ /\b($wl)\b/){
 					$force{lc($1)} = 1;
@@ -5058,7 +5078,7 @@ sub get {
 		$show{'host'} = 1;
 		$show{'no-host'} = 0;},
 	'html-wan' => sub {
-		$force{'no-html-wan'} = 0;},
+		$force{'html-wan'} = 1;},
 	'ifconfig' => sub {
 		$force{'ifconfig'} = 1;},
 	'indent:i' => sub {
@@ -5080,7 +5100,7 @@ sub get {
 	'irc' => sub {
 		$b_irc = 1;},
 	'man' => sub {
-		$use{'yes-man'} = 1;},
+		$force{'man'} = 1;},
 	'max-wrap|wrap-max|indent-min:i' => sub {
 		my ($opt,$arg) = @_;
 		if ($arg >= 0){
@@ -5095,19 +5115,27 @@ sub get {
 		$risc{'mips'} = 1;},
 	'no-dig' => sub {
 		$force{'no-dig'} = 1;},
+	'no-egl' => sub {
+		$force{'no-egl'} = 1;},
 	'no-doas' => sub {
 		$force{'no-doas'} = 1;},
+	'no-graphics-api' => sub {
+		$force{'no-graphics-api'} = 1;},
 	'no-host|no-hostname' => sub {
 		$show{'host'} = 0;
 		$show{'no-host'} = 1;},
 	'no-html-wan' => sub {
 		$force{'no-html-wan'}= 1;},
 	'no-man' => sub {
-		$use{'no-man'} = 0;},
+		$force{'no-man'} = 1;},
+	'no-opengl' => sub {
+		$force{'no-opengl'} = 1;},
 	'no-ssl' => sub {
-		$use{'no-ssl'} = 1;},
+		$force{'no-ssl'} = 1;},
 	'no-sudo' => sub {
 		$force{'no-sudo'} = 1;},
+	'no-vulkan' => sub {
+		$force{'no-vulkan'} = 1;},
 	'output|export:s' => sub {
 		my ($opt,$arg) = @_;
 		if ($arg =~ /^(json|screen|xml)$/){
@@ -5232,7 +5260,10 @@ sub post_process {
 	if ($use{'downloader'} || $wan_url || ($force{'no-dig'} && $show{'ip'})){
 		main::set_downloader();
 	}
-	$use{'man'} = 0 if (!$use{'yes-man'} || $use{'no-man'});
+	# setting some where internal switches test opposite value only
+	$use{'man'} = 0 if (!$force{'man'} || $force{'no-man'});
+	$force{'no-html-wan'} = 0 if $force{'html-man'};
+	$force{'no-dig'} = 0 if $force{'dig'};
 	main::update_me($self_download,$download_id) if $use{'update-trigger'};
 	main::set_xorg_log() if $show{'graphic'};
 	set_pledge() if $b_pledge;
@@ -5371,9 +5402,9 @@ sub process_updater {
 			$download_id = 'alt server';
 			$self_download = $arg;
 		}
-		if ($self_download && $self_name eq 'inxi'){
+		if ($self_download && $self_name eq 'inxi' && !$force{'no-man'}){
 			$use{'man'} = 1;
-			$use{'yes-man'} = 1;
+			$force{'man'} = 1;
 		}
 		if (!$self_download){
 			main::error_handler('bad-arg', $opt, $arg);
@@ -5424,25 +5455,27 @@ sub show_options {
 	it will display a short system summary."],
 	['0', '', '', ''],
 	['0', '', '', "You can use these options alone or together, 
-	to show or add the item(s) you want to see: A, B, C, d, D, E, f, G, i, I, j, 
+# 	to show or add the item(s) you want to see: A, B, C, d, D, E, f, G, i, I, j, 
 	J, l, L, m, M, n, N, o, p, P, r, R, s, S, t, u, w, --edid, --mm, --ms, 
-	--slots. If you use them with -v [level], -b or -F, $self_name will add the
-	requested lines to the output."],
+	--slots. If you use them with  -b, -e, or -v [level], $self_name will add the
+	requested lines to the report."],
 	['0', '', '', '' ],
 	['0', '', '', "Examples:^$self_name^-v4^-c6 OR $self_name^-bDc^6 OR
-	$self_name^-FzjJxy^80"],
+	$self_name^-ezjJxy^85"],
 	['0', '', '', $line ],
 	['0', '', '', "See Filter Options for output filtering, Output Control Options
-	for colors, sizing, output changes, Extra Data Options to extend Main output,
+	for colors, sizing, output changes, Extra Data Options to extend Main report,
 	Additional Options and Advanced Options for less common situations."],
 	['0', '', '', $line ],
 	['0', '', '', "Main Feature Options:"],
 	['1', '-A', '--audio', "Audio/sound devices(s), driver; active sound APIs and 
 	servers."],
-	['1', '-b', '--basic', "Basic output, short form. Same as $self_name^-v^2."],
+	['1', '-b', '--basic', "Basic report: System (-S); basic CPU; Machine (-M); 
+	Battery (-B) (if found); Graphics (-G); Network devices (-N); basic Disk; 
+	Info (-I). Same as $self_name^-v2. See -e for expanded report."],
 	['1', '-B', '--battery', "System battery info, including charge, condition
 	voltage (if critical), plus extra info (if battery present/detected)."],
-	['1', '-C', '--cpu', "CPU output (if each item available): basic topology,
+	['1', '-C', '--cpu', "CPU report (if each item available): basic topology,
 	model, type (see man for types), cache, average CPU speed, min/max speeds, 
 	per core clock speeds."],
 	['1', '-d', '--disk-full, --optical', "Optical drive data (and floppy disks, 
@@ -5450,22 +5483,24 @@ sub show_options {
 	['1', '-D', '--disk', "Hard Disk info, including total storage and details 
 	for each disk. Disk total used percentage includes swap ${partition_string}
 	size(s)."],
+	['1', '-e', '--expanded', "(formerly -F/--full) Expands -b basic report. 
+	Includes all Upper Case options (except -J) plus --swap, -s and -n. Does not 
+	show extra verbose options such as -d -f -i -J -l -m -o -p -r -t -u -x, unless 
+	specified."],
 	['1', '-E', '--bluetooth', "Show bluetooth device data and report, if 
 	available. Shows state, address, IDs, version info."],
 	['1', '', '--edid', "Full graphics data, triggers -a, -G. Add monitor chroma,
 	full modelines (if > 2), EDID errors and warnings, if present."],
 	['1', '-f', '--flags', "All CPU $flags. Triggers -C. Not shown with -F to 
 	avoid spamming."],
-	['1', '-F', '--full', "Full output. Includes all Upper Case line letters 
-	(except -J, -W) plus --swap, -s and -n. Does not show extra verbose options 
-	such as -d -f -i -J -l -m -o -p -r -t -u -x, unless specified."],
+	['1', '-F', '--full', "Deprecated. See -e/--expanded."],
 	['1', '-G', '--graphics', "Graphics info (devices(s), drivers, display 
 	protocol (if available), display server/Wayland compositor, resolution, X.org: 
 	renderer, basic EGL, OpenGL, Vulkan API data; Xvesa API: VBE info."],
 	['1', '-i', '--ip', "WAN IP address and local interfaces (requires ifconfig 
 	or ip network tool). Triggers -n. Not shown with -F for user security reasons. 
 	You shouldn't paste your local/WAN IP."],
-	['1', '', '--ip-limit, --limit', "[-1; 1-x] Set max output limit of IP 
+	['1', '', '--ip-limit, --limit', "[-1; 1-x] Set max report limit of IP 
 	addresses for -i (default 10; -1 removes limit)."],
 	['1', '-I', '--info', "General info, including processes, uptime, memory (if 
 	-m/-tm not used), IRC client or shell type, $self_name version."],
@@ -5499,7 +5534,7 @@ sub show_options {
 	all other detected ${partition_string}s)."],
 	['1', '', '--partitions-sort, --ps', "
 	[dev-base|fs|id|label|percent-used|size|uuid|used] Change sort order of 
-	${partition_string} output. See man page for specifics."],
+	${partition_string} report. See man page for specifics."],
 	['1', '-P', '--partitions', "Basic $partition_string info. Shows, if detected: 
 	/ /boot /home /opt /tmp /usr /usr/home /var /var/log /var/tmp. Swap 
 	${partition_string}s show if --swap is not used. Use -p to see all 
@@ -5511,7 +5546,7 @@ sub show_options {
 	['1', '-R', '--raid', "RAID data. Shows RAID devices, states, levels, array 
 	sizes, and components. md-raid: If device is resyncing, also shows resync
 	progress line."],
-	['1', '-s', '--sensors', "Sensors output (if sensors installed/configured): 
+	['1', '-s', '--sensors', "Sensors report (if sensors installed/configured): 
 	mobo/CPU/GPU temp; detected fan speeds. Nvidia shows screen number for > 1 
 	screen. IPMI sensors if present."],
 	['1', '', '--slots', "PCI slots: type, speed, status. Requires root."],
@@ -5524,28 +5559,25 @@ sub show_options {
 	numbers (e.g.^-t^cm10)."],
 	['1', '-u', '--uuid', "$partition_string_u, system board UUIDs. Use with -j, 
 	-M, -o, -p, -P."],
-	['1', '-v', '--verbosity', "Set $self_name verbosity level (0-8). 
-	Should not be used with -b or -F. Example: $self_name^-v^4"],
-	['2', '0', '', "Same as: $self_name"],
-	['2', '1', '', "Basic verbose, -S + basic CPU + -G + basic Disk + -I."],
-	['2', '2', '', "Networking device (-N), Machine (-M), Battery (-B; if 
-	present), and, if present, basic RAID (devices only; notes if inactive). Same 
-	as $self_name^-b"],
-	['2', '3', '', "Advanced CPU (-C), battery (-B), network (-n); 
-	triggers -x. "],
-	['2', '4', '', "$partition_string_u size/used data (-P) for 
-	(if present) /, /home, /var/, /boot. Shows full disk data (-D). "],
-	['2', '5', '', "Audio device (-A), sensors (-s), memory/RAM (-m), 
-	bluetooth (if present), $partition_string label^(-l), full swap (-j), 
-	UUID^(-u), short form of optical drives, RAID data (if present)."],
-	['2', '6', '', "Full $partition_string (-p), 
-	unmounted $partition_string (-o), optical drive (-d), USB (-J),
-	full RAID; triggers -xx."], 
-	['2', '7', '', "Network IP data (-i), bluetooth, logical (-L), 
-	RAID forced, full CPU $flags; triggers -xxx."],
-	['2', '8', '', "Everything available, including	advanced gpu EDID (--edid)
-	data, repos (-r), processes (-tcm), PCI slots (--slots); triggers 
-	admin (-a)."],
+	['1', '-v', '--verbosity', "Set $self_name report verbosity level (0-8). 
+	Should not be used with -b or -e. Example: $self_name^-v^4"],
+	['2', '0', '', "Simple report. Same as: $self_name"],
+	['2', '1', '', "Basic report: System (-S); basic CPU; Graphics (-G); basic 
+	Disk; Info (-I)."],
+	['2', '2', '', "Adds: Machine (-M); Battery (-B) (if present); Networking 
+	devices (-N). Same as $self_name^-b."],
+	['2', '3', '', "Adds: Full CPU (-C); advanced network (-n); triggers -x."],
+	['2', '4', '', "Adds: full disk data (-D); $partition_string_u size/used data 
+	(-P) for (if present) /, /home, /var/, /boot."],
+	['2', '5', '', "Adds: memory/RAM (-m); Audio (-A); bluetooth (-E) (if present); 
+	RAID (-R) (if present); $partition_string label^(-l) and UUID^(-u); full swap 
+	(-j); sensors (-s)."],
+	['2', '6', '', "Adds: optical drives (-d); full $partition_string (-p); 
+	unmounted $partition_string (-o); USB (-J); triggers -xx."], 
+	['2', '7', '', "Adds: full CPU $flags (-f); logical devices (-L); Network IP 
+	(-i); forces Battery (-B), Bluetooth (-E), RAID (-R); triggers -xxx."],
+	['2', '8', '', "Adds: PCI slots (--slots); GPU EDID (--edid); Repos (-r); 
+	Processes (-tcm); triggers -a. -v8 is all the system info available."],
 	);
 	# if distro maintainers don't want the weather feature disable it
 	if ($use{'weather'}){
@@ -5569,7 +5601,7 @@ sub show_options {
 	[0, '', '', "$line"],
 	['0', '', '', "Filter Options:"],
 	['1', '', '--host', "Turn on hostname for -S. Overrides -z."],
-	['1', '', '--no-host', "Turn off hostname for -S. Useful if showing output 
+	['1', '', '--no-host', "Turn off hostname for -S. Useful if showing report 
 	from servers etc. Activated by -z as well."],
 	['1', '-z', '--filter', "Adds security filters for IP/MAC addresses, serial 
 	numbers, location (-w), user home directory name, host name. Default on for 
@@ -5676,10 +5708,10 @@ sub show_options {
 		['2', '-w', '', "Wind speed and direction, humidity, pressure, and time
 		zone, if available."]);
 	}
-	push(@$rows, 
+	push(@$rows,
 	['0', '', '', ''],
 	['1', '-xx', '--extra 2', "Show extra, extra data (only works with verbose 
-	or line output, not short form):"],
+	or line item reports, not short form):"],
 	['2', '-A', '', "Chip vendor:product ID for each audio device; PCIe speed,
 	lanes (if found); USB rev, speed, lanes (if found); sound server/api helper 
 	daemons/plugins."],
@@ -5694,7 +5726,7 @@ sub show_options {
 	found); Xorg: Xorg compositor; alternate Xorg drivers (if available. Alternate 
 	means driver is on automatic driver check list of Xorg for the device vendor, 
 	but is not installed on system); Xorg Screen data: ID, s-res, dpi;  Monitors: 
-	ID, position (if > 1), resolution, dpi, model, diagonal; APIs: EGL: per 
+	ID, position (if > 1), resolution, hz, dpi, model, diagonal; APIs: EGL: per 
 	platform report; OpenGL: ES version, device-ID, display-ID (if not found in 
 	Display line); Vulkan: per device report."], 
 	['2', '-I', '', "Adds Power: with children uptime, wakeups (from suspend); 
@@ -5729,10 +5761,10 @@ sub show_options {
 		cover, wind chill, dew point, heat index, if available."]
 		);
 	}
-	push(@$rows, 
+	push(@$rows,
 	['0', '', '', ''],
 	['1', '-xxx', '--extra 3', "Show extra, extra, extra data (only works 
-	with verbose or line output, not short form):"],
+	with verbose or line reports, not short form):"],
 	['2', '-A', '', "Serial number, class ID."],
 	['2', '-B', '', "Chemistry, cycles, location (if available)."],
 	['2', '-C', '', "CPU voltage, external clock speed (if root and dmidecode
@@ -5742,7 +5774,8 @@ sub show_options {
 	['2', '-E', '', "Serial number, class ID, bluetooth device class ID, HCI 
 	version and revision."],
 	['2', '-G', '', "Device serial number, class ID; Xorg Screen size, diag; 
-	Monitors: hz, size, modes, serial, scale, modes (max/min); APIs: EGL: hardware 
+	Monitors: resolution details (mode, hz, scale, scaled to if scale != 1), 
+	size, modes, serial, scale, modes (max/min); APIs: EGL: hardware 
 	driver info; Vulkan: layer count, device hardware vendor."],
 	['2', '-I', '', "For Power:, adds states, suspend/hibernate active type; 
 	For 'Shell:' adds ([doas|su|sudo|login]) to shell name if present; adds 
@@ -5769,10 +5802,10 @@ sub show_options {
 		altitude, sunrise/sunset, if available."] 
 		);
 	}
-	push(@$rows, 
+	push(@$rows,
 	['0', '', '', ''],
 	['1', '-a', '--admin', "Adds advanced sys admin data (only works with 
-	verbose or line output, not short form); check man page for explanations!; 
+	verbose or line reports, not short form); check man page for explanations!; 
 	also sets --extra=3:"],
 	['2', '-A', '', "If available: list of alternate kernel modules/drivers 
 	for device(s); PCIe lanes-max: gen, speed, lanes (if relevant); USB mode (if 
@@ -5793,7 +5826,8 @@ sub show_options {
 	relevant); USB mode (if found); list of alternate kernel modules/drivers for 
 	device(s) (if available); Monitor built year, gamma, screen ratio (if 
 	available); APIs: OpenGL: device memory, unified memory status; Vulkan: adds 
-	full device report, device name, driver version, surfaces."],
+	full device report, device name, driver version, surfaces; Info: Tools: added,
+	shows installed tools from types: api, de, gpu, wl, x11."],
 	['2', '-I', '', "Adds to Power suspend/hibernate available non active states, 
 	hibernate image size, suspend failed totals (if not 0), active power services; 
 	Packages total number of lib files found for each package manager and pm tools 
@@ -5846,7 +5880,7 @@ sub show_options {
 		^$self_name^-U^https://myserver.com/inxi"],
 		);
 	}
-	push(@$rows, 
+	push(@$rows,
 	['1', '', '--version, --vf', "Prints full $self_name version info then exits."],
 	['1', '', '--version-short,--vs', "Prints 1 line $self_name version info. Can 
 	be used with other line options."],
@@ -5865,14 +5899,19 @@ sub show_options {
 	['1', '', '--display', "[:[0-9]] Try to get display data out of X (default: 
 	display 0)."],
 	['1', '', '--dmidecode', "Force use of dmidecode data instead of /sys where 
-	relevant 
-	(e.g. -M, -B)."],
+	relevant (e.g. -M, -B)."],
 	['1', '', '--downloader', "Force $self_name to use [curl fetch perl wget] for 
 	downloads."],
-	['1', '', '--force', "[bt-adapter btmgmt dmidecode hciconfig hddtemp ip 
-	ifconfig lsusb meminfo rfkill usb-sys vmstat wmctrl].
+	['1', '', '--egl', "Force use of EGL graphics API even if blocked internally."],
+	['1', '', '--force', "[bluetoothctl bt-adapter btmgmt colors cpuinfo display 
+	dmidecode hciconfig hddtemp html-wan ifconfig ip kscreen lsusb man meminfo 
+	no-dig no-doas no-egl no-graphics-api no-html-wan no-man no-opengl no-ssl 
+	no-sudo no-vulkan pkg rfkill rpm sensors-sys swaymsg udevadm usb-sys vmstat 
+	wayland wl-info wlr-randr wmctrl].
 	1 or more in comma separated list. Force use of item(s). 
-	See --hddtemp, --dmidecode, --wm, --usb-tool, --usb-sys."],
+	See --bt-tool, --hddtemp,--html-wan, --dmidecode, --no-dig, --no-doas, 
+	--no-egl, --no-graphics-api, --no-html-wan, --no-man, --no-opengl, --no-ssl, 
+	--no-sudo, --no-vulkan, --wm, --usb-tool, --usb-sys."],
 	['1', '', '--hddtemp', "Force use of hddtemp for disk temps."],
 	['1', '', '--html-wan', "Overrides configuration item NO_HTML_WAN (resets to 
 	default)."],
@@ -5884,10 +5923,12 @@ sub show_options {
 		pinxi using -U."],
 		);
 	}
-	push(@$rows, 
+	push(@$rows,
 	['1', '', '--no-dig', "Skip dig for WAN IP checks, use downloader program."],
 	['1', '', '--no-doas', "Skip internal program use of doas features (not 
 	related to starting $self_name with doas)."],
+	['1', '', '--no-egl', "Skip EGL API data for graphics."],
+	['1', '', '--no-graphics-api', "Skip all API data for graphics."],
 	['1', '', '--no-html-wan', "Skip HTML IP sources for WAN IP checks, use dig 
 	only, or nothing if --no-dig."],
 	);
@@ -5896,20 +5937,22 @@ sub show_options {
 		['1', '', '--no-man', "Disable man install for all -U update actions."],
 		);
 	}
-	push(@$rows, 
+	push(@$rows,
+	['1', '', '--no-opengl', "Skip OpenGL API data for graphics."],
 	['1', '', '--no-ssl', "Skip SSL certificate checks for all downloader actions 
 	(Wget/Fetch/Curl/Perl-HTTP::Tiny)."],
 	['1', '', '--no-sudo', "Skip internal program use of sudo features (not 
 	related to starting $self_name with sudo)."],
+	['1', '', '--no-vulkan', "Skip Vulkan API data for graphics."],
 	['1', '', '--rpm', "Force use of disabled package manager counts for packages 
 	feature with -rx/-Ix. RPM disabled by default due to unacceptably slow rpm 
 	package count query times."],
 	['1', '', '--sensors-default', "Removes configuration item SENSORS_USE and 
 	SENSORS_EXCLUDE. Same as default behavior."],
 	['1', '', '--sensors-exclude', "[sensor[s] name, comma separated] Exclude 
-	supplied sensor array[s] for -s output (lm-sensors, /sys. Linux only)."],
+	supplied sensor array[s] for -s report (lm-sensors, /sys. Linux only)."],
 	['1', '', '--sensors-use', "[sensor[s] name, comma separated] Use only 
-	supplied sensor array[s] for -s output (lm-sensors, /sys. Linux only)."],
+	supplied sensor array[s] for -s report (lm-sensors, /sys. Linux only)."],
 	['1', '', '--sleep', "[0-x.x] Change CPU sleep time, in seconds, for -C 
 	(default:^$cpu_sleep). Allows system to catch up and show a more accurate CPU 
 	use. Example:^$self_name^-Cxxx^--sleep^0.15"],
@@ -5924,7 +5967,7 @@ sub show_options {
 	['1', '', '--usb-tool', "Force USB data to use lsusb as data source [default]
 	(Linux only)."],
 	['1', '', '--wan-ip-url', "[URL] Skips dig, uses supplied URL for WAN IP (-i). 
-	URL output must end in the IP address. See man. 
+	URL HTML must end in the IP address. See man. 
 	Example:^$self_name^-i^--wan-ip-url^https://yoursite.com/remote-ip"],
 	['1', '', '--wm', "Force wm: to use wmctrl as data source. Default uses ps."],
 	['0', '', '', $line ],
@@ -5937,10 +5980,10 @@ sub show_options {
 	['2', '10', '', "Basic logging."],
 	['2', '11', '', "Full file/system info logging."],
 	['1', '', ,'', "The following create a tar.gz file of system data, plus 
-	$self_name output. To automatically upload debugger data tar.gz file to 
+	$self_name report. To automatically upload debugger data tar.gz file to 
 	ftp.smxi.org: $self_name^--debug^21"],
 	['2', '20', '', "Full system data collection: /sys; xorg conf and log data, 
-	xrandr, xprop, xdpyinfo, glxinfo etc.; data from dev, disks,  
+	display tool data, etc.; data from dev, disks,  
 	${partition_string}s, etc."],
 	['2', '21', '', "Upload debugger dataset to $self_name debugger server 
 	automatically, removes debugger data directory, leaves tar.gz debugger file."],
@@ -6200,11 +6243,13 @@ sub get_client_version {
 	}
 	# NOTE: these must be empirically determined, not all events that 
 	# show no tty are actually IRC. tmux is not a vt, but runs inside one
+	# kate/dolphin etc have embedded terminals
 	if (!$client{'name-print'}){
-		my $wl_terms = 'alacritty|altyo|\bate\b|black-screen|conhost|doas|evilvte|';
-		$wl_terms .= 'foot|germinal|guake|havoc|hyper|kate|kgx|kitty|kmscon|konsole|';
-		$wl_terms .= 'login|macwise|minicom|putty|rxvt|sakura|securecrt|';
-		$wl_terms .= 'shellinabox|^st$|sudo|term|tilda|tilix|tmux|tym|wayst|xiki|';
+		my $wl_terms = '(alacri|ghos|ki|min|pu)tty|altyo|\bate\b|black-screen|';
+		$wl_terms .= 'conemu|conhost|contour|doas|dolphin|evilvte|foot|';
+		$wl_terms .= 'germinal|guake|havoc|hyper|kate|kgx|kmscon|konsole|';
+		$wl_terms .= 'login|macwise|minicom|phyxis|\brio\b|rxvt|sakura|securecrt|';
+		$wl_terms .= 'shellinabox|^st$|sudo|term|tilda|tilix|tmux|tym|warp|wayst|xiki|';
 		$wl_terms .= 'yaft|yakuake|\bzoc\b';
 		my $wl_clients = 'ansible|chef|run-parts|slurm|sshd';
 		my $whitelist = "$wl_terms|$wl_clients";
@@ -6487,7 +6532,8 @@ sub clean_regex {
 sub clean_unset {
 	my ($string,$extra) = @_;
 	my $cleaner = '^(\.)+$|Bad Index|default string|\[?empty\]?|\bnone\b|N\/A|^not |';
-	$cleaner .= 'not set|OUT OF SPEC|To be filled|O\.?E\.?M|undefine|unknow|unspecif';
+	$cleaner .= 'not set|\bnull\b|OUT OF SPEC|To be filled|O\.?E\.?M|';
+	$cleaner .= 'undefine|unknow|unspecif';
 	$cleaner .= '|' . $extra if $extra;
 	$string =~ s/.*($cleaner).*//i;
 	return $string;
@@ -6681,6 +6727,8 @@ sub message {
 	'file-unreadable' => 'File not readable (permissions?)',
 	'gfx-api' => 'No display API data available.',
 	'gfx-api-console' => 'No API data available in console. Headless machine?',
+	'gfx-api-unsafe' => "Unreliable API tool+hardware. Override with --$id.",
+	'gfx-tools' => 'No graphics tools found.',
 	'glx-console-root' => 'GL data unavailable in console for root.',
 	'glx-console-try' => 'GL data unavailable in console. Try -G --display',
 	'glx-display-root' => 'GL data unavailable for root.',
@@ -14247,7 +14295,7 @@ sub set_disk_vendors {
 	['^ANACOMDA','^ANACOMDA','ANACOMDA',''],
 	['^Android','^Android','Android',''],
 	['^ANK','^Anker','Anker',''],
-	['^Ant[\s_-]?Esports','^Ant[\s_-]?Esports','Ant Esports',''],
+	['^(Ant[\s_-]?Esports|\d+\sNEO)','^Ant[\s_-]?Esports','Ant Esports',''],
 	['^Anucell','^Anucell','Anucell',''],
 	['^Aoluska','^Aoluska','Aoluska',''],
 	['^(Aotec|AOK)','^Aotec','Aotec',''],
@@ -14516,7 +14564,7 @@ sub set_disk_vendors {
 	['^(KLEVV|NEO\sN|CRAS)','^KLEVV','KLEVV',''],
 	['^(KNUP|KP\b)','^KNUP','KNUP',''],
 	['^(Kodak|Memory\s?Saver)','^Kodak','Kodak',''],
-	['^(KOOTION)','^KOOTION','KOOTION',''],
+	['^(KOOTION|X12)','^KOOTION','KOOTION',''],
 	['^(KUAIKAI|MSAM)','^KUAIKAI','KuaKai',''],
 	['(KUIJIA|DAHUA)','^KUIJIA','KUIJIA',''],
 	['^KUNUP','^KUNUP','KUNUP',''],
@@ -14707,6 +14755,7 @@ sub set_disk_vendors {
 	['^Sundisk','^Sundisk','Sundisk',''],
 	['^SUNEAST','^SUNEAST','SunEast',''],
 	['^Suntrsi','^Suntrsi','Suntrsi',''],
+	['^(Sunwind|SW)','^Sunwind','Sunwind',''],
 	['^SuperMicro','^SuperMicro','SuperMicro',''],
 	['^Supersonic','^Supersonic','Supersonic',''],
 	['^SuperSSpeed','^SuperSSpeed','SuperSSpeed',''],
@@ -15069,7 +15118,7 @@ sub drive_speed {
 ## GraphicItem ##
 {
 package GraphicItem;
-my ($b_primary,$b_wayland_data,%graphics,%mesa_drivers,
+my ($b_primary,$b_wayland_data,%gfx_ids,%graphics,%mesa_drivers,
 $monitor_ids,$monitor_map);
 my ($gpu_amd,$gpu_intel,$gpu_loongson,$gpu_nv);
 
@@ -15107,7 +15156,8 @@ sub get {
 	# note: not perfect, but we need usb gfx to show for all types, soc, pci, etc
 	usb_output($rows);
 	display_output($rows);
-	display_api($rows);
+	display_api($rows) if !$force{'no-graphics-api'};
+	info_output($rows);
 	(%graphics,$monitor_ids,$monitor_map) = ();
 	eval $end if $b_log;
 	return $rows;
@@ -15146,6 +15196,8 @@ sub device_output {
 			my $item = main::get_pci_vendor($row->[4],$row->[12]);
 			$rows->[$j]{main::key($num++,0,2,'vendor')} = $item if $item;
 		}
+		# used to detect bad gpu generations for APIs
+		push(@{$gfx_ids{$row->[5]}},$row->[6]) if $row->[5] && $row->[6];
 		push(@{$graphics{'gpu-drivers'}},$row->[9]) if $row->[9];
 		my $driver = ($row->[9]) ? $row->[9]:'N/A';
 		$rows->[$j]{main::key($num++,1,2,'driver')} = $driver;
@@ -15331,7 +15383,7 @@ sub port_output {
 }
 
 ## DISPLAY OUTPUT ##
-sub display_output(){
+sub display_output {
 	eval $start if $b_log;
 	my $rows = $_[0];
 	my ($num,$j) = (0,scalar @$rows);
@@ -15660,7 +15712,26 @@ sub monitors_output_full {
 				$resolution = $monitors->{$key}{'res-x'} . 'x' . $monitors->{$key}{'res-y'};
 			}
 			$resolution ||= 'N/A';
-			$rows->[$$j]{main::key($$num++,0,$m2,'res')} = $resolution;
+			# if we have scaling-calc we have res-x,y and log-x,y
+			if ($extra > 2 && $monitors->{$key}{'scale-used'}){
+				$rows->[$$j]{main::key($$num++,1,$m2,'res')} = '';
+				$rows->[$$j]{main::key($$num++,0,$m2+1,'mode')} = $resolution;
+				if ($monitors->{$key}{'hz'}){
+					$rows->[$$j]{main::key($$num++,0,$m2+1,'hz')} = $monitors->{$key}{'hz'};
+				}
+				my $scale = $monitors->{$key}{'scale-percent'} . '% (' . $monitors->{$key}{'scale-used'}. ')';
+				$rows->[$$j]{main::key($$num++,1,$m2+1,'scale')} = $scale;
+				if ($monitors->{$key}{'scale-used'} != 1){
+					my $scaled = $monitors->{$key}{'log-x'} . 'x' . $monitors->{$key}{'log-y'};
+					$rows->[$$j]{main::key($$num++,0,$m2+2,'to')} = $scaled;
+				}
+			}
+			else {
+				$rows->[$$j]{main::key($$num++,1,$m2,'res')} = $resolution;
+				if ($monitors->{$key}{'hz'}){
+					$rows->[$$j]{main::key($$num++,0,$m2,'hz')} = $monitors->{$key}{'hz'};
+				}
+			}
 		}
 		else {
 			if ($b_display){
@@ -15671,9 +15742,6 @@ sub monitors_output_full {
 			}
 			$b_no_size = 1;
 			$rows->[$$j]{main::key($$num++,0,$m2,'size-res')} = $resolution;
-		}
-		if ($extra > 2 && $monitors->{$key}{'hz'}){
-			$rows->[$$j]{main::key($$num++,0,$m2,'hz')} = $monitors->{$key}{'hz'};
 		}
 		if ($monitors->{$key}{'dpi'}){
 			$rows->[$$j]{main::key($$num++,0,$m2,'dpi')} = $monitors->{$key}{'dpi'};
@@ -15695,9 +15763,6 @@ sub monitors_output_full {
 			$rows->[$$j]{main::key($$num++,1,$m3,'white')} = '';
 			$rows->[$$j]{main::key($$num++,0,$m4,'x')} = $monitors->{$key}{'colors'}{'white_x'};
 			$rows->[$$j]{main::key($$num++,0,$m4,'y')} = $monitors->{$key}{'colors'}{'white_y'};
-		}
-		if ($extra > 2 && $monitors->{$key}{'scale'}){
-			$rows->[$$j]{main::key($$num++,0,$m2,'scale')} = $monitors->{$key}{'scale'};
 		}
 		if ($extra > 2 && $monitors->{$key}{'size-x'} && $monitors->{$key}{'size-y'}){
 			my $size =  $monitors->{$key}{'size-x'} . 'x' . $monitors->{$key}{'size-y'} .
@@ -15775,11 +15840,19 @@ sub display_api {
 	}
 	my ($b_egl,$b_egl_print,$b_glx,$b_glx_print,$b_vulkan,$api,$program,$type);
 	my $gl = {};
-	if ($fake{'egl'} || ($program = main::check_program('eglinfo'))){
-		gl_data('egl',$program,$rows,$gl);
+	if (!$force{'no-egl'} && 
+	($fake{'egl'} || ($program = main::check_program('eglinfo')))){
+		if (!$fake{'glx'} && !$force{'egl'} && $bits_sys && $bits_sys == 32 && 
+		unsafe_api_device('egl')){
+			$gl->{'egl'}{'unsafe'} = 1;
+		}
+		else {
+			gl_data('egl',$program,$rows,$gl);
+		}
 		$b_egl = 1;
 	}
-	if ($fake{'glx'} || ($program = main::check_program('glxinfo'))){
+	if (!$force{'no-opengl'} && 
+	($fake{'glx'} || ($program = main::check_program('glxinfo')))){
 		gl_data('glx',$program,$rows,$gl) if $b_display;
 		$b_glx = 1;
 	}
@@ -15802,8 +15875,9 @@ sub display_api {
 		$b_glx_print = 1;
 	}
 	# if ($fake{'vulkan'} || ($program = main::check_program('vulkaninfo'))){
-	if (($fake{'vulkan'} || ($program = main::check_program('vulkaninfo'))) &&
-	($show{'graphic-full'} || (!$b_egl_print && !$b_glx_print))){
+	if (!$force{'no-vulkan'} && 
+	(($fake{'vulkan'} || ($program = main::check_program('vulkaninfo'))) &&
+	($show{'graphic-full'} || (!$b_egl_print && !$b_glx_print)))){
 		vulkan_output($program,$rows);
 		$b_vulkan = 1;
 	}
@@ -15811,40 +15885,42 @@ sub display_api {
 		# remember, sudo/root usually has empty $DISPLAY as well
 		if ($b_display){
 			# first do positive tests, won't be set for sudo/root
-			if (!$b_glx && $graphics{'protocol'} eq 'x11'){
+			if (!$force{'no-opengl'} && !$b_glx && $graphics{'protocol'} eq 'x11'){
 				$api = 'OpenGL';
 				$type = 'glx-missing';
 			}
-			elsif (!$b_egl && $graphics{'protocol'} eq 'wayland'){
+			elsif (!$force{'no-egl'} && !$b_egl && $graphics{'protocol'} eq 'wayland'){
 				$api = 'EGL'; # /GBM
 				$type = 'egl-missing';
 			}
-			elsif (!$b_glx && 
+			elsif (!$force{'no-opengl'} && !$b_glx && 
 			(main::check_program('X') || main::check_program('Xorg'))){
 				$api = 'OpenGL';
 				$type = 'glx-missing';
 			}
-			elsif (!$b_egl && main::check_program('Xwayland')){
+			elsif (!$force{'no-egl'} && !$b_egl && main::check_program('Xwayland')){
 				$api = 'EGL';
 				$type = 'egl-missing';
 			}
-			elsif (!$b_egl && !$b_glx && !$b_vulkan) {
+			elsif (!$force{'no-egl'} && !$force{'no-opengl'} && 
+			!$force{'no-vulkan'} && !$b_egl && !$b_glx && !$b_vulkan) {
 				$api = 'N/A';
 				$type = 'gfx-api';
 			}
 		}
 		else {
-			if (!$b_glx && 
+			if (!$force{'no-opengl'} && !$b_glx && 
 			(main::check_program('X') || main::check_program('Xorg'))){
 				$api = 'OpenGL';
 				$type = 'glx-missing-console';
 			}
-			elsif (!$b_egl && main::check_program('Xwayland')){
+			elsif (!$force{'no-egl'} && !$b_egl && main::check_program('Xwayland')){
 				$api = 'EGL';
 				$type = 'egl-missing-console';
 			}
 			# we don't know what it is, headless system, non xwayland wayland
-			elsif (!$b_egl && !$b_glx && !$b_vulkan) {
+			elsif (!$force{'no-egl'} && !$force{'no-opengl'} && 
+			!$force{'no-vulkan'} && !$b_egl && !$b_glx && !$b_vulkan) {
 				$api = 'N/A';
 				$type = 'gfx-api-console';
 			}
@@ -15856,22 +15932,49 @@ sub display_api {
 
 sub no_data_output {
 	eval $start if $b_log;
-	my ($api,$type,$rows) = @_;
+	my ($api,$type,$rows,$extra) = @_;
 	my $num = 0;
 	push(@$rows, {
 	main::key($num++,1,1,'API') => $api,
-	main::key($num++,0,2,'Message') => main::message($type)
+	main::key($num++,0,2,'Message') => main::message($type,$extra)
 	});
+	eval $end if $b_log;
+}
+
+sub unsafe_api_device {
+	eval $start if $b_log;
+	my $api = $_[0];
+	my %test = (
+	'egl' => {
+	'8086' => '1132|3577|7120|7121|7122|7123|7124|7125|7126|7128|712a|7800|' . 
+	'2562|2572|2582|3577|3582|358e',
+	# '1002' => '68f9',
+	},
+	);
+	return if !$test{$api};
+	foreach my $vendor (keys %{$test{$api}}){
+		next if !$gfx_ids{$vendor};
+		foreach my $id (@{$gfx_ids{$vendor}}){
+			return 1 if $id =~ /^($test{$api}->{$vendor})$/;
+		}
+	}
 	eval $end if $b_log;
 }
 
 sub egl_output {
 	eval $start if $b_log;
 	my ($rows,$gl) = @_;
-	if (!$gl->{'egl'}){
+	if (!$gl->{'egl'} || $gl->{'egl'}{'unsafe'}){
 		my $api = 'EGL';
-		my $type = 'egl-null';
-		no_data_output($api,$type,$rows);
+		my ($extra,$type);
+		if (!$gl->{'egl'}){
+			$type = 'egl-null';
+		}
+		else {
+			$type = 'gfx-api-unsafe';
+			$extra = 'egl';
+		}
+		no_data_output($api,$type,$rows,$extra);
 		return 0;
 	}
 	my ($i,$j,$num) = (0,scalar @$rows,0);
@@ -16162,7 +16265,27 @@ sub xvesa_output {
 	eval $end if $b_log;
 }
 
-# API Data #
+## INFO OUTPUT ##
+sub info_output {
+	eval $start if $b_log;
+	my $rows = $_[0];
+	my ($num,$j) = (0,scalar @$rows);
+	my ($list,$space,$tools) = ('','',{});
+	tools_data($tools);
+	$list = main::message('gfx-tools') if !%$tools;
+	$rows->[$j]{main::key($num++,1,1,'Info')} = '';
+	$rows->[$j]{main::key($num++,1,2,'Tools')} = $list;
+	foreach my $key (sort keys %$tools){
+		$space = (scalar @{$tools->{$key}} > 2) ? ' ' : ''; 
+		$list = join(','. $space, @{$tools->{$key}});
+		$rows->[$j]{main::key($num++,0,3,$key)} = $list;
+	}
+	eval $end if $b_log;
+}
+
+## DATA ##################
+
+## API Data ##
 sub gl_data {
 	eval $start if $b_log;
 	my ($source,$program,$rows,$gl) = @_;
@@ -16856,7 +16979,56 @@ sub vulkan_data {
 	eval $end if $b_log;
 }
 
-## DISPLAY DATA WAYLAND ##
+## DISPLAY DATA ##
+sub display_protocol {
+	eval $start if $b_log;
+	$graphics{'protocol'} = '';
+	if ($ENV{'XDG_SESSION_TYPE'}){
+		$graphics{'protocol'} = $ENV{'XDG_SESSION_TYPE'};
+	}
+	if (!$graphics{'protocol'} && $ENV{'WAYLAND_DISPLAY'}){
+		$graphics{'protocol'} = $ENV{'WAYLAND_DISPLAY'};
+	}
+	# can show as wayland-0
+	if ($graphics{'protocol'} && $graphics{'protocol'} =~ /wayland/i){
+		$graphics{'protocol'} = 'wayland';
+	}
+	# yes, I've seen this in 2019 distros, sigh
+	elsif ($graphics{'protocol'} eq 'tty'){
+		$graphics{'protocol'} = '';
+	}
+	# If no other source, get user session id, then grab session type.
+	# loginctl also results in the session id
+	# undef $graphics{'protocol'};
+	if (!$graphics{'protocol'}){
+		if (my $program = main::check_program('loginctl')){
+			my $id = '';
+			# $id = $ENV{'XDG_SESSION_ID'}; # returns tty session in console
+			my @data = main::grabber("$program --no-pager --no-legend 2>/dev/null",'','strip');
+			foreach (@data){
+				# some systems show empty or ??? for TTY field, but whoami should do ok
+				next if /(ttyv?\d|pts\/)/; # freebsd: ttyv3
+				# in display, root doesn't show in the logins
+				next if $client{'whoami'} && $client{'whoami'} ne 'root' && !/\b$client{'whoami'}\b/;
+				$id = (split(/\s+/, $_))[0];
+				# multiuser? too bad, we'll go for the first one that isn't a tty/pts
+				last; 
+			}
+			if ($id){
+				my $temp = (main::grabber("$program show-session $id -p Type --no-pager --no-legend 2>/dev/null"))[0];
+				$temp =~ s/Type=// if $temp;
+				# ssh will not show /dev/ttyx so would have passed the first test
+				$graphics{'protocol'} = $temp if $temp && $temp ne 'tty';
+			}
+		}
+	}
+	$graphics{'protocol'} = lc($graphics{'protocol'}) if $graphics{'protocol'};
+	eval $end if $b_log;
+}
+
+## DISPLAY DATA: WAYLAND ##
+# NOTE: have added gnome-randr and kscreen-console/kscreen-doctor to debugger
+# but need many samples before using those as data sources if below are absent.
 sub display_data_wayland {
 	eval $start if $b_log;
 	my ($b_skip_pos,$program);
@@ -16865,16 +17037,23 @@ sub display_data_wayland {
 		# return as wayland-0 or 0?
 		$graphics{'display-id'} =~ s/wayland-?//i;
 	}
-	if ($fake{'swaymsg'} || ($program = main::check_program('swaymsg'))){
+	if (!$force{'kscreen'} && !$force{'wl-info'} && !$force{'wlr-randr'} && 
+	($fake{'swaymsg'} || ($program = main::check_program('swaymsg')))){
 		swaymsg_data($program);
 	}
 	# until we get data proving otherwise, assuming these have same output
-	elsif ($fake{'wl-info'} || (($program = main::check_program('wayland-info')) || 
-	($program = main::check_program('weston-info')))){
+	elsif (!$force{'kscreen'} && !$force{'wlr-randr'} && ($fake{'wl-info'} || 
+	(($program = main::check_program('wayland-info')) || 
+	($program = main::check_program('weston-info'))))){
 		wlinfo_data($program);
 	}
-	elsif ($fake{'wlr-randr'} || ($program = main::check_program('wlr-randr'))){
+	elsif (!$force{'kscreen'} && ($fake{'wlr-randr'} ||
+	($program = main::check_program('wlr-randr')))){
 		wlrrandr_data($program);
+	}
+	elsif (($fake{'kscreen'} ||
+	($program = main::check_program('kscreen-console')))){
+		kscreen_data($program);
 	}
 	# make sure we got enough for advanced position data, might be from /sys
 	if ($extra > 1 && $monitor_ids){
@@ -16972,7 +17151,31 @@ sub wayland_data_advanced {
 	eval $end if $b_log;
 }
 
-## WAYLAND COMPOSITOR DATA TOOLS ##
+# WAYLAND TOOLS DATA #
+# Note: not used yet because it's hard to know what is controlling the desktop
+sub kscreen_data {
+	eval $start if $b_log;
+	my ($program) = @_;
+	my ($data,%mon,@temp,$ref);
+	my ($b_iwlo,$b_izxdg,$file,$hz,$id,$pos_x,$pos_y,$res_x,$res_y,$scale);
+	if (!$fake{'kscreen'}){
+		$data = main::grabber("$program outputs 2>/dev/null",'','strip','ref');
+	}
+	else {
+		undef $monitor_ids;
+		$file = "$fake_data_dir/graphics/wayland/kscreen-console-laptop-1-monitor-1.txt";
+		$data = main::reader($file,'strip','ref');
+	}
+	print 'kscreen-console raw: ', Data::Dumper::Dumper $data if $dbg[46]; 
+	main::log_data('dump','@$data', $data) if $b_log;
+	foreach (@$data){
+	
+	}
+	print '%mon: ', Data::Dumper::Dumper \%mon if $dbg[46]; 
+	main::log_data('dump','%mon', \%mon) if $b_log;
+	print 'kscreen-console: monitor_ids: ', Data::Dumper::Dumper $monitor_ids if $dbg[46];
+	eval $end if $b_log;
+}
 # NOTE: These patterns are VERY fragile, and depend on no changes at all to 
 # the data structure, and more important, the order. Something I would put 
 # almost no money on being able to count on.
@@ -16982,26 +17185,34 @@ sub wlinfo_data {
 	my ($data,%mon,@temp,$ref);
 	my ($b_iwlo,$b_izxdg,$file,$hz,$id,$pos_x,$pos_y,$res_x,$res_y,$scale);
 	if (!$fake{'wl-info'}){
-		undef $monitor_ids;
 		$data = main::grabber("$program 2>/dev/null",'','strip','ref');
 	}
 	else {
-		$file = "$fake_data_dir/graphics/wayland/weston-info-2-mon-1.txt";
-		$file = "$fake_data_dir/graphics/wayland/wayland-info-weston-vm-sparky.txt";
+		undef $monitor_ids;
+		# $file = "$fake_data_dir/graphics/wayland/weston-info-2-mon-1.txt";
+		# $file = "$fake_data_dir/graphics/wayland/wayland-info-weston-vm-sparky.txt";
+		$file = "$fake_data_dir/graphics/wayland/wayland-info-3-monitors-1.txt";
+		# $file = "$fake_data_dir/graphics/wayland/wayland-info-1-monitor-laptop-1.txt";
 		$data = main::reader($file,'strip','ref');
 	}
 	print 'wayland/weston-info raw: ', Data::Dumper::Dumper $data if $dbg[46]; 
 	main::log_data('dump','@$data', $data) if $b_log;
 	foreach (@$data){
 		# print 'l: ', $_,"\n";
-		if (/^interface: 'wl_output', version: \d+, name: (\d+)$/){
+		if (/^interface:\s+'wl_output',\s+version:\s+\d+,\s+name:\s+(\d+)$/){
 			$b_iwlo = 1;
+			$b_izxdg = 0;
 			$id = $1;
 		}
 		elsif (/^interface: 'zxdg_output/){
 			$b_izxdg = 1;
 			$b_iwlo = 0;
 		}
+		elsif (/^interface: '(?!(wl_output|zxdg_output))'/){
+			$b_izxdg = 0;
+			$b_iwlo = 0;
+		}
+		next if !$b_izxdg && !$b_iwlo;
 		if ($b_iwlo){
 			if (/^x: (\d+), y: (\d+), scale: ([\d\.]+)/){
 				$mon{$id}->{'pos-x'} = $1;
@@ -17030,6 +17241,7 @@ sub wlinfo_data {
 					$mon{$id}->{'model'} = main::clean_dmi($mon{$id}->{'model'});
 				}
 			}
+			# this is physical px width/height, not scaled, though may be same
 			elsif (/^width: (\d+) px, height: (\d+) px, refresh: ([\d\.]+) Hz,/){
 				$mon{$id}->{'res-x'} = $1;
 				$mon{$id}->{'res-y'} = $2;
@@ -17054,9 +17266,6 @@ sub wlinfo_data {
 				$mon{$id}->{'log-y'} = $2;
 			}
 		}
-		if ($b_izxdg && /^interface: '(?!zxdg_output)/){
-			last;
-		}
 	}
 	# now we need to map %mon back to $monitor_ids
 	if (%mon){
@@ -17065,6 +17274,7 @@ sub wlinfo_data {
 			next if !$mon{$key}->{'monitor'}; # no way to know what it is, sorry
 			$id = $mon{$key}->{'monitor'};
 			$monitor_ids->{$id}{'monitor'} = $id;
+			$monitor_ids->{$id}{'connector-id'} = $key;
  			$monitor_ids->{$id}{'log-x'} = $mon{$key}->{'log-x'} if defined $mon{$key}->{'log-x'};
 			$monitor_ids->{$id}{'log-y'} = $mon{$key}->{'log-y'} if defined $mon{$key}->{'log-y'};
 			$monitor_ids->{$id}{'pos-x'} = $mon{$key}->{'pos-x'} if defined $mon{$key}->{'pos-x'};
@@ -17074,9 +17284,15 @@ sub wlinfo_data {
 			$monitor_ids->{$id}{'size-x'} = $mon{$key}->{'size-x'} if defined $mon{$key}->{'size-x'};
 			$monitor_ids->{$id}{'size-y'} = $mon{$key}->{'size-y'} if defined $mon{$key}->{'size-y'};
 			$monitor_ids->{$id}{'hz'} = $mon{$key}->{'hz'} if defined $mon{$key}->{'hz'};
+			if ($mon{$key}->{'log-x'} && $mon{$key}->{'res-x'}){
+				$monitor_ids->{$id}{'scale-type'} = 'wl'; 
+				$monitor_ids->{$id}{'scale-used'} = sprintf('%0.2f',($mon{$key}->{'res-x'}/$mon{$key}->{'log-x'})) + 0;
+				$monitor_ids->{$id}{'scale-percent'} = int($monitor_ids->{$id}{'scale-used'} * 100);
+			}
 			if (defined $mon{$key}->{'model'} && !$monitor_ids->{$id}{'model'}){
 				$monitor_ids->{$id}{'model'} = $mon{$key}->{'model'};
 			}
+			# note, this value seems nonsensical, seen actual scale 0.8 show 2
 			$monitor_ids->{$id}{'scale'} = $mon{$key}->{'scale'} if defined $mon{$key}->{'scale'};
 			# fallbacks in case wl_output block is not present, which happens
 			if (!defined $mon{$key}->{'pos-x'} && defined $mon{$key}->{'log-pos-x'}){
@@ -17105,7 +17321,8 @@ sub swaymsg_data {
 	eval $start if $b_log;
 	my ($program) = @_;
 	my (@data,%json,@temp,$ref);
-	my ($b_json,$file,$hz,$id,$model,$pos_x,$pos_y,$res_x,$res_y,$scale,$serial);
+	my ($b_json,$file,$hz,$id,$log_x,$log_y,$model,$pos_x,$pos_y,$res_x,$res_y,
+	$scale,$serial);
 	if (!$fake{'swaymsg'}){
 		main::load_json() if !$loaded{'json'};
 		if ($use{'json'}){
@@ -17122,7 +17339,8 @@ sub swaymsg_data {
 	}
 	else {
 		undef $monitor_ids;
-		$file = "$fake_data_dir/graphics/wayland/swaymsg-2-monitor-1.txt";
+		# $file = "$fake_data_dir/graphics/wayland/swaymsg-2-monitor-1.txt";
+		$file = "$fake_data_dir/graphics/wayland/swaymsg-1-monitor-laptop-1.txt";
 		@data = main::reader($file,'strip');
 	}
 	print 'swaymsg: ', Data::Dumper::Dumper \@data if $dbg[46]; 
@@ -17167,11 +17385,15 @@ sub swaymsg_data {
 					$monitor_ids->{$id}{'res-y'} = $mon->{'current_mode'}{'height'};
 				}
 				if ($mon->{'rect'}){
+					$monitor_ids->{$id}{'log-x'} = $mon->{'rect'}{'width'};
+					$monitor_ids->{$id}{'log-y'} = $mon->{'rect'}{'height'};
 					$monitor_ids->{$id}{'pos-x'} = $mon->{'rect'}{'x'};
 					$monitor_ids->{$id}{'pos-y'} = $mon->{'rect'}{'y'};
 				}
 				if ($mon->{'scale'}){
-					$monitor_ids->{$id}{'scale'} =$mon->{'scale'};
+					$monitor_ids->{$id}{'scale-type'} = 'swaymsg';
+					$monitor_ids->{$id}{'scale-percent'} = int(100*$mon->{'scale'});
+					$monitor_ids->{$id}{'scale-used'} = (sprintf('%.2f',$mon->{'scale'})) + 0;
 				}
 			}
 		}
@@ -17186,16 +17408,24 @@ sub swaymsg_data {
 		$b_wayland_data = 1 if scalar @data > 8;
 		foreach (@data){
 			if ($_ eq '~~' && $id){
+				if ($scale && $res_x){
+					$log_x = int(($res_x/$scale));
+					$log_y = int(($res_y/$scale));
+				}
 				$monitor_ids->{$id}{'hz'} = $hz;
+				$monitor_ids->{$id}{'log-x'} = $log_x;
+				$monitor_ids->{$id}{'log-y'} = $log_y;
 				$monitor_ids->{$id}{'model'} = $model if $model;
 				$monitor_ids->{$id}{'monitor'} = $id;
 				$monitor_ids->{$id}{'pos-x'} = $pos_x;
 				$monitor_ids->{$id}{'pos-y'} = $pos_y;
 				$monitor_ids->{$id}{'res-x'} = $res_x;
 				$monitor_ids->{$id}{'res-y'} = $res_y;
-				$monitor_ids->{$id}{'scale'} = $scale;
+				$monitor_ids->{$id}{'scale-type'} = 'wl';
+				$monitor_ids->{$id}{'scale-percent'} = int(100*$scale) if $scale;
+				$monitor_ids->{$id}{'scale-used'} = $scale;
 				$monitor_ids->{$id}{'serial'} = $serial if $serial;
-				($hz,$model,$pos_x,$pos_y,$res_x,$res_y,$scale,$serial) = ();
+				($hz,$log_x,$log_y,$model,$pos_x,$pos_y,$res_x,$res_y,$scale,$serial) = ();
 				$b_wayland_data = 1;
 			}
 			# Output VGA-1 '<Unknown> <Unknown> ' (focused)
@@ -17209,7 +17439,7 @@ sub swaymsg_data {
 			elsif (/^Current mode:\s+(\d+)x(\d+)\s+\@\s+([\d\.]+)\s+Hz/i){
 				$res_x = $1;
 				$res_y = $2;
-				$hz = (sprintf('%.0f',($3/1000)) + 0) if $3;
+				$hz = sprintf('%.0f',$3) if $3;
 			}
 			elsif (/^Position:\s+(\d+),(\d+)/i){
 				$pos_x = $1;
@@ -17229,14 +17459,16 @@ sub swaymsg_data {
 sub wlrrandr_data {
 	eval $start if $b_log;
 	my ($program) = @_;
-	my ($file,$hz,$id,$info,$model,$pos_x,$pos_y,$res_x,$res_y,$scale,$serial);
+	my ($file,$hz,$id,$info,$log_x,$log_y,$model,$pos_x,$pos_y,$res_x,$res_y,
+	$scale,$serial);
 	my ($data,@temp);
 	if (!$fake{'wlr-randr'}){
 		$data = main::grabber("$program 2>/dev/null",'','strip','ref');
 	}
 	else {
 		undef $monitor_ids;
-		$file = "$fake_data_dir/graphics/wayland/wlr-randr-2-monitor-1.txt";
+		# $file = "$fake_data_dir/graphics/wayland/wlr-randr-2-monitor-1.txt";
+		$file = "$fake_data_dir/graphics/wayland/wlr-randr-1-monitor-1.txt";
 		$data = main::reader($file,'strip','ref');
 	}
 	foreach (@$data){
@@ -17250,16 +17482,25 @@ sub wlrrandr_data {
 	main::log_data('dump','@$data', $data) if $b_log;
 	foreach (@$data){
 		if ($_ eq '~~' && $id){
+			if ($scale && $res_x){
+				$log_x = int($res_x/$scale);
+				$log_y = int($res_y/$scale);
+				$scale = sprintf('%.2f',$scale) + 0;
+			}
 			$monitor_ids->{$id}{'hz'} = $hz;
+			$monitor_ids->{$id}{'log-x'} = $log_x;
+			$monitor_ids->{$id}{'log-y'} = $log_y;
 			$monitor_ids->{$id}{'model'} = $model if $model && !$monitor_ids->{$id}{'model'};
 			$monitor_ids->{$id}{'monitor'} = $id;
 			$monitor_ids->{$id}{'pos-x'} = $pos_x;
 			$monitor_ids->{$id}{'pos-y'} = $pos_y;
 			$monitor_ids->{$id}{'res-x'} = $res_x;
 			$monitor_ids->{$id}{'res-y'} = $res_y;
-			$monitor_ids->{$id}{'scale'} = $scale;
+			$monitor_ids->{$id}{'scale-type'} = 'wlr-randr';
+			$monitor_ids->{$id}{'scale-percent'} = int($scale*100) if $scale;
+			$monitor_ids->{$id}{'scale-used'} = $scale;
 			$monitor_ids->{$id}{'serial'} = $serial if $serial && !$monitor_ids->{$id}{'serial'};
-			($hz,$info,$model,$pos_x,$pos_y,$res_x,$res_y,$scale,$serial) = ();
+			($hz,$info,$log_x,$log_y,$model,$pos_x,$pos_y,$res_x,$res_y,$scale,$serial) = ();
 			$b_wayland_data = 1;
 		}
 		# Output: VGA-1 '<Unknown> <Unknown> ' (focused)
@@ -17283,6 +17524,9 @@ sub wlrrandr_data {
 		}
 		elsif (/^Scale:\s+([\d\.]+)/i){
 			$scale = $1 + 0;
+		}
+		elsif (/^Serial:\s+(\S+)/i){
+			$serial = main::clean_dmi($1);
 		}
 	}
 	print 'wlr-randr: ', Data::Dumper::Dumper $monitor_ids if $dbg[46];
@@ -17311,7 +17555,7 @@ sub get_model_serial {
 	return ($model,$serial);
 }
 
-# DISPLAY DATA X.org ##
+## DISPLAY DATA: X11 ##
 sub display_data_x {
 	eval $start if $b_log;
 	my ($prog_xdpyinfo,$prog_xdriinfo,$prog_xrandr);
@@ -17484,7 +17728,7 @@ sub xrandr_data {
 	eval $end if $b_log;
 	my ($program) = @_;
 	my ($diagonal,$diagonal_m,$dpi,$monitor_id,$pos_x,$pos_y,$primary);
-	my ($res_x,$res_x_max,$res_y,$res_y_max);
+	my ($log_x,$log_y,$res_x,$res_x_max,$res_y,$res_y_max);
 	my ($screen_id,$set_as,$size_x,$size_x_i,$size_y,$size_y_i);
 	my (@ids,%monitors,@xrandr,@xrandr_screens);
 	if (!$fake{'xrandr'}){
@@ -17540,6 +17784,7 @@ sub xrandr_data {
 				'size-y-i' => undef,
 				'source' => 'xrandr',
 				});
+				($res_x,$res_y,$res_x_max,$res_y_max) = ();
 			}
 			if (%monitors){
 				push(@xrandr_screens,{%monitors});
@@ -17549,29 +17794,27 @@ sub xrandr_data {
 		# HDMI-2 connected 1920x1200+1080+0 (normal left inverted right x axis y axis) 519mm x 324mm
 		# DP-1 connected primary 2560x1440+1080+1200 (normal left inverted right x axis y axis) 598mm x 336mm
 		# HDMI-1 connected 1080x1920+0+0 left (normal left inverted right x axis y axis) 160mm x 90mm
+		# DVI-I-1 connected 1664x1332+0+0 (normal left inverted right x axis y axis) 338mm x 270mm
 		# disabled but connected: VGA-1 connected (normal left inverted right x axis y axis)
 		elsif (/^([\S]+)\s+connected\s(primary\s)?/){
 			$monitor_id = $1;
 			$set_as = $2;
 			if (/^[^\s]+\s+connected\s(primary\s)?([0-9]+)\s*x\s*([0-9]+)\+([0-9]+)\+([0-9]+)(\s[^(]*\([^)]+\))?(\s([0-9]+)mm\sx\s([0-9]+)mm)?/){
-				$res_x = $2;
-				$res_y = $3;
+				$log_x = $2;
+				$log_y = $3;
 				$pos_x = $4;
 				$pos_y = $5;
 				$size_x = $8;
 				$size_y = $9;
 				# flip size x,y if don't roughly  match res x/y ratio
 				if ($size_x && $size_y && $res_y){
-					flip_size_x_y(\$size_x,\$size_y,\$res_x,\$res_y);
+					flip_size_x_y(\$size_x,\$size_y,\$log_x,\$log_y);
 				}
 				$size_x_i = ($size_x) ? sprintf("%.2f", ($size_x/25.4)) + 0 : 0;
 				$size_y_i = ($size_y) ? sprintf("%.2f", ($size_y/25.4)) + 0 : 0;
-				$dpi = ($res_x && $size_x) ? sprintf("%.0f", $res_x * 25.4 / $size_x) : '';
-				$diagonal = ($res_x && $size_x) ? sprintf("%.2f", (sqrt($size_x**2 + $size_y**2)/25.4)) + 0 : '';
-				$diagonal_m = ($res_x && $size_x) ? sprintf("%.0f", (sqrt($size_x**2 + $size_y**2))) : '';
 			}
 			else {
-				($res_x,$res_y,$pos_x,$pos_y,$size_x,$size_x_i,$size_y,$size_y_i,$dpi,$diagonal,$diagonal_m) = ()
+				($log_x,$log_y,$pos_x,$pos_y,$size_x,$size_x_i,$size_y,$size_y_i) = ()
 			}
 			undef $primary;
 			push(@ids,[$monitor_id]);
@@ -17581,24 +17824,20 @@ sub xrandr_data {
 				$b_primary = 1;
 			}
 			$monitors{$monitor_id} = {
-			'screen' => $screen_id,
+			'log-x' => $log_x,
+			'log-y' => $log_y,
 			'monitor' => $monitor_id,
 			'pos-x' => $pos_x,
 			'pos-y' => $pos_y,
+			'position' => $set_as,
 			'primary' => $primary,
-			'res-x' => $res_x,
-			'res-y' => $res_y,
+			'screen' => $screen_id,
 			'size-x' => $size_x,
 			'size-x-i' => $size_x_i,
 			'size-y' => $size_y,
 			'size-y-i' => $size_y_i,
-			'dpi' => $dpi,
-			'diagonal' => $diagonal,
-			'diagonal-m' => $diagonal_m,
-			'position' => $set_as,
 			};
 			# print "x:$size_x y:$size_y rx:$res_x ry:$res_y dpi:$dpi\n";
-			($res_x,$res_y,$size_x,$size_x_i,$size_y,$size_y_i,$set_as) = (0,0,0,0,0,0,0,0,undef);
 		}
 		elsif (/^([\S]+)\s+disconnected\s/){
 			undef $monitor_id;
@@ -17613,8 +17852,21 @@ sub xrandr_data {
 				# print "$working[1] :: $working[2]\n";
 				$working[2] =~ s/\*|\+//g;
 				$working[2] = sprintf("%.0f",$working[2]);
+				($res_x,$res_y) = split(/x/,$working[1]);
+				$diagonal = ($res_x && $size_x) ? sprintf("%.2f", (sqrt($size_x**2 + $size_y**2)/25.4)) + 0 : '';
+				$diagonal_m = ($res_x && $size_x) ? sprintf("%.0f", (sqrt($size_x**2 + $size_y**2))) : '';
+				$dpi = ($res_x && $size_x) ? sprintf("%.0f", $res_x * 25.4 / $size_x) : '';
+				$monitors{$monitor_id}->{'diagonal'} = $diagonal;
+				$monitors{$monitor_id}->{'diagonal-m'} = $diagonal_m;
+				$monitors{$monitor_id}->{'dpi'} = $dpi;
+				$monitors{$monitor_id}->{'res-x'} = $res_x;
+				$monitors{$monitor_id}->{'res-y'} = $res_y;
+				$monitors{$monitor_id}->{'scale-type'} = 'x11';
+				$monitors{$monitor_id}->{'scale-percent'} = int(($res_x/$monitors{$monitor_id}->{'log-x'}) * 100);
+				$monitors{$monitor_id}->{'scale-used'} = ($monitors{$monitor_id}->{'log-x'}/$res_x) + 0;
 				$monitors{$monitor_id}->{'hz'} = $working[2];
-				($diagonal,$dpi) = ('','');
+				($diagonal,$diagonal_m,$dpi,$log_x,$log_y,$res_x,$res_y,$size_x,
+				$size_x_i,$size_y,$size_y_i,$set_as) = ();
 				# print Data::Dumper::Dumper \@monitors;
 			}
 			#	\tCONNECTOR_ID: 52
@@ -17637,6 +17889,8 @@ sub xrandr_data {
 	$graphics{'display-screens'} < scalar @{$graphics{'screens'}})){
 		$graphics{'display-screens'} = scalar @{$graphics{'screens'}};
 	}
+	print "xrandr_screens: " . Data::Dumper::Dumper \@xrandr_screens if $dbg[17];
+	main::log_data('dump','@xrandr_screens 1',\@xrandr_screens) if $b_log;
 	map_monitor_ids(\@ids) if @ids;
 	# print "xrandr_screens 1: " . Data::Dumper::Dumper \@xrandr_screens;
 	foreach my $main (@{$graphics{'screens'}}){
@@ -17664,8 +17918,7 @@ sub xrandr_data {
 		$i++;
 	}
 	undef $layouts;
-	# print "xrandr_screens 2: " . Data::Dumper::Dumper \@xrandr_screens;
-	print 'Data: xrandr: ', Data::Dumper::Dumper $graphics{'screens'} if $dbg[17];
+	print 'Data: graphics{screens}: ', Data::Dumper::Dumper $graphics{'screens'} if $dbg[17];
 	main::log_data('dump','$graphics{screens}',$graphics{'screens'}) if $b_log;
 	eval $end if $b_log;
 }
@@ -17694,6 +17947,7 @@ sub check_screens {
 	return $b_use;
 }
 
+## DISPLAY SERVER DATA ##
 # Case where no xpdyinfo display server/version data exists, or to set Wayland
 # Xwayland version, or Xvesa data.
 sub display_server_data {
@@ -17801,52 +18055,6 @@ sub tinyx_data {
 	eval $end if $b_log;
 }
 
-sub display_protocol {
-	eval $start if $b_log;
-	$graphics{'protocol'} = '';
-	if ($ENV{'XDG_SESSION_TYPE'}){
-		$graphics{'protocol'} = $ENV{'XDG_SESSION_TYPE'};
-	}
-	if (!$graphics{'protocol'} && $ENV{'WAYLAND_DISPLAY'}){
-		$graphics{'protocol'} = $ENV{'WAYLAND_DISPLAY'};
-	}
-	# can show as wayland-0
-	if ($graphics{'protocol'} && $graphics{'protocol'} =~ /wayland/i){
-		$graphics{'protocol'} = 'wayland';
-	}
-	# yes, I've seen this in 2019 distros, sigh
-	elsif ($graphics{'protocol'} eq 'tty'){
-		$graphics{'protocol'} = '';
-	}
-	# If no other source, get user session id, then grab session type.
-	# loginctl also results in the session id
-	# undef $graphics{'protocol'};
-	if (!$graphics{'protocol'}){
-		if (my $program = main::check_program('loginctl')){
-			my $id = '';
-			# $id = $ENV{'XDG_SESSION_ID'}; # returns tty session in console
-			my @data = main::grabber("$program --no-pager --no-legend 2>/dev/null",'','strip');
-			foreach (@data){
-				# some systems show empty or ??? for TTY field, but whoami should do ok
-				next if /(ttyv?\d|pts\/)/; # freebsd: ttyv3
-				# in display, root doesn't show in the logins
-				next if $client{'whoami'} && $client{'whoami'} ne 'root' && !/\b$client{'whoami'}\b/;
-				$id = (split(/\s+/, $_))[0];
-				# multiuser? too bad, we'll go for the first one that isn't a tty/pts
-				last; 
-			}
-			if ($id){
-				my $temp = (main::grabber("$program show-session $id -p Type --no-pager --no-legend 2>/dev/null"))[0];
-				$temp =~ s/Type=// if $temp;
-				# ssh will not show /dev/ttyx so would have passed the first test
-				$graphics{'protocol'} = $temp if $temp && $temp ne 'tty';
-			}
-		}
-	}
-	$graphics{'protocol'} = lc($graphics{'protocol'}) if $graphics{'protocol'};
-	eval $end if $b_log;
-}
-
 ## DRIVER DATA ##
 # for wayland display/monitor drivers, or if no display drivers found for x
 sub gpu_drivers_sys {
@@ -17893,13 +18101,15 @@ sub display_drivers_x {
 		# list is from sgfxi plus non-free drivers, plus ARM drivers. 
 		# Don't use ati. It's just a wrapper for: r128, mach64, radeon
 		my $list = join('|', qw(amdgpu apm ark armsoc atimisc
-		chips cirrus cyrix etnaviv fbdev fbturbo fglrx geode glide glint 
+		chips cirrus cyrix efifb etnaviv fbdev fbturbo fglrx geode glide glint 
 		i128 i740 i810-dec100 i810e i810 i815 i830 i845 i855 i865 i915 i945 i965 
 		iftv igs imstt intel ipaq ivtv mach64 mesa mga m68k modesetting neomagic 
 		newport nouveau nova nsc nvidia nv openchrome r128 radeonhd radeon rendition 
-		s3virge s3 savage siliconmotion sisimedia sisusb sis sis530 sunbw2 suncg14 
-		suncg3 suncg6 sunffb sunleo suntcx tdfx tga trident trio ts300 tseng 
-		unichrome v4l vboxvideo vesa vga via vmware vmwgfx voodoo));
+		s3virge s3 savage siliconmotion simpledrm simplefb 
+		sisimedia sisusb sis sis530 
+		sunbw2 suncg14 suncg3 suncg6 sunffb sunleo suntcx 
+		tdfx tga trident trio ts300 tseng 
+		unichrome v4l vboxvideo vesa vesafb vga via vmware vmwgfx voodoo));
 		# $list = qr/$list/i; # qr/../i only added perl 5.14, fails on older perls
 		my ($b_use_dri,$dri,$driver,%drivers);
 		my ($alternate,$failed,$loaded,$unloaded);
@@ -18202,8 +18412,8 @@ sub set_amd_data {
 	'years' => '2017-20',
 	},
 	{'arch' => 'RDNA-1',
-	'ids' => '13e9|13f9|13fe|1478|1479|1607|7310|7312|7318|7319|731a|731b|731e|' .
-	'731f|7340|7341|7343|7347|734f|7360|7362',
+	'ids' => '13e9|13f9|13fe|1607|7310|7312|7318|7319|731a|731b|731e|731f|7340|' .
+	'7341|7343|7347|734f|7360|7362',
 	'code' => 'Navi-1x',
 	'process' => 'TSMC n7 (7nm)',
 	'years' => '2019-20',
@@ -18217,14 +18427,14 @@ sub set_amd_data {
 	'years' => '2020-22',
 	},
 	{'arch' => 'RDNA-3',
-	'ids' => '73a8|73c4|73c5|73c8|7448|744c|745e|7460|7461|7470|7478|747e',
+	'ids' => '73a8|73c4|73c5|73c8|7448|744a|744c|745e|7460|7461|7470|7478|747e',
 	'code' => 'Navi-3x',
 	'process' => 'TSMC n5 (5nm)',
 	'years' => '2022+',
 	},
 	{'arch' => 'RDNA-3',
-	'ids' => '73f0|7480|7481|7483|7487|7489|748b|749f',
-	'code' => 'Navi-33',-
+	'ids' => '73f0|7480|7481|7483|7487|7489|748b|7499',
+	'code' => 'Navi-3x',
 	'process' => 'TSMC n6 (6nm)',
 	'years' => '2023+',
 	},
@@ -18247,7 +18457,7 @@ sub set_amd_data {
 	'years' => '2021-22+',
 	},
 	{'arch' => 'CDNA-3',
-	'ids' => '74a0|74a1',
+	'ids' => '74a0|74a1|74a2|74a5|74a9|74b5|74bd',
 	'code' => 'Instinct-MI3xx',
 	'process' => 'TSMC n5 (5nm)',
 	'years' => '2023+',
@@ -18258,7 +18468,7 @@ sub set_amd_data {
 sub set_intel_data {
 	$gpu_intel = [
 	{'arch' => 'Gen-1',
-	'ids' => '1132|7120|7121|7122|7123|7124|7125|7126|7128|712a',
+	'ids' => '1132|3577|7120|7121|7122|7123|7124|7125|7126|7128|712a',
 	'code' => '',
 	'process' => 'Intel 150nm',
 	'years' => '1998-2002',
@@ -18271,26 +18481,26 @@ sub set_intel_data {
 	'years' => '1998',
 	},
 	{'arch' => 'Gen-2',
-	'ids' => '2562|2572|3577|3582|358e',
+	'ids' => '2562|2572|2582|3577|3582|358e',
 	'code' => '',
 	'process' => 'Intel 130nm',
 	'years' => '2002-03',
 	},
 	{'arch' => 'Gen-3',
-	'ids' => '2582|2592|2780|2782|2792',
-	'code' => 'Intel 130nm',
-	'process' => '',
+	'ids' => '2582|258a|2592|2780|2782|2792',
+	'code' => '',
+	'process' => 'Intel 130nm',
 	'years' => '2004-05',
 	},
 	{'arch' => 'Gen-3.5',
-	'ids' => '2772|2776|27a2|27a6|27ae|2972|2973',
+	'ids' => '2772|2776|27a2|27a6|27ae|2972|2973|2982|29b2|29c2|29d2|a001|a011',
 	'code' => '',
 	'process' => 'Intel 90nm',
 	'years' => '2005-06',
 	},
 	{'arch' => 'Gen-4',
 	'ids' => '2982|2983|2992|2993|29a2|29a3|29b2|29b3|29c2|29c3|29d2|29d3|2a02|' .
-	'2a03|2a12|2a13|2a42|2e02|2e12|2e22|2e32|2e42|2e92|a001|a011',
+	'2a03|2a12|2a13|2a42|2e02|2e12|2e22|2e32|2e42|2e92',
 	'code' => '',
 	'process' => 'Intel 65n',
 	'years' => '2006-07',
@@ -18299,7 +18509,7 @@ sub set_intel_data {
 	'ids' => '4100|8108|8109|a001|a002|a011|a012',
 	'code' => '',
 	'process' => 'Intel 45-130nm',
-	'year' => '2008-10',
+	'years' => '2008-10',
 	},
 	{'arch' => 'Gen-5',
 	'ids' => '2a41|2a42|2a43|2e02|2e03|2e12|2e13|2e22|2e23|2e32|2e33|2e42|2e43|' .
@@ -18375,7 +18585,7 @@ sub set_intel_data {
 	'process' => 'Intel 14n',
 	'years' => '2015-16',
 	},
-	# gen10 was cancelled., 
+	# gen10 was cancelled.
 	{'arch' => 'Gen-11',
 	'ids' => '0d16|0d26|0d36|4541|4551|4555|4557|4571|4e51|4e55|4e57|4e61|4e71|' .
 	'8a50|8a51|8a52|8a53|8a54|8a56|8a57|8a58|8a59|8a5a|8a5b|8a5c|8a5d|8a70|8a71|' .
@@ -18384,68 +18594,66 @@ sub set_intel_data {
 	'process' => 'Intel 10nm',
 	'years' => '2019-21',
 	},
-	{'arch' => 'Gen-12.1',
+	{'arch' => 'Xe',
 	'ids' => '4626|4628|462a|4636|4638|463a|4680|4682|4688|468a|468b|4690|4692|' .
 	'4693|46a1|46a2|46a3|46b2|46b3|46c2|46c3|46d0|46d1|46d2|4905|4907|4908|4909|' .
-	'4c8a|4c8b|4c90|4c9a|9a40|9a49|9a59|9a60|9a68|9a70|9a78|9ac0|9ac9|9ad9|9af8|' .
-	'a719|a720|a721|a780|a781|a782|a783|a788|a789|a78a|a78b|a7a8|a7a9',
+	'4c8a|4c8b|4c90|4c9a|9a40|9a49|9a59|9a60|9a68|9a70|9a78|9ac0|9ad9|9af8|a720|' .
+	'a721|a780|a781|a782|a783|a788|a789|a78a|a78b|a7a8|a7a9',
 	'code' => '',
 	'process' => 'Intel 10nm',
 	'years' => '2020-21',
 	},
-	{'arch' => 'Gen-12.2',
+	{'arch' => 'Xe',
 	'ids' => '4626|46a0|46a1|46a6|46a8|46aa|46b0|46b1|46b6|46b8|46ba|46c0|46c1|' .
 	'46d3|46d4',
 	'code' => '',
 	'process' => 'Intel 10nm',
 	'years' => '2021-22+',
 	},
-	{'arch' => 'Gen-12.5',
+	{'arch' => 'Xe',
 	'ids' => '0bd5|0bda',
 	'code' => '',
 	'process' => 'Intel 10nm',
 	'years' => '2021-23+',
 	},
-	{'arch' => 'Gen-12.7',
+	{'arch' => 'Xe-HPG',
 	'ids' => '4f80|4f81|4f82|4f83|4f84|4f85|4f86|4f87|4f88|5690|5691|5692|5693|' .
 	'5694|5696|5697|5698|56a0|56a1|56a2|56a3|56a4|56a5|56a6|56a7|56a8|56a9|56b0|' .
-	'56b1|56b2|56b3|56ba|56bb|56bc|56bd|56be|56bf|56c0|56c1',
+	'56b1|56b2|56b3|56ba|56bb|56bc|56bd|56c0|56c1',
 	'code' => 'Alchemist',
 	'process' => 'TSMC n6 (7nm)',
 	'years' => '2022+',
 	},
-	{'arch' => 'Gen-13',
-	'ids' => 'a70d|a719|a720|a721|a74d|a780|a781|a782|a783|a788|a789|a78a|a78b|' .
-	'a7a0|a7a1|a7a8|a7a9|a7aa|a7ab|a7ac|a7ad',
+	{'arch' => 'Xe',
+	'ids' => 'a70d|a74d|a7a0|a7a1|a7aa|a7ab|a7ac|a7ad',
 	'code' => '',
 	'process' => 'Intel 7 (10nm)',
 	'years' => '2022+',
 	},
-	{'arch' => 'Gen-13',
-	'ids' => '7d40|7d41|7d45|7d51|7d55|7d60|7d67|7dd1|7dd5',
+	{'arch' => 'Xe-LPG',
+	'ids' => '7d40|7d45|7d55|7d60|7dd5',
 	'code' => '',
 	'process' => 'Intel 4 (7nm+)',
 	'years' => '2023+',
 	},
-	{'arch' => 'Gen-14',
+	{'arch' => 'Xe2',
 	'ids' => 'e202|e20b|e20c|e20d|e212',
 	'code' => '',
 	'process' => 'TSMC n4 (4nm)',
 	'years' => '2024+',
 	},
-	{'arch' => 'Gen-14',
-	'ids' => '6420|64a0|64b0',
+	{'arch' => 'Xe2',
+	'ids' => '6420|64a0|64b0|b080|b081|b082|b083|b08f|b090|b0a0|b0b0',
 	'code' => '',
 	'process' => 'TSMC n3 (3nm)',
 	'years' => '2024+',
 	},
-	{'arch' => 'Gen-15',
-	'ids' => '7d41|7d51|7d67|7dd1',
+	{'arch' => 'Xe-LPG',
+	'ids' => '7d41|7d51|7d67|7dd1|b640',
 	'code' => '',
 	'process' => 'TSMC 3nm?',
 	'years' => '2025+',
 	},
-
 	];
 }
 
@@ -18677,7 +18885,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 28nm',
 	'release' => '',
-	'series' => '550.xx+',
+	'series' => '550/565.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2014-2019',
@@ -18694,7 +18902,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 16nm',
 	'release' => '',
-	'series' => '550.xx+',
+	'series' => '550/565.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2016-2021',
@@ -18706,7 +18914,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 12nm',
 	'release' => '',
-	'series' => '550.xx+',
+	'series' => '550/565.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2017-2020',
@@ -18724,7 +18932,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 12nm FF',
 	'release' => '',
-	'series' => '550.xx+',
+	'series' => '550/565.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2018-2022',
@@ -18742,19 +18950,19 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC n7 (7nm)',
 	'release' => '',
-	'series' => '550.xx+',
+	'series' => '550/565.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2020-2023',
 	},
 	{'arch' => 'Hopper',
-	'ids' => '2321|2322|2324|2329|2330|2331|2335|2339|233a|2342',
+	'ids' => '2321|2322|2324|2329|232c|2330|2331|2335|2339|233a|233b|2342|2348',
 	'code' => 'GH1xx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC n4 (5nm)',
 	'release' => '',
-	'series' => '550.xx+',
+	'series' => '550/565.xx+',
 	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2022+',
@@ -18769,7 +18977,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC n4 (5nm)',
 	'release' => '',
-	'series' => '550.xx+',
+	'series' => '550/565.xx+',
 	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2022+',
@@ -18836,6 +19044,31 @@ sub get_gpu_data {
 	print "Raw \$info data: ", Data::Dumper::Dumper $info if $dbg[49];
 	eval $end if $b_log;
 	return $info;
+}
+
+## INFO DATA ##
+# args: 0: $tools, hash ref
+sub tools_data {
+	eval $start if $b_log;
+	my %items = (
+	'api' => [qw(clinfo eglinfo glxinfo vulkaninfo)],
+	'de' => [qw(gnome-monitor-config gnome-randr kscreen-console kscreen-doctor 
+	xfce4-display-settings xfce5-display-settings)],
+	'gpu' => [qw(amd-smi amdgpu_top aticonfig corectrl gputop intel_gpu_top lsgpu 
+	lact nvidia-settings nvidia-smi radeon_gpu_profiler radeontop tuxclocker umr)],
+	'wl' => [qw(kanshi nwg-displays swaymsg way-displays wayland-info wdisplays 
+	weston-info wlay wlr-randr)],
+	'x11' => [qw(xdriinfo xdpyinfo xprop xrandr)]
+	);
+	foreach my $key (keys %items){
+		foreach my $tool (@{$items{$key}}){
+			if (main::check_program($tool)){
+				push(@{$_[0]->{$key}},$tool);
+			}
+		}
+	}
+	# print Data::Dumper::Dumper $_[0];
+	eval $end if $b_log;
 }
 
 ## MONITOR DATA ##
@@ -33534,23 +33767,36 @@ sub version_proc {
 		my $version;
 		if ($fake{'compiler'}){
 			# $result = $result =~ /\*(gcc|clang)\*eval\*/;
+			## CLANG ##
 			# $result='Linux version 5.4.0-rc1 (sourav@archlinux-pc) (clang version 9.0.0 (tags/RELEASE_900/final)) #1 SMP PREEMPT Sun Oct 6 18:02:41 IST 2019';
 			# $result='Linux version 5.8.3-fw1 (fst@x86_64.frugalware.org) ( OpenMandriva 11.0.0-0.20200819.1 clang version 11.0.0 (/builddir/build/BUILD/llvm-project-release-11.x/clang 2a0076812cf106fcc34376d9d967dc5f2847693a), LLD 11.0.0)';
+			# $result='Linux version 6.0.8-0-generic (chimera@chimera) (clang version 15.0.4, LLD 15.0.4) #1 SMP PREEMPT_DYNAMIC Fri Nov 11 13:45:29 UTC 2022';
+			## GCC BASIC LEGACY ##
+			# $result='Linux version 2.4.27-2-386 (horms@tabatha.lab.ultramonkey.org) (gcc version 3.3.5 (Debian 1:3.3.5-12)) #1 Mon May 16 16:47:51 JST 2005';
+			# $result='Linux version 2.6.18-5-686 (Debian 2.6.18.dfsg.1-17) (dannf@debian.org) (gcc version 4.1.2 20061115 (prerelease) (Debian 4.1.1-21)) #1 SMP Mon Dec 24 16:41:07 UTC 2007';
+			# $result='Linux version 4.3.6-1-ck (squishy@ease) (gcc version 5.3.0 (GCC) ) #1 SMP PREEMPT Fri Feb 19 20:14:58 EST 2016';
+			## GCC HURD ##
+			# $result='Linux version 2.6.1 (GNU 0.9 GNU-Mach 1.8+git20201007-486/Hurd-0.9 i686-AT386)';
+			## GCC BSDs ##
+			# $result='NetBSD version 9.1 (netbsd@localhost) (gcc version 7.5.0) NetBSD 9.1 (GENERIC) #0: Sun Oct 18 19:24:30 UTC 2020';
+			## GCC GENERAL ##
+			# $result='Linux version 5.8.0-2-amd64 (debian-kernel@lists.debian.org) (gcc-10 (Debian 10.2.0-9) 10.2.0, GNU ld (GNU Binutils for Debian) 2.35) #1 SMP Debian 5.8.10-1 (2020-09-19)';
 			# $result='Linux version 5.8.0-18-generic (buildd@lgw01-amd64-057) (gcc (Ubuntu 10.2.0-5ubuntu2) 10.2.0, GNU ld (GNU Binutils for Ubuntu) 2.35) #19-Ubuntu SMP Wed Aug 26 15:26:32 UTC 2020';
 			# $result='Linux version 5.8.9-fw1 (fst@x86_64.frugalware.org) (gcc (Frugalware Linux) 9.2.1 20200215, GNU ld (GNU Binutils) 2.35) #1 SMP PREEMPT Tue Sep 15 16:38:57 CEST 2020';
-			# $result='Linux version 5.8.0-2-amd64 (debian-kernel@lists.debian.org) (gcc-10 (Debian 10.2.0-9) 10.2.0, GNU ld (GNU Binutils for Debian) 2.35) #1 SMP Debian 5.8.10-1 (2020-09-19)';
 			# $result='Linux version 5.9.0-5-amd64 (debian-kernel@lists.debian.org) (gcc-10 (Debian 10.2.1-1) 10.2.1 20201207, GNU ld (GNU Binutils for Debian) 2.35.1) #1 SMP Debian 5.9.15-1 (2020-12-17)';
-			# $result='Linux version 2.6.1 (GNU 0.9 GNU-Mach 1.8+git20201007-486/Hurd-0.9 i686-AT386)';
-			# $result='NetBSD version 9.1 (netbsd@localhost) (gcc version 7.5.0) NetBSD 9.1 (GENERIC) #0: Sun Oct 18 19:24:30 UTC 2020';
-			 #$result='Linux version 6.0.8-0-generic (chimera@chimera) (clang version 15.0.4, LLD 15.0.4) #1 SMP PREEMPT_DYNAMIC Fri Nov 11 13:45:29 UTC 2022';
-			# 2023 ubuntu, sigh..
+			## 2023 ubuntu, sigh..
 			# $result='Linux version 6.5.8-1-liquorix-amd64 (steven@liquorix.net) (gcc (Debian 13.2.0-4) 13.2.0, GNU ld (GNU Binutils for Debian) 2.41) #1 ZEN SMP PREEMPT liquorix 6.5-9.1~trixie (2023-10-19)';
 			# $result='Linux version 6.5.0-9-generic (buildd@bos03-amd64-043) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.2.0-4ubuntu3) 13.2.0, GNU ld (GNU Binutils for Ubuntu) 2.41) #9-Ubuntu SMP PREEMPT_DYNAMIC Sat Oct  7 01:35:40 UTC 2023';
 			# $result='Linux version 6.5.13-un-def-alt1 (builder@localhost.localdomain) (gcc-13 (GCC) 13.2.1 20230817 (ALT Sisyphus 13.2.1-alt2), GNU ld (GNU Binutils) 2.41.0.20230826) #1 SMP PREEMPT_DYNAMIC Wed Nov 29 15:54:38 UTC 2023';
+			## issue 310, 2024 redhat, returned: gcc v: 2.40-14.fc39
+			# $result='Linux version 6.11.2-300.fc41.x86_64 (mockbuild@b8af20a4150648399241be170922971e) (gcc (GCC) 14.2.1 20240912 (Red Hat 14.2.1-3), GNU ld version 2.43.1-2.fc41) #1 SMP PREEMPT_DYNAMIC Fri Oct  4 16:44:08 UTC 2024';
+			## note the new (x86_64-linux-gnu- in front of gcc, this is 2024-12-10 debian sid
+			# $result='Linux version 6.11.10-amd64 (debian-kernel@lists.debian.org) (x86_64-linux-gnu-gcc-14 (Debian 14.2.0-8) 14.2.0, GNU ld (GNU Binutils for Debian) 2.43.1) #1 SMP PREEMPT_DYNAMIC Debian 6.11.10-1 (2024-11-23)';
 		}
 		# Note: zigcc is only theoretical, but someone is going to try it!
 		# cleanest, old style: 'clang version 9.0.0 (' | 'gcc version 7.5.0'
-		if ($result =~ /(gcc|clang|zigcc).*?version\s([^,\s\)]+)/){
+		# note; issue 310 forces [^\d]*\s instead of old .*?
+		if ($result =~ /(gcc|clang|zigcc)[^\d]*\sversion\s([^,\s\)]+)/){
 			@$compiler = ($1,$2);
 		}
 		# new styles: compiler + stuff + x.y.z. Ignores modifiers to number: -4, -ubuntu
@@ -34460,6 +34706,7 @@ sub package_counts {
 	# 0: key; 1: program; 2: p/d [no-list]; 3: arg/path/no-list; 4: 0/1 use lib; 
 	# 5: lib slice; 6: lib splitter; 7: optional eval test; 
 	# 8: optional installed tool tests for -ra
+	# NOTE: 2 if p must have 3, option to use with command.
 	# needed: cards [nutyx], urpmq [mageia]
 	my @pkg_managers = (
 	['alps','alps','p','showinstalled',1,0,''],
@@ -34492,7 +34739,7 @@ sub package_counts {
 	 'pakku','pamac','paru','pikaur','trizen','yaourt','yay','yup']], 
 	['pacman-g2','pacman-g2','p','-Q',1,0,'','',],
 	['pkg','pkg','d','/var/db/pkg/*',1,0,''], # 'pkg list' returns non programs
-	['pkg_add','pkg_info','p','',1,0,''], # OpenBSD has set of tools, not 1 pm
+	['pkg_add','pkg_info','p','-a',1,0,''], # OpenBSD has set of tools, not 1 pm
 	# like cards, avoid pkginfo directly due to python pm being so slow
 	# but pkgadd is also found in scratch
 	['pkgutils','pkginfo','p','-i',1,0,'','main::check_program(\'pkgadd\')'],
@@ -36362,7 +36609,7 @@ sub set_de_wm {
 		# Note that many lockers may not be services
 		@{$ps_data{'tools-test'}}=qw(away boinc-screensaver budgie-screensaver 
 		cinnamon-screensaver gnome-screensaver gsd-screensaver-proxy gtklock 
-		hyprlock i3lock kscreenlocker light-locker lockscreen lxlock 
+		hypridle hyprlock i3lock kscreenlocker light-locker lockscreen lxlock 
 		mate-screensaver nwg-lock 
 		physlock rss-glx slock swayidle swaylock ukui-screensaver unicode-screensaver 
 		waylock xautolock xfce4-screensaver xlock xlockmore xscreensaver 
