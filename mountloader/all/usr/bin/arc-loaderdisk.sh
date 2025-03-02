@@ -29,6 +29,10 @@ mountLoaderDisk() {
         ${ARC_SUDO} mkdir -p "/mnt/p${i}"
         ${ARC_SUDO} mount "/dev/synoboot${i}" "/mnt/p${i}" || {
           echo "Can't mount /dev/synoboot${i}."
+          for i in {1..3}; do
+            ${ARC_SUDO} umount "/mnt/p${i}" 2>/dev/null || true
+            ${ARC_SUDO} rm -rf "/mnt/p${i}" 2>/dev/null || true
+          done
           break 2
         }
       done
@@ -40,7 +44,7 @@ mountLoaderDisk() {
         echo "export LOADER_DISK_PART2=\"/dev/synoboot2\""
         echo "export LOADER_DISK_PART3=\"/dev/synoboot3\""
       } | ${ARC_SUDO} tee "/usr/arc/.mountloader" >/dev/null
-      ${ARC_SUDO} chmod 755 "/usr/arc/.mountloader"
+      ${ARC_SUDO} chmod a+x "/usr/arc/.mountloader"
 
       sync
 
@@ -65,8 +69,8 @@ unmountLoaderDisk() {
       echo "export LOADER_DISK_PART2=\"\""
       echo "export LOADER_DISK_PART3=\"\""
     } | ${ARC_SUDO} tee "/usr/arc/.mountloader" >/dev/null
-    ${ARC_SUDO} chmod 755 "/usr/arc/.mountloader"
-    ${ARC_SUDO} "/usr/rr/.mountloader"
+    ${ARC_SUDO} chmod a+x "/usr/arc/.mountloader"
+    ${ARC_SUDO} "/usr/arc/.mountloader"
     ${ARC_SUDO} rm -f "/usr/arc/.mountloader"
 
     sync

@@ -108,7 +108,7 @@ install_patches() {
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
     TTYN="$(echo "${I}" | cut -d',' -f1)"
     BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
-    echo "ttyS0 ttyS1 ttyS2" | grep -qw "${TTYN}" && continue
+    echo "ttyS0 ttyS1 ttyS2" | grep -wq "${TTYN}" && continue
     if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
       echo "Starting getty on ${TTYN}"
       if [ -n "${BAUD}" ]; then

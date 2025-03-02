@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
-
 install_addon() {
   echo "Installing addon rebootto... - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
@@ -16,6 +14,7 @@ install_addon() {
   cp -pf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin
   cp -pf /usr/bin/grub-editenv /tmpRoot/usr/bin
 
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ ! -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "copy esynoscheduler.db"
@@ -37,6 +36,7 @@ uninstall_addon() {
   rm -f /tmpRoot/usr/bin/loader-reboot.sh
   rm -f /tmpRoot/usr/bin/grub-editenv
 
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete rebootto... task from esynoscheduler.db"
