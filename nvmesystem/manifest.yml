@@ -1,6 +1,6 @@
 version: 1
 name: nvmesystem
-description: "Enable DSM installation to NVMe M.2 SSDs. (Only use if you have only NVMe M.2 SSDs installed)"
+description: "Enable DSM installation to NVMe M.2 SSDs. (If only NVMe M.2 SSDs installed)"
 system: false
 beta: false
 target: system
@@ -10,11 +10,11 @@ all:
 apollolake: false
 broadwell: false
 broadwellnk: false
-broadwellnkv2: false
+broadwellnkv2: true
 broadwellntbap: false
 denverton: false
-geminilake: false
-purley: false
-v1000: false
-r1000: false
+geminilake: true
+purley: true
+v1000: true
+r1000: true
 epyc7002: true

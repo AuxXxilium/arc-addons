@@ -1,4 +1,4 @@
-#!/usr/bin/env ash
+#!/usr/bin/env sh
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
@@ -9,7 +9,7 @@
 install_patches() {
   echo "Installing addon blockupdates - patches"
   cp -pf /usr/syno/sbin/bootup-smallupdate.sh /usr/syno/sbin/bootup-smallupdate.sh.bak
-  echo -en '#!/bin/sh\nexit 0\n' >/usr/syno/sbin/bootup-smallupdate.sh
+  printf '#!/bin/sh\nexit 0\n' >/usr/syno/sbin/bootup-smallupdate.sh
 }
 
 install_late() {

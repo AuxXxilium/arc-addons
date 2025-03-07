@@ -6,8 +6,8 @@
 # See /LICENSE for more information.
 #
 
-create() {
-  if grep -q "Arc-UpdateNotify" /usr/syno/etc/synoschedule.d/root/*.task 2>/dev/null; then
+Create() {
+  if grep -q '^name=Arc-UpdateNotify' /usr/syno/etc/synoschedule.d/root/*.task; then
     echo "Existence tasks"
   else
     echo "Create tasks"
@@ -18,17 +18,18 @@ create() {
   exit 0
 }
 
-delete() {
-  for I in /usr/syno/etc/synoschedule.d/root/*.task; do
-    if [ "$(grep '^name=' "${I}" 2>/dev/null | cut -d'=' -f2)" = "Arc-UpdateNotify" ]; then
-      id=$(grep '^id=' "${I}" | cut -d'=' -f2)
+Delete() {
+  for F in /usr/syno/etc/synoschedule.d/root/*.task; do
+    [ ! -e "${F}" ] && continue
+    if grep -q '^name=Arc-UpdateNotify' "${F}"; then
+      id=$(grep '^id=' "${F}" | cut -d'=' -f2)
       [ -n "${id}" ] && synoschedtask --del id=${id}
     fi
   done
   exit 0
 }
 
-check() {
+Check() {
   LOCALTAG=$(grep LOADERVERSION /usr/arc/VERSION 2>/dev/null | cut -d'=' -f2 | sed 's/\"//g')
   if [ -z "${LOCALTAG}" ]; then
     echo "Unknown bootloader version!"
@@ -40,6 +41,7 @@ check() {
   if echo "$@" | grep -wq "\-p"; then
     TAG=$(curl -skL --connect-timeout 10 "${URL}/tags" | grep "/refs/tags/.*\.zip" | head -1 | sed -E 's/.*\/refs\/tags\/(.*)\.zip.*$/\1/')
   else
+    # shellcheck disable=SC1083
     TAG="$(curl -skL --connect-timeout 10 -w %{url_effective} -o /dev/null "${URL}/releases/latest" | awk -F'/' '{print $NF}')"
   fi
   [ "${TAG:0:1}" = "v" ] && TAG="${TAG:1}"
@@ -71,7 +73,8 @@ case "${ACTION,,}" in
     Delete
     ;;
   "check")
-    Check
+    shift
+    Check "$@"
     ;;
   *)
     echo "Unknown command!"

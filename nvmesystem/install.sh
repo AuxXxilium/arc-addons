@@ -1,4 +1,4 @@
-#!/usr/bin/env ash
+#!/usr/bin/env sh
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
@@ -6,16 +6,20 @@
 # See /LICENSE for more information.
 #
 
-check_build() {
-  _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
-  if [ ${_BUILD:-64570} -lt 69057 ]; then
-    echo "${_BUILD} is not supported nvmesystem addon!"
-    exit 0
-  fi
-}
+# PLATFORMS="epyc7002"
+# PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
+# if ! echo "${PLATFORMS}" | grep -wq "${PLATFORM}"; then
+#   echo "${PLATFORM} is not supported nvmesystem addon!"
+#   exit 0
+# fi
+# _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
+# if [ ${_BUILD:-42218} -lt 42218 ]; then
+#   echo "${_BUILD} is not supported nvmesystem addon!"
+#   exit 0
+# fi
 
-install_early() {
-  echo "Installing addon nvmesystem - early"
+if [ "${1}" = "early" ]; then
+  echo "Installing addon nvmesystem - ${1}"
 
   # System volume is assembled with SSD Cache only, please remove SSD Cache and then reboot
   sed -i "s/support_ssd_cache=.*/support_ssd_cache=\"no\"/" /etc/synoinfo.conf /etc.defaults/synoinfo.conf
@@ -24,24 +28,25 @@ install_early() {
   SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -f "${SO_FILE}" "${SO_FILE}.tmp"
-  xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
-    sed "s/4584ed74b7488b4c24083b01/4584ed75b7488b4c24083b01/" |
+  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
+    sed "s/4584ed74b7488b4c24083b01/4584ed75b7488b4c24083b01/; s/4584f674b7488b4c24083b01/4584f675b7488b4c24083b01/;" | # P1: [69057,?); P2: [42218,69057);
     xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
-}
 
-install_late() {
-  echo "Installing addon nvmesystem - late"
+elif [ "${1}" = "late" ]; then
+  echo "Installing addon nvmesystem - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   # disk/shared_disk_info_enum.c::84 Failed to allocate list in SharedDiskInfoEnum, errno=0x900.
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
-
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
-  xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null |
-    sed "s/0f95c00fb6c0488b94240810/0f94c00fb6c0488b94240810/; s/8944240c8b44240809e84409/8944240c8b44240890904409/" |
+  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
+    sed "s/0f95c00fb6c0488b94240810/0f94c00fb6c0488b94240810/; s/8944240c8b44240809e84409/8944240c8b44240890904409/" | # [69057,?);     (from SA6400 69057)
+    sed "s/0f95c00fb6c0488b94240810/0f94c00fb6c0488b94240810/; s/85e40f884e0100004585ed0f/85e49090909090904585ed0f/" | # [42962,69057); (from SA6400 42962)
+    sed "s/0f95c00fb6c0488b4c242864/0f94c00fb6c0488b4c242864/; s/85e40f884e0100004585ed0f/85e49090909090904585ed0f/" | # [42962,69057); (from DS920+ 42962)
+    sed "s/0f95c00fb6c04883c408c348/0f94c00fb6c04883c408c348/; s/85e40f88580100004585ed0f/85e49090909090904585ed0f/" | # [42218,42962); (from DS920+ 42218)
     xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
@@ -54,7 +59,7 @@ install_late() {
   DEST="/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
   {
     echo "[Unit]"
-    echo "Description=Modify storage panel(nvmesystem)"
+    echo "Description=nvmesystem daemon"
     echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
     echo "After=smpkg-custom-install.service"
     echo "After=storagepanel.service" # storagepanel
@@ -62,7 +67,7 @@ install_late() {
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/nvmesystem.sh"
+    echo "ExecStart=-/usr/bin/nvmesystem.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
@@ -79,21 +84,20 @@ install_late() {
 
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-    if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -qw "task"; then
+    if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
       echo "copy esynoscheduler.db"
       mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
       cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
     fi
     echo "insert ARCONBOOTUPARC_UDEV task to esynoscheduler.db"
-    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'ARCONBOOTUPARC_UDEV';
-INSERT INTO task VALUES('ARCONBOOTUPARC_UDEV', '', 'bootup', '', 1, 0, 0, 0, '', 0, '$(echo -e ${ONBOOTUP})', 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('ARCONBOOTUPARC_UDEV', '', 'bootup', '', 1, 0, 0, 0, '', 0, '$(printf "%b" "${ONBOOTUP}")', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
-}
 
-uninstall_addon() {
-  echo "Uninstalling addon nvmesystem - ${1}"
+elif [ "${1}" = "uninstall" ]; then
+  echo "Installing addon nvmesystem - ${1}"
 
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
@@ -105,22 +109,4 @@ uninstall_addon() {
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/nvmesystem.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/nvmesystem.sh" >>/tmpRoot/usr/arc/revert.sh
-}
-
-case "${1}" in
-  early)
-    check_build
-    install_early
-    ;;
-  late)
-    check_build
-    install_late
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-  *)
-    exit 0
-    ;;
-esac
-exit 0
+fi

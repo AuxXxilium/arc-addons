@@ -1,4 +1,4 @@
-#!/usr/bin/env ash
+#!/usr/bin/env sh
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
@@ -8,8 +8,10 @@
 
 install_jrExit() {
   echo "Installing addon wol - jrExit"
-  for N in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
-    /usr/bin/ethtool -s ${N} wol g 2>/dev/null
+  for F in /sys/class/net/eth*; do
+    [ ! -e "${F}" ] && continue
+    ETH="$(basename "${F}")"
+    /usr/bin/ethtool -s "${ETH}" wol g 2>/dev/null
   done
 }
 
