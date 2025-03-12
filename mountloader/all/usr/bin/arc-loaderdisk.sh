@@ -73,10 +73,6 @@ unmountLoaderDisk() {
       echo "export LOADER_DISK_PART1=\"\""
       echo "export LOADER_DISK_PART2=\"\""
       echo "export LOADER_DISK_PART3=\"\""
-      if [ -f "${RR_PATH}/opt/arc/menu.sh" ]; then
-        ${ARC_SUDO} rm -rf "${RR_PATH}" >/dev/null 2>&1 || true
-        echo "export WORK_PATH=\"\""
-      fi
     } | ${ARC_SUDO} tee "/usr/arc/.mountloader" >/dev/null
     ${ARC_SUDO} chmod a+x "/usr/arc/.mountloader"
     ${ARC_SUDO} "/usr/arc/.mountloader"
@@ -84,9 +80,6 @@ unmountLoaderDisk() {
 
     sync
 
-    if echo "$@" | grep -wq "\-all"; then
-      ${ARC_SUDO} rm -rf "${RR_PATH}"
-    fi
     for j in {1..3}; do
       ${ARC_SUDO} umount "/mnt/p${j}" 2>/dev/null || true
       ${ARC_SUDO} rm -rf "/mnt/p${j}" 2>/dev/null || true
@@ -96,6 +89,17 @@ unmountLoaderDisk() {
   fi
   echo "Loader disk umount success!"
   return 0
+}
+
+[ -z "${1}" ] && {
+  echo " Usage: $0 [mountLoaderDisk|unmountLoaderDisk] [-all]"
+  exit 1
+}
+
+[ -x "/sbin/arcsu" ] && ARC_SUDO="/sbin/arcsu" || ARC_SUDO=""
+${ARC_SUDO} ls /root >/dev/null 2>&1 || {
+  echo "No root permission!"
+  exit 1
 }
 
 "$@"
