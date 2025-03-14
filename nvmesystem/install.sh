@@ -76,26 +76,6 @@ elif [ "${1}" = "late" ]; then
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/nvmesystem.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmesystem.service
 
-  # A bug in the custom kernel, the reason for which is currently unknown
-  if cat /proc/version 2>/dev/null | grep -q 'RR@RR'; then
-    ONBOOTUP=""
-    ONBOOTUP="${ONBOOTUP}systemctl restart systemd-udev-trigger.service\n"
-    ONBOOTUP="${ONBOOTUP}echo \"DELETE FROM task WHERE task_name LIKE ''ARCONBOOTUPARC_UDEV'';\" | sqlite3 /usr/syno/etc/esynoscheduler/esynoscheduler.db\n"
-
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-    ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-    if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
-      echo "copy esynoscheduler.db"
-      mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
-      cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
-    fi
-    echo "insert ARCONBOOTUPARC_UDEV task to esynoscheduler.db"
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-DELETE FROM task WHERE task_name LIKE 'ARCONBOOTUPARC_UDEV';
-INSERT INTO task VALUES('ARCONBOOTUPARC_UDEV', '', 'bootup', '', 1, 0, 0, 0, '', 0, '$(printf "%b" "${ONBOOTUP}")', 'script', '{}', '', '', '{}', '{}');
-EOF
-  fi
-
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon nvmesystem - ${1}"
 
