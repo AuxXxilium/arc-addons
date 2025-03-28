@@ -18,12 +18,12 @@ if [ "${1}" = "patches" ]; then
     ETHLIST="${ETHLIST}${BUS} ${MAC} ${ETH}\n"
   done
   ETHLISTTMPM=""
-  ETHLISTTMPB="$(printf "%b" "${ETHLISTTMPB}" | grep -v "${MACX}")\n"
+  ETHLISTTMPB="$(printf "%b" "${ETHLIST}" | sort)"
   if [ -n "${2}" ]; then
     MACS="$(echo "${2}" | sed 's/://g; s/,/ /g; s/.*/\L&/')"
     for MACX in ${MACS}; do
       ETHLISTTMPM="${ETHLISTTMPM}$(printf "%b" "${ETHLISTTMPB}" | grep "${MACX}")\n"
-      ETHLISTTMPB="$(printf "%b""${ETHLISTTMPB}" | grep -v "${MACX}")\n"
+      ETHLISTTMPB="$(printf "%b" "${ETHLISTTMPB}" | grep -v "${MACX}")\n"
     done
   fi
   ETHLIST="$(printf "%b" "${ETHLISTTMPM}${ETHLISTTMPB}" | grep -v '^$')"
