@@ -12,34 +12,50 @@
 # ls /var/tmp/user/1026/gvfs/  /usr/syno/etc/synovfs/1026
 
 NUM="${1:-7}"
-PRE="${2:-dsm}"
+PRE="${2:-bkp}"
 
-BACKUPPATH="/usr/arc/dsmbackup"
+DSMBPATH="/usr/arc/dsmbackup"
 FILENAME="${PRE}_$(date +%Y%m%d%H%M%S).dss"
-mkdir -p "${BACKUPPATH}"
-/usr/syno/bin/synoconfbkp export --filepath="${BACKUPPATH}/${FILENAME}"
-echo "Backup to ${BACKUPPATH}/${FILENAME}"
+mkdir -p "${DSMBPATH}"
+/usr/syno/bin/synoconfbkp export --filepath="${DSMBPATH}/${FILENAME}"
+echo "Backup to ${DSMBPATH}/${FILENAME}"
 
-for I in $(ls ${BACKUPPATH}/${PRE}*.dss | sort -r | awk "NR>${NUM}"); do
+for I in $(ls ${DSMBPATH}/${PRE}*.dss | sort -r | awk "NR>${NUM}"); do
   rm -f "${I}"
 done
 
-PART1_PATH="$(cat /proc/mounts | grep '/dev/synoboot1' | cut -d' ' -f2)"
-if [ -z "${PART1_PATH}" ]; then
-  echo 1 >/proc/sys/kernel/syno_install_flag
-  mkdir -p /mnt/p1
-  mount /dev/synoboot1 /mnt/p1
-  [ $? -ne 0 ] && exit 1
-  rm -rf /mnt/p1/dsmbackup
-  cp -rf "${BACKUPPATH}" /mnt/p1/
-  sync
-  umount /mnt/p1
-  echo 0 >/proc/sys/kernel/syno_install_flag
-else
-  rm -rf "${PART1_PATH}/dsmbackup"
-  cp -rf "${BACKUPPATH}" "${PART1_PATH}/"
-  sync
+LOADER_DISK_PART1="$(/sbin/blkid -L ARC1 2>/dev/null)"
+ if [ ! -b "${LOADER_DISK_PART1}" ] && [ -b "/dev/synoboot1" ]; then
+  LOADER_DISK_PART1="/dev/synoboot1"
 fi
-echo "Backup to /mnt/p1/dsmbackup"
+if [ ! -b "${LOADER_DISK_PART1}" ]; then
+  echo "Boot disk not found"
+  exit 1
+fi
+
+modprobe -q vfat
+echo 1 >/proc/sys/kernel/syno_install_flag 2>/dev/null
+[ -f "/sbin/fsck.vfat" ] && fsck.vfat -aw "${LOADER_DISK_PART1}" >/dev/null 2>&1 || true
+WORK_PATH="/mnt/p1"
+mkdir -p "${WORK_PATH}"
+mount | grep -q "${LOADER_DISK_PART1}" && umount "${LOADER_DISK_PART1}" 2>/dev/null || true
+mount "${LOADER_DISK_PART1}" "${WORK_PATH}" || {
+  echo "Can't mount ${LOADER_DISK_PART1}."
+  rm -rf "${WORK_PATH}"
+  echo 0 >/proc/sys/kernel/syno_install_flag 2>/dev/null
+  exit 1
+}
+
+rm -rf "${WORK_PATH}/dsmbackup"
+cp -rf "${DSMBPATH}" "${WORK_PATH}"
+
+sync
+
+umount "${LOADER_DISK_PART1}" 2>/dev/null
+rm -rf "${WORK_PATH}"
+
+echo 0 >/proc/sys/kernel/syno_install_flag 2>/dev/null
+
+echo "Backup to /mnt/p1/dsmbackup/"
 
 exit 0

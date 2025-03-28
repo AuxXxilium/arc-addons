@@ -1,4 +1,4 @@
-#!/usr/bin/env ash
+#!/usr/bin/env sh
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
@@ -6,37 +6,38 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon cpuinfo - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
-  
-  cp -pf /usr/bin/cpuinfo.sh /tmpRoot/usr/bin/cpuinfo.sh
 
+  # cpuinfo
+  cp -vpf /usr/bin/cpuinfo.sh /tmpRoot/usr/bin/cpuinfo.sh
+
+  shift
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/cpuinfo.service"
   {
     echo "[Unit]"
-    echo "Description=Adds correct CPU Info"
-    echo "After=multi-user.target"
-    echo "After=synoscgi.service nginx.service"
+    echo "Description=cpuinfo daemon"
+    echo "After=multi-user.target synoscgi.service nginx.service"
     echo
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/cpuinfo.sh ${2}"
+    echo "ExecStart=/usr/bin/cpuinfo.sh" "$@"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
   } >"${DEST}"
-  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/cpuinfo.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo.service
 
   # synoscgiproxy
   cp -vpf /usr/sbin/synoscgiproxy /tmpRoot/usr/sbin/synoscgiproxy
-}
 
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon cpuinfo - ${1}"
 
   # cpuinfo
@@ -49,17 +50,4 @@ uninstall_addon() {
 
   # synoscgiproxy
   rm -f /tmpRoot/usr/sbin/synoscgiproxy
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}" "${2}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-  *)
-    exit 0
-    ;;
-esac
-exit 0
+fi

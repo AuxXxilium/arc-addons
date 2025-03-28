@@ -1,12 +1,10 @@
-#!/usr/bin/env ash
+#!/usr/bin/env sh
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-
-export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
 
 install_addon() {
   echo "Installing addon sensors - ${1}"
@@ -16,6 +14,7 @@ install_addon() {
   tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
   cp -pf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
 
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
     echo "copy esynoscheduler.db"
@@ -43,6 +42,7 @@ uninstall_addon() {
   rm -rf /tmpRoot/etc/fancontrol
   rm -f /tmpRoot/usr/bin/arc-sensors.sh
 
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete sensors task from esynoscheduler.db"

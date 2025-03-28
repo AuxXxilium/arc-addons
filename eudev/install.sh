@@ -1,4 +1,4 @@
-#!/usr/bin/env ash
+#!/usr/bin/env sh
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
@@ -44,7 +44,7 @@ install_late() {
 
   echo "copy modules"
   isChange="false"
-  export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   
