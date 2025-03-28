@@ -29,7 +29,7 @@
 # /var/packages/StorageManager/target/ui/storage_panel.js
 
 
-scriptver="v3.6.110"
+scriptver="v3.6.111"
 script=Synology_HDD_db
 repo="007revad/Synology_HDD_db"
 scriptname=syno_hdd_db
@@ -126,7 +126,7 @@ if options="$(getopt -o SIabcdefghijklmnopqrstuvwxyz0123456789 -l \
                 ;;
             --restore)          # Restore changes from backups
                 restore=yes
-                if $(echo "${args[@]}" | grep -q -- '--ssd=restore'); then
+                if echo "${args[@]}" | grep -q -- '--ssd=restore'; then
                     ssd_restore=yes
                 fi
                 #break
@@ -262,7 +262,7 @@ model=$(cat /proc/sys/kernel/syno_hw_version)
 modelname="$model"
 
 # Get CPU platform_name
-platform_name=$(/usr/syno/bin/synogetkeyvalue /etc.defaults/synoinfo.conf platform_name)
+#platform_name=$(/usr/syno/bin/synogetkeyvalue /etc.defaults/synoinfo.conf platform_name)
 
 # Get CPU arch
 arch="$(uname -m)"
@@ -605,8 +605,8 @@ if [[ $buildnumber -gt 64570 ]]; then
     # DSM 7.2.1 and later
     #strgmgr="/var/packages/StorageManager/target/ui/storage_panel.js"
     strgmgr="/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js"
-elif [[ $buildnumber -ge 64561 ]]; then
-    # DSM 7.2
+elif [[ $buildnumber -ge 42962 ]]; then
+    # DSM 7.1.1 to 7.2
     strgmgr="/usr/syno/synoman/webman/modules/StorageManager/storage_panel.js"
 fi
 vidfile="/usr/syno/etc.defaults/pci_vendor_ids.conf"
@@ -730,8 +730,8 @@ if [[ $restore == "yes" ]]; then
         if [[ $buildnumber -gt 64570 ]]; then
             # DSM 7.2.1 and later
             strgmgrver="$(/usr/syno/bin/synopkg version StorageManager)"
-        elif [[ $buildnumber -ge 64561 ]]; then
-            # DSM 7.2
+        elif [[ $buildnumber -ge 42962 ]]; then
+            # DSM 7.1.1 to 7.2
             strgmgrver="${buildnumber}${smallfixnumber}"
         fi
         if [[ -f "${strgmgr}.$strgmgrver" ]]; then
@@ -2221,7 +2221,7 @@ fi
 
 # Enable creating pool on drives in M.2 adaptor card
 if [[ -f "$strgmgr" ]] && [[ $buildnumber -gt 42962 ]]; then
-    # DSM 7.2 and later
+    # DSM 7.1.1 and later
     if [[ ${#m2cards[@]} -gt "0" ]] || [[ $forcepci == "yes" ]]; then
 
         if grep -q 'notSupportM2Pool_addOnCard' "$strgmgr"; then
@@ -2230,8 +2230,8 @@ if [[ -f "$strgmgr" ]] && [[ $buildnumber -gt 42962 ]]; then
             if [[ $buildnumber -gt 64570 ]]; then
                 # DSM 7.2.1 and later
                 strgmgrver="$(/usr/syno/bin/synopkg version StorageManager)"
-            elif [[ $buildnumber -ge 64561 ]]; then
-                # DSM 7.2
+            elif [[ $buildnumber -ge 42962 ]]; then
+                # DSM 7.1.1 to 7.2
                 strgmgrver="${buildnumber}${smallfixnumber}"
             fi
 

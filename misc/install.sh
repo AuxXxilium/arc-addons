@@ -1,4 +1,4 @@
-#!/usr/bin/env ash
+#!/usr/bin/env sh
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
@@ -12,7 +12,7 @@ install_early() {
   SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
-  xxd -c $(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c) -p "${SO_FILE}.tmp" 2>/dev/null | sed "s/2d6520302e39/2d6520312e32/" | xxd -r -p >"${SO_FILE}" 2>/dev/null
+  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null | sed "s/2d6520302e39/2d6520312e32/" | xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 }
 
@@ -108,7 +108,7 @@ install_patches() {
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
     TTYN="$(echo "${I}" | cut -d',' -f1)"
     BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
-    echo "ttyS0 ttyS1 ttyS2" | grep -qw "${TTYN}" && continue
+    echo "ttyS0 ttyS1 ttyS2" | grep -wq "${TTYN}" && continue
     if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
       echo "Starting getty on ${TTYN}"
       if [ -n "${BAUD}" ]; then
@@ -123,18 +123,22 @@ install_patches() {
     for I in $(grep -Eo 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
       MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/')"
       IPRS="$(echo "${I}" | cut -d= -f2)"
-      for ETH in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
-        MACX=$(cat /sys/class/net/${ETH}/address 2>/dev/null | sed 's/://g; s/.*/\L&/')
+      for F in /sys/class/net/eth*; do
+        [ ! -e "${F}" ] && continue
+        ETH="$(basename "${F}")"
+        MACX=$(cat "/sys/class/net/${ETH}/address" 2>/dev/null | sed 's/://g; s/.*/\L&/')
         if [ "${MACR}" = "${MACX}" ]; then
           echo "Setting IP for ${ETH} to ${IPRS}"
           mkdir -p /etc/sysconfig/network-scripts
-          echo "DEVICE=${ETH}" >/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "IPADDR=$(echo "${IPRS}" | cut -d/ -f1)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "NETMASK=$(echo "${IPRS}" | cut -d/ -f2)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "GATEWAY=$(echo "${IPRS}" | cut -d/ -f3)" >>/etc/sysconfig/network-scripts/ifcfg-${ETH}
-          echo "${ETH}" >>/etc/ifcfgs
+          {
+            echo "DEVICE=${ETH}"
+            echo "BOOTPROTO=static"
+            echo "ONBOOT=yes"
+            echo "IPADDR=$(echo "${IPRS}" | cut -d/ -f1)"
+            echo "NETMASK=$(echo "${IPRS}" | cut -d/ -f2)"
+            echo "GATEWAY=$(echo "${IPRS}" | cut -d/ -f3)"
+          } >"/etc/sysconfig/network-scripts/ifcfg-${ETH}"
+          echo "${ETH}" >>"/etc/ifcfgs"
         fi
       done
     done
@@ -217,17 +221,21 @@ install_late() {
   done
 
   [ ! -f /tmpRoot/usr/lib/udev/script/sdcard.sh.bak ] && cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
-  echo -en '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
+  printf '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
 
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
   mkdir -p /tmpRoot/etc/sysconfig/network-scripts
   mkdir -p /tmpRoot/etc.defaults/sysconfig/network-scripts
-  for I in $(ls /etc/sysconfig/network-scripts/ifcfg-eth*); do
-    [ ! -f "/tmpRoot/${I}" ] && cp -vpf "${I}" "/tmpRoot/${I}"
-    [ ! -f "/tmpRoot/${I/etc/etc.defaults}" ] && cp -vpf "${I}" "/tmpRoot/${I/etc/etc.defaults}"
+  IFPATH1="/tmpRoot/etc/sysconfig/network-scripts"
+  IFPATH2="/tmpRoot/etc.defaults/sysconfig/network-scripts"
+  for F in /etc/sysconfig/network-scripts/ifcfg-eth*; do
+    [ ! -e "${F}" ] && continue
+    I="$(basename "${F}")"
+    [ ! -f "${IFPATH1}/${I}" ] && mkdir -p "${IFPATH1}" && cp -vpf "${F}" "${IFPATH1}/${I}"
+    [ ! -f "${IFPATH2}/${I}" ] && mkdir -p "${IFPATH2}" && cp -vpf "${F}" "${IFPATH2}/${I}"
   done
   if grep -q 'network.' /proc/cmdline && [ -f "/etc/ifcfgs" ]; then
-    for ETH in $(cat /etc/ifcfgs); do
+    for ETH in $(cat "/etc/ifcfgs"); do
       echo "Copy ifcfg-${ETH}"
       if [ -f "/etc/sysconfig/network-scripts/ifcfg-${ETH}" ]; then
         rm -vf /tmpRoot/etc/sysconfig/network-scripts/ifcfg-*${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-*${ETH}

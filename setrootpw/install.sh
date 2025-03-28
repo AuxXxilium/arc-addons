@@ -1,12 +1,10 @@
-#!/usr/bin/env ash
+#!/usr/bin/env sh
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-
-export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
 
 install_addon() {
   echo "Installing addon setrootpw - ${1}"
@@ -15,7 +13,6 @@ install_addon() {
 
   mkdir -p /tmpRoot/usr/lib/openssh
   cp -vpf /usr/lib/openssh/sftp-server /tmpRoot/usr/lib/openssh/sftp-server
-  [ ! -f "/tmpRoot/usr/lib/libcrypto.so.3" ] && cp -vpf /usr/lib/libcrypto.so.3 /tmpRoot/usr/lib/libcrypto.so.3
 
   FILE="/tmpRoot/etc/ssh/sshd_config"
   [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
@@ -24,6 +21,7 @@ install_addon() {
   sed -i 's|^.*PermitRootLogin.*$|PermitRootLogin yes|' ${FILE}
   sed -i 's|^Subsystem.*$|Subsystem	sftp	/usr/lib/openssh/sftp-server|' ${FILE}
 
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
     echo "copy esynoscheduler.db"
@@ -54,6 +52,7 @@ uninstall_addon() {
   FILE="/tmpRoot/etc/ssh/sshd_config"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
 
+  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete setrootpw task from esynoscheduler.db"

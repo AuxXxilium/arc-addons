@@ -6,7 +6,9 @@
 # See /LICENSE for more information.
 #
 
-for N in $(ls /sys/class/net/ 2>/dev/null | grep eth); do
-  echo "set ${N} wol g"
-  /usr/bin/ethtool -s "${N}" wol g
+for F in /sys/class/net/eth*; do
+  [ ! -e "${F}" ] && continue
+  ETH="$(basename "${F}")"
+  echo "set ${F} wol g"
+  /usr/bin/ethtool -s "${ETH}" wol g 2>/dev/null
 done

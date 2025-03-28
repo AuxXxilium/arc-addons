@@ -1,4 +1,4 @@
-#!/usr/bin/env ash
+#!/usr/bin/env sh
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
@@ -14,13 +14,13 @@ install_addon() {
   MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
   FILE="/tmpRoot/usr/syno/etc/adapter_cards.conf"
 
-  [ ! -f "${FILE}.bak" ] && cp -f "${FILE}" "${FILE}.bak"
+  [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
   cp -pf "${FILE}" "${FILE}.tmp"
-  echo -n "" >"${FILE}"
-  while read -r N; do
+  : > "${FILE}"
+  for N in $(grep '\[' "${FILE}.tmp" 2>/dev/null); do
     echo "${N}" >>"${FILE}"
     echo "${MODEL}=yes" >>"${FILE}"
-  done < <(grep '\[' "${FILE}.tmp" 2>/dev/null)
+  done
   rm -f "${FILE}.tmp"
 }
 

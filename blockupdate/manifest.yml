@@ -1,12 +1,12 @@
 version: 1
-name: reboottoloader
-description: "Add ability to reboot to Loader from Inside DSM"
+name: blockupdate
+description: "Block all automatic DSM update"
 system: false
 beta: false
 target: system
 all:
   install-script: "install.sh"
-  copy: "all"
+  copy: ""
 apollolake: true
 broadwell: true
 broadwellnk: true

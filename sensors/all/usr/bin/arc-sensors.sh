@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -30,18 +30,18 @@ grep -Eo 'Driver\s*:\s*\w+' "/tmp/sensors.log" | awk -F': ' '{print $2}'
 
 sensors
 
-echo "$@" | grep -wq "\-f" && rm -f /etc/fancontrol
-if [ ! -f /etc/fancontrol ]; then
+generate_fancontrol_config() {
   # Or use pwmconfig to generate /etc/fancontrol interactively.
   local DEVPATH DEVNAME FCTEMPS FCFANS MINTEMP MAXTEMP MINSTART MINSTOP
-  local CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
+  CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
+  # shellcheck disable=SC2044
   for P in $(find "/sys/devices/platform/" -name "temp1_input"); do
     D="$(echo "${P}" | sed -n 's|.*/\(devices/platform/[^/]*\)/.*|\1|p')"
     I="$(echo "${P}" | sed -n 's|.*hwmon\([0-9]\).*|\1|p')"
     DEVPATH="${DEVPATH} hwmon${I}=${D}"
     DEVNAME="${DEVNAME} hwmon${I}=$(cat /sys/${D}/*/*/name)"
     for F in $(find "/sys/${D}" -name "fan[0-9]_input"); do
-      local IDX="$(echo "${F}" | sed -n 's|.*fan\([0-9]\)_input|\1|p')"
+      IDX="$(echo "${F}" | sed -n 's|.*fan\([0-9]\)_input|\1|p')"
       FCTEMPS="${FCTEMPS} hwmon${I}/pwm${IDX}=${CORETEMP}"
       FCFANS="${FCFANS} hwmon${I}/pwm${IDX}=hwmon${I}/fan${IDX}_input"
       MINTEMP="${MINTEMP} hwmon${I}/pwm${IDX}=30"
@@ -65,6 +65,11 @@ if [ ! -f /etc/fancontrol ]; then
     echo "MINSTART=$(echo ${MINSTART})"
     echo "MINSTOP=$(echo ${MINSTOP})"
   } >"${DEST}"
+}
+
+echo "$@" | grep -wq "\-f" && rm -f /etc/fancontrol
+if [ ! -f /etc/fancontrol ]; then
+  generate_fancontrol_config
 fi
 
 killall fancontrol

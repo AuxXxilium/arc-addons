@@ -1,4 +1,4 @@
-#!/usr/bin/env ash
+#!/usr/bin/env sh
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
@@ -6,21 +6,25 @@
 # See /LICENSE for more information.
 #
 
+set -e
+
 install_vmtools() {
   echo "Installing addon vmtools - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
+
   mkdir -p /tmpRoot/usr/vmtools
   tar -zxf /addons/vmtools-7.1.tgz -C /tmpRoot/usr/vmtools
+
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/vmtools.service"
 
   if grep -Eq 'mev=vmware' /proc/cmdline; then
-    setup_vmware
+    setup_vmware_service "${DEST}"
   elif grep -Eq 'mev=kvm|mev=qemu' /proc/cmdline; then
-    setup_qemu
+    setup_kvm_service "${DEST}"
   else
-    setup_unknown
+    setup_unknown_service "${DEST}"
     exit 1
   fi
 
@@ -28,25 +32,27 @@ install_vmtools() {
   ln -vsf /usr/lib/systemd/system/vmtools.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/vmtools.service
 }
 
-setup_vmware() {
-  VMTOOLS_PATH="/usr/vmtools"
-  COMMON_PATH=${VMTOOLS_PATH}/lib/open-vm-tools/plugins
-  PLUGINS_PATH=${COMMON_PATH}/vmsvc
-  VMWARE_CONF="/usr/vmtools/etc/vmware-tools/tools.conf"
+setup_vmware_service() {
+  local DEST=$1
+  local VMTOOLS_PATH="/usr/vmtools"
+  local COMMON_PATH="${VMTOOLS_PATH}/lib/open-vm-tools/plugins"
+  local PLUGINS_PATH="${COMMON_PATH}/vmsvc"
+  local VMWARE_CONF="${VMTOOLS_PATH}/etc/vmware-tools/tools.conf"
+
   mkdir -p /tmpRoot/usr/vmtools/etc/vmware-tools
   cat <<EOF >"/tmpRoot${VMWARE_CONF}"
 [vmtools]
     disable-tools-version = false
 [setenvironment]
-    vmsvc.LOCALE = us
+    vmsvc.LOCALE = it
 [logging]
     log = true
     vmsvc.level = debug
     vmsvc.handler = file
-    vmsvc.data = /var/log/vmsvc.rr.log
+    vmsvc.data = /var/log/vmsvc.arc.log
     vmtoolsd.level = debug
     vmtoolsd.handler = file
-    vmtoolsd.data = /var/log/vmtoolsd.rr.log
+    vmtoolsd.data = /var/log/vmtoolsd.arc.log
 [powerops]
     poweron-script=${VMTOOLS_PATH}/etc/vmware-tools/poweron-vm-default
     poweroff-script=${VMTOOLS_PATH}/etc/vmware-tools/poweroff-vm-default
@@ -72,7 +78,9 @@ WantedBy=multi-user.target
 EOF
 }
 
-setup_qemu() {
+setup_kvm_service() {
+  local DEST=$1
+
   cat <<EOF >"${DEST}"
 [Unit]
 Description=vmtools daemon
@@ -92,7 +100,9 @@ WantedBy=multi-user.target
 EOF
 }
 
-setup_unknown() {
+setup_unknown_service() {
+  local DEST=$1
+
   cat <<EOF >"${DEST}"
 [Unit]
 Description=vmtools daemon
@@ -117,8 +127,9 @@ uninstall_vmtools() {
   rm -rf /tmpRoot/usr/vmtools
 }
 
-if [ "${1}" = "late" ]; then
-  install_vmtools "${1}"
-elif [ "${1}" = "uninstall" ]; then
-  uninstall_vmtools "${1}"
-fi
+case "${1}" in
+  late) install_vmtools "${1}" ;;
+  uninstall) uninstall_vmtools "${1}" ;;
+  *) exit 0 ;;
+esac
+exit 0
