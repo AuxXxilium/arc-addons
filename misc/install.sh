@@ -260,6 +260,11 @@ install_late() {
   if [ -d /tmpRoot/var/packages/qemu-ga ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege >/dev/null 2>&1 || true
   fi
+
+  if [ -d /tmpRoot/var/packages/arc-control ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/arc-control/conf/privilege >/dev/null 2>&1 || true
+    /tmpRoot/var/packages/arc-control/app/install.sh "tmpRoot" >/dev/null 2>&1 || true
+  fi
 }
 
 case "${1}" in

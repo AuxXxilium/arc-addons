@@ -67,7 +67,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/nvmesystem.sh"
+    echo "ExecStart=/usr/bin/nvmesystem.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
