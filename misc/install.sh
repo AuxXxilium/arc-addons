@@ -262,9 +262,7 @@ install_late() {
   fi
 
   if [ -d /tmpRoot/var/packages/arc-control ]; then
-    if [ -f /tmpRoot/var/packages/arc-control/app/install.sh ]; then
-      /tmpRoot/var/packages/arc-control/app/install.sh "tmpRoot" >/dev/null 2>&1 || true
-    fi
+    /tmpRoot/var/packages/arc-control/target/app/install.sh "tmpRoot" >/dev/null 2>&1 || true
   fi
 }
 
