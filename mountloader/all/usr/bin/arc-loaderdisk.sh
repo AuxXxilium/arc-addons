@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-[ -f "/sbin/arcsu" ] && ARC_SUDO="/sbin/arcsu" || ARC_SUDO=""
+[ -f "/bin/arcsu" ] && ARC_SUDO="/bin/arcsu" || ARC_SUDO=""
 
 mountLoaderDisk() {
   while true; do
