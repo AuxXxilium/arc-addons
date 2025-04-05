@@ -14,17 +14,15 @@ install_addon() {
   mkdir -p /tmpRoot/usr/mountloader
   tar -zxf /addons/mountloader-7.1.tgz -C /tmpRoot/usr/mountloader
 
+  rm -f /tmpRoot/usr/sbin/arcsu
+
   cp -vpf /usr/bin/yq /tmpRoot/usr/bin/yq
   cp -vpf /usr/bin/unzip /tmpRoot/usr/bin/unzip
-
-  ln -vsf /usr/bin/sudo /tmpRoot/usr/sbin/arcsu
-  chown root:root /tmpRoot/usr/sbin/arcsu
-  chmod u+s /tmpRoot/usr/sbin/arcsu
-  if [ -f "/var/packages/arc-control/target/app/install.sh" ]; then
-    /tmpRoot/var/packages/arc-control/target/app/install.sh
-  fi
-
+  cp -vpf /usr/bin/arcsu /tmpRoot/usr/bin/arcsu
+  chown root:root /tmpRoot/usr/bin/arcsu
+  chmod 4755 /tmpRoot/usr/bin/arcsu
   cp -pf /usr/bin/arc-loaderdisk.sh /tmpRoot/usr/bin/arc-loaderdisk.sh
+  
   rm -f /tmpRoot/usr/arc/.mountloader
 }
 
@@ -32,6 +30,7 @@ uninstall_addon() {
   echo "Uninstalling addon mountloader - ${1}"
 
   rm -f "/tmpRoot/usr/bin/arc-loaderdisk.sh"
+  rm -f "/tmpRoot/usr/bin/arcsu"
 }
 
 case "${1}" in
