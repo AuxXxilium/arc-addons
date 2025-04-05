@@ -16,15 +16,11 @@ install_addon() {
 
   cp -vpf /usr/bin/yq /tmpRoot/usr/bin/yq
   cp -vpf /usr/bin/unzip /tmpRoot/usr/bin/unzip
-
-  ln -vsf /usr/bin/sudo /tmpRoot/usr/sbin/arcsu
-  chown root:root /tmpRoot/usr/sbin/arcsu
-  chmod u+s /tmpRoot/usr/sbin/arcsu
-  if [ -f "/var/packages/arc-control/target/app/install.sh" ]; then
-    /tmpRoot/var/packages/arc-control/target/app/install.sh
-  fi
-
+  cp -vpf /usr/bin/arcsu /tmpRoot/usr/bin/arcsu
   cp -pf /usr/bin/arc-loaderdisk.sh /tmpRoot/usr/bin/arc-loaderdisk.sh
+  chown -R root:root /tmpRoot/usr/bin/arcsu
+  chmod -R 4750 /tmpRoot/usr/bin/arcsu
+  
   rm -f /tmpRoot/usr/arc/.mountloader
 }
 
