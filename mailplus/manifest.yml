@@ -1,6 +1,6 @@
 version: 1
-name: sspatch
-description: "Dynamic License Patch for SS 9.2.0 (Not for DVA 3219)"
+name: mailplus
+description: "Dynamic License Patch for MailPlus-Server 3.3.0"
 system: false
 beta: true
 target: app
