@@ -66,9 +66,9 @@ if [ -d "${SSPATH}" ]; then
   
   mkdir -p "${PATCHPATH}/${SSVERSION}"
   tar -xzf "${PATCHPATH}/${SSVERSION}.tar.gz" -C "${PATCHPATH}/${SSVERSION}" > /dev/null 2>&1 || true
-  SS_HASHIN
+  local SS_HASHIN
   SS_HASHIN="$(sha256sum "${PATCHPATH}/${SSVERSION}/libssutils.so" | cut -d' ' -f1)"
-  SS_HASHOUT
+  local SS_HASHOUT
   SS_HASHOUT="$(sha256sum "${SSPATH}/lib/libssutils.so" | cut -d' ' -f1)"
   
   if [ "${SS_HASHIN}" != "${SS_HASHOUT}" ]; then
