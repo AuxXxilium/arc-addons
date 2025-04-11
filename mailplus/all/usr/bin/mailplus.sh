@@ -70,6 +70,7 @@ if [ -d "${MPPATH}" ]; then
   
     copy_file "${MPPATH}/lib" libmailserver-license.so.1.0 "${PATCHPATH}/${MPVERSION}" 0755
   
+    /usr/syno/bin/synopkg restart Perl > /dev/null 2>&1 || true
     /usr/syno/bin/synopkg restart MailPlus-Server > /dev/null 2>&1 || true
   fi
 else

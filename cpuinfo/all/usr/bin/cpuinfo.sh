@@ -7,11 +7,11 @@
 #
 
 TEMP="on"
-VENDOR=""
-FAMILY=""
-SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)"
-CORES="$(grep -c 'cpu cores' /proc/cpuinfo 2>/dev/null)"
-SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)"
+VENDOR=""                                                                               # str
+FAMILY=""                                                                               # str
+SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)"       # str
+CORES="$(grep -c 'cpu cores' /proc/cpuinfo 2>/dev/null)"                                # str
+SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)" # int
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
@@ -29,7 +29,9 @@ restoreCpuinfo() {
   elif [ -f "${FILE_JS}.bak" ]; then
     mv -f "${FILE_JS}.bak" "${FILE_JS}"
   fi
-  pkill -f "/usr/sbin/synoscgiproxy" || true
+  if ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
+    pkill -f "/usr/sbin/synoscgiproxy"
+  fi
   [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
   [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
@@ -39,60 +41,58 @@ if options="$(getopt -o t:v:f:s:c:p:rh --long temp:,vendor:,family:,series:,core
   eval set -- "$options"
   while true; do
     case "${1,,}" in
-      -t | --temp)
-        TEMP="${2}"
-        shift 2
-        ;;
-      -v | --vendor)
-        VENDOR="${2}"
-        shift 2
-        ;;
-      -f | --family)
-        FAMILY="${2}"
-        shift 2
-        ;;
-      -s | --series)
-        SERIES="${2}"
-        shift 2
-        ;;
-      -c | --cores)
-        CORES="${2}"
-        shift 2
-        ;;
-      -p | --speed)
-        SPEED="${2}"
-        shift 2
-        ;;
-      -r | --restore)
-        restoreCpuinfo
-        exit 0
-        ;;
-      -h | --help)
-        cat <<EOF
-Usage: cpuinfo.sh [OPTIONS]
-Options:
-  -t, --temp   <on/off>   Set the CPU&GPU temperature display
-  -v, --vendor <VENDOR>   Set the CPU vendor
-  -f, --family <FAMILY>   Set the CPU family
-  -s, --series <SERIES>   Set the CPU series
-  -c, --cores <CORES>     Set the number of CPU cores
-  -p, --speed <SPEED>     Set the CPU clock speed
-  -r, --restore           Restore the original cpuinfo
-  -h, --help              Show this help message and exit
-Example:
-  cpuinfo.sh -t "on" -v "AMD" -f "Ryzen" -s "Ryzen 7 5800X3D" -c 64 -p 5200
-  cpuinfo.sh -t "on" --vendor "Intel" --family "Core i9" --series "i7-13900ks" --cores 64 --speed 5200
-  cpuinfo.sh --restore
-  cpuinfo.sh --help
-EOF
-        exit 0
-        ;;
-      --)
-        break
-        ;;
-      *)
-        echo "Invalid option: $OPTARG" >&2
-        ;;
+    -t | --temp)
+      TEMP="${2}"
+      shift 2
+      ;;
+    -v | --vendor)
+      VENDOR="${2}"
+      shift 2
+      ;;
+    -f | --family)
+      FAMILY="${2}"
+      shift 2
+      ;;
+    -s | --series)
+      SERIES="${2}"
+      shift 2
+      ;;
+    -c | --cores)
+      CORES="${2}"
+      shift 2
+      ;;
+    -p | --speed)
+      SPEED="${2}"
+      shift 2
+      ;;
+    -r | --restore)
+      restoreCpuinfo
+      exit 0
+      ;;
+    -h | --help)
+      echo "Usage: cpuinfo.sh [OPTIONS]"
+      echo "Options:"
+      echo "  -t, --temp   <on/off>   Set the CPU&GPU temperature display"
+      echo "  -v, --vendor <VENDOR>   Set the CPU vendor"
+      echo "  -f, --family <FAMILY>   Set the CPU family"
+      echo "  -s, --series <SERIES>   Set the CPU series"
+      echo "  -c, --cores <CORES>     Set the number of CPU cores"
+      echo "  -p, --speed <SPEED>     Set the CPU clock speed"
+      echo "  -r, --restore           Restore the original cpuinfo"
+      echo "  -h, --help              Show this help message and exit"
+      echo "Example:"
+      echo "  cpuinfo.sh -t \"on\" -v \"AMD\" -f \"Ryzen\" -s \"Ryzen 7 5800X3D\" -c 64 -p 5200"
+      echo "  cpuinfo.sh -t \"on\" --vendor \"Intel\" --family \"Core i9\" --series \"i7-13900ks\" --cores 64 --speed 5200"
+      echo "  cpuinfo.sh --restore"
+      echo "  cpuinfo.sh --help"
+      exit 0
+      ;;
+    --)
+      break
+      ;;
+    *)
+      echo "Invalid option: $OPTARG" >&2
+      ;;
     esac
   done
 else
@@ -133,11 +133,13 @@ CARDN=$(ls -d /sys/class/drm/card* 2>/dev/null | head -1)
 if [ -d "${CARDN}" ]; then
   PCIDN="$(awk -F= '/DEVNAME/ {print $2}' "${CARDN}/device/uevent" 2>/dev/null)"
   LNAME="$(lspci -Q -s ${PCIDN:-"99:99.9"} 2>/dev/null | sed "s/.*: //")"
+  # LABLE="$(cat "/sys/class/drm/card0/device/label" 2>/dev/null)"
   CLOCK="$(cat "${CARDN}/gt_max_freq_mhz" 2>/dev/null)"
   [ -n "${CLOCK}" ] && CLOCK="${CLOCK} MHz"
   if [ -n "${LNAME}" ] && [ -n "${CLOCK}" ]; then
     echo "GPU Info set to: \"${LNAME}\" \"${CLOCK}\""
     sed -i "s/_D(\"support_nvidia_gpu\")},/_D(\"support_nvidia_gpu\")||true},/g" "${FILE_JS}"
+    # t.gpu={};t.gpu.clock=\"455 MHz\";t.gpu.memory=\"8192 MiB\";t.gpu.name=\"Tesla P4\";t.gpu.temperature_c=47;t.gpu.tempwarn=false;
     sed -i "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!t.gpu){t.gpu={};t.gpu.clock=\"${CLOCK}\";t.gpu.name=\"${LNAME}\";}let/g" "${FILE_JS}"
   fi
 fi
@@ -145,16 +147,18 @@ fi
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
 if "/usr/sbin/synoscgiproxy" -t >/dev/null 2>&1; then
-  if ! pgrep -f "/usr/sbin/synoscgiproxy" >/dev/null; then
+  if ! ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
     "/usr/sbin/synoscgiproxy" &
-    [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx.conf.bak
+    [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
     sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' /etc/nginx/nginx.conf
     [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
     sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' /usr/syno/share/nginx/nginx.mustache
     systemctl reload nginx
   fi
 else
-  pkill -f "/usr/sbin/synoscgiproxy" || true
+  if ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
+    pkill -f "/usr/sbin/synoscgiproxy"
+  fi
   [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
   [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
