@@ -8,46 +8,42 @@
 
 install_addon() {
   echo "Installing addon sspatch - ${1}"
-  mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  cp -pf "/usr/bin/sspatch.sh" "/tmpRoot/usr/bin/sspatch.sh"
-  mkdir -p "/tmpRoot/usr/arc/addons/sspatch"
+  # Create necessary directories and copy files
+  mkdir -p "/tmpRoot/usr/arc/addons/sspatch" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf "/usr/bin/sspatch.sh" "/tmpRoot/usr/bin/"
   cp -prf "/addons/sspatch" "/tmpRoot/usr/arc/addons/"
 
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/sspatch.service"
-  {
-    echo "[Unit]"
-    echo "Description=addon sspatch"
-    echo "After=multi-user.target"
-    echo
-    echo "[Service]"
-    echo "Type=oneshot"
-    echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/sspatch.sh"
-    echo
-    echo "[Install]"
-    echo "WantedBy=multi-user.target"
-  } >"${DEST}"
-  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  # Create and configure systemd service
+  cat >"/tmpRoot/usr/lib/systemd/system/sspatch.service" <<EOF
+[Unit]
+Description=addon sspatch
+After=synoscgi.service nginx.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/sspatch.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Create symlink for systemd service
   ln -vsf /usr/lib/systemd/system/sspatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sspatch.service
 }
 
 uninstall_addon() {
   echo "Uninstalling addon sspatch - ${1}"
-  # To-Do
+  # To-Do: Add uninstallation logic here
 }
 
+# Handle script arguments
 case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-  *)
-    exit 0
-    ;;
+  late) install_addon "${1}" ;;
+  uninstall) uninstall_addon "${1}" ;;
+  *) exit 0 ;;
 esac
+
 exit 0

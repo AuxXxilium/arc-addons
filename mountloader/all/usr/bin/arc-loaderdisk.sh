@@ -1,12 +1,10 @@
-#!/usr/bin/env ash
+#!/usr/bin/env bash
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-
-[ -f "/bin/arcsu" ] && ARC_SUDO="/bin/arcsu" || ARC_SUDO=""
 
 mountLoaderDisk() {
   while true; do
@@ -91,12 +89,7 @@ unmountLoaderDisk() {
   return 0
 }
 
-[ -z "${1}" ] && {
-  echo " Usage: $0 [mountLoaderDisk|unmountLoaderDisk]"
-  exit 1
-}
-
-[ -x "/sbin/arcsu" ] && ARC_SUDO="/sbin/arcsu" || ARC_SUDO=""
+[ -x "/usr/bin/arcsu" ] && ARC_SUDO="/usr/bin/arcsu" || ARC_SUDO=""
 ${ARC_SUDO} ls /root >/dev/null 2>&1 || {
   echo "No root permission!"
   exit 1
