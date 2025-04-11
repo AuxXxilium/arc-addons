@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-set -e
-
 install_vmtools() {
   echo "Installing addon vmtools - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"

@@ -20,7 +20,7 @@ if [ "${1}" = "late" ]; then
   {
     echo "[Unit]"
     echo "Description=cpuinfo daemon"
-    echo "After=multi-user.target synoscgi.service nginx.service"
+    echo "After=synoscgi.service nginx.service"
     echo
     echo "[Service]"
     echo "Type=oneshot"
@@ -51,3 +51,4 @@ elif [ "${1}" = "uninstall" ]; then
   # synoscgiproxy
   rm -f /tmpRoot/usr/sbin/synoscgiproxy
 fi
+exit 0
