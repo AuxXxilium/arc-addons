@@ -1,8 +1,8 @@
 version: 1
-name: photosfacepatch
-description: "Face Detection Patch for Syno Photos (Best with iGPU)"
+name: surveillance
+description: "Dynamic License Patch for Surveillance 9.2.0 (Not for DVA 3219)"
 system: false
-beta: false
+beta: true
 target: app
 all:
   install-script: "install.sh"
