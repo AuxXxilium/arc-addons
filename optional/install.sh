@@ -38,20 +38,10 @@ install_addon() {
     xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
-  # syslog-ng
-  if [ -f /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf ]; then
-    cp -pf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf.bak
-    sed -i 's/destination(d_scemd)/flags(final)/g' /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf
-  else
-    echo "scemd.conf does not exist."
-  fi
-
-  if [ -f /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf ]; then
-    cp -pf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf.bak
-    sed -i 's/destination(d_synosystemd)/flags(final)/g; s/destination(d_systemd)/flags(final)/g' /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf
-  else
-    echo "synosystemd.conf does not exist."
-  fi
+  # syno-dump-core
+  SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
+  [ ! -f "${SH_FILE}.bak" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak"
+  printf '#!/bin/sh\nexit 0\n' >"${SH_FILE}"
 }
 
 uninstall_addon() {
@@ -66,14 +56,8 @@ uninstall_addon() {
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
 
-  # Restore syslog-ng configurations
-  if [ -f /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf.bak ]; then
-    mv -pf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf.bak /tmpRoot/etc.defaults/syslog-ng/patterndb.d/scemd.conf
-  fi
-
-  if [ -f /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf.bak ]; then
-    mv -pf /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf.bak /tmpRoot/etc.defaults/syslog-ng/patterndb.d/synosystemd.conf
-  fi
+  SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
+  [ -f "${SH_FILE}.bak" ] && mv -f "${SH_FILE}.bak" "${SH_FILE}"
 }
 
 case "${1}" in
