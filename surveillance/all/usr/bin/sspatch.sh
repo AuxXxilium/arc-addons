@@ -31,14 +31,13 @@ copy_file() {
 SSPATH="/var/packages/SurveillanceStation/target"
 SSPATCHPATH="/usr/arc/addons/sspatch"
 local SVERSION
-SVERSION="$(/usr/syno/bin/synopkg version SurveillanceStation 2>/dev/null)"
+SVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1 | sed -E 's/^0*([0-9])0/\1/')"
 
 if [ -z "${SVERSION}" ]; then
   echo "sspatch: Please install Surveillance Station first"
-  exit 1
 else
   SUFFIX=""
-  case "$(/usr/bin/syno/synogetkeyvalue /var/packages/SurveillanceStation/INFO model)" in
+  case "$(grep -oP '(?<=model=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1)" in
   "synology_denverton_dva3219") SUFFIX="_dva_3219" ;;
   "synology_denverton_dva3221") SUFFIX="_dva_3221" ;;
   "synology_geminilake_dva1622") SUFFIX="_openvino" ;;
@@ -50,7 +49,6 @@ else
 
   if [ ! -f "${SSPATCHPATH}/${SSVERSION}.tar.gz" ]; then
     echo "sspatch: Patch for ${SSVERSION} not found"
-    exit 1
   else
     echo "sspatch: Patch for ${SSVERSION} found"
     echo "sspatch: Adding hosts entries"

@@ -31,14 +31,12 @@ copy_file() {
 MPPATH="/var/packages/MailPlus-Server/target"
 MPPATCHPATH="/usr/arc/addons/mailplus"
 local MPVERSION
-MPVERSION="$(/usr/syno/bin/synopkg version MailPlus-Server 2>/dev/null)"
+MPVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/MailPlus-Server/INFO | head -n1 | sed -E 's/^0*([0-9])0/\1/')"
 if [ -z "${MPVERSION}" ]; then
   echo "mailplus: Please install MailPlus-Server first"
-  exit 1
 else
   if [ ! -f "${MPPATCHPATH}/${MPVERSION}.tar.gz" ]; then
     echo "mailplus: Patch for ${MPVERSION} not found"
-    exit 1
   else
     # Define the hosts entries to be added
     echo "mailplus: Adding hosts entries"
