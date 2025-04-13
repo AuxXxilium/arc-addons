@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-_process_file() {
+copy_file() {
   SS_TARGET="${1}"
   SS_FILE="${2}"
   SS_INPUT="${3}"
@@ -30,6 +30,7 @@ _process_file() {
 
 SSPATH="/var/packages/SurveillanceStation/target"
 SSPATCHPATH="/usr/arc/addons/sspatch"
+local VERSION
 VERSION="$(/usr/syno/bin/synopkg version SurveillanceStation 2>/dev/null)"
 
 if [ -z "${VERSION}" ]; then
@@ -37,13 +38,14 @@ if [ -z "${VERSION}" ]; then
   exit 1
 else
   SUFFIX=""
-  case "$(synogetkeyvalue /var/packages/SurveillanceStation/INFO model)" in
+  case "$(/usr/bin/syno/synogetkeyvalue /var/packages/SurveillanceStation/INFO model)" in
   "synology_denverton_dva3219") SUFFIX="_dva_3219" ;;
   "synology_denverton_dva3221") SUFFIX="_dva_3221" ;;
   "synology_geminilake_dva1622") SUFFIX="_openvino" ;;
   *) ;;
   esac
   
+  local SSVERSION
   SSVERSION="${VERSION}${SUFFIX}"
 
   if [ ! -f "${SSPATCHPATH}/${SSVERSION}.tar.gz" ]; then
@@ -75,21 +77,23 @@ else
 
     mkdir -p "${SSPATCHPATH}/${SSVERSION}"
     tar -xzf "${SSPATCHPATH}/${SSVERSION}.tar.gz" -C "${SSPATCHPATH}/${SSVERSION}" > /dev/null 2>&1 || true
+    local SS_HASHIN
     SS_HASHIN=$(sha256sum "${SSPATCHPATH}/${SSVERSION}/libssutils.so" | awk '{print $1}')
+    local SS_HASHOUT
     SS_HASHOUT=$(sha256sum "${SSPATH}/lib/libssutils.so" | awk '{print $1}')
     
     if [ "${SS_HASHIN}" != "${SS_HASHOUT}" ]; then
       echo "sspatch: SurveillanceStation found - ${SSVERSION}"
       /usr/syno/bin/synopkg stop SurveillanceStation > /dev/null 2>&1 || true
     
-      _process_file "${SSPATH}/lib" libssutils.so "${SSPATCHPATH}/${SSVERSION}" 0644
-      _process_file "${SSPATH}/sbin" sscmshostd "${SSPATCHPATH}/${SSVERSION}" 0755
-      _process_file "${SSPATH}/sbin" sscored "${SSPATCHPATH}/${SSVERSION}" 0755
-      _process_file "${SSPATH}/sbin" ssdaemonmonitord "${SSPATCHPATH}/${SSVERSION}" 0755
-      _process_file "${SSPATH}/sbin" ssexechelperd "${SSPATCHPATH}/${SSVERSION}" 0755
-      _process_file "${SSPATH}/sbin" ssroutined "${SSPATCHPATH}/${SSVERSION}" 0755
-      _process_file "${SSPATH}/sbin" ssmessaged "${SSPATCHPATH}/${SSVERSION}" 0755
-      # _process_file "${SSPATH}/sbin" ssrtmpclientd "${SSPATCHPATH}/${SSVERSION}" 0755
+      copy_file "${SSPATH}/lib" libssutils.so "${SSPATCHPATH}/${SSVERSION}" 0644
+      copy_file "${SSPATH}/sbin" sscmshostd "${SSPATCHPATH}/${SSVERSION}" 0755
+      copy_file "${SSPATH}/sbin" sscored "${SSPATCHPATH}/${SSVERSION}" 0755
+      copy_file "${SSPATH}/sbin" ssdaemonmonitord "${SSPATCHPATH}/${SSVERSION}" 0755
+      copy_file "${SSPATH}/sbin" ssexechelperd "${SSPATCHPATH}/${SSVERSION}" 0755
+      copy_file "${SSPATH}/sbin" ssroutined "${SSPATCHPATH}/${SSVERSION}" 0755
+      copy_file "${SSPATH}/sbin" ssmessaged "${SSPATCHPATH}/${SSVERSION}" 0755
+      # copy_file "${SSPATH}/sbin" ssrtmpclientd "${SSPATCHPATH}/${SSVERSION}" 0755
     
       /usr/syno/bin/synopkg restart SurveillanceStation > /dev/null 2>&1 || true
     fi
