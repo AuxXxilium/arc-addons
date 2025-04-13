@@ -29,52 +29,57 @@ copy_file() {
 }
 
 MPPATH="/var/packages/MailPlus-Server/target"
-PATCHPATH="/usr/arc/addons/mailplus"
-if [ -d "${MPPATH}" ]; then
-  # Define the hosts entries to be added
-  echo "mailplus: Adding hosts entries"
-  ENTRIES=("0.0.0.0 license.synology.com")
-  for ENTRY in "${ENTRIES[@]}"; do
-    if [ -f "/etc/hosts" ]; then
-      # Check if the entry is already in the file
-      if grep -Fxq "${ENTRY}" /etc/hosts; then
-        echo "mailplus: Entry ${ENTRY} already exists"
-      else
-        echo "mailplus: Entry ${ENTRY} does not exist, adding now"
-        echo "${ENTRY}" >> /etc/hosts
-      fi
-    fi
-    if [ -f "/etc.defaults/hosts" ]; then
-      if grep -Fxq "${ENTRY}" /etc.defaults/hosts; then
-        echo "mailplus: Entry ${ENTRY} already exists"
-      else
-        echo "mailplus: Entry ${ENTRY} does not exist, adding now"
-        echo "${ENTRY}" >> /etc.defaults/hosts
-      fi
-    fi
-  done
-
-  local MPVERSION
-  MPVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/MailPlus-Server/INFO | head -n1 | sed -E 's/^0*([0-9])0/\1/')"
-  
-  mkdir -p "${PATCHPATH}/${MPVERSION}"
-  tar -xzf "${PATCHPATH}/${MPVERSION}.tar.gz" -C "${PATCHPATH}/${MPVERSION}" > /dev/null 2>&1 || true
-  local MP_HASHIN
-  MP_HASHIN="$(sha256sum "${PATCHPATH}/${MPVERSION}/libmailserver-license.so.1.0" | cut -d' ' -f1)"
-  local MP_HASHOUT
-  MP_HASHOUT="$(sha256sum "${MPPATH}/lib/libmailserver-license.so.1.0" | cut -d' ' -f1)"
-  
-  if [ "${MP_HASHIN}" != "${MP_HASHOUT}" ]; then
-    echo "mailplus: MailPlus-Server found - ${MPVERSION}"
-    /usr/syno/bin/synopkg stop MailPlus-Server > /dev/null 2>&1 || true
-  
-    copy_file "${MPPATH}/lib" libmailserver-license.so.1.0 "${PATCHPATH}/${MPVERSION}" 0755
-  
-    /usr/syno/bin/synopkg restart Perl > /dev/null 2>&1 || true
-    /usr/syno/bin/synopkg restart MailPlus-Server > /dev/null 2>&1 || true
-  fi
+MPPATCHPATH="/usr/arc/addons/mailplus"
+local MPVERSION
+MPVERSION="$(/usr/syno/bin/synopkg version MailPlus-Server 2>/dev/null)"
+if [ -z "${MPVERSION}" ]; then
+  echo "mailplus: Please install MailPlus-Server first"
+  exit 1
 else
-  echo "mailplus: MailPlus-Server not found"
+  if [ ! -f "${MPPATCHPATH}/${MPVERSION}.tar.gz" ]; then
+    echo "mailplus: Patch for ${MPVERSION} not found"
+    exit 1
+  else
+    # Define the hosts entries to be added
+    echo "mailplus: Adding hosts entries"
+    ENTRIES=("0.0.0.0 license.synology.com")
+    for ENTRY in "${ENTRIES[@]}"; do
+      if [ -f "/etc/hosts" ]; then
+        # Check if the entry is already in the file
+        if grep -Fxq "${ENTRY}" /etc/hosts; then
+          echo "mailplus: Entry ${ENTRY} already exists"
+        else
+          echo "mailplus: Entry ${ENTRY} does not exist, adding now"
+          echo "${ENTRY}" | tee -a /etc/hosts > /dev/null
+        fi
+      fi
+      if [ -f "/etc.defaults/hosts" ]; then
+        if grep -Fxq "${ENTRY}" /etc.defaults/hosts; then
+          echo "mailplus: Entry ${ENTRY} already exists"
+        else
+          echo "mailplus: Entry ${ENTRY} does not exist, adding now"
+          echo "${ENTRY}" | tee -a /etc.defaults/hosts > /dev/null
+        fi
+      fi
+    done
+    
+    mkdir -p "${MPPATCHPATH}/${MPVERSION}"
+    tar -xzf "${MPPATCHPATH}/${MPVERSION}.tar.gz" -C "${MPPATCHPATH}/${MPVERSION}" > /dev/null 2>&1 || true
+    local MP_HASHIN
+    MP_HASHIN="$(sha256sum "${MPPATCHPATH}/${MPVERSION}/libmailserver-license.so.1.0" | cut -d' ' -f1)"
+    local MP_HASHOUT
+    MP_HASHOUT="$(sha256sum "${MPPATH}/lib/libmailserver-license.so.1.0" | cut -d' ' -f1)"
+    
+    if [ "${MP_HASHIN}" != "${MP_HASHOUT}" ]; then
+      echo "mailplus: MailPlus-Server found - ${MPVERSION}"
+      /usr/syno/bin/synopkg stop MailPlus-Server > /dev/null 2>&1 || true
+    
+      copy_file "${MPPATH}/lib" libmailserver-license.so.1.0 "${MPPATCHPATH}/${MPVERSION}" 0755
+    
+      /usr/syno/bin/synopkg restart Perl > /dev/null 2>&1 || true
+      /usr/syno/bin/synopkg restart MailPlus-Server > /dev/null 2>&1 || true
+    fi
+  fi
 fi
 
 exit 0
