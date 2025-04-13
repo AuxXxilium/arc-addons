@@ -19,7 +19,7 @@ install_addon() {
   cat >"/tmpRoot/usr/lib/systemd/system/mailplus.service" <<EOF
 [Unit]
 Description=addon mailplus
-After=synoscgi.service nginx.service
+After=multi-user.target
 
 [Service]
 Type=oneshot
