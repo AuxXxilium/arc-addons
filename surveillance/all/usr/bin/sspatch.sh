@@ -7,15 +7,19 @@
 #
 
 copy_file() {
+  local SS_TARGET
+  local SS_FILE
+  local SS_INPUT
+  local SS_MODE
+  local SS_HASHIN
+  local SS_HASHOUT
   SS_TARGET="${1}"
   SS_FILE="${2}"
   SS_INPUT="${3}"
-  SS_MODE="${4}"
   if [ -f "${SS_INPUT}/${SS_FILE}" ] && [ -f "${SS_TARGET}/${SS_FILE}" ]; then
-    local SS_HASHIN
-    SS_HASHIN="$(sha256sum "${SS_INPUT}/${SS_FILE}" | cut -d' ' -f1)"
-    local SS_HASHOUT
-    SS_HASHOUT="$(sha256sum "${SS_TARGET}/${SS_FILE}" | cut -d' ' -f1)"
+    SS_MODE="$(stat -c "%a" "${SS_TARGET}/${SS_FILE}")"
+    SS_HASHIN="$(sha256sum "${SS_INPUT}/${SS_FILE}" | awk '{print $1}')"
+    SS_HASHOUT="$(sha256sum "${SS_TARGET}/${SS_FILE}" | awk '{print $1}')"
     if [ "${SS_HASHIN}" = "${SS_HASHOUT}" ]; then
       echo "sspatch: ${SS_FILE} already patched"
     else
@@ -26,9 +30,12 @@ copy_file() {
       chmod "${SS_MODE}" "${SS_TARGET}/${SS_FILE}"
     fi
   fi
+  return 0
 }
 
+local SSPATH
 SSPATH="/var/packages/SurveillanceStation/target"
+local SSPATCHPATH
 SSPATCHPATH="/usr/arc/addons/sspatch"
 local SVERSION
 SVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1 | sed -E 's/^0*([0-9])0/\1/')"
@@ -76,22 +83,25 @@ else
     mkdir -p "${SSPATCHPATH}/${SSVERSION}"
     tar -xzf "${SSPATCHPATH}/${SSVERSION}.tar.gz" -C "${SSPATCHPATH}/${SSVERSION}" > /dev/null 2>&1 || true
     local SS_HASHIN
-    SS_HASHIN=$(sha256sum "${SSPATCHPATH}/${SSVERSION}/libssutils.so" | awk '{print $1}')
+    SS_HASHIN="$(sha256sum "${SSPATCHPATH}/${SSVERSION}/libssutils.so" | awk '{print $1}')"
     local SS_HASHOUT
-    SS_HASHOUT=$(sha256sum "${SSPATH}/lib/libssutils.so" | awk '{print $1}')
+    SS_HASHOUT="$(sha256sum "${SSPATH}/lib/libssutils.so" | awk '{print $1}')"
     
     if [ "${SS_HASHIN}" != "${SS_HASHOUT}" ]; then
       echo "sspatch: SurveillanceStation found - ${SSVERSION}"
       /usr/syno/bin/synopkg stop SurveillanceStation > /dev/null 2>&1 || true
     
-      copy_file "${SSPATH}/lib" libssutils.so "${SSPATCHPATH}/${SSVERSION}" 0644
-      copy_file "${SSPATH}/sbin" sscmshostd "${SSPATCHPATH}/${SSVERSION}" 0755
-      copy_file "${SSPATH}/sbin" sscored "${SSPATCHPATH}/${SSVERSION}" 0755
-      copy_file "${SSPATH}/sbin" ssdaemonmonitord "${SSPATCHPATH}/${SSVERSION}" 0755
-      copy_file "${SSPATH}/sbin" ssexechelperd "${SSPATCHPATH}/${SSVERSION}" 0755
-      copy_file "${SSPATH}/sbin" ssroutined "${SSPATCHPATH}/${SSVERSION}" 0755
-      copy_file "${SSPATH}/sbin" ssmessaged "${SSPATCHPATH}/${SSVERSION}" 0755
-      # copy_file "${SSPATH}/sbin" ssrtmpclientd "${SSPATCHPATH}/${SSVERSION}" 0755
+      copy_file "${SSPATH}/lib" "lib/libssutils.so" "${SSPATCHPATH}/${SSVERSION}"
+      copy_file "${SSPATH}/bin" "bin/ssctl" "${SSPATCHPATH}/${SSVERSION}"
+      copy_file "${SSPATH}/sbin" "sbin/ssactruled" "${SSPATCHPATH}/${SSVERSION}"
+      copy_file "${SSPATH}/sbin" "sbin/sscmshostd" "${SSPATCHPATH}/${SSVERSION}"
+      copy_file "${SSPATH}/sbin" "sbin/sscored" "${SSPATCHPATH}/${SSVERSION}"
+      copy_file "${SSPATH}/sbin" "sbin/ssdaemonmonitord" "${SSPATCHPATH}/${SSVERSION}"
+      copy_file "${SSPATH}/sbin" "sbin/ssexechelperd" "${SSPATCHPATH}/${SSVERSION}"
+      copy_file "${SSPATH}/sbin" "sbin/ssroutined" "${SSPATCHPATH}/${SSVERSION}"
+      copy_file "${SSPATH}/sbin" "sbin/ssmessaged" "${SSPATCHPATH}/${SSVERSION}"
+      copy_file "${SSPATH}/sbin" "sbin/ssrtmpclientd" "${SSPATCHPATH}/${SSVERSION}"
+      copy_file "${SSPATH}/webapi/Camera/src/SYNO.SurveillanceStation.Camera.so" "webapi/Camera/src/SYNO.SurveillanceStation.Camera.so" "${SSPATCHPATH}/${SSVERSION}"
     
       /usr/syno/bin/synopkg restart SurveillanceStation > /dev/null 2>&1 || true
     fi
