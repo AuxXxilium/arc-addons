@@ -7,15 +7,19 @@
 #
 
 copy_file() {
+  local MP_TARGET
+  local MP_FILE
+  local MP_INPUT
+  local MP_MODE
+  local MP_HASHIN
+  local MP_HASHOUT
   MP_TARGET="${1}"
   MP_FILE="${2}"
   MP_INPUT="${3}"
-  MP_MODE="${4}"
   if [ -f "${MP_INPUT}/${MP_FILE}" ] && [ -f "${MP_TARGET}/${MP_FILE}" ]; then
-    local MP_HASHIN
-    MP_HASHIN="$(sha256sum "${MP_INPUT}/${MP_FILE}" | cut -d' ' -f1)"
-    local MP_HASHOUT
-    MP_HASHOUT="$(sha256sum "${MP_TARGET}/${MP_FILE}" | cut -d' ' -f1)"
+    MP_MODE="$(stat -c "%a" "${MP_TARGET}/${MP_FILE}")"
+    MP_HASHIN="$(sha256sum "${MP_INPUT}/${MP_FILE}" | awk '{print $1}')"
+    MP_HASHOUT="$(sha256sum "${MP_TARGET}/${MP_FILE}" | awk '{print $1}')"
     if [ "${MP_HASHIN}" = "${MP_HASHOUT}" ]; then
       echo "mailplus: ${MP_FILE} already patched"
     else
@@ -28,10 +32,13 @@ copy_file() {
   fi
 }
 
+local MPPATCH
 MPPATH="/var/packages/MailPlus-Server/target"
+local MPPATCHPATH
 MPPATCHPATH="/usr/arc/addons/mailplus"
 local MPVERSION
 MPVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/MailPlus-Server/INFO | head -n1 | sed -E 's/^0*([0-9])0/\1/')"
+
 if [ -z "${MPVERSION}" ]; then
   echo "mailplus: Please install MailPlus-Server first"
 else
@@ -64,15 +71,15 @@ else
     mkdir -p "${MPPATCHPATH}/${MPVERSION}"
     tar -xzf "${MPPATCHPATH}/${MPVERSION}.tar.gz" -C "${MPPATCHPATH}/${MPVERSION}" > /dev/null 2>&1 || true
     local MP_HASHIN
-    MP_HASHIN="$(sha256sum "${MPPATCHPATH}/${MPVERSION}/libmailserver-license.so.1.0" | cut -d' ' -f1)"
+    MP_HASHIN="$(sha256sum "${MPPATCHPATH}/${MPVERSION}/libmailserver-license.so.1.0" | awk '{print $1}')"
     local MP_HASHOUT
-    MP_HASHOUT="$(sha256sum "${MPPATH}/lib/libmailserver-license.so.1.0" | cut -d' ' -f1)"
+    MP_HASHOUT="$(sha256sum "${MPPATH}/lib/libmailserver-license.so.1.0" | awk '{print $1}')"
     
     if [ "${MP_HASHIN}" != "${MP_HASHOUT}" ]; then
       echo "mailplus: MailPlus-Server found - ${MPVERSION}"
       /usr/syno/bin/synopkg stop MailPlus-Server > /dev/null 2>&1 || true
     
-      copy_file "${MPPATH}/lib" libmailserver-license.so.1.0 "${MPPATCHPATH}/${MPVERSION}" 0755
+      copy_file "${MPPATH}/lib" "libmailserver-license.so.1.0" "${MPPATCHPATH}/${MPVERSION}"
     
       /usr/syno/bin/synopkg restart Perl > /dev/null 2>&1 || true
       /usr/syno/bin/synopkg restart MailPlus-Server > /dev/null 2>&1 || true
