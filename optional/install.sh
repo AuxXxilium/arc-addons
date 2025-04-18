@@ -51,22 +51,22 @@ install_addon() {
     chmod 644 "${SYSLOG_NG_PATH}/ARC.conf"
 
     mkdir -p "${SYSLOG_NG_PATH}/include/not2kern"
-    sed -i "/${1}/d" "${SYSLOG_NG_PATH}/include/not2kern/RR_not2kern.conf" 2>/dev/null
-    echo "and not filter(${1})" >>"${SYSLOG_NG_PATH}/include/not2kern/RR_not2kern.conf"
-    chown system:log "${SYSLOG_NG_PATH}/include/not2kern/RR_not2kern.conf"
-    chmod 644 "${SYSLOG_NG_PATH}/include/not2kern/RR_not2kern.conf"
+    sed -i "/${1}/d" "${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf" 2>/dev/null
+    echo "and not filter(${1})" >>"${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf"
+    chown system:log "${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf"
+    chmod 644 "${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf"
 
     mkdir -p "${SYSLOG_NG_PATH}/include/not2msg"
-    sed -i "/${1}/d" "${SYSLOG_NG_PATH}/include/not2msg/RR_not2msg.conf" 2>/dev/null
-    echo "and not filter(${1})" >>"${SYSLOG_NG_PATH}/include/not2msg/RR_not2msg.conf"
-    chown system:log "${SYSLOG_NG_PATH}/include/not2msg/RR_not2msg.conf"
-    chmod 644 "${SYSLOG_NG_PATH}/include/not2msg/RR_not2msg.conf"
+    sed -i "/${1}/d" "${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf" 2>/dev/null
+    echo "and not filter(${1})" >>"${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf"
+    chown system:log "${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf"
+    chmod 644 "${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf"
 
     # systemctl restart syslog-ng
   }
 
   SYSLOG_NG_PATH="/tmpRoot/etc/syslog-ng/patterndb.d"
-  rm -f "${SYSLOG_NG_PATH}/ARC.conf" "${SYSLOG_NG_PATH}/include/not2kern/RR_not2kern.conf" "${SYSLOG_NG_PATH}/include/not2msg/RR_not2msg.conf" 2>/dev/null
+  rm -f "${SYSLOG_NG_PATH}/ARC.conf" "${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf" "${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf" 2>/dev/null
 
   _blocklog "f_messages_empty_ttyS" "synobios get empty ttyS current"
   _blocklog "f_messages_telnet_tcp" "telnet/tcp: bind: Address already in use"

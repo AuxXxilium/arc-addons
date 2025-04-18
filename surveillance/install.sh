@@ -19,7 +19,7 @@ install_addon() {
   cat >"/tmpRoot/usr/lib/systemd/system/sspatch.service" <<EOF
 [Unit]
 Description=addon sspatch
-After=synoscgi.service nginx.service
+After=synoscgi.service
 
 [Service]
 Type=oneshot

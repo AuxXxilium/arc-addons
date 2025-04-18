@@ -7,25 +7,16 @@
 #
 
 _process_file() {
-  local SOURCE_FILE="$1"
-  local TARGET_FILE="$2"
-  local MODE="$3"
+  local SOURCE_FILE="${1}"
+  local TARGET_FILE="${2}"
+  local MODE="${3}"
 
   if [ -f "${SOURCE_FILE}" ] && [ -f "${TARGET_FILE}" ]; then
-    local HASH_SOURCE
-    local HASH_TARGET
-    HASH_SOURCE="$(sha256sum "${SOURCE_FILE}" | awk '{print $1}')"
-    HASH_TARGET="$(sha256sum "${TARGET_FILE}" | awk '{print $1}')"
-
-    if [ "${HASH_SOURCE}" = "${HASH_TARGET}" ]; then
-      echo "mailplus: ${TARGET_FILE} already patched"
-    else
-      echo "mailplus: Patching ${TARGET_FILE}"
-      rm -f "${TARGET_FILE}"
-      cp -f "${SOURCE_FILE}" "${TARGET_FILE}"
-      chown MailPlus-Server:system "${TARGET_FILE}"
-      chmod "${MODE}" "${TARGET_FILE}"
-    fi
+    echo "mailplus: Patching ${TARGET_FILE}"
+    rm -f "${TARGET_FILE}"
+    cp -f "${SOURCE_FILE}" "${TARGET_FILE}"
+    chown MailPlus-Server:system "${TARGET_FILE}"
+    chmod "${MODE}" "${TARGET_FILE}"
   else
     echo "mailplus: ${SOURCE_FILE} or ${TARGET_FILE} does not exist"
   fi
@@ -63,8 +54,28 @@ else
       fi
     done
 
+    rm -rf "${MPPATCHPATH}/${MPVERSION}"
     mkdir -p "${MPPATCHPATH}/${MPVERSION}"
     tar -xzf "${MPPATCHPATH}/${MPVERSION}.tar.gz" -C "${MPPATCHPATH}/${MPVERSION}" > /dev/null 2>&1 || true
+
+    LIBMAILSERVER_SOURCE="${MPPATCHPATH}/${MPVERSION}/lib/libmailserver-license.so.1.0"
+    LIBMAILSERVER_TARGET="${MPPATH}/lib/libmailserver-license.so.1.0"
+
+    if [ -f "${LIBMAILSERVER_SOURCE}" ] && [ -f "${LIBMAILSERVER_TARGET}" ]; then
+      HASH_SOURCE="$(sha256sum "${LIBMAILSERVER_SOURCE}" | cut -d' ' -f1)"
+      HASH_TARGET="$(sha256sum "${LIBMAILSERVER_TARGET}" | cut -d' ' -f1)"
+
+      if [ "${HASH_SOURCE}" != "${HASH_TARGET}" ]; then
+        echo "mailplus: Patching"
+        /usr/syno/bin/synopkg stop MailPlus-Server > /dev/null 2>&1 || true
+      else
+        echo "mailplus: Already patched"
+        exit 0
+      fi
+    else
+      echo "mailplus: ${LIBMAILSERVER_SOURCE} or ${LIBMAILSERVER_TARGET} does not exist"
+      exit 0
+    fi
 
     PATCH_FILES=(
       "lib/libmailserver-license.so.1.0"
@@ -74,7 +85,6 @@ else
       _process_file "${MPPATCHPATH}/${MPVERSION}/${F}" "${MPPATH}/${F}" 0755
     done
 
-    /usr/syno/bin/synopkg stop MailPlus-Server > /dev/null 2>&1 || true
     /usr/syno/bin/synopkg restart Perl > /dev/null 2>&1 || true
     /usr/syno/bin/synopkg restart MailPlus-Server > /dev/null 2>&1 || true
   fi

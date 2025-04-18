@@ -7,26 +7,17 @@
 #
 
 _process_file() {
-  local SOURCE_FILE="$1"
-  local TARGET_FILE="$2"
-  local SUFFIX="$3"
-  local MODE="$4"
+  local SOURCE_FILE="${1}"
+  local TARGET_FILE="${2}"
+  local SUFFIX="${3}"
+  local MODE="${4}"
 
   if [ -f "${SOURCE_FILE}" ] && [ -f "${TARGET_FILE}" ]; then
-    local HASH_SOURCE
-    local HASH_TARGET
-    HASH_SOURCE="$(sha256sum "${SOURCE_FILE}" | awk '{print $1}')"
-    HASH_TARGET="$(sha256sum "${TARGET_FILE}" | awk '{print $1}')"
-
-    if [ "${HASH_SOURCE}" = "${HASH_TARGET}" ]; then
-      echo "sspatch: ${TARGET_FILE} already patched"
-    else
-      echo "sspatch: Patching ${TARGET_FILE}"
-      rm -f "${TARGET_FILE}"
-      cp -f "${SOURCE_FILE}" "${TARGET_FILE}"
-      chown SurveillanceStation:SurveillanceStation "${TARGET_FILE}"
-      chmod "${MODE}" "${TARGET_FILE}"
-    fi
+    echo "sspatch: Patching ${TARGET_FILE}"
+    rm -f "${TARGET_FILE}"
+    cp -f "${SOURCE_FILE}" "${TARGET_FILE}"
+    chown SurveillanceStation:SurveillanceStation "${TARGET_FILE}"
+    chmod "${MODE}" "${TARGET_FILE}"
   else
     echo "sspatch: ${SOURCE_FILE} or ${TARGET_FILE} does not exist"
   fi
@@ -34,13 +25,13 @@ _process_file() {
 
 SSPATH="/var/packages/SurveillanceStation/target"
 SSPATCHPATH="/usr/arc/addons/sspatch"
-SVERSION="$(/usr/syno/bin/synopkg version SurveillanceStation 2>/dev/null)"
+SVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1 | sed -E 's/^0*([0-9])0/\1/')"
 
 if [ -z "${SVERSION}" ]; then
   echo "sspatch: Please install Surveillance Station first"
 else
   SUFFIX=""
-  case "$(synogetkeyvalue /var/packages/SurveillanceStation/INFO model)" in
+  case "$(grep -oP '(?<=model=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1)" in
   "synology_denverton_dva3219") SUFFIX="_dva_3219" ;;
   "synology_denverton_dva3221") SUFFIX="_dva_3221" ;;
   "synology_geminilake_dva1622") SUFFIX="_openvino" ;;
@@ -73,8 +64,28 @@ else
       fi
     done
 
+    rm -rf "${SSPATCHPATH}/${SSVERSION}"
     mkdir -p "${SSPATCHPATH}/${SSVERSION}"
     tar -xzf "${SSPATCHPATH}/${SSVERSION}.tar.gz" -C "${SSPATCHPATH}/${SSVERSION}" > /dev/null 2>&1 || true
+
+    LIBSSUTILS_SOURCE="${SSPATCHPATH}/${SSVERSION}/lib/libssutils.so"
+    LIBSSUTILS_TARGET="${SSPATH}/lib/libssutils.so"
+
+    if [ -f "${LIBSSUTILS_SOURCE}" ] && [ -f "${LIBSSUTILS_TARGET}" ]; then
+      HASH_SOURCE="$(sha256sum "${LIBSSUTILS_SOURCE}" | cut -d' ' -f1)"
+      HASH_TARGET="$(sha256sum "${LIBSSUTILS_TARGET}" | cut -d' ' -f1)"
+
+      if [ "${HASH_SOURCE}" != "${HASH_TARGET}" ]; then
+        echo "sspatch: Patching"
+        /usr/syno/bin/synopkg stop SurveillanceStation > /dev/null 2>&1 || true
+      else
+        echo "sspatch: ${LIBSSUTILS_TARGET} already patched"
+        exit 0
+      fi
+    else
+      echo "sspatch: ${LIBSSUTILS_SOURCE} or ${LIBSSUTILS_TARGET} does not exist"
+      exit 0
+    fi
 
     PATCH_FILES=(
       "lib/libssutils.so"
