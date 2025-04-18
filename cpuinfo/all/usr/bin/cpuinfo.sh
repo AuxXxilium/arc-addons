@@ -7,11 +7,11 @@
 #
 
 TEMP="on"
-VENDOR=""                                                                               # str
-FAMILY=""                                                                               # str
-SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)"       # str
-CORES="$(grep -c 'cpu cores' /proc/cpuinfo 2>/dev/null)"                                # str
-SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)" # int
+VENDOR=""
+FAMILY=""
+SERIES=""
+CORES=""
+SPEED=""
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
@@ -100,9 +100,6 @@ else
   exit 1
 fi
 
-CORES="${CORES:-1}"
-SPEED="${SPEED:-0}"
-
 if [ -f "${FILE_GZ}" ]; then
   [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
 else
@@ -116,18 +113,18 @@ else
   cp -pf "${FILE_JS}.bak" "${FILE_JS}"
 fi
 
-echo "CPU Info set to: \"TEMP:${TEMP}\" \"${VENDOR}\" \"${FAMILY}\" \"${SERIES}\" \"${CORES}\" \"${SPEED}\""
-
 if [ "${TEMP^^}" = "ON" ]; then
   sed -i 's/,t,i,s)}/,t,i,s+" \| "+e.sys_temp+" °C")}/g' "${FILE_JS}"
   sed -i 's/,C,D);/,C,D+" \| "+t.gpu.temperature_c+" °C");/g' "${FILE_JS}"
 fi
 
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_clock_speed/\1${SPEED//\"/}/g" "${FILE_JS}"
+[ -n "${VENDOR//\"/}" ] && sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" "${FILE_JS}" # str
+[ -n "${FAMILY//\"/}" ] && sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}" # str
+[ -n "${SERIES//\"/}" ] && sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}" # str
+[ -n "${CORES//\"/}" ] && sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"    # str
+[ -n "${SPEED//\"/}" ] && sed -i "s/\(\(,\)\|\((\)\).\.cpu_clock_speed/\1${SPEED//\"/}/g" "${FILE_JS}"  # int
+
+# sed -i "s/\(d.push(\[_T(\"status\",\"status_version\"),t.firmware_ver,f\]);\)/\1d.push(\[\"bootloader\",t.bootloader_ver,f\]);/g" "${FILE_JS}"
 
 CARDN=$(ls -d /sys/class/drm/card* 2>/dev/null | head -1)
 if [ -d "${CARDN}" ]; then
@@ -146,21 +143,12 @@ fi
 
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
-if "/usr/sbin/synoscgiproxy" -t >/dev/null 2>&1; then
-  if ! ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
-    "/usr/sbin/synoscgiproxy" &
-    [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' /etc/nginx/nginx.conf
-    [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
-    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' /usr/syno/share/nginx/nginx.mustache
-    systemctl reload nginx
-  fi
-else
-  if ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
-    pkill -f "/usr/sbin/synoscgiproxy"
-  fi
-  [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
-  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
+if ! ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
+  "/usr/sbin/synoscgiproxy" &
+  [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+  sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' /etc/nginx/nginx.conf
+  [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
+  sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
 fi
 
