@@ -9,15 +9,15 @@
 _process_file() {
   local SOURCE_FILE="${1}"
   local TARGET_FILE="${2}"
-  local SUFFIX="${3}"
-  local MODE="${4}"
+  local FMODE
 
   if [ -f "${SOURCE_FILE}" ] && [ -f "${TARGET_FILE}" ]; then
     echo "sspatch: Patching ${TARGET_FILE}"
+    FMODE="$(stat -c "%a" "${TARGET_FILE}")"
     rm -f "${TARGET_FILE}"
     cp -f "${SOURCE_FILE}" "${TARGET_FILE}"
     chown SurveillanceStation:SurveillanceStation "${TARGET_FILE}"
-    chmod "${MODE}" "${TARGET_FILE}"
+    chmod "${FMODE}" "${TARGET_FILE}"
   else
     echo "sspatch: ${SOURCE_FILE} or ${TARGET_FILE} does not exist"
   fi
@@ -32,8 +32,8 @@ if [ -z "${SVERSION}" ]; then
 else
   SUFFIX=""
   case "$(grep -oP '(?<=model=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1)" in
-  "synology_denverton_dva3219") SUFFIX="_dva_3219" ;;
-  "synology_denverton_dva3221") SUFFIX="_dva_3221" ;;
+  "synology_denverton_dva3219") SUFFIX="_dva3219" ;;
+  "synology_denverton_dva3221") SUFFIX="_dva3221" ;;
   "synology_geminilake_dva1622") SUFFIX="_openvino" ;;
   *) ;;
   esac
@@ -68,30 +68,13 @@ else
     mkdir -p "${SSPATCHPATH}/${SSVERSION}"
     tar -xzf "${SSPATCHPATH}/${SSVERSION}.tar.gz" -C "${SSPATCHPATH}/${SSVERSION}" > /dev/null 2>&1 || true
 
-    LIBSSUTILS_SOURCE="${SSPATCHPATH}/${SSVERSION}/lib/libssutils.so"
-    LIBSSUTILS_TARGET="${SSPATH}/lib/libssutils.so"
-
-    if [ -f "${LIBSSUTILS_SOURCE}" ] && [ -f "${LIBSSUTILS_TARGET}" ]; then
-      HASH_SOURCE="$(sha256sum "${LIBSSUTILS_SOURCE}" | cut -d' ' -f1)"
-      HASH_TARGET="$(sha256sum "${LIBSSUTILS_TARGET}" | cut -d' ' -f1)"
-
-      if [ "${HASH_SOURCE}" != "${HASH_TARGET}" ]; then
-        echo "sspatch: Patching"
-        /usr/syno/bin/synopkg stop SurveillanceStation > /dev/null 2>&1 || true
-      else
-        echo "sspatch: ${LIBSSUTILS_TARGET} already patched"
-        exit 0
-      fi
-    else
-      echo "sspatch: ${LIBSSUTILS_SOURCE} or ${LIBSSUTILS_TARGET} does not exist"
-      exit 0
-    fi
-
     PATCH_FILES=(
       "lib/libssutils.so"
+      "lib/libssffmpegutils.so"
       "bin/ssctl"
       "sbin/ssactruled"
       "sbin/sscmshostd"
+      "sbin/sscamerad"
       "sbin/sscored"
       "sbin/ssdaemonmonitord"
       "sbin/ssexechelperd"
@@ -101,11 +84,38 @@ else
       "webapi/Camera/src/SYNO.SurveillanceStation.Camera.so"
     )
 
+    NEED_PATCH=false
+
     for F in "${PATCH_FILES[@]}"; do
-      _process_file "${SSPATCHPATH}/${SSVERSION}/${F}" "${SSPATH}/${F}" 0755
+      SOURCE_FILE="${SSPATCHPATH}/${SSVERSION}/${F}"
+      TARGET_FILE="${SSPATH}/${F}"
+
+      if [ -f "${SOURCE_FILE}" ] && [ -f "${TARGET_FILE}" ]; then
+        HASH_SOURCE="$(sha256sum "${SOURCE_FILE}" | cut -d' ' -f1)"
+        HASH_TARGET="$(sha256sum "${TARGET_FILE}" | cut -d' ' -f1)"
+
+        if [ "${HASH_SOURCE}" != "${HASH_TARGET}" ]; then
+          NEED_PATCH=true
+          break
+        fi
+      else
+        echo "sspatch: ${SOURCE_FILE} or ${TARGET_FILE} does not exist"
+      fi
     done
 
-    /usr/syno/bin/synopkg restart SurveillanceStation > /dev/null 2>&1 || true
+    if [ "${NEED_PATCH}" = true ]; then
+      echo "sspatch: Patching required, stopping SurveillanceStation"
+      /usr/syno/bin/synopkg stop SurveillanceStation > /dev/null 2>&1 || true
+
+      for F in "${PATCH_FILES[@]}"; do
+        _process_file "${SSPATCHPATH}/${SSVERSION}/${F}" "${SSPATH}/${F}"
+      done
+
+      echo "sspatch: Restarting SurveillanceStation"
+      /usr/syno/bin/synopkg restart SurveillanceStation > /dev/null 2>&1 || true
+    else
+      echo "sspatch: All files are already patched"
+    fi
   fi
 fi
 
