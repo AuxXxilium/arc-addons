@@ -9,14 +9,15 @@
 _process_file() {
   local SOURCE_FILE="${1}"
   local TARGET_FILE="${2}"
-  local MODE="${3}"
+  local FMODE
 
   if [ -f "${SOURCE_FILE}" ] && [ -f "${TARGET_FILE}" ]; then
     echo "mailplus: Patching ${TARGET_FILE}"
+    FMODE="$(stat -c "%a" "${TARGET_FILE}")"
     rm -f "${TARGET_FILE}"
     cp -f "${SOURCE_FILE}" "${TARGET_FILE}"
     chown MailPlus-Server:system "${TARGET_FILE}"
-    chmod "${MODE}" "${TARGET_FILE}"
+    chmod "${FMODE}" "${TARGET_FILE}"
   else
     echo "mailplus: ${SOURCE_FILE} or ${TARGET_FILE} does not exist"
   fi
@@ -58,35 +59,43 @@ else
     mkdir -p "${MPPATCHPATH}/${MPVERSION}"
     tar -xzf "${MPPATCHPATH}/${MPVERSION}.tar.gz" -C "${MPPATCHPATH}/${MPVERSION}" > /dev/null 2>&1 || true
 
-    LIBMAILSERVER_SOURCE="${MPPATCHPATH}/${MPVERSION}/lib/libmailserver-license.so.1.0"
-    LIBMAILSERVER_TARGET="${MPPATH}/lib/libmailserver-license.so.1.0"
-
-    if [ -f "${LIBMAILSERVER_SOURCE}" ] && [ -f "${LIBMAILSERVER_TARGET}" ]; then
-      HASH_SOURCE="$(sha256sum "${LIBMAILSERVER_SOURCE}" | cut -d' ' -f1)"
-      HASH_TARGET="$(sha256sum "${LIBMAILSERVER_TARGET}" | cut -d' ' -f1)"
-
-      if [ "${HASH_SOURCE}" != "${HASH_TARGET}" ]; then
-        echo "mailplus: Patching"
-        /usr/syno/bin/synopkg stop MailPlus-Server > /dev/null 2>&1 || true
-      else
-        echo "mailplus: Already patched"
-        exit 0
-      fi
-    else
-      echo "mailplus: ${LIBMAILSERVER_SOURCE} or ${LIBMAILSERVER_TARGET} does not exist"
-      exit 0
-    fi
-
     PATCH_FILES=(
       "lib/libmailserver-license.so.1.0"
     )
 
+    NEED_PATCH=false
+
     for F in "${PATCH_FILES[@]}"; do
-      _process_file "${MPPATCHPATH}/${MPVERSION}/${F}" "${MPPATH}/${F}" 0755
+      SOURCE_FILE="${MPPATCHPATH}/${MPVERSION}/${F}"
+      TARGET_FILE="${MPPATH}/${F}"
+
+      if [ -f "${SOURCE_FILE}" ] && [ -f "${TARGET_FILE}" ]; then
+        HASH_SOURCE="$(sha256sum "${SOURCE_FILE}" | cut -d' ' -f1)"
+        HASH_TARGET="$(sha256sum "${TARGET_FILE}" | cut -d' ' -f1)"
+
+        if [ "${HASH_SOURCE}" != "${HASH_TARGET}" ]; then
+          NEED_PATCH=true
+          break
+        fi
+      else
+        echo "mailplus: ${SOURCE_FILE} or ${TARGET_FILE} does not exist"
+      fi
     done
 
-    /usr/syno/bin/synopkg restart Perl > /dev/null 2>&1 || true
-    /usr/syno/bin/synopkg restart MailPlus-Server > /dev/null 2>&1 || true
+    if [ "${NEED_PATCH}" = true ]; then
+      echo "mailplus: Patching required, stopping MailPlus-Server"
+      /usr/syno/bin/synopkg stop MailPlus-Server > /dev/null 2>&1 || true
+
+      for F in "${PATCH_FILES[@]}"; do
+        _process_file "${MPPATCHPATH}/${MPVERSION}/${F}" "${MPPATH}/${F}"
+      done
+
+      echo "mailplus: Restarting MailPlus-Server"
+      /usr/syno/bin/synopkg restart Perl > /dev/null 2>&1 || true
+      /usr/syno/bin/synopkg restart MailPlus-Server > /dev/null 2>&1 || true
+    else
+      echo "mailplus: All files are already patched"
+    fi
   fi
 fi
 
