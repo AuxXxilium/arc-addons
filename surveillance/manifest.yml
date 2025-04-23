@@ -1,6 +1,6 @@
 version: 1
 name: surveillance
-description: "Dynamic License Patch for Surveillance 9.2.0 / 9.2.3 (Not for DVA 3219)"
+description: "Dynamic License Patch for Surveillance 9.2.0 / 9.2.3"
 system: false
 beta: true
 target: app
