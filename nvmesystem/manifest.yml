@@ -10,11 +10,12 @@ all:
 apollolake: false
 broadwell: false
 broadwellnk: false
-broadwellnkv2: true
+broadwellnkv2: false
 broadwellntbap: false
 denverton: false
-geminilake: true
-purley: true
-v1000: true
-r1000: true
+geminilake: false
+purley: false
+v1000: false
+v1000nk: true
+r1000: false
 epyc7002: true
