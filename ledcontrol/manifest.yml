@@ -16,5 +16,6 @@ denverton: false
 geminilake: false
 purley: false
 v1000: false
+v1000nk: true
 r1000: false
 epyc7002: true
