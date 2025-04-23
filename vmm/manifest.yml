@@ -1,6 +1,6 @@
 version: 1
-name: surveillance
-description: "Dynamic License Patch for Surveillance 9.2.0 / 9.2.3"
+name: vmm
+description: "Dynamic License Patch for VMM 2.7.0"
 system: false
 beta: true
 target: app
