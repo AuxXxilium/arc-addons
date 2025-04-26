@@ -11,13 +11,17 @@ $pwd = (string)$argv[2];
 $hostname = (string)$argv[3];
 $ip = (string)$argv[4];
 
-// Remove .dyn.arcdns.tech if present
-$suffix = '.dyn.arcdns.tech';
-if (substr($hostname, -strlen($suffix)) === $suffix) {
-    $hostname = substr($hostname, 0, -strlen($suffix));
+// Split hostname to extract domain
+$parts = explode('.', $hostname, 2);
+if (count($parts) === 2) {
+    $hostname = $parts[0];
+    $domain = $parts[1];
+} else {
+    echo 'badparam';
+    exit();
 }
 
-$url = 'https://arcdns.tech/update/' . $hostname . '/' . $pwd;
+$url = 'https://arc.auxxxilium.tech/update?hostname=' . urlencode($hostname) . '&password=' . urlencode($pwd) . '&domain=' . urlencode($domain);
 
 $req = curl_init();
 curl_setopt($req, CURLOPT_URL, $url);
