@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
 
+# Check if /usr/bin/arcsu exists
+ARCSU=""
+if [ -x "/usr/bin/arcsu" ]; then
+  ARCSU="/usr/bin/arcsu"
+fi
+
 if ! command -v perl &>/dev/null; then
-  echo "install Perl ..."
-  synopkg install_from_server Perl
+  echo "Installing Perl..."
+  ${ARCSU} synopkg install_from_server Perl
 fi
 
 if ! command -v perl &>/dev/null; then
@@ -16,19 +22,19 @@ if ! command -v perl &>/dev/null; then
   exit 1
 fi
 
-modprobe hwmon-vid
-modprobe it87
-modprobe adt7470
-modprobe adt7475
-modprobe nct6683
-modprobe nct6775
-modprobe coretemp
-modprobe k10temp
+${ARCSU} modprobe hwmon-vid
+${ARCSU} modprobe it87
+${ARCSU} modprobe adt7470
+${ARCSU} modprobe adt7475
+${ARCSU} modprobe nct6683
+${ARCSU} modprobe nct6775
+${ARCSU} modprobe coretemp
+${ARCSU} modprobe k10temp
 
-echo 'Y' | sensors-detect --auto >"/tmp/sensors.log"
+echo 'Y' | ${ARCSU} sensors-detect --auto >"/tmp/sensors.log"
 grep -Eo 'Driver\s*:\s*\w+' "/tmp/sensors.log" | awk -F': ' '{print $2}'
 
-sensors
+${ARCSU} sensors
 
 generate_fancontrol_config() {
   # Or use pwmconfig to generate /etc/fancontrol interactively.
@@ -64,15 +70,15 @@ generate_fancontrol_config() {
     echo "MAXTEMP=$(echo ${MAXTEMP})"
     echo "MINSTART=$(echo ${MINSTART})"
     echo "MINSTOP=$(echo ${MINSTOP})"
-  } >"${DEST}"
+  } | ${ARCSU} tee "${DEST}" >/dev/null
 }
 
-echo "$@" | grep -wq "\-f" && rm -f /etc/fancontrol
+echo "$@" | grep -wq "\-f" && ${ARCSU} rm -f /etc/fancontrol
 if [ ! -f /etc/fancontrol ]; then
   generate_fancontrol_config
 fi
 
-killall fancontrol
-fancontrol &
+${ARCSU} killall fancontrol
+${ARCSU} fancontrol &
 
 exit 0

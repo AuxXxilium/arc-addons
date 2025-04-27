@@ -6,8 +6,11 @@
 # See /LICENSE for more information.
 #
 
-# Make things safer
-set -euo pipefail
+# Check if /usr/bin/arcsu exists
+ARCSU=""
+if [ -x "/usr/bin/arcsu" ]; then
+  ARCSU="/usr/bin/arcsu"
+fi
 
 # Load the correct cpufreq module
 touch /tmp/scaling.log
@@ -23,11 +26,11 @@ fi
 if [ "${SYSGOVERNOR}" != "${GOVERNOR}" ]; then
   case "${GOVERNOR}" in
     ondemand|conservative)
-      insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" 2>/dev/null || true
-      echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      ${ARCSU} insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" 2>/dev/null || true
+      echo "${GOVERNOR}" | ${ARCSU} tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null
       ;;
     schedutil|powersave)
-      echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      echo "${GOVERNOR}" | ${ARCSU} tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null
       ;;
   esac
   sleep 3

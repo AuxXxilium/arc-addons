@@ -6,11 +6,17 @@
 # See /LICENSE for more information.
 #
 
+# Check if /usr/bin/arcsu exists
+ARCSU=""
+if [ -x "/usr/bin/arcsu" ]; then
+  ARCSU="/usr/bin/arcsu"
+fi
+
 AMEVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/CodecPack/INFO | head -n1 | sed -E 's/^0*([0-9])0/\1/')" || true
 
 if [ -d "/var/packages/CodecPack" ] && [ "${AMEVERSION}" = "3.1.0-3005" ]; then
     AME_APPARMOR="/var/packages/CodecPack/target/apparmor"
-    [ -d "$AME_APPARMOR" ] && /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack && mv -f "$AME_APPARMOR" "${AME_APPARMOR}.bak" || true
+    [ -d "$AME_APPARMOR" ] && ${ARCSU} /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack && ${ARCSU} mv -f "$AME_APPARMOR" "${AME_APPARMOR}.bak" || true
 
     AME_PATH="/var/packages/CodecPack/target/usr"
     AME_SO="${AME_PATH}/lib/libsynoame-license.so"
@@ -18,10 +24,10 @@ if [ -d "/var/packages/CodecPack" ] && [ "${AMEVERSION}" = "3.1.0-3005" ]; then
     AME_LIC="/usr/syno/etc/license/data/ame/offline_license.json"
     AME_LIC_BAK="/usr/syno/etc/license/data/ame/offline_license.json.orig"
     
-    [ ! -f "${AME_SO_BAK}" ] && cp -pf "${AME_SO}" "${AME_SO_BAK}"
-    [ ! -f "${AME_LIC_BAK}" ] && cp -pf "${AME_LIC}" "${AME_LIC_BAK}"
+    [ ! -f "${AME_SO_BAK}" ] && ${ARCSU} cp -pf "${AME_SO}" "${AME_SO_BAK}"
+    [ ! -f "${AME_LIC_BAK}" ] && ${ARCSU} cp -pf "${AME_LIC}" "${AME_LIC_BAK}"
     
-    AME_HASH="$(md5sum -b "${AME_SO}" | awk '{print $1}')"
+    AME_HASH="$(${ARCSU} md5sum -b "${AME_SO}" | awk '{print $1}')"
     
     case "$AME_HASH" in
         "fcc1084f4eadcf5855e6e8494fb79e23" | "923fd0d58e79b7dc0f6c377547545930")
@@ -44,23 +50,23 @@ if [ -d "/var/packages/CodecPack" ] && [ "${AMEVERSION}" = "3.1.0-3005" ]; then
     for ((i = 0; i < ${#LIC_HEX_VALUES[@]}; i++)); do
         offset=$(( 0x${LIC_HEX_VALUES[i]} + 0x8000 ))
         value=${LIC_VALUES[LIC_INDICES[i]]}
-        printf '%s' "$value" | xxd -r -p | dd of="${AME_SO}" bs=1 seek="$offset" conv=notrunc
+        printf '%s' "$value" | xxd -r -p | ${ARCSU} dd of="${AME_SO}" bs=1 seek="$offset" conv=notrunc
         if [[ $? -ne 0 ]]; then
             echo -e "AME Patch: Error while writing to file!"
             exit 1
         fi
     done
 
-    mkdir -p "$(dirname "${AME_LIC}")"
-    rm -f "${AME_LIC}"
-    echo "${LIC_CONTENT}" > "${AME_LIC}"
+    ${ARCSU} mkdir -p "$(dirname "${AME_LIC}")"
+    ${ARCSU} rm -f "${AME_LIC}"
+    echo "${LIC_CONTENT}" | ${ARCSU} tee "${AME_LIC}" >/dev/null
 
-    if "${AME_PATH}"/bin/synoame-bin-check-license; then
-        "${AME_PATH}"/bin/synoame-bin-auto-install-needed-codec
+    if ${ARCSU} "${AME_PATH}"/bin/synoame-bin-check-license; then
+        ${ARCSU} "${AME_PATH}"/bin/synoame-bin-auto-install-needed-codec
         echo -e "AME Patch: Successful!"
     else
-        [ -f "${AME_SO_BAK}" ] && cp -pf "${AME_SO_BAK}" "${AME_SO}" || true
-        [ -f "${AME_LIC_BAK}" ] && cp -pf "${AME_LIC_BAK}" "${AME_LIC}" || true
+        [ -f "${AME_SO_BAK}" ] && ${ARCSU} cp -pf "${AME_SO_BAK}" "${AME_SO}" || true
+        [ -f "${AME_LIC_BAK}" ] && ${ARCSU} cp -pf "${AME_LIC_BAK}" "${AME_LIC}" || true
         echo -e "AME Patch: Unsuccessful!"
         exit 1
     fi

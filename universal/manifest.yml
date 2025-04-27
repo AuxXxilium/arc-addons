@@ -1,6 +1,6 @@
 version: 1
 name: universal
-description: "Fix bugs in Synology Photos, local_display, and other apps."
+description: "Fix Synology Photos and local_display"
 system: false
 beta: true
 target: system
