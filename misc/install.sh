@@ -252,6 +252,9 @@ install_late() {
 
   cp -f /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -f /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
+  cp -f /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
+  cp -f /usr/bin/sveinstaller /tmpRoot/usr/bin/sveinstaller
+  cp -f /usr/bin/forcemount /tmpRoot/usr/bin/forcemount
 
   if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege >/dev/null 2>&1 || true

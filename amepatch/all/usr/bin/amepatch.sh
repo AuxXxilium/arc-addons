@@ -16,7 +16,7 @@ AMEVERSION="$(grep -oP '(?<=version=").*(?=")' /var/packages/CodecPack/INFO | he
 
 if [ -d "/var/packages/CodecPack" ] && [ "${AMEVERSION}" = "3.1.0-3005" ]; then
     AME_APPARMOR="/var/packages/CodecPack/target/apparmor"
-    [ -d "$AME_APPARMOR" ] && ${ARCSU} /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack && ${ARCSU} mv -f "$AME_APPARMOR" "${AME_APPARMOR}.bak" || true
+    [ -d "$AME_APPARMOR" ] && /usr/syno/etc/rc.sysv/apparmor.sh remove_packages_profile 0 CodecPack && ${ARCSU} mv -f "$AME_APPARMOR" "${AME_APPARMOR}.bak" || true
 
     AME_PATH="/var/packages/CodecPack/target/usr"
     AME_SO="${AME_PATH}/lib/libsynoame-license.so"
@@ -27,7 +27,7 @@ if [ -d "/var/packages/CodecPack" ] && [ "${AMEVERSION}" = "3.1.0-3005" ]; then
     [ ! -f "${AME_SO_BAK}" ] && ${ARCSU} cp -pf "${AME_SO}" "${AME_SO_BAK}"
     [ ! -f "${AME_LIC_BAK}" ] && ${ARCSU} cp -pf "${AME_LIC}" "${AME_LIC_BAK}"
     
-    AME_HASH="$(${ARCSU} md5sum -b "${AME_SO}" | awk '{print $1}')"
+    AME_HASH="$(md5sum -b "${AME_SO}" | awk '{print $1}')"
     
     case "$AME_HASH" in
         "fcc1084f4eadcf5855e6e8494fb79e23" | "923fd0d58e79b7dc0f6c377547545930")
@@ -61,8 +61,8 @@ if [ -d "/var/packages/CodecPack" ] && [ "${AMEVERSION}" = "3.1.0-3005" ]; then
     ${ARCSU} rm -f "${AME_LIC}"
     echo "${LIC_CONTENT}" | ${ARCSU} tee "${AME_LIC}" >/dev/null
 
-    if ${ARCSU} "${AME_PATH}"/bin/synoame-bin-check-license; then
-        ${ARCSU} "${AME_PATH}"/bin/synoame-bin-auto-install-needed-codec
+    if "${AME_PATH}"/bin/synoame-bin-check-license; then
+        "${AME_PATH}"/bin/synoame-bin-auto-install-needed-codec
         echo -e "AME Patch: Successful!"
     else
         [ -f "${AME_SO_BAK}" ] && ${ARCSU} cp -pf "${AME_SO_BAK}" "${AME_SO}" || true

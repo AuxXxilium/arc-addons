@@ -14,7 +14,7 @@ fi
 
 if ! command -v perl &>/dev/null; then
   echo "Installing Perl..."
-  ${ARCSU} synopkg install_from_server Perl
+  synopkg install_from_server Perl
 fi
 
 if ! command -v perl &>/dev/null; then

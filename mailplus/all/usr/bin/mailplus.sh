@@ -90,15 +90,15 @@ else
 
     if [ "${NEED_PATCH}" = true ]; then
       echo "mailplus: Patching required, stopping MailPlus-Server"
-      ${ARCSU} /usr/syno/bin/synopkg stop MailPlus-Server > /dev/null 2>&1 || true
+      ${ARCSU} synopkg stop MailPlus-Server > /dev/null 2>&1 || true
 
       for F in "${PATCH_FILES[@]}"; do
         _process_file "${MPPATCHPATH}/${MPVERSION}/${F}" "${MPPATH}/${F}"
       done
 
       echo "mailplus: Restarting MailPlus-Server"
-      ${ARCSU} /usr/syno/bin/synopkg restart Perl > /dev/null 2>&1 || true
-      ${ARCSU} /usr/syno/bin/synopkg restart MailPlus-Server > /dev/null 2>&1 || true
+      ${ARCSU} synopkg restart Perl > /dev/null 2>&1 || true
+      ${ARCSU} synopkg restart MailPlus-Server > /dev/null 2>&1 || true
     else
       echo "mailplus: All files are already patched"
     fi

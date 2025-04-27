@@ -36,7 +36,7 @@ restore_synology_photos() {
 
 patch_synology_photos() {
   echo "Stopping Synology Photos package..."
-  ${ARCSU} /usr/syno/bin/synopkg stop SynologyPhotos > /dev/null 2>&1 || true
+  ${ARCSU} synopkg stop SynologyPhotos > /dev/null 2>&1 || true
 
   FILE="/var/packages/SynologyPhotos/target/usr/bin/synofoto-bin-push-service"
   if [ -z "$(cat "/etc/application_key.conf")" ] && [ -f "${FILE}" ]; then
@@ -54,7 +54,7 @@ patch_synology_photos() {
   fi
 
   echo "Restarting Synology Photos package..."
-  ${ARCSU} /usr/syno/bin/synopkg restart SynologyPhotos > /dev/null 2>&1 || true
+  ${ARCSU} synopkg restart SynologyPhotos > /dev/null 2>&1 || true
 }
 
 restore_surveillance_station() {
@@ -64,7 +64,7 @@ restore_surveillance_station() {
 
 patch_surveillance_station() {
   echo "Stopping Surveillance Station package..."
-  ${ARCSU} /usr/syno/bin/synopkg stop SurveillanceStation > /dev/null 2>&1 || true
+  ${ARCSU} synopkg stop SurveillanceStation > /dev/null 2>&1 || true
 
   if [ -d "/var/packages/SurveillanceStation/target/@SSData/AddOns/LocalDisplay" ]; then
     echo -n "" | ${ARCSU} tee "/volume1/@appstore/SurveillanceStation/@SSData/AddOns/LocalDisplay/disabled" >/dev/null
@@ -74,7 +74,7 @@ patch_surveillance_station() {
   fi
 
   echo "Restarting Surveillance Station package..."
-  ${ARCSU} /usr/syno/bin/synopkg restart SurveillanceStation > /dev/null 2>&1 || true
+  ${ARCSU} synopkg restart SurveillanceStation > /dev/null 2>&1 || true
 }
 
 apply_all_patches() {
@@ -140,3 +140,4 @@ case "${1}" in
     exit 1
     ;;
 esac
+exit 0

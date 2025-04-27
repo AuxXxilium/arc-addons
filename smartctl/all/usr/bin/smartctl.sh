@@ -31,4 +31,4 @@ for argv in "$@"; do
   argp="${argv}"
 done
 
-${ARCSU} /usr/bin/smartctl.bak "${args[@]}"
+${ARCSU} smartctl.bak "${args[@]}"

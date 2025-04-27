@@ -12,50 +12,35 @@ install() {
   # Create necessary directories and copy files
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
-  cp -vpf /usr/bin/{PatchELFSharp,sveinstaller,universal.sh} /tmpRoot/usr/bin/
+  cp -pf /usr/bin/universal.sh /tmpRoot/usr/bin/
 
   # Create and configure systemd service
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   cat >"/tmpRoot/usr/lib/systemd/system/universal.service" <<EOF
 [Unit]
-Description=universal patch daemon
-After=syno-packages.target
+Description=addon universal patch
+After=multi-user.target
 
 [Service]
 Type=oneshot
-RemainAfterExit=no
-ExecStart=-/usr/bin/universal.sh
+RemainAfterExit=yes
+ExecStart=/usr/bin/universal.sh
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-  # Create and configure systemd path
-  cat >"/tmpRoot/usr/lib/systemd/system/universal.path" <<EOF
-[Unit]
-Description=universal patch daemon path
-After=syno-packages.target
-ConditionPathExists=/var/packages
-
-[Path]
-PathModified=/var/packages
-Unit=universal.service
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-  # Create symlinks for systemd
+  # Create symlink for systemd service
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/universal.{service,path} /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/
+  ln -vsf /usr/lib/systemd/system/universal.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/universal.service
 }
 
 uninstall() {
   echo "Uninstalling addon universal patch - ${1}"
 
   # Remove systemd files and symlinks
-  rm -f /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/universal.{service,path}
-  rm -f /tmpRoot/usr/lib/systemd/system/universal.{service,path}
+  rm -f /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/universal.service
+  rm -f /tmpRoot/usr/lib/systemd/system/universal.service
 
   # Create revert script if it doesn't exist
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && {
