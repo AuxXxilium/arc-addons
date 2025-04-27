@@ -6,7 +6,13 @@
 # See /LICENSE for more information.
 #
 
-UGREEN_LEDS_CLI="/usr/bin/arcsu ugreen_leds_cli"
+# Check if /usr/bin/arcsu exists
+ARCSU=""
+if [ -x "/usr/bin/arcsu" ]; then
+  ARCSU="/usr/bin/arcsu"
+fi
+
+UGREEN_LEDS_CLI="${ARCSU} ugreen_leds_cli"
 LEDFAIL=0
 
 if [ "${1}" = "on" ]; then
@@ -52,7 +58,7 @@ else
     echo "Checking disk status..."
     for dev in "${!hwmap[@]}"; do
         # Use udevadm to check disk status
-        if /usr/bin/arcsu udevadm info --query=all --name=/dev/${dev} &> /dev/null; then
+        if ${ARCSU} udevadm info --query=all --name=/dev/${dev} &> /dev/null; then
             status="ONLINE"
         else
             status="OFFLINE"
@@ -67,10 +73,10 @@ else
         fi
     done
 
-    if [ -f "/usr/bin/sensors" ]; then
+    if [ -x "/usr/bin/sensors" ]; then
         echo "Checking CPU temperature..."
         # Get CPU temperature (requires sensors plugin)
-        cpu_temp=$(/usr/bin/arcsu sensors | awk '/Core 0/ {print $3}' | cut -c2- | cut -d'.' -f1)
+        cpu_temp=$(${ARCSU} sensors | awk '/Core 0/ {print $3}' | cut -c2- | cut -d'.' -f1)
 
         # Set power LED status based on CPU temperature, red blinking alert for 90 degrees
         if [ ${cpu_temp} -ge 90 ]; then
@@ -87,7 +93,7 @@ else
     # Set disk LED status based on disk temperature, red blinking alert for 50 degrees
     for i in "${!hwmap[@]}"; do
         index=$((${hwmap[$i]} + 2))
-        hdd_temp=$(/usr/bin/arcsu cat /run/synostorage/disks/sata$((${hwmap[$i]} + 1))/temperature)
+        hdd_temp=$(${ARCSU} cat /run/synostorage/disks/sata$((${hwmap[$i]} + 1))/temperature)
         if [ ${hdd_temp} -ge 50 ]; then
             devices[$index]=r
             LEDFAIL=1
