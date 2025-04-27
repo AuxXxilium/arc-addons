@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 #
-# Copyright (C) 2024 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
+
+# Check if /usr/bin/arcsu exists
+ARCSU=""
+if [ -x "/usr/bin/arcsu" ]; then
+  ARCSU="/usr/bin/arcsu"
+fi
 
 args=()
 
@@ -25,4 +31,4 @@ for argv in "$@"; do
   argp="${argv}"
 done
 
-/usr/bin/smartctl.bak "${args[@]}"
+${ARCSU} /usr/bin/smartctl.bak "${args[@]}"

@@ -1,6 +1,6 @@
 version: 1
-name: optional
-description: "Disable some DSM logs and help with Disk hibernation"
+name: reducelogs
+description: "Reduce DSM logs and help with Disk hibernation"
 system: false
 beta: false
 target: system

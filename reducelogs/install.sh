@@ -7,7 +7,7 @@
 #
 
 install_addon() {
-  echo "Installing addon optional - ${1}"
+  echo "Installing addon reducelogs - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
@@ -84,7 +84,7 @@ install_addon() {
 }
 
 uninstall_addon() {
-  echo "Uninstalling addon optional - ${1}"
+  echo "Uninstalling addon reducelogs - ${1}"
 
   #SO_FILE="/tmpRoot/usr/lib/libsynosata.so.1"
   #[ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
