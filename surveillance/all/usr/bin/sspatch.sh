@@ -37,7 +37,7 @@ if [ -z "${SVERSION}" ]; then
   echo "sspatch: Please install Surveillance Station first"
 else
   SUFFIX=""
-  case "$(${ARCSU} grep -oP '(?<=model=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1)" in
+  case "$(grep -oP '(?<=model=").*(?=")' /var/packages/SurveillanceStation/INFO | head -n1)" in
   "synology_denverton_dva3219") SUFFIX="_dva3219" ;;
   "synology_denverton_dva3221") SUFFIX="_dva3221" ;;
   "synology_geminilake_dva1622") SUFFIX="_openvino" ;;
@@ -111,14 +111,14 @@ else
 
     if [ "${NEED_PATCH}" = true ]; then
       echo "sspatch: Patching required, stopping SurveillanceStation"
-      ${ARCSU} /usr/syno/bin/synopkg stop SurveillanceStation > /dev/null 2>&1 || true
+      ${ARCSU} synopkg stop SurveillanceStation > /dev/null 2>&1 || true
 
       for F in "${PATCH_FILES[@]}"; do
         _process_file "${SSPATCHPATH}/${SSVERSION}/${F}" "${SSPATH}/${F}"
       done
 
       echo "sspatch: Restarting SurveillanceStation"
-      ${ARCSU} /usr/syno/bin/synopkg restart SurveillanceStation > /dev/null 2>&1 || true
+      ${ARCSU} synopkg restart SurveillanceStation > /dev/null 2>&1 || true
     else
       echo "sspatch: All files are already patched"
     fi

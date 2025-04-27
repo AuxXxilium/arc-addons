@@ -50,8 +50,8 @@ else
       TARGET_FILE="${VMMPATH}/${F}"
 
       if [ -f "${SOURCE_FILE}" ] && [ -f "${TARGET_FILE}" ]; then
-        HASH_SOURCE="$(${ARCSU} sha256sum "${SOURCE_FILE}" | cut -d' ' -f1)"
-        HASH_TARGET="$(${ARCSU} sha256sum "${TARGET_FILE}" | cut -d' ' -f1)"
+        HASH_SOURCE="$(sha256sum "${SOURCE_FILE}" | cut -d' ' -f1)"
+        HASH_TARGET="$(sha256sum "${TARGET_FILE}" | cut -d' ' -f1)"
 
         if [ "${HASH_SOURCE}" != "${HASH_TARGET}" ]; then
           NEED_PATCH=true
@@ -64,14 +64,14 @@ else
 
     if [ "${NEED_PATCH}" = true ]; then
       echo "vmmpatch: Patching required, stopping Virtualization"
-      ${ARCSU} /usr/syno/bin/synopkg stop Virtualization > /dev/null 2>&1 || true
+      ${ARCSU} synopkg stop Virtualization > /dev/null 2>&1 || true
 
       for F in "${PATCH_FILES[@]}"; do
         _process_file "${VMMPATCHPATH}/${VMMVERSION}/${F}" "${VMMPATH}/${F}"
       done
 
       echo "vmmpatch: Restarting Virtualization"
-      ${ARCSU} /usr/syno/bin/synopkg restart Virtualization > /dev/null 2>&1 || true
+      ${ARCSU} synopkg restart Virtualization > /dev/null 2>&1 || true
     else
       echo "vmmpatch: All files are already patched"
     fi
