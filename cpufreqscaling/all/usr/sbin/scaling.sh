@@ -42,7 +42,7 @@ if [ "${SYSGOVERNOR}" != "${GOVERNOR}" ]; then
     exit 1
   fi
 
-  sleep 17
+  sleep 10
   echo "CPUFreqScaling: ReChecking governor" >> /tmp/scaling.log
 
   SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
