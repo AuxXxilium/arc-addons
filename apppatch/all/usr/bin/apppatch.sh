@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 #
 # Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
