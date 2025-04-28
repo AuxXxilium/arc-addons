@@ -34,7 +34,7 @@ install_addon() {
   #[ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   #cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
   #xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
-  #  sed "s/8d1512840900bf03000000e8d0fcfdff/8D1512840900BF030000009090909090/; s/8d159a810900bf03000000e858fafdff/8D159A810900BF030000009090909090/" |
+  #  sed "s/8d1512840900bf03000000e8d0fcfdff/8d1512840900bf030000009090909090/; s/8d159a810900bf03000000e858fafdff/8d159a810900bf030000009090909090/" |
   #  xxd -r -p >"${SO_FILE}" 2>/dev/null
   #rm -f "${SO_FILE}.tmp"
 
@@ -76,6 +76,11 @@ install_addon() {
   _blocklog "f_messages_failed_to_check" "Failed to check"
   _blocklog "f_messages_failed_to_update" "Failed to update"
   _blocklog "f_messages_sata_chip_name" "Can't get sata chip name"
+  _blocklog "f_scemd_redundant_power_chec" "redundant_power_chec"
+  _blocklog "f_scemd_fan_fan_" "fan/fan_"
+  _blocklog "f_synoscgi_fan_fan_" "fan/fan_"
+  _blocklog "f_synoplugin_plugin_action" "plugin_action"
+  _blocklog "f_synoplugin_package_action" "package_action"
 
   # syno-dump-core
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
