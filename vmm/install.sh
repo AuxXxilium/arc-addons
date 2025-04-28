@@ -19,7 +19,8 @@ install_addon() {
   cat >"/tmpRoot/usr/lib/systemd/system/vmmpatch.service" <<EOF
 [Unit]
 Description=addon vmmpatch
-After=multi-user.target
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 
 [Service]
 Type=oneshot

@@ -8,50 +8,53 @@
 
 install_addon() {
   echo "Installing addon amepatch - ${1}"
-  mkdir -p "/tmpRoot/usr/arc/addons/"
+
+  # Create necessary directories and copy files
+  mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf /usr/bin/amepatch.sh /tmpRoot/usr/bin/
 
-  cp -pf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
+  # Create systemd service file
+  cat <<EOF >"/tmpRoot/usr/lib/systemd/system/amepatch.service"
+[Unit]
+Description=addon amepatch
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/amepatch.service"
-  {
-    echo "[Unit]"
-    echo "Description=addon amepatch"
-    echo "After=syno-volume.target syno-space.target"
-    echo
-    echo "[Service]"
-    echo "Type=oneshot"
-    echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/amepatch.sh"
-    echo
-    echo "[Install]"
-    echo "WantedBy=multi-user.target"
-  } >"${DEST}"
-  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/amepatch.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
   ln -vsf /usr/lib/systemd/system/amepatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service
 }
 
 uninstall_addon() {
   echo "Uninstalling addon amepatch - ${1}"
 
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/amepatch.service"
-  rm -f "/tmpRoot/usr/bin/amepatch.sh"
+  # Remove systemd files and binaries
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service" \
+        "/tmpRoot/usr/lib/systemd/system/amepatch.service" \
+        "/tmpRoot/usr/bin/amepatch.sh"
 
-  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' > /tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
+  # Create revert script if not present
+  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && {
+    echo '#!/usr/bin/env bash' > /tmpRoot/usr/arc/revert.sh
+    chmod +x /tmpRoot/usr/arc/revert.sh
+  }
+
+  # Add revert command
   echo "rm -f /usr/bin/amepatch.sh" >> /tmpRoot/usr/arc/revert.sh
 }
 
 case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-  *)
-    exit 0
-    ;;
+  late) install_addon "${1}" ;;
+  uninstall) uninstall_addon "${1}" ;;
+  *) exit 0 ;;
 esac
+
 exit 0
