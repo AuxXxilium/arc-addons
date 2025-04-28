@@ -18,8 +18,7 @@ install_addon() {
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/amepatch.service"
 [Unit]
 Description=addon amepatch
-Wants=smpkg-custom-install.service pkgctl-StorageManager.service
-After=smpkg-custom-install.service
+After=multi-user.target
 
 [Service]
 Type=oneshot
