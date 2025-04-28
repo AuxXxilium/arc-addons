@@ -58,18 +58,20 @@ patch_synology_photos() {
 }
 
 restore_surveillance_station() {
-  [ -d "/var/packages/SurveillanceStation/target/@SSData/AddOns/LocalDisplay" ] &&
-    ${ARCSU} rm -f "/volume1/@appstore/SurveillanceStation/@SSData/AddOns/LocalDisplay/disabled"
+  SS_PATH="/var/packages/SurveillanceStation/target"
+    [ -d "${SS_PATH}/@SSData/AddOns/LocalDisplay" ] &&
+    ${ARCSU} rm -f "${SS_PATH}/@SSData/AddOns/LocalDisplay/disabled"
 }
 
 patch_surveillance_station() {
   echo "Stopping Surveillance Station package..."
   ${ARCSU} synopkg stop SurveillanceStation > /dev/null 2>&1 || true
 
-  if [ -d "/var/packages/SurveillanceStation/target/@SSData/AddOns/LocalDisplay" ]; then
-    echo -n "" | ${ARCSU} tee "/volume1/@appstore/SurveillanceStation/@SSData/AddOns/LocalDisplay/disabled" >/dev/null
-    if [ -d "/var/packages/SurveillanceStation/target/local_display" ]; then
-      ${ARCSU} rm -rf "/var/packages/SurveillanceStation/target/local_display/.config/chromium-local-display/BrowserMetrics/"*
+  SS_PATH="/var/packages/SurveillanceStation/target"
+    if [ -d "${SS_PATH}/@SSData/AddOns/LocalDisplay" ]; then
+      ${ARCSU} echo -n "" >"${SS_PATH}/@SSData/AddOns/LocalDisplay/disabled"
+      if [ -d "${SS_PATH}/local_display" ]; then
+        ${ARCSU} rm -rf "${SS_PATH}/local_display/.config/chromium-local-display/BrowserMetrics/"*
     fi
   fi
 

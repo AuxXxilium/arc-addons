@@ -1,5 +1,5 @@
 version: 1
-name: universal
+name: apppatch
 description: "Fix Synology Photos and local_display"
 system: false
 beta: true

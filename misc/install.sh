@@ -9,10 +9,13 @@
 install_early() {
   echo "Installing addon misc - early"
 
+  # [CREATE][failed] Raidtool initsys
   SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
-  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null | sed "s/2d6520302e39/2d6520312e32/" | xxd -r -p >"${SO_FILE}" 2>/dev/null
+  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
+    sed "s/2d6520302e39/2d6520312e32/" |
+    xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 }
 
@@ -21,18 +24,52 @@ install_rcExit() {
     sed -i 's/c("welcome","desc_install")/"Error: The bootloader disk is not successfully mounted, the installation will fail."/' /usr/syno/web/main.js
   fi
 
-  if grep -q 'force_junior' /proc/cmdline 2>/dev/null && grep -q 'recovery' /proc/cmdline 2>/dev/null; then
-    echo "Installing addon misc - rcExit"
+  #DSM_MODEL="$(/bin/get_key_value /etc/synoinfo.conf upnpmodelname)"
+  #DSM_MODEL=$(echo "${DSM_MODEL}" | tr 'A-Z' 'a-z')
+  #DB_FILE="$(ls /var/lib/disk-compatibility/${DSM_MODEL}*.db 2>/dev/null | head -1)"
+  #
+  #for D in /sys/block/*; do
+  #  [ ! -e "${D}" ] && continue
+  #  [ ! -e "${D}/device/syno_block_info" ] && continue
+  #
+  #  model=$(cat "${D}/device/model" 2>/dev/null | xargs)
+  #  rev=$(cat "${D}/device/rev" 2>/dev/null | xargs)
+  #  sz=$(cat "${D}/size" 2>/dev/null | xargs)
+  #  ss=$(cat "${D}/queue/hw_sector_size" 2>/dev/null | xargs)
+  #  size=$((${sz:-0} * ${ss:-0} / 1024 / 1024 / 1024))
+  #
+  #  grep -q "\"${model}\"" "${DB_FILE}" && continue
+  #  VDATA="{
+  #        \"size_gb\": ${size},
+  #        \"compatibility_interval\": [
+  #            {
+  #                \"compatibility\": \"support\",
+  #                \"not_yet_rolling_status\": \"support\",
+  #                \"fw_dsm_update_status_notify\": false,
+  #                \"barebone_installable\": true,
+  #                \"barebone_installable_v2\": \"auto\",
+  #                \"smart_test_ignore\": true,
+  #                \"smart_attr_ignore\": true
+  #            }
+  #        ]
+  #    }"
+  #  MDATA="\"${model}\":{\"${rev}\":${VDATA},\"default\":${VDATA}}"
+  #  echo "${D} - ${MDATA}"
+  #  jq ".disk_compatbility_info += {${MDATA}}" "${DB_FILE}" >temp.json && mv temp.json "${DB_FILE}"
+  #done
 
-    mkdir -p /usr/syno/web/webman
+  SH_FILE="/usr/syno/share/get_hcl_invalid_disks.sh"
+  [ -f "${SH_FILE}" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak" && printf '#!/bin/sh\nexit 0\n' >"${SH_FILE}"
 
-    create_cgi_script() {
-      FILE_PATH="/usr/syno/web/webman/${1}.cgi"
-      echo "${2}" >"${FILE_PATH}"
-      chmod +x "${FILE_PATH}"
-    }
+  mkdir -p /usr/syno/web/webman
 
-    create_cgi_script "clean_system_disk" '#!/bin/sh
+  create_cgi_script() {
+    FILE_PATH="/usr/syno/web/webman/${1}.cgi"
+    echo "${2}" >"${FILE_PATH}"
+    chmod +x "${FILE_PATH}"
+  }
+
+  create_cgi_script "clean_system_disk" '#!/bin/sh
 echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
 if [ -b /dev/md0 ]; then
   mkdir -p /mnt/md0
@@ -47,7 +84,7 @@ else
   echo "{\"success\": false}"
 fi'
 
-    create_cgi_script "reboot_to_loader" '#!/bin/sh
+  create_cgi_script "reboot_to_loader" '#!/bin/sh
 echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
 if [ -f /usr/bin/loader-reboot.sh ]; then
   /usr/bin/loader-reboot.sh config
@@ -56,7 +93,7 @@ else
   echo "{\"success\": false}"
 fi'
 
-    create_cgi_script "get_logs" '#!/bin/sh
+  create_cgi_script "get_logs" '#!/bin/sh
 echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
 echo "==== proc cmdline ===="
 cat /proc/cmdline 
@@ -67,7 +104,7 @@ cat /tmp/installer_sh.log
 echo "==== Messages log ===="
 cat /var/log/messages'
 
-    create_cgi_script "recovery" '#!/bin/sh
+  create_cgi_script "recovery" '#!/bin/sh
 echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
 echo "Starting ttyd ..."
 MSG=""
@@ -98,6 +135,7 @@ mkdir -p /tmpRoot
 mount /dev/md0 /tmpRoot
 echo "Arc Recovery mode is ready"'
 
+  if grep -Eq 'force_junior|recovery' /proc/cmdline 2>/dev/null; then
     /usr/syno/web/webman/recovery.cgi
   fi
 }

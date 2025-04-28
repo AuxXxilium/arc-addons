@@ -6,12 +6,10 @@
 # See /LICENSE for more information.
 #
 
-# PLATFORMS="epyc7002"
-# PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
-# if ! echo "${PLATFORMS}" | grep -wq "${PLATFORM}"; then
-#   echo "${PLATFORM} is not supported nvmesystem addon!"
-#   exit 0
-# fi
+if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
+   echo "non-DT models is not supported nvmesystem addon!"
+   exit 0
+ fi
 # _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
 # if [ ${_BUILD:-42218} -lt 42218 ]; then
 #   echo "${_BUILD} is not supported nvmesystem addon!"
