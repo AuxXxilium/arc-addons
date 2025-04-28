@@ -49,8 +49,8 @@ use POSIX qw(ceil uname strftime ttyname);
 
 ## INXI INFO ##
 my $self_name='inxi';
-my $self_version='3.3.37';
-my $self_date='2025-01-06';
+my $self_version='3.3.38';
+my $self_date='2025-04-06';
 my $self_patch='00';
 ## END INXI INFO ##
 
@@ -467,17 +467,20 @@ sub set_display_size {
 	if (!$b_irc){
 		if (my $program = check_program('tput')){
 			# Arch urxvt: 'tput: unknown terminal "rxvt-unicode-256color"'
+			# OpenBSD error unknwn terminal xterm-qhostty
 			# trips error if use qx(); in FreeBSD, if you use 2>/dev/null 
-			# it makes default value 80x24, who knows why?
-			chomp($size{'term-cols'} = qx{$program cols});
-			chomp($size{'term-lines'} = qx{$program lines});
+			# it makes default value 80x24, who knows why? That's a FreeBSD issue, not
+			# inxi, so suppressing errors.
+			chomp($size{'term-cols'} = qx{$program cols 2>/dev/null});
+			chomp($size{'term-lines'} = qx{$program lines 2>/dev/null});
 		}
 		# print "tc: $size{'term-cols'} cmc: $size{'console'}\n";
 		# double check, just in case it's missing functionality or whatever
-		if (!is_int($size{'term-cols'} || $size{'term-cols'} == 0)){ 
+		# handle '' or 0, we don't care.
+		if (!$size{'term-cols'} || !is_int($size{'term-cols'})){ 
 			$size{'term-cols'} = 80;
 		}
-		if (!is_int($size{'term-lines'} || $size{'term-lines'} == 0)){ 
+		if (!$size{'term-lines'} || !is_int($size{'term-lines'})){ 
 			$size{'term-lines'} = 24;
 		}
 	}
@@ -2943,7 +2946,7 @@ sub error_handler {
 			$errno=23; $b_exit=0; 
 			"The option: $one has been deprecated. Please use $two instead." }
 		elsif ($err eq 'option-removed'){ 
-			$errno=24; $b_help=1; "The option: $one has been remnoved. Please use $two instead." }
+			$errno=24; $b_help=1; "The option: $one has been removed. Please use $two instead." }
 		## Data
 		elsif ($err eq 'open-data'){ 
 			$errno=32; "Error opening data for reading: $one \nError: $two" }
@@ -3006,7 +3009,7 @@ sub error_handler {
 	};
 	print_line("Error $errno: $message\n");
 	if ($b_help){
-		print_line("Check -h for correct useage.\n");
+		print_line("Check -h for correct usage.\n");
 	}
 	if ($b_recommends){
 		print_line("See --recommends for more information.\n");
@@ -4044,14 +4047,18 @@ sub is_hex {
 ## NOTE: for perl pre 5.012 length(undef) returns warning
 # receives string, returns boolean 1 if integer
 sub is_int {
-	return 1 if (defined $_[0] && length($_[0]) && 
-	 length($_[0]) == ($_[0] =~ tr/0123456789//));
+	if (defined $_[0] && length($_[0]) && 
+	length($_[0]) == ($_[0] =~ tr/0123456789//)){
+		return 1;
+	}
 }
 
 # receives string, returns true/1 if >= 0 numeric. tr/// 4x faster than regex
 sub is_numeric {
-	return 1 if (defined $_[0] && ($_[0] =~ tr/0123456789//) >= 1 && 
-	 length($_[0]) == ($_[0] =~ tr/0123456789.//) && ($_[0] =~ tr/.//) <= 1);
+	if (defined $_[0] && ($_[0] =~ tr/0123456789//) >= 1 && 
+	length($_[0]) == ($_[0] =~ tr/0123456789.//) && ($_[0] =~ tr/.//) <= 1){
+		return 1;
+	}
 }
 
 # gets array ref, which may be undefined, plus join string
@@ -10542,11 +10549,11 @@ sub cpu_sysctl_data {
 	@{$sysctl{'cpu'}} = () if !$sysctl{'cpu'}; # don't want error next!
 	foreach (@{$sysctl{'cpu'}}){
 		@line = split(/\s*:\s*/, $_);
-		next if !$line[0];
+		next if !$line[0] || !defined $line[1];
 		# darwin shows machine, like MacBook7,1, not cpu
 		# machdep.cpu.brand_string: Intel(R) Core(TM)2 Duo CPU     P8600  @ 2.40GHz
-		if (($bsd_type ne 'darwin' && $line[0] eq 'hw.model') || 
-		$line[0] eq 'machdep.cpu.brand_string'){
+		if (($bsd_type ne 'darwin' && ($line[0] eq 'hw.model') || 
+		$line[0] eq 'machdep.cpu.brand_string')){
 			# cut L2 cache/cpu max speed out of model string, if available
 			# openbsd 5.6: AMD Sempron(tm) Processor 3400+ ("AuthenticAMD" 686-class, 256KB L2 cache)
 			# openbsd 6.x has Lx cache data in dmesg.boot
@@ -12789,6 +12796,7 @@ sub cp_elbrus_data {
 # args: 0: vendor_id,like GenuineIntel, AuthenticAMD
 sub cpu_vendor {
 	eval $start if $b_log;
+	return '' if !defined $_[0];
 	my $string = $_[0];
 	my $vendor = '';
 	$string = lc($string);
@@ -16807,11 +16815,12 @@ sub vulkan_data {
 	}
 	else {
 		my $file;
-		 $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-intel-llvm-1.txt";
-		 $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-nvidia-1.txt";
-		 $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-intel-1.txt";
-		 $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-amd-dz.txt";
-		 $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-mali-3.txt";
+		# $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-intel-llvm-1.txt";
+		# $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-nvidia-1.txt";
+		# $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-intel-1.txt";
+		# $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-amd-dz.txt";
+		# $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-mali-3.txt";
+		 $file = "$fake_data_dir/graphics/vulkan/vulkaninfo-2-gpu-no-DriverProperties-1.3.296.1.txt";
 		$data = main::reader($file,'','ref');
 	}
 	if (!$data){
@@ -16875,7 +16884,8 @@ sub vulkan_data {
 		elsif ($working[0] eq 'VkPhysicalDeviceProperties'){
 			$active{'props'} = 1;
 		}
-		elsif ($working[0] eq 'VkPhysicalDeviceDriverProperties'){
+		# note: VkPhysicalDeviceDriverProperties was dropped after 1.3.255, by 1.3.296
+		elsif ($working[0] eq 'VkPhysicalDeviceVulkan12Properties'){
 			$active{'driver'} = 1;
 		}
 		elsif ($working[0] =~ /^\S+Features/i){
@@ -16969,6 +16979,11 @@ sub vulkan_data {
 				elsif ($line =~ /^\s+driverInfo\s*=\s*((Mesa)\s)?(.*)/i){
 					$vulkan->{'devices'}{$id}{'mesa'} = lc($2) if $2;
 					$vulkan->{'devices'}{$id}{'driver-info'} = $3;
+				}
+				# this is a long block, just exit after driver info. If we want the
+				# conforming data in future, move exit down to shading line.
+				elsif ($line =~ /^\s+conformanceVersion/){
+					$active{'driver'} = undef;
 				}
 			}
 		}
@@ -18419,9 +18434,9 @@ sub set_amd_data {
 	'years' => '2019-20',
 	},
 	{'arch' => 'RDNA-2',
-	'ids' => '1435|1506|163f|164d|164e|1681|73a0|73a1|73a2|73a3|73a5|73ab|73ae|' .
-	'73af|73bf|73c0|73c1|73c3|73ce|73df|73e0|73e1|73e3|73ef|73ff|7420|7421|7422|' .
-	'7423|7424|743f',
+	'ids' => '13c0|1435|1506|163f|164d|164e|1681|73a0|73a1|73a2|73a3|73a5|73ab|' .
+	'73ae|73af|73bf|73c0|73c1|73c3|73ce|73df|73e0|73e1|73e3|73ef|73ff|7420|7421|' .
+	'7422|7423|7424|743f',
 	'code' => 'Navi-2x',
 	'process' => 'TSMC n7 (7nm)',
 	'years' => '2020-22',
@@ -18637,7 +18652,7 @@ sub set_intel_data {
 	'years' => '2023+',
 	},
 	{'arch' => 'Xe2',
-	'ids' => 'e202|e20b|e20c|e20d|e212',
+	'ids' => 'e202|e20b|e20c|e20d|e210|e212|e215|e216',
 	'code' => '',
 	'process' => 'TSMC n4 (4nm)',
 	'years' => '2024+',
@@ -18853,15 +18868,15 @@ sub set_nv_data {
 	},
 	# GT 720M and 805A/810A are the same cpu id.
 	# years: 2012-2018 Kepler 2013-2015 Kepler 2.0
-	{'arch' => 'Kepler-2',
-	'ids' => '0fc6|0fc8|0fc9|0fcd|0fce|0fd1|0fd2|0fd3|0fd4|0fd5|0fd8|0fd9|0fdf|' .
-	'0fe0|0fe1|0fe2|0fe3|0fe4|0fe9|0fea|0fed|0fee|0ff6|0ff8|0ff9|0ffa|0ffb|0ffc|' .
-	'0ffd|0ffe|0fff|1001|1004|1005|1007|1008|100a|100c|1021|1022|1023|1024|1026|' .
-	'1027|1028|1029|102a|102d|103a|103c|1180|1183|1184|1185|1187|1188|1189|118a|' .
-	'118e|118f|1193|1194|1195|1198|1199|119a|119d|119e|119f|11a0|11a1|11a2|11a3|' .
-	'11a7|11b4|11b6|11b7|11b8|11ba|11bc|11bd|11be|11c0|11c2|11c3|11c4|11c5|11c6|' .
-	'11c8|11cb|11e0|11e1|11e2|11e3|11fa|11fc|1280|1282|1284|1286|1287|1288|1290|' .
-	'1291|1292|1293|1295|1296|1298|1299|129a|12b9|12ba',
+	 {'arch' => 'Kepler-2',
+	'ids' => '0fc1|0fc6|0fc8|0fc9|0fcd|0fce|0fd1|0fd2|0fd3|0fd4|0fd5|0fd8|0fd9|' .
+	'0fdf|0fe0|0fe1|0fe2|0fe3|0fe4|0fe9|0fea|0fed|0fee|0ff6|0ff8|0ff9|0ffa|0ffb|' .
+	'0ffc|0ffd|0ffe|0fff|1001|1004|1005|1007|1008|100a|100c|1021|1022|1023|1024|' .
+	'1026|1027|1028|1029|102a|102d|103a|103c|1180|1183|1184|1185|1187|1188|1189|' .
+	'118a|118e|118f|1193|1194|1195|1198|1199|119a|119d|119e|119f|11a0|11a1|11a2|' .
+	'11a3|11a7|11b4|11b6|11b7|11b8|11ba|11bc|11bd|11be|11c0|11c2|11c3|11c4|11c5|' .
+	'11c6|11c8|11cb|11e0|11e1|11e2|11e3|11fa|11fc|1280|1282|1284|1286|1287|1288|' .
+	'1290|1291|1292|1293|1295|1296|1298|1299|129a|12b9|12ba',
 	'code' => 'GKxxx',
 	'kernel' => '',
 	'legacy' => 1,
@@ -18885,7 +18900,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 28nm',
 	'release' => '',
-	'series' => '550/565.xx+',
+	'series' => '550-570.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2014-2019',
@@ -18902,7 +18917,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 16nm',
 	'release' => '',
-	'series' => '550/565.xx+',
+	'series' => '550-570.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2016-2021',
@@ -18914,7 +18929,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 12nm',
 	'release' => '',
-	'series' => '550/565.xx+',
+	'series' => '550-570.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2017-2020',
@@ -18932,7 +18947,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 12nm FF',
 	'release' => '',
-	'series' => '550/565.xx+',
+	'series' => '550-570.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2018-2022',
@@ -18944,13 +18959,13 @@ sub set_nv_data {
 	'24b1|24b6|24b7|24b8|24b9|24ba|24bb|24c7|24c9|24dc|24dd|24e0|24fa|2503|2504|' .
 	'2507|2508|2520|2521|2523|2531|2544|2560|2563|2571|2582|2584|25a0|25a2|25a5|' .
 	'25ab|25ac|25b0|25b2|25b6|25b8|25b9|25ba|25bb|25bc|25bd|25e0|25e2|25e5|25ec|' .
-	'25f9|25fa|25fb|2822|2838',
+	'25f9|25fa|25fb|2822|2838|28a3',
 	'code' => 'GAxxx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC n7 (7nm)',
 	'release' => '',
-	'series' => '550/565.xx+',
+	'series' => '550-570.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2020-2023',
@@ -18962,7 +18977,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC n4 (5nm)',
 	'release' => '',
-	'series' => '550/565.xx+',
+	'series' => '550-570.xx+',
 	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2022+',
@@ -18971,16 +18986,28 @@ sub set_nv_data {
 	'ids' => '2684|2685|2689|26b1|26b2|26b3|26b5|26b9|26ba|2702|2704|2705|2709|' .
 	'2717|2730|2757|2770|2782|2783|2786|2788|27a0|27b0|27b1|27b2|27b6|27b8|27ba|' .
 	'27bb|27e0|27fb|2803|2805|2808|2820|2860|2882|28a0|28a1|28b0|28b9|28ba|28bb|' .
-	'28e0|28e1',
+	'28e0|28e1|2b85|2b87|2c02',
 	'code' => 'AD1xx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC n4 (5nm)',
 	'release' => '',
-	'series' => '550/565.xx+',
+	'series' => '550-570.xx+',
 	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2022+',
+	},
+	{'arch' => 'Blackwell',
+	'ids' => '2901',
+	'code' => 'GB2xx',
+	'kernel' => '',
+	'legacy' => 0,
+	'process' => 'TSMC 4np (5nm)',
+	'release' => '',
+	'series' => '550-570.xx+',
+	'status' => $status_current,
+	'xorg' => '',
+	'years' => '2024+',
 	},
 	],
 }
@@ -21381,14 +21408,14 @@ sub wan_ip {
 		# 0.020s: http://whatismyip.akamai.com/
 		# 0.136s: https://get.geojs.io/v1/ip
 		# 0.024s: http://icanhazip.com/
-		# 0.027s: ifconfig.io
-		# 0.230s: https://smxi.org/opt/ip.php
+		# 0.027s: ifconfig.io ip page too big, too many lines, also returned ipv6 for some reason
+		# 0.230s: legacy: smxi ip tool, removed, too slow anyway
 		# 0.023s: https://api.ipify.org :: NOTE: hangs, widely variable times, don't use
 		my @urls = (!$wan_url) ? qw(http://whatismyip.akamai.com/ 
-		http://icanhazip.com/ https://smxi.org/opt/ip.php) : ($wan_url);
+		http://icanhazip.com/) : ($wan_url);
 		foreach (@urls){
 			last if !$dl{'dl'};
-			$ua = 'ip' if $_ =~ /smxi/;
+			# $ua = 'ip' if $_ =~ /smxi/;
 			$ip = main::download_file('stdout',$_,'',$ua);
 			if ($ip){
 				# print "$_\n";
@@ -26396,7 +26423,7 @@ sub get_repos_linux {
 		);
 		@content = ();
 	}
-	# pisi: Pardus, Solus
+	# pisi: Pardus, Solus, Side
 	if ((-d $pisi_dir && ($path = main::check_program('pisi'))) || 
 	(-d $eopkg_dir && ($path = main::check_program('eopkg')))){
 		# $path = 'eopkg';
@@ -27312,8 +27339,8 @@ sub linux_sensors_data {
 				$sensors->{'temp-unit'} = set_temp_unit($sensors->{'temp-unit'},$working_unit) if $working_unit;
 			}
 			elsif ($_ =~ /^T?(dimm|mem|sodimm).*?:([0-9\.]+)[\s°]*(C|F)/i){
-				$sensors->{'sodimm-temp'} = $1;
-				$working_unit = $2;
+				$sensors->{'sodimm-temp'} = $2;
+				$working_unit = $3;
 				$sensors->{'temp-unit'} = set_temp_unit($sensors->{'temp-unit'},$working_unit) if $working_unit;
 			}
 			# for temp1/2 only use temp1/2 if they are null or greater than the last ones
@@ -30426,6 +30453,7 @@ sub de_env_data {
 		# debian package: lxde-core. 
 		# NOTE: some distros fail to set XDG data for root, ps may get it
 		[1,'lxde','lxpanel','','gtk-na',',^lxsession$'], # no gtk v data, not same as system
+		[1,'sde','sde','','gtk-na',''], # no lxpanel, nothing returns version
 		[1,'razor','razor-session','','qt','^razor-session$'],
 		# BAD: lxqt-about opens dialogue, sigh. 
 		# Checked, lxqt-panel does show same version as lxqt-about/session
@@ -32236,7 +32264,7 @@ sub get_distro_linux {
 	# order matters!
 	my @derived = qw(antix-version aptosid-version bodhibuilder.conf kanotix-version 
 	knoppix-version pclinuxos-release mandrake-release manjaro-release mx-version 
-	pardus-release porteus-version q4os_version sabayon-release 
+	pardus-release porteus-version q4os_version sabayon-release side-release
 	siduction-version sidux-version slax-version slint-version slitaz-release 
 	solusos-release turbolinux-release zenwalk-version);
 	my $derived_str = join('|', @derived);
@@ -32249,7 +32277,7 @@ sub get_distro_linux {
 	my $lsb_good_str = 'mandrake-release|mandriva-release|mandrakelinux-release|';
 	$lsb_good_str .= 'manjaro-release';
 	my $osr_good_str = 'altlinux-release|arch-release|mageia-release|';
-	$osr_good_str .= 'pclinuxos-release|rpi-issue|SuSE-release';
+	$osr_good_str .= 'pclinuxos-release|rpi-issue|side-release|SuSE-release';
 	# We need these empirically verified one by one as they appear, but always remember
 	# that stuff changes, legacy, deprecated, but these ideally are going to be right
 	my $osr_good = 'antergos|chakra|fedora|guix|mageia|manjaro|oracle|pclinuxos|';
@@ -34643,7 +34671,10 @@ sub create_output {
 	}
 	else {
 		if ($type eq 'inner' || $pms{'disabled'}){
-			$total = 'N/A' if $extra < 2;
+			# only total key exists, which is 0.
+			if ($extra < 2 || scalar keys %pms == 1){
+				$total = 'N/A';
+			}
 		}
 		else {
 			$total = main::message('package-data');
@@ -34659,7 +34690,7 @@ sub create_output {
 				last;
 			}
 		}
-		$total = '' if !$b_mismatch;
+		$total = '' if !$b_mismatch && %pms;
 	}
 	$output->{main::key($$num++,1,1,'Packages')} = $total;
 	# if blocked pm secondary, only show if no total or improbable total
@@ -34738,6 +34769,7 @@ sub package_counts {
 	 ['argon','aura','aurutils','baph','cylon','octopi','pacaur','pacseek',
 	 'pakku','pamac','paru','pikaur','trizen','yaourt','yay','yup']], 
 	['pacman-g2','pacman-g2','p','-Q',1,0,'','',],
+	['pisi','pisi','p','li',1,0,'','',],
 	['pkg','pkg','d','/var/db/pkg/*',1,0,''], # 'pkg list' returns non programs
 	['pkg_add','pkg_info','p','-a',1,0,''], # OpenBSD has set of tools, not 1 pm
 	# like cards, avoid pkginfo directly due to python pm being so slow
@@ -36079,6 +36111,7 @@ sub set_values {
 	'sapphire' => ['^version sapphire',3,'-version','sapphire',0,1,0,'',''],
 	'sawfish' => ['^sawfish',3,'--version','Sawfish',0,1,0,'',''],
 	'scrotwm' => ['^scrotwm',2,'-v','scrotwm',0,1,1,'welcome to scrotwm',''],
+	'sde' => ['^sde',0,'0','SDE',0,1,0,'',''], # no detectable version, lxde based
 	'simulavr' => ['simulavr^',0,'0','SimulaVR',0,1,0,'',''], # unverified
 	'skylight' => ['^skylight',0,'0','Skylight',0,1,0,'',''], # unverified
 	'smithay' => ['^smithay',0,'0','Smithay',0,1,0,'',''], # unverified
@@ -38839,7 +38872,6 @@ sub info_item {
 	$index++ if $extra > 0;
 	if ($extra > 0 && !$loaded{'package-data'}){
 		my $packages = PackageData::get('inner',\$num);
-		
 		for (keys %$packages){
 			$data->{$data_name}[$index]{$_} = $packages->{$_};
 		}

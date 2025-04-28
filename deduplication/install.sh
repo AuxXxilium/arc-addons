@@ -9,51 +9,54 @@
 #
 
 install_addon() {
-  echo "Creating service to exec deduplication"
-  mkdir -p "/tmpRoot/usr/arc/addons/"
-  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
-  
-  cp -pf /usr/bin/deduplication.sh /tmpRoot/usr/bin/deduplication.sh
+  echo "Installing deduplication addon"
 
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/deduplication.service"
-  {
-    echo "[Unit]"
-    echo "Description=Enable Deduplication"
-    echo "After=multi-user.target"
-    echo
-    echo "[Service]"
-    echo "Type=oneshot"
-    echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/deduplication.sh -t"
-    echo
-    echo "[Install]"
-    echo "WantedBy=multi-user.target"
-  } >"${DEST}"
-  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  # Create necessary directories and copy files
+  mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
+  cp -pf /usr/bin/deduplication.sh /tmpRoot/usr/bin/
+
+  # Create systemd service file
+  cat <<EOF >"/tmpRoot/usr/lib/systemd/system/deduplication.service"
+[Unit]
+Description=Enable Deduplication
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/deduplication.sh -t
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
   ln -vsf /usr/lib/systemd/system/deduplication.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/deduplication.service
 }
 
 uninstall_addon() {
-  echo "Uninstalling addon deduplication"
+  echo "Uninstalling deduplication addon"
 
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/deduplication.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/deduplication.service"
+  # Remove systemd files
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/deduplication.service" \
+        "/tmpRoot/usr/lib/systemd/system/deduplication.service"
 
-  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
-  echo "/usr/bin/deduplication.sh --restore" >>/tmpRoot/usr/arc/revert.sh
-  echo "rm -f /usr/bin/deduplication.sh" >>/tmpRoot/usr/arc/revert.sh
+  # Create revert script if not present
+  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && {
+    echo '#!/usr/bin/env bash' > /tmpRoot/usr/arc/revert.sh
+    chmod +x /tmpRoot/usr/arc/revert.sh
+  }
+
+  # Add revert commands
+  echo "/usr/bin/deduplication.sh --restore" >> /tmpRoot/usr/arc/revert.sh
+  echo "rm -f /usr/bin/deduplication.sh" >> /tmpRoot/usr/arc/revert.sh
 }
 
 case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon
-    ;;
-  *)
-    exit 0
-    ;;
+  late) install_addon ;;
+  uninstall) uninstall_addon ;;
+  *) exit 0 ;;
 esac
+
 exit 0

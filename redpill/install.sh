@@ -7,21 +7,10 @@
 #
 
 install_addon() {
-  SUPPORTED="false"
-  PLATFORMS="epyc7002 v1000nk"
-  PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
-
-  # Check if the platform is supported
-  for SUPPORTED_PLATFORM in ${PLATFORMS}; do
-    if [ "${PLATFORM}" = "${SUPPORTED_PLATFORM}" ]; then
-      SUPPORTED="true"
-      break
-    fi
-  done
-
-  if [ "${SUPPORTED}" != "true" ]; then
-    echo "${PLATFORM} is not supported for the redpill addon!"
-    exit 1
+  _release=$(/bin/uname -r)
+  if [ "$(/bin/echo ${_release%%[-+]*} | /usr/bin/cut -d'.' -f1)" -lt 5 ]; then
+    echo "Kernel version < 5 is not supported redpill addon!"
+    exit 0
   fi
 
   # Handle installation based on the argument

@@ -321,6 +321,9 @@ dtModel() {
     done
     echo "};" >>"${DEST}"
   else
+    # fix model name
+    sed -i "0,/version = .*;/s/model = \".*\";/model = \"${UNIQUE}\";/" "${DEST}"
+
     MAXDISKS=$(grep -c "internal_slot@" "${DEST}" 2>/dev/null)
     if _check_post_k "rd" "maxdisks"; then
       MAXDISKS=$(($(_get_conf_kv rd maxdisks)))
