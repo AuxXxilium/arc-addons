@@ -6,12 +6,6 @@
 # See /LICENSE for more information.
 #
 
-# Check if /usr/bin/arcsu exists
-ARCSU=""
-if [ -x "/usr/bin/arcsu" ]; then
-  ARCSU="/usr/bin/arcsu"
-fi
-
 args=()
 
 HBA=false
@@ -31,4 +25,4 @@ for argv in "$@"; do
   argp="${argv}"
 done
 
-${ARCSU} smartctl.bak "${args[@]}"
+smartctl.bak "${args[@]}"

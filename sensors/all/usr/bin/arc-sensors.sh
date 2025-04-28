@@ -6,12 +6,6 @@
 # See /LICENSE for more information.
 #
 
-# Check if /usr/bin/arcsu exists
-ARCSU=""
-if [ -x "/usr/bin/arcsu" ]; then
-  ARCSU="/usr/bin/arcsu"
-fi
-
 if ! command -v perl &>/dev/null; then
   echo "Installing Perl..."
   synopkg install_from_server Perl
@@ -22,19 +16,19 @@ if ! command -v perl &>/dev/null; then
   exit 1
 fi
 
-${ARCSU} modprobe hwmon-vid
-${ARCSU} modprobe it87
-${ARCSU} modprobe adt7470
-${ARCSU} modprobe adt7475
-${ARCSU} modprobe nct6683
-${ARCSU} modprobe nct6775
-${ARCSU} modprobe coretemp
-${ARCSU} modprobe k10temp
+modprobe hwmon-vid
+modprobe it87
+modprobe adt7470
+modprobe adt7475
+modprobe nct6683
+modprobe nct6775
+modprobe coretemp
+modprobe k10temp
 
-echo 'Y' | ${ARCSU} sensors-detect --auto >"/tmp/sensors.log"
+echo 'Y' | sensors-detect --auto >"/tmp/sensors.log"
 grep -Eo 'Driver\s*:\s*\w+' "/tmp/sensors.log" | awk -F': ' '{print $2}'
 
-${ARCSU} sensors
+sensors
 
 generate_fancontrol_config() {
   # Or use pwmconfig to generate /etc/fancontrol interactively.
@@ -70,15 +64,15 @@ generate_fancontrol_config() {
     echo "MAXTEMP=$(echo ${MAXTEMP})"
     echo "MINSTART=$(echo ${MINSTART})"
     echo "MINSTOP=$(echo ${MINSTOP})"
-  } | ${ARCSU} tee "${DEST}" >/dev/null
+  } | tee "${DEST}" >/dev/null
 }
 
-echo "$@" | grep -wq "\-f" && ${ARCSU} rm -f /etc/fancontrol
+echo "$@" | grep -wq "\-f" && rm -f /etc/fancontrol
 if [ ! -f /etc/fancontrol ]; then
   generate_fancontrol_config
 fi
 
-${ARCSU} killall fancontrol
-${ARCSU} fancontrol &
+killall fancontrol
+fancontrol &
 
 exit 0
