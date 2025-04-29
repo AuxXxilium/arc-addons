@@ -29,7 +29,7 @@ curl_setopt($req, CURLOPT_RETURNTRANSFER, true);
 $res = curl_exec($req);
 $json = json_decode($res, true);
 
-if ($json['status'] !== 'Successfuly updated') {
+if ($json['success'] !== true) {
     echo 'badauth';
     curl_close($req);
     exit();
