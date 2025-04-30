@@ -21,7 +21,7 @@ install_addon() {
       ;;
     jrExit)
       echo "Installing addon redpill - jrExit"
-      rmmod redpill
+      #rmmod redpill
       ;;
     *)
       exit 0
