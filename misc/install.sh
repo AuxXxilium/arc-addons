@@ -24,6 +24,9 @@ install_rcExit() {
     sed -i 's/c("welcome","desc_install")/"Error: The bootloader disk is not successfully mounted, the installation will fail."/' /usr/syno/web/main.js
   fi
 
+  SH_FILE="/usr/syno/share/get_hcl_invalid_disks.sh"
+  [ -f "${SH_FILE}" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak" && printf '#!/bin/sh\nexit 0\n' >"${SH_FILE}"
+
   #DSM_MODEL="$(/bin/get_key_value /etc/synoinfo.conf upnpmodelname)"
   #DSM_MODEL=$(echo "${DSM_MODEL}" | tr 'A-Z' 'a-z')
   #DB_FILE="$(ls /var/lib/disk-compatibility/${DSM_MODEL}*.db 2>/dev/null | head -1)"
@@ -57,9 +60,6 @@ install_rcExit() {
   #  echo "${D} - ${MDATA}"
   #  jq ".disk_compatbility_info += {${MDATA}}" "${DB_FILE}" >temp.json && mv temp.json "${DB_FILE}"
   #done
-
-  SH_FILE="/usr/syno/share/get_hcl_invalid_disks.sh"
-  [ -f "${SH_FILE}" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak" && printf '#!/bin/sh\nexit 0\n' >"${SH_FILE}"
 
   mkdir -p /usr/syno/web/webman
 
@@ -142,7 +142,7 @@ echo "Arc Recovery mode is ready"'
 
 install_patches() {
   echo "Installing addon misc - patches"
-
+  # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
     TTYN="$(echo "${I}" | cut -d',' -f1)"
     BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
@@ -156,7 +156,7 @@ install_patches() {
       fi
     fi
   done
-
+  # network
   if grep -q 'network.' /proc/cmdline; then
     for I in $(grep -Eo 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
       MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/')"
@@ -194,11 +194,15 @@ install_late() {
 
   cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
   cp -vpdf /usr/lib/libubsan.* /tmpRoot/usr/lib/
-  cp -vpdf /usr/lib/libblkid.* /tmpRoot/usr/lib/
+  cp -vpf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
+  cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
+  cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
+  cp -vpf /usr/bin/sveinstaller /tmpRoot/usr/bin/sveinstaller
+  cp -vpf /usr/bin/forcemount /tmpRoot/usr/bin/forcemount
 
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
-
+  # acpi-cpufreq
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
     CPUFREQ=$(ls -l /sys/devices/system/cpu/cpufreq/*/* 2>/dev/null | wc -l)
     if [ ${CPUFREQ} -eq 0 ]; then
@@ -213,6 +217,7 @@ install_late() {
   modprobe -r acpi-cpufreq
   umount /sys
 
+  # crypto
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf ]; then
     if grep flags /proc/cpuinfo 2>/dev/null | grep -wq sse4_2; then
       echo "CPU Supports SSE4.2, crc32c-intel should load"
@@ -230,6 +235,7 @@ install_late() {
     fi
   fi
 
+  # nvidia
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf ]; then
     if ! grep -iq 10de /proc/bus/pci/devices 2>/dev/null; then
       echo "NVIDIA GPU is not detected, disabling "
@@ -240,9 +246,11 @@ install_late() {
     fi
   fi
 
+  # service
   SERVICE_PATH="/tmpRoot/usr/lib/systemd/system"
   sed -i 's|ExecStart=/|ExecStart=/|g' ${SERVICE_PATH}/syno-oob-check-status.service ${SERVICE_PATH}/SynoInitEth.service ${SERVICE_PATH}/syno_update_disk_logs.service
 
+  # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
     TTYN="$(echo "${I}" | cut -d',' -f1)"
     BAUD="$(echo "${I}" | cut -d',' -f2 | cut -d'n' -f1)"
@@ -258,9 +266,11 @@ install_late() {
     fi
   done
 
+  # sdcard
   [ ! -f /tmpRoot/usr/lib/udev/script/sdcard.sh.bak ] && cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
   printf '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
 
+  # network
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
   mkdir -p /tmpRoot/etc/sysconfig/network-scripts
   mkdir -p /tmpRoot/etc.defaults/sysconfig/network-scripts
@@ -283,27 +293,20 @@ install_late() {
     done
   fi
 
+  # packages
   if [ ! -f /tmpRoot/usr/syno/etc/packages/feeds ]; then
     mkdir -p /tmpRoot/usr/syno/etc/packages
     echo '[{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/tmpRoot/usr/syno/etc/packages/feeds
   fi
 
-  cp -f /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
-  cp -f /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
-  cp -f /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
-  cp -f /usr/bin/sveinstaller /tmpRoot/usr/bin/sveinstaller
-  cp -f /usr/bin/forcemount /tmpRoot/usr/bin/forcemount
-
+  # vmtools
   if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege >/dev/null 2>&1 || true
   fi
 
+  #qemu-ga
   if [ -d /tmpRoot/var/packages/qemu-ga ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege >/dev/null 2>&1 || true
-  fi
-
-  if [ -d /tmpRoot/var/packages/arc-control ]; then
-    sed -i 's/package/root/g' /var/packages/arc-control/conf/privilege >/dev/null 2>&1 || true
   fi
 }
 
