@@ -147,12 +147,13 @@ fi
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
 if "/usr/sbin/synoscgiproxy" -t >/dev/null 2>&1; then
-  if ! ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
+  if ! pgrep -f "/usr/sbin/synoscgiproxy" >/dev/null; then
     "/usr/sbin/synoscgiproxy" &
-    [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_arc.sock;|' /etc/nginx/nginx.conf
-    [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
-    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_arc.sock;|' /usr/syno/share/nginx/nginx.mustache
+    for FILE in /etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache; do
+      [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
+      sed -i 's|/run/synoscgi.sock|/run/synoscgi_arc.sock|g' "${FILE}"
+      sed -i 's|/run/synoscgi_rr.sock|/run/synoscgi_arc.sock|g' "${FILE}"
+    done
     systemctl reload nginx
   fi
 else

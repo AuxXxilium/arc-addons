@@ -20,7 +20,7 @@ install_early() {
 }
 
 install_rcExit() {
-  if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
+  if [ ! -b "/dev/synoboot" ] || [ ! -b "/dev/synoboot1" ] || [ ! -b "/dev/synoboot2" ] || [ ! -b "/dev/synoboot3" ]; then
     sed -i 's/c("welcome","desc_install")/"Error: The bootloader disk is not successfully mounted, the installation will fail."/' /usr/syno/web/main.js
   fi
 
@@ -204,7 +204,7 @@ install_late() {
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
   # acpi-cpufreq
-  if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
+  if [ -f "/tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf" ]; then
     CPUFREQ=$(ls -l /sys/devices/system/cpu/cpufreq/*/* 2>/dev/null | wc -l)
     if [ "${CPUFREQ}" -eq 0 ]; then
       echo "CPU does NOT support CPU Performance Scaling, disabling"
@@ -237,7 +237,7 @@ install_late() {
   fi
 
   # nvidia
-  if [ -f /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf ]; then
+  if [ -f "/tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf" ]; then
     if ! grep -iq 10de /proc/bus/pci/devices 2>/dev/null; then
       echo "NVIDIA GPU is not detected, disabling "
       sed -i 's/^nvidia/# nvidia/g' /tmpRoot/usr/lib/modules-load.d/70-syno-nvidia-gpu.conf
@@ -268,7 +268,7 @@ install_late() {
   done
 
   # sdcard
-  [ ! -f /tmpRoot/usr/lib/udev/script/sdcard.sh.bak ] && cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
+  [ ! -f "/tmpRoot/usr/lib/udev/script/sdcard.sh.bak" ] && cp -f /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
   printf '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
 
   # network
@@ -287,26 +287,26 @@ install_late() {
     for ETH in $(cat "/etc/ifcfgs"); do
       echo "Copy ifcfg-${ETH}"
       if [ -f "/etc/sysconfig/network-scripts/ifcfg-${ETH}" ]; then
-        rm -vf /tmpRoot/etc/sysconfig/network-scripts/ifcfg-*${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-*${ETH}
-        cp -vpf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc/sysconfig/network-scripts/
-        cp -vpf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/
+        rm -vf "/tmpRoot/etc/sysconfig/network-scripts/ifcfg-${ETH}" "/tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-${ETH}"
+        cp -vpf "/etc/sysconfig/network-scripts/ifcfg-${ETH}" /tmpRoot/etc/sysconfig/network-scripts/
+        cp -vpf "/etc/sysconfig/network-scripts/ifcfg-${ETH}" /tmpRoot/etc.defaults/sysconfig/network-scripts/
       fi
     done
   fi
 
   # packages
-  if [ ! -f /tmpRoot/usr/syno/etc/packages/feeds ]; then
+  if [ ! -f "/tmpRoot/usr/syno/etc/packages/feeds" ]; then
     mkdir -p /tmpRoot/usr/syno/etc/packages
     echo '[{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/tmpRoot/usr/syno/etc/packages/feeds
   fi
 
   # vmtools
-  if [ -d /tmpRoot/var/packages/open-vm-tools ]; then
+  if [ -d "/tmpRoot/var/packages/open-vm-tools" ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege >/dev/null 2>&1 || true
   fi
 
   # qemu-ga
-  if [ -d /tmpRoot/var/packages/qemu-ga ]; then
+  if [ -d "/tmpRoot/var/packages/qemu-ga" ]; then
     sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege >/dev/null 2>&1 || true
   fi
 }
