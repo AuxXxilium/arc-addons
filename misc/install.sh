@@ -194,6 +194,7 @@ install_late() {
 
   cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
   cp -vpdf /usr/lib/libubsan.* /tmpRoot/usr/lib/
+  cp -vpdf /usr/lib/libblkid.* /tmpRoot/usr/lib/
   cp -vpf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
   cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
@@ -205,7 +206,7 @@ install_late() {
   # acpi-cpufreq
   if [ -f /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf ]; then
     CPUFREQ=$(ls -l /sys/devices/system/cpu/cpufreq/*/* 2>/dev/null | wc -l)
-    if [ ${CPUFREQ} -eq 0 ]; then
+    if [ "${CPUFREQ}" -eq 0 ]; then
       echo "CPU does NOT support CPU Performance Scaling, disabling"
       sed -i 's/^acpi-cpufreq/# acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
     else
