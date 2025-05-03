@@ -23,10 +23,18 @@ FILE_GZ="${FILE_JS}.gz"
 
 # Restore original files
 restoreCpuinfo() {
-  for file in "${FILE_GZ}" "${FILE_JS}" "/etc/nginx/nginx.conf" "/usr/syno/share/nginx/nginx.mustache"; do
-    [ -f "${file}.bak" ] && cp -f "${file}.bak" "${file}"
-  done
+  [ -f "${FILE_GZ}.bak" ] && cp -f "${FILE_GZ}.bak" "${FILE_GZ}"
+  [ -f "${FILE_JS}.bak" ] && cp -f "${FILE_JS}.bak" "${FILE_JS}"
+  [ -f "/etc/nginx/nginx.conf.bak" ] && cp -f "/etc/nginx/nginx.conf.bak" "/etc/nginx/nginx.conf"
+  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -f "/usr/syno/share/nginx/nginx.mustache.bak" "/usr/syno/share/nginx/nginx.mustache"
   pkill -f "/usr/sbin/synoscgiproxy" 2>/dev/null
+}
+
+# Restart services if necessary
+restartProxy() {
+  if ! ps aux | grep -q "[/]usr/sbin/synoscgiproxy"; then
+    "/usr/sbin/synoscgiproxy" &
+  fi
 }
 
 # Backup files if not already backed up
@@ -46,11 +54,11 @@ updateJavaScript() {
     sed -i 's/,C,D);/,C,D+" \| "+t.gpu.temperature_c+" °C");/g' "${FILE_JS}"
   fi
 
-  sed -i -e "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR}\"/g" \
-         -e "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY}\"/g" \
-         -e "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES}\"/g" \
-         -e "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES}\"/g" \
-         -e "s/\(\(,\)\|\((\)\).\.cpu_clock_speed/\1${SPEED}/g" "${FILE_JS}"
+  sed -i -e "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" \
+         -e "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" \
+         -e "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" \
+         -e "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" \
+         -e "s/\(\(,\)\|\((\)\).\.cpu_clock_speed/\1${SPEED//\"/}/g" "${FILE_JS}"
 }
 
 # GPU Info
@@ -76,17 +84,15 @@ compressJavaScript() {
 
 # Restart services if necessary
 restartServices() {
-  if ! ps aux | grep -q "[/]usr/sbin/synoscgiproxy"; then
-    "/usr/sbin/synoscgiproxy" &
-    backupFile "/etc/nginx/nginx.conf"
-    backupFile "/usr/syno/share/nginx/nginx.mustache"
-    sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' "/etc/nginx/nginx.conf" "/usr/syno/share/nginx/nginx.mustache"
-    systemctl reload nginx
-  fi
+  backupFile "/etc/nginx/nginx.conf"
+  backupFile "/usr/syno/share/nginx/nginx.mustache"
+  sed -i 's|/run/synoscgi.sock;|/run/synoscgi_rr.sock;|' "/etc/nginx/nginx.conf" "/usr/syno/share/nginx/nginx.mustache"
+  systemctl reload nginx
 }
 
 # Function calls
 restoreCpuinfo
+restartProxy
 backupFile "${FILE_GZ}"
 backupFile "${FILE_JS}"
 prepareJavaScript
