@@ -167,7 +167,7 @@ dtModel() {
       echo "    power_limit = \"\";"
     } >"${DEST}"
     # SATA ports
-    if [ "${1}" = "true" ]; then
+    if grep -wq "hddsort" /proc/cmdline 2>/dev/null; then
       I=1
       for P in $(lspci -d ::106 2>/dev/null | cut -d' ' -f1); do
         HOSTNUM="$(ls -l /sys/class/scsi_host 2>/dev/null | grep -c "${P}")"
@@ -471,7 +471,7 @@ if [ "${1}" = "patches" ]; then
 
   checkSynoboot
 
-  [ "$(_get_conf_kv rd supportportmappingv2)" = "yes" ] && dtModel "${2}" || nondtModel "${2}"
+  [ "$(_get_conf_kv rd supportportmappingv2)" = "yes" ] && dtModel || nondtModel
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon disks - ${1}"
