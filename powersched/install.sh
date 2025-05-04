@@ -38,8 +38,7 @@ case "${1}" in
     uninstall_addon "${1}"
     ;;
   *)
-    echo "Usage: ${0} {late|uninstall}"
-    exit 1
+    exit 0
     ;;
 esac
 exit 0
