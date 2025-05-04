@@ -39,74 +39,6 @@ restoreCpuinfo() {
   systemctl reload nginx
 }
 
-if options="$(getopt -o t:v:f:s:c:p:rh --long temp:,vendor:,family:,series:,cores:,speed:,restore,help -- "$@")"; then
-  eval set -- "$options"
-  while true; do
-    case "${1,,}" in
-      -t | --temp)
-        TEMP="${2}"
-        shift 2
-        ;;
-      -v | --vendor)
-        VENDOR="${2}"
-        shift 2
-        ;;
-      -f | --family)
-        FAMILY="${2}"
-        shift 2
-        ;;
-      -s | --series)
-        SERIES="${2}"
-        shift 2
-        ;;
-      -c | --cores)
-        CORES="${2}"
-        shift 2
-        ;;
-      -p | --speed)
-        SPEED="${2}"
-        shift 2
-        ;;
-      -r | --restore)
-        restoreCpuinfo
-        exit 0
-        ;;
-      -h | --help)
-        cat <<EOF
-Usage: cpuinfo.sh [OPTIONS]
-Options:
-  -t, --temp   <on/off>   Set the CPU&GPU temperature display
-  -v, --vendor <VENDOR>   Set the CPU vendor
-  -f, --family <FAMILY>   Set the CPU family
-  -s, --series <SERIES>   Set the CPU series
-  -c, --cores <CORES>     Set the number of CPU cores
-  -p, --speed <SPEED>     Set the CPU clock speed
-  -r, --restore           Restore the original cpuinfo
-  -h, --help              Show this help message and exit
-Example:
-  cpuinfo.sh -t "on" -v "AMD" -f "Ryzen" -s "Ryzen 7 5800X3D" -c 64 -p 5200
-  cpuinfo.sh -t "on" --vendor "Intel" --family "Core i9" --series "i7-13900ks" --cores 64 --speed 5200
-  cpuinfo.sh --restore
-  cpuinfo.sh --help
-EOF
-        exit 0
-        ;;
-      --)
-        break
-        ;;
-      *)
-        echo "Invalid option: $OPTARG" >&2
-        ;;
-    esac
-  done
-else
-  echo "getopt error"
-  exit 1
-fi
-
-CORES="${CORES:-1}"
-SPEED="${SPEED:-0}"
-
 if [ -f "${FILE_GZ}" ]; then
   [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
 else
@@ -148,7 +80,7 @@ fi
 
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
-if grep -Eq 'mev=physical' /proc/cmdline; then
+if "/usr/sbin/synoscgiproxy" -t >/dev/null 2>&1; then
   if ! ps aux | grep -v grep | grep "/usr/sbin/synoscgiproxy" >/dev/null; then
     "/usr/sbin/synoscgiproxy" &
     [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx.conf.bak
