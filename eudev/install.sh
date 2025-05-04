@@ -128,8 +128,7 @@ case "${1}" in
     install_late
     ;;
   *)
-    echo "Usage: ${0} {early|modules|late}"
-    exit 1
+    exit 0
     ;;
 esac
 exit 0
