@@ -1,0 +1,43 @@
+--- lib/libssutils.so
++++ lib/libssutils.so
+@0024c370: 8b 87 e0 00 00 00 c3 90 0f 1f 84 00 00 00 00 00 > b8 3c 00 00 00 90 c3 90 0f 1f 84 00 00 00 00 00
+@0024da90: 85 13 01 00 00 48 8d ac 24 90 00 00 00 41 bc 41 > 85 13 01 00 00 48 8d ac 24 90 00 00 00 41 bc 7d
+@0024dc30: 00 00 41 bc 49 00 00 00 48 8b 7c 24 30 49 83 c7 > 00 00 41 bc 7d 00 00 00 48 8b 7c 24 30 49 83 c7
+@0024dcc0: 0f 85 6c ff ff ff 41 bc 41 00 00 00 e9 67 ff ff > 0f 85 6c ff ff ff 41 bc 7d 00 00 00 e9 67 ff ff
+@0044a370: 49 89 c5 74 0b 8b 40 14 85 c0 74 24 0f 1f 40 00 > 49 89 c5 74 0b 31 c0 41 89 45 14 eb 23 90 90 90
+@0044a3a0: e8 9b df c5 ff 49 8b 55 20 48 29 d0 48 99 48 31 > e8 9b df c5 ff 49 89 45 20 48 31 c0 48 99 48 31
+@0044a3b0: d0 48 29 d0 48 3d 80 51 01 00 7f c4 48 8d 43 24 > d0 48 29 d0 48 3d 80 51 01 00 90 90 48 8d 43 24
+@0044a3d0: 3f 00 77 ac b8 01 00 00 00 eb b6 90 0f 1f 40 00 > 3f 00 90 90 b8 01 00 00 00 eb b6 90 0f 1f 40 00
+--- sbin/ssexechelperd
++++ sbin/ssexechelperd
+@00011010: f5 0f 8f 79 01 00 00 48 83 3d 01 06 21 00 00 0f > f5 90 90 90 90 90 90 48 83 3d 01 06 21 00 00 0f
+--- sbin/ssrtmpclientd
++++ sbin/ssrtmpclientd
+@00011860: 0f 8f 3b 05 00 00 48 85 db 74 12 4d 39 f7 0f 8f > e9 3c 05 00 00 90 48 85 db 74 12 4d 39 f7 0f 8f
+@00012eb0: 0f 88 82 04 00 00 48 8d bd a0 ed ff ff 4c 8d bd > 90 90 90 90 90 90 48 8d bd a0 ed ff ff 4c 8d bd
+--- sbin/ssroutined
++++ sbin/ssroutined
+@00015990: 48 89 c3 e8 e8 54 ff ff 49 39 df 0f 8d 27 05 00 > 48 89 c3 e8 e8 54 ff ff 49 39 df 90 90 90 90 90
+@000159a0: 00 bf 01 00 00 00 e8 65 59 ff ff 84 c0 74 0d e8 > 90 bf 01 00 00 00 e8 65 59 ff ff 84 c0 74 0d e8
+@00015c30: e8 4b 60 ff ff 8b 5c 24 08 44 29 e3 85 db 0f 88 > e8 4b 60 ff ff 8b 5c 24 08 44 29 e3 85 db 90 90
+@00015c40: fc 07 00 00 bb 01 00 00 00 48 8d bc 24 40 02 00 > 90 90 90 90 bb 01 00 00 00 48 8d bc 24 40 02 00
+@00017cd0: 00 00 4c 8b 3d d7 9d 21 00 4d 39 fe 0f 8f 9e 00 > 00 00 4c 8b 3d d7 9d 21 00 4d 39 fe 90 90 90 90
+@00017ce0: 00 00 40 84 ed 74 14 41 83 fd 04 0f 84 ef 04 00 > 90 90 40 84 ed 74 14 41 83 fd 04 0f 84 ef 04 00
+--- sbin/ssmessaged
++++ sbin/ssmessaged
+@00010a20: 10 e8 4a d5 ff ff 84 c0 0f 84 f2 00 00 00 48 8d > 10 e8 4a d5 ff ff 84 c0 e9 f3 00 00 00 90 48 8d
+--- sbin/ssdaemonmonitord
++++ sbin/ssdaemonmonitord
+@000075b0: ff ff 48 39 05 47 00 21 00 7c 4d 48 8b 84 24 38 > ff ff 90 90 90 90 90 90 90 90 90 48 8b 84 24 38
+--- sbin/sscmshostd
++++ sbin/sscmshostd
+@00022a40: 24 88 00 00 00 31 c0 e8 64 de fe ff 48 89 c5 0f > 24 88 00 00 00 31 c0 e8 64 de fe ff 48 89 c5 90
+@00022a50: b6 05 aa c7 23 00 84 c0 0f 84 82 00 00 00 4c 8b > 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90
+@00022a60: 25 a3 c7 23 00 4c 39 e5 0f 8f e2 00 00 00 48 8d > 90 90 90 90 90 90 90 90 90 90 90 90 90 90 48 8d
+@00023570: ff 48 89 c5 0f b6 05 85 bc 23 00 84 c0 74 61 4c > ff 48 89 c5 90 90 90 90 90 90 90 90 90 90 90 90
+@00023580: 8b 25 82 bc 23 00 4c 39 e5 0f 8f c1 00 00 00 48 > 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 48
+--- sbin/sscored
++++ sbin/sscored
+@00004d30: 3b 05 d2 66 20 00 0f 8c 64 ff ff ff e8 df e7 ff > 3b 05 d2 66 20 00 e9 65 ff ff ff 90 e8 df e7 ff
+@000068c0: e8 ab cc ff ff 48 8d a8 10 99 ed ff e8 1f c8 ff > e8 ab cc ff ff 90 90 90 90 90 90 90 90 90 90 90
+@000068d0: ff 8b 15 f1 4a 20 00 83 fa 01 75 68 31 ff e8 8d > 90 90 90 90 90 90 90 90 90 90 eb 68 31 ff e8 8d
