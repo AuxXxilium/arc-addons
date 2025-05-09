@@ -1,0 +1,62 @@
+--- webapi/Camera/src/SYNO.SurveillanceStation.Camera.so
++++ webapi/Camera/src/SYNO.SurveillanceStation.Camera.so
+@0007f080: 89 c4 74 2f 48 89 c7 e8 84 3a fe ff 4c 89 e7 e8 > 89 c4 eb 2f 48 89 c7 e8 84 3a fe ff 4c 89 e7 e8
+@000f8250: 85 c0 49 89 c6 74 36 48 89 c7 e8 b1 a8 f6 ff 4c > 85 c0 49 89 c6 eb 36 48 89 c7 e8 b1 a8 f6 ff 4c
+@00180b60: 89 c3 74 2f 48 89 c7 e8 a4 1f ee ff 48 89 df e8 > 89 c3 eb 2f 48 89 c7 e8 a4 1f ee ff 48 89 df e8
+@00181f10: 85 c0 49 89 c4 0f 84 69 01 00 00 48 89 c7 e8 ed > 85 c0 49 89 c4 e9 6a 01 00 00 90 48 89 c7 e8 ed
+@00184be0: c5 0f 84 91 01 00 00 48 89 c7 e8 21 df ed ff 4c > c5 e9 92 01 00 00 90 48 89 c7 e8 21 df ed ff 4c
+@00187c20: 85 c0 49 89 c7 0f 84 85 01 00 00 48 89 c7 e8 dd > 85 c0 49 89 c7 e9 86 01 00 00 90 48 89 c7 e8 dd
+@00195e40: c7 0f 84 90 01 00 00 48 89 c7 e8 c1 cc ec ff 4c > c7 e9 91 01 00 00 90 48 89 c7 e8 c1 cc ec ff 4c
+@0020f5c0: 5c 75 e5 ff 48 85 c0 49 89 c4 74 31 48 89 c7 e8 > 5c 75 e5 ff 48 85 c0 49 89 c4 eb 31 48 89 c7 e8
+@002149a0: 89 c4 e8 79 21 e5 ff 48 85 c0 48 89 c5 0f 84 c5 > 89 c4 e8 79 21 e5 ff 48 85 c0 48 89 c5 e9 c6 02
+@002149b0: 02 00 00 48 89 c7 e8 55 e1 e4 ff 48 89 ef e8 2d > 00 00 90 48 89 c7 e8 55 e1 e4 ff 48 89 ef e8 2d
+--- lib/libssffmpegutils.so
++++ lib/libssffmpegutils.so
+@0003a140: 85 c0 49 89 c4 74 0b 8b 40 14 85 c0 0f 84 2e 04 > 85 c0 49 89 c4 74 0b 8b 40 14 85 c0 e9 2f 04 00
+@0003a150: 00 00 4c 8d 2d b7 a6 ff ff 48 83 ec 08 4c 8b 63 > 00 90 4c 8d 2d b7 a6 ff ff 48 83 ec 08 4c 8b 63
+@0003a590: 31 d0 48 29 d0 48 3d 80 51 01 00 0f 8e b8 fb ff > 31 d0 48 29 d0 48 3d 80 51 01 00 e9 b9 fb ff ff
+@0003a5a0: ff e9 ac fb ff ff 48 8b 2d 4b 29 22 00 8b 45 00 > 90 e9 ac fb ff ff 48 8b 2d 4b 29 22 00 8b 45 00
+--- lib/libssutils.so
++++ lib/libssutils.so
+@0024c2b0: 8b 87 e0 00 00 00 c3 90 0f 1f 84 00 00 00 00 00 > b8 3c 00 00 00 90 c3 90 0f 1f 84 00 00 00 00 00
+@0024d9c0: 85 0b 01 00 00 e8 b6 84 e5 ff 83 f8 01 41 bc 43 > 85 0b 01 00 00 e8 b6 84 e5 ff 83 f8 01 41 bc 7d
+@0024dad0: 41 bc 41 00 00 00 e9 fe fe ff ff 0f 1f 44 00 00 > 41 bc 7d 00 00 00 e9 fe fe ff ff 0f 1f 44 00 00
+@0044a040: 49 89 c5 74 0b 8b 40 14 85 c0 74 24 0f 1f 40 00 > 49 89 c5 74 0b 8b 40 14 85 c0 eb 24 0f 1f 40 00
+@0044a080: d0 48 29 d0 48 3d 80 51 01 00 7f c4 48 8d 43 24 > d0 48 29 d0 48 3d 80 51 01 00 90 90 48 8d 43 24
+@0044a0a0: 3f 00 77 ac b8 01 00 00 00 eb b6 90 0f 1f 40 00 > 3f 00 90 90 b8 01 00 00 00 eb b6 90 0f 1f 40 00
+@00544eb0: 2e 73 79 6e 6f 6c 6f 67 79 2e 63 6f 6d 00 69 6e > 2e 73 73 73 73 73 73 73 73 2e 73 73 6d 00 69 6e
+--- sbin/ssexechelperd
++++ sbin/ssexechelperd
+@00011010: f5 0f 8f 79 01 00 00 48 83 3d 01 06 21 00 00 0f > f5 90 90 90 90 90 90 48 83 3d 01 06 21 00 00 0f
+--- sbin/ssrtmpclientd
++++ sbin/ssrtmpclientd
+@00011830: c4 0f 84 6a 05 00 00 48 89 c7 e8 71 59 ff ff 4c > c4 e9 6b 05 00 00 90 48 89 c7 e8 71 59 ff ff 4c
+--- sbin/ssroutined
++++ sbin/ssroutined
+@00015970: 74 2f 48 89 c7 e8 86 5f ff ff 4c 89 e7 e8 1e 59 > eb 2f 48 89 c7 e8 86 5f ff ff 4c 89 e7 e8 1e 59
+@00017cd0: 00 00 4c 8b 3d d7 9d 21 00 4d 39 fe 0f 8f 9e 00 > 00 00 4c 8b 3d d7 9d 21 00 4d 39 fe 90 90 90 90
+@00017ce0: 00 00 40 84 ed 74 14 41 83 fd 04 0f 84 ef 04 00 > 90 90 40 84 ed 74 14 41 83 fd 04 0f 84 ef 04 00
+--- sbin/ssmessaged
++++ sbin/ssmessaged
+@00010a20: 10 e8 4a d5 ff ff 84 c0 0f 84 f2 00 00 00 48 8d > 10 e8 4a d5 ff ff 84 c0 e9 f3 00 00 00 90 48 8d
+--- sbin/ssdaemonmonitord
++++ sbin/ssdaemonmonitord
+@000075a0: 00 00 31 c0 80 3d 5d 00 21 00 00 74 3b e8 6e e1 > 00 00 31 c0 80 3d 5d 00 21 00 00 eb 3b e8 6e e1
+--- sbin/sscamerad
++++ sbin/sscamerad
+@0009c130: 85 c0 75 24 e8 47 51 f8 ff 49 8b 55 20 48 29 d0 > 85 c0 90 90 e8 47 51 f8 ff 49 8b 55 20 48 29 d0
+@0009c140: 48 99 48 31 d0 48 29 d0 48 3d 80 51 01 00 0f 8e > 48 99 48 31 d0 48 29 d0 48 3d 80 51 01 00 e9 1d
+@0009c150: 1c 04 00 00 0f 1f 40 00 48 8b 43 30 e9 43 ff ff > 04 00 00 90 0f 1f 40 00 48 8b 43 30 e9 43 ff ff
+--- sbin/sscmshostd
++++ sbin/sscmshostd
+@00022a50: b6 05 aa c7 23 00 84 c0 0f 84 82 00 00 00 4c 8b > b6 05 aa c7 23 00 84 c0 90 90 90 90 90 90 4c 8b
+@00022a60: 25 a3 c7 23 00 4c 39 e5 0f 8f e2 00 00 00 48 8d > 25 a3 c7 23 00 4c 39 e5 90 90 90 90 90 90 48 8d
+@00023570: ff 48 89 c5 0f b6 05 85 bc 23 00 84 c0 74 61 4c > ff 48 89 c5 0f b6 05 85 bc 23 00 84 c0 90 90 4c
+@00023580: 8b 25 82 bc 23 00 4c 39 e5 0f 8f c1 00 00 00 48 > 8b 25 82 bc 23 00 4c 39 e5 90 90 90 90 90 90 48
+--- sbin/sscored
++++ sbin/sscored
+@00004d50: 0f 85 80 06 00 00 be 01 00 00 00 4c 89 f7 e8 bd > e9 81 06 00 00 90 be 01 00 00 00 4c 89 f7 e8 bd
+@000068d0: ff 8b 15 f1 4a 20 00 83 fa 01 75 68 31 ff e8 8d > ff 8b 15 f1 4a 20 00 83 fa 01 eb 68 31 ff e8 8d
+@000069b0: ff 84 c0 74 2b 31 d2 b9 03 00 00 00 be 34 91 40 > ff 84 c0 90 90 31 d2 b9 03 00 00 00 be 34 91 40
+@000069c0: 00 48 89 ef e8 b7 ca ff ff 48 83 f8 ff 0f 84 7d > 00 48 89 ef e8 b7 ca ff ff 48 83 f8 ff 90 90 90
+@000069d0: 00 00 00 b8 04 00 00 00 48 83 c4 08 5b 5d c3 90 > 90 90 90 b8 3c 00 00 00 48 83 c4 08 5b 5d c3 90

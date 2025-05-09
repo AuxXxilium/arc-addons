@@ -1,0 +1,36 @@
+--- lib/libssutils.so
++++ lib/libssutils.so
+@0024e2c0: 8b 87 e0 00 00 00 c3 90 0f 1f 84 00 00 00 00 00 > b8 3c 00 00 00 90 c3 90 0f 1f 84 00 00 00 00 00
+@0024f5e0: 85 0b 01 00 00 e8 46 81 e5 ff 83 f8 01 41 bc 43 > 85 0b 01 00 00 e8 46 81 e5 ff 83 f8 01 41 bc 7d
+@0024f6f0: 41 bc 41 00 00 00 e9 fe fe ff ff 0f 1f 44 00 00 > 41 bc 7d 00 00 00 e9 fe fe ff ff 0f 1f 44 00 00
+@0044c030: 49 89 c5 74 0b 8b 40 14 85 c0 74 24 0f 1f 40 00 > 49 89 c5 74 0b 31 d2 89 50 14 eb 24 0f 1f 40 00
+@0044c060: e8 db da c5 ff 49 8b 55 20 48 29 d0 48 99 48 31 > e8 db da c5 ff 49 89 45 20 90 90 90 90 90 90 90
+@0044c070: d0 48 29 d0 48 3d 80 51 01 00 7f c4 48 8d 43 24 > 90 90 90 90 90 90 90 90 90 90 90 90 48 8d 43 24
+@0044c090: 3f 00 77 ac b8 01 00 00 00 eb b6 90 0f 1f 40 00 > 3f 00 90 90 b8 01 00 00 00 eb b6 90 0f 1f 40 00
+--- sbin/ssexechelperd
++++ sbin/ssexechelperd
+@00010fb0: f5 0f 8f 79 01 00 00 48 83 3d 61 06 21 00 00 0f > f5 90 90 90 90 90 90 48 83 3d 61 06 21 00 00 0f
+--- sbin/ssrtmpclientd
++++ sbin/ssrtmpclientd
+@00011b70: 48 89 c3 e8 48 4f ff ff 4c 39 f3 7f 1b 48 85 db > 48 89 c3 e8 48 4f ff ff 4c 39 f3 eb 1b 48 85 db
+--- sbin/ssroutined
++++ sbin/ssroutined
+@00016dd0: 48 8b 7d 98 4c 89 ee e8 94 e5 ff ff e9 52 fe ff > 48 8b 7d 98 4c 89 ee 90 90 90 90 90 e9 52 fe ff
+--- sbin/ssmessaged
++++ sbin/ssmessaged
+@00011000: 10 e8 2a d5 ff ff 84 c0 0f 84 f2 00 00 00 48 8d > 10 e8 2a d5 ff ff 84 c0 e9 f3 00 00 00 90 48 8d
+--- sbin/ssdaemonmonitord
++++ sbin/ssdaemonmonitord
+@000073f0: ec 01 21 00 0f 8e e6 01 00 00 e8 a1 e3 ff ff 84 > ec 01 21 00 e9 e7 01 00 00 90 e8 a1 e3 ff ff 84
+--- sbin/sscmshostd
++++ sbin/sscmshostd
+@00028500: b6 05 1a cd 23 00 84 c0 0f 84 82 00 00 00 4c 8b > b6 05 1a cd 23 00 84 c0 90 90 90 90 90 90 4c 8b
+@00028510: 25 13 cd 23 00 4c 39 e5 0f 8f e2 00 00 00 48 8d > 25 13 cd 23 00 4c 39 e5 90 90 90 90 90 90 48 8d
+@00029020: ff 48 89 c5 0f b6 05 f5 c1 23 00 84 c0 74 61 4c > ff 48 89 c5 0f b6 05 f5 c1 23 00 84 c0 90 90 4c
+@00029030: 8b 25 f2 c1 23 00 4c 39 e5 0f 8f c1 00 00 00 48 > 8b 25 f2 c1 23 00 4c 39 e5 90 90 90 90 90 90 48
+--- sbin/sscored
++++ sbin/sscored
+@00004b90: 54 68 20 00 0f 8c 56 ff ff ff e8 01 e8 ff ff 48 > 54 68 20 00 e9 57 ff ff ff 90 e8 01 e8 ff ff 48
+@00006110: ff 8b 15 99 52 20 00 83 fa 01 75 68 31 ff e8 bd > ff 8b 15 99 52 20 00 83 fa 01 eb 68 31 ff e8 bd
+@000061f0: ff 84 c0 74 2b 31 d2 b9 03 00 00 00 be 64 89 40 > ff 84 c0 eb 1e 31 d2 b9 03 00 00 00 be 64 89 40
+@00006210: 00 00 00 b8 04 00 00 00 48 83 c4 08 5b 5d c3 90 > 00 00 00 b8 3c 00 00 00 48 83 c4 08 5b 5d c3 90
