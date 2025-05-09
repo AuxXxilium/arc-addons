@@ -21,7 +21,7 @@ elif [ "${1}" = "late" ]; then
     echo '# Author: "SynoCommunity"'
     echo ''
     echo '# general disks dtb rules'
-    echo 'ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ENV{DEVNAME}=="/dev/nvme*|/dev/sas*|/dev/usb*|/dev/synoboot*|/dev/sd*|/dev/sata*", PROGRAM=="/usr/bin/disks.sh --update %E{DEVNAME}"'
+    echo 'ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ENV{DEVNAME}=="/dev/nvme*|/dev/sas*|/dev/usb*|/dev/sd*|/dev/sata*", PROGRAM=="/usr/bin/disks.sh --update %E{DEVNAME}"'
   } >"/tmpRoot/usr/lib/udev/rules.d/04-system-disk-dtb.rules"
 
   if [ "$(/bin/get_key_value "/etc.defaults/synoinfo.conf" "supportportmappingv2")" = "yes" ]; then
@@ -35,7 +35,7 @@ elif [ "${1}" = "late" ]; then
     cp -vpf /etc/extensionPorts /tmpRoot/etc/extensionPorts
     cp -vpf /etc/extensionPorts /tmpRoot/etc.defaults/extensionPorts
   fi
-  KVLIST="${KVLIST} maxdisks supportnvme support_m2_pool support_ssd_cache support_write_cache"
+  KVLIST="${KVLIST} maxdisks supportnvme support_m2_pool" # support_ssd_cache support_write_cache"
 
   for K in ${KVLIST}; do
     V="$(/bin/get_key_value "/etc.defaults/synoinfo.conf" "${K}")"
