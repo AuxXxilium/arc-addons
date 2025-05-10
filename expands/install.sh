@@ -38,10 +38,9 @@ uninstall_addon() {
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/expands.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/expands.service"
 
-  FILE="/tmpRoot/usr/syno/etc/usb.map"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
-  FILE="/tmpRoot/etc/ssl/certs/ca-certificates.crt"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
+[ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
+  echo "/usr/bin/expands.sh -r" >>/tmpRoot/usr/arc/revert.sh
+  echo "rm -f /usr/bin/expands.sh" >>/tmpRoot/usr/arc/revert.sh
 }
 
 case "${1}" in

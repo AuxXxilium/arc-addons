@@ -14,6 +14,13 @@ install_vmtools() {
   mkdir -p /tmpRoot/usr/vmtools
   tar -zxf /addons/vmtools-7.1.tgz -C /tmpRoot/usr/vmtools
 
+  ln -vsf /usr/vmtools/etc/open-vm-tools /tmpRoot/etc/open-vm-tools
+  ln -vsf /usr/vmtools/lib/open-vm-tools /tmpRoot/lib/open-vm-tools
+  ln -vsf /usr/vmtools/share/open-vm-tools /tmpRoot/share/open-vm-tools
+
+  VMTOOLS_PATH="/usr/vmtools"
+  VMTOOLS_PID="/var/run/vmtools.pid"
+
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/vmtools.service"
 
@@ -31,18 +38,16 @@ install_vmtools() {
 }
 
 setup_vmware_service() {
-  local DEST=$1
-  local VMTOOLS_PATH="/usr/vmtools"
-  local COMMON_PATH="${VMTOOLS_PATH}/lib/open-vm-tools/plugins"
-  local PLUGINS_PATH="${COMMON_PATH}/vmsvc"
-  local VMWARE_CONF="${VMTOOLS_PATH}/etc/vmware-tools/tools.conf"
+  DEST=$1
+  VMTOOLS_PATH="/usr/vmtools"
+  VMWARE_CONF="${VMTOOLS_PATH}/etc/vmware-tools/tools.conf"
+  COMMON_PATH="${VMTOOLS_PATH}/lib/open-vm-tools/plugins"
+  PLUGINS_PATH="${COMMON_PATH}/vmsvc"
 
   mkdir -p /tmpRoot/usr/vmtools/etc/vmware-tools
   cat <<EOF >"/tmpRoot${VMWARE_CONF}"
 [vmtools]
     disable-tools-version = false
-[setenvironment]
-    vmsvc.LOCALE = it
 [logging]
     log = true
     vmsvc.level = debug
@@ -52,10 +57,10 @@ setup_vmware_service() {
     vmtoolsd.handler = file
     vmtoolsd.data = /var/log/vmtoolsd.arc.log
 [powerops]
-    poweron-script=${VMTOOLS_PATH}/etc/vmware-tools/poweron-vm-default
-    poweroff-script=${VMTOOLS_PATH}/etc/vmware-tools/poweroff-vm-default
-    resume-script=${VMTOOLS_PATH}/etc/vmware-tools/resume-vm-default
-    suspend-script=${VMTOOLS_PATH}/etc/vmware-tools/suspend-vm-default
+    poweron-script = ${VMTOOLS_PATH}/etc/vmware-tools/poweron-vm-default
+    poweroff-script = ${VMTOOLS_PATH}/etc/vmware-tools/poweroff-vm-default
+    resume-script = ${VMTOOLS_PATH}/etc/vmware-tools/resume-vm-default
+    suspend-script = ${VMTOOLS_PATH}/etc/vmware-tools/suspend-vm-default
 EOF
 
   cat <<EOF >"${DEST}"
@@ -66,10 +71,10 @@ After=multi-user.target
 
 [Service]
 Type=forking
-PIDFile=/var/run/vmtools.pid
-Environment="PATH=/usr/vmtools/bin:/usr/vmtools/sbin:\$PATH"
-Environment="LD_LIBRARY_PATH=/usr/vmtools/lib:\$LD_LIBRARY_PATH"
-ExecStart=/usr/vmtools/bin/vmtoolsd -c ${VMWARE_CONF} --common-path=${COMMON_PATH} --plugin-path=${PLUGINS_PATH} -b /var/run/vmtools.pid
+PIDFile=${VMTOOLS_PID}
+Environment=\"PATH=${VMTOOLS_PATH}/bin:${VMTOOLS_PATH}/sbin:\$PATH\"
+Environment="LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:\$LD_LIBRARY_PATH"
+ExecStart=/usr/vmtools/bin/vmtoolsd -c ${VMWARE_CONF} --common-path=${COMMON_PATH} --plugin-path=${PLUGINS_PATH} -b ${VMTOOLS_PID}
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=10
@@ -80,21 +85,23 @@ EOF
 }
 
 setup_kvm_service() {
-  local DEST=$1
+  DEST=$1
+
+  GUEST_AGENT="/dev/virtio-ports/org.qemu.guest_agent.0"
 
   cat <<EOF >"${DEST}"
 [Unit]
 Description=vmtools daemon
 IgnoreOnIsolate=true
 After=multi-user.target
-ConditionPathExists=/dev/virtio-ports/org.qemu.guest_agent.0
+ConditionPathExists=${GUEST_AGENT}
 
 [Service]
 Type=forking
-PIDFile=/var/run/vmtools.pid
-Environment="PATH=/usr/vmtools/bin:/usr/vmtools/sbin:\$PATH"
-Environment="LD_LIBRARY_PATH=/usr/vmtools/lib:\$LD_LIBRARY_PATH"
-ExecStart=/usr/vmtools/bin/qemu-ga -m virtio-serial -p /dev/virtio-ports/org.qemu.guest_agent.0 -t /var/run/ -f /var/run/vmtools.pid
+PIDFile=${VMTOOLS_PID}
+Environment=\"PATH=${VMTOOLS_PATH}/bin:${VMTOOLS_PATH}/sbin:\$PATH\"
+Environment="LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:\$LD_LIBRARY_PATH"
+ExecStart=${VMTOOLS_PATH}/bin/qemu-ga -m virtio-serial -p ${GUEST_AGENT} -t /var/run/ -d -f ${VMTOOLS_PID}
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=10
@@ -105,7 +112,7 @@ EOF
 }
 
 setup_unknown_service() {
-  local DEST=$1
+  DEST=$1
 
   cat <<EOF >"${DEST}"
 [Unit]
@@ -115,8 +122,8 @@ After=multi-user.target
 
 [Service]
 Type=oneshot
-Environment="PATH=/usr/vmtools/bin:/usr/vmtools/sbin:\$PATH"
-Environment="LD_LIBRARY_PATH=/usr/vmtools/lib:\$LD_LIBRARY_PATH"
+Environment=\"PATH=${VMTOOLS_PATH}/bin:${VMTOOLS_PATH}/sbin:\$PATH\"
+Environment="LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:\$LD_LIBRARY_PATH"
 ExecStart=-echo Unknown mev
 
 [Install]
@@ -128,12 +135,15 @@ uninstall_vmtools() {
   echo "Uninstalling addon vmtools - ${1}"
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/vmtools.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/vmtools.service"
+
+  rm -rf /tmpRoot/share/open-vm-tools
+  rm -rf /tmpRoot/lib/open-vm-tools
+  rm -rf /tmpRoot/etc/open-vm-tools
   rm -rf /tmpRoot/usr/vmtools
 }
 
 case "${1}" in
   late) install_vmtools "${1}" ;;
   uninstall) uninstall_vmtools "${1}" ;;
-  *) exit 0 ;;
 esac
 exit 0

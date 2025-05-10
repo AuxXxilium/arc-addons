@@ -6,7 +6,7 @@ beta: false
 target: system
 all:
   install-script: "install.sh"
-  copy: ""
+  copy: "all"
 apollolake: true
 broadwell: true
 broadwellnk: true
