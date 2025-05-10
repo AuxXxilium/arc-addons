@@ -36,13 +36,14 @@ install_addon() {
 uninstall_addon() {
   echo "Uninstalling addon updatenotify - ${1}"
 
+  rm -f /tmpRoot/usr/bin/pup
+
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arc-updatenotify.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/arc-updatenotify.service"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/arc-updatenotify.sh delete" >>/tmpRoot/usr/arc/revert.sh
-  echo "rm -f /usr/bin/pup /usr/bin/arc-updatenotify.sh" >>/tmpRoot/usr/arc/revert.sh
-}
+  echo "rm -f /usr/bin/arc-updatenotify.sh" >>/tmpRoot/usr/arc/revert.sh
 
 case "${1}" in
   late)

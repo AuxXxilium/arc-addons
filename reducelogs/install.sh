@@ -11,100 +11,117 @@ install_addon() {
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  ## libsynosata.so.1
-  #SO_FILE="/tmpRoot/usr/lib/libsynosata.so.1"
-  #[ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
-  #cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
-  #xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
-  #  sed "s/8d15ba160000bf03000000e8c0c8ffff/8d15ba160000bf030000009090909090/" |
-  #  xxd -r -p >"${SO_FILE}" 2>/dev/null
-  #rm -f "${SO_FILE}.tmp"
-  #
-  ## libsynonvme.so.1
-  #SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
-  #[ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
-  #cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
-  #xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
-  #  sed "s/8d15ca400000bf03000000e820c3ffff/8d15ca400000bf030000009090909090/; s/8d15da1a0000bf03000000e8309dffff/8d15da1a0000bf030000009090909090/" |
-  #  xxd -r -p >"${SO_FILE}" 2>/dev/null
-  #rm -f "${SO_FILE}.tmp"
-  #
-  ## libhwcontrol.so.1
-  #SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
-  #[ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
-  #cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
-  #xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
-  #  sed "s/8d1512840900bf03000000e8d0fcfdff/8d1512840900bf030000009090909090/; s/8d159a810900bf03000000e858fafdff/8d159a810900bf030000009090909090/" |
-  #  xxd -r -p >"${SO_FILE}" 2>/dev/null
-  #rm -f "${SO_FILE}.tmp"
-
-  _blocklog() {
-    SYSLOG_NG_PATH="/tmpRoot/etc/syslog-ng/patterndb.d"
+  addblocklog() {
+    [ -z "${1}" ] && return 1
+    FNAME="f_$(echo "${1}" | sed 's/[^a-zA-Z0-9]/_/g' | sed 's/.*/\L&/' | cut -c 1-30)"
+    REGEX="${1}"
     mkdir -p "${SYSLOG_NG_PATH}"
-    sed -i "/${1}/d" "${SYSLOG_NG_PATH}/ARC.conf" 2>/dev/null
-    {
-      echo "filter ${1} { match(\"${2}\" value(\"MESSAGE\")); };"
-      echo "log { source(src); filter(${1}); flags(final); };"
-      echo ""
-    } >>"${SYSLOG_NG_PATH}/ARC.conf"
+        sed -i "/${FNAME}/d" "${SYSLOG_NG_PATH}/ARC.conf" 2>/dev/null
+    # shellcheck disable=SC2059
+    printf "filter ${FNAME} { match(\"${REGEX}\" value(\"MESSAGE\")); };\nlog { source(src); filter(${FNAME}); flags(final); };\n" >>"${SYSLOG_NG_PATH}/ARC.conf"
     chown system:log "${SYSLOG_NG_PATH}/ARC.conf"
     chmod 644 "${SYSLOG_NG_PATH}/ARC.conf"
 
-    mkdir -p "${SYSLOG_NG_PATH}/include/not2kern"
-    sed -i "/${1}/d" "${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf" 2>/dev/null
-    echo "and not filter(${1})" >>"${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf"
-    chown system:log "${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf"
-    chmod 644 "${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf"
-
-    mkdir -p "${SYSLOG_NG_PATH}/include/not2msg"
-    sed -i "/${1}/d" "${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf" 2>/dev/null
-    echo "and not filter(${1})" >>"${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf"
-    chown system:log "${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf"
-    chmod 644 "${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf"
+    for D in not2kern not2msg; do
+      mkdir -p "${SYSLOG_NG_PATH}/include/${D}"
+      sed -i "/${FNAME}/d" "${SYSLOG_NG_PATH}/include/${D}/ARC_${D}.conf" 2>/dev/null
+      echo "and not filter(${FNAME})" >>"${SYSLOG_NG_PATH}/include/${D}/ARC_${D}.conf"
+      chown system:log "${SYSLOG_NG_PATH}/include/${D}/ARC_${D}.conf"
+      chmod 644 "${SYSLOG_NG_PATH}/include/${D}/ARC_${D}.conf"
+    done
 
     # systemctl restart syslog-ng
   }
 
-  SYSLOG_NG_PATH="/tmpRoot/etc/syslog-ng/patterndb.d"
-  rm -f "${SYSLOG_NG_PATH}/ARC.conf" "${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf" "${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf" 2>/dev/null
+  delblocklog() {
+    [ -z "${1}" ] && return 1
+    if echo "all *" | grep -wq "${1}"; then
+      rm -f "${SYSLOG_NG_PATH}/ARC.conf"
+      for D in not2kern not2msg; do
+        rm -f "${SYSLOG_NG_PATH}/include/${D}/ARC_${D}.conf"
+      done
+    else
+      FNAME="f_$(echo "${1}" | sed 's/[^a-zA-Z0-9]/_/g' | sed 's/.*/\L&/' | cut -c 1-30)"
+      sed -i "/${FNAME}/d" "${SYSLOG_NG_PATH}/ARC.conf" 2>/dev/null
+      for D in not2kern not2msg; do
+        sed -i "/${FNAME}/d" "${SYSLOG_NG_PATH}/include/${D}/ARC_${D}.conf" 2>/dev/null
+      done
+    fi
+  }
 
-  _blocklog "f_messages_empty_ttyS" "synobios get empty ttyS current"
-  _blocklog "f_messages_telnet_tcp" "telnet/tcp: bind: Address already in use"
-  _blocklog "f_messages_invalid_parameter" "Invalid parameter"
-  _blocklog "f_messages_failed_to_get" "Failed to get"
-  _blocklog "f_messages_failed_to_load" "Failed to load"
-  _blocklog "f_messages_failed_to_check" "Failed to check"
-  _blocklog "f_messages_failed_to_update" "Failed to update"
-  _blocklog "f_messages_sata_chip_name" "Can't get sata chip name"
-  _blocklog "f_scemd_redundant_power_chec" "redundant_power_chec"
-  _blocklog "f_scemd_fan_fan_" "fan/fan_"
-  _blocklog "f_synoscgi_fan_fan_" "fan/fan_"
-  _blocklog "f_synoplugin_plugin_action" "plugin_action"
-  _blocklog "f_synoplugin_package_action" "package_action"
+  getblocklog() {
+    grep -Eo "filter.*match.*" "${SYSLOG_NG_PATH}/ARC.conf" 2>/dev/null | sed 's/filter \(.*\) { match(\(.*\) value("MESSAGE")); };/\1=\2/'
+  }
+
+  # syslog-ng
+  ROOT_PATH="/tmpRoot"
+  SYSLOG_NG_PATH="${ROOT_PATH}/etc/syslog-ng/patterndb.d"
+  delblocklog "*"
+  addblocklog "synobios get empty ttyS current"
+  addblocklog "telnet/tcp: bind: Address already in use"
+  addblocklog "Invalid parameter"
+  addblocklog "Failed to get"
+  addblocklog "Failed to load"
+  addblocklog "Failed to check"
+  addblocklog "Failed to update"
+  addblocklog "fail to get all"
+  addblocklog "Can't get sata chip name"
+  addblocklog "redundant_power_chec"
+  addblocklog "fan/fan_"
+  addblocklog "fan/fan_"
+  addblocklog "plugin_action"
+  addblocklog "package_action"
+  addblocklog "No NVIDIA"
 
   # syno-dump-core
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
   [ ! -f "${SH_FILE}.bak" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak"
   printf '#!/bin/sh\nexit 0\n' >"${SH_FILE}"
+
+  # reducelogs.service
+  cp -vpf /usr/bin/reducelogs.sh /tmpRoot/usr/bin/reducelogs.sh
+
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  DEST="/tmpRoot/usr/lib/systemd/system/reducelogs.service"
+  {
+    echo "[Unit]"
+    echo "Description=reducelogs daemon"
+    echo "After=multi-user.target"
+    echo
+    echo "[Service]"
+    echo "Type=oneshot"
+    echo "RemainAfterExit=yes"
+    echo "ExecStart=-/usr/bin/reducelogs.sh"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
+
+  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/reducelogs.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/reducelogs.service
 }
 
 uninstall_addon() {
   echo "Uninstalling addon reducelogs - ${1}"
 
-  #SO_FILE="/tmpRoot/usr/lib/libsynosata.so.1"
-  #[ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
-  #
-  #SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
-  #[ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
-  #
-  #SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
-  #[ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
-
+  # syslog-ng
   SYSLOG_NG_PATH="/tmpRoot/etc/syslog-ng/patterndb.d"
-  rm -f "${SYSLOG_NG_PATH}/ARC.conf" "${SYSLOG_NG_PATH}/include/not2kern/ARC_not2kern.conf" "${SYSLOG_NG_PATH}/include/not2msg/ARC_not2msg.conf" 2>/dev/null
+  rm -f "${SYSLOG_NG_PATH}/ARC.conf"
+  for D in not2kern not2msg; do
+    rm -f "${SYSLOG_NG_PATH}/include/${D}/ARC_${D}.conf"
+  done
 
+  # syno-dump-core
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
   [ -f "${SH_FILE}.bak" ] && mv -f "${SH_FILE}.bak" "${SH_FILE}"
+
+  # reducelogs.service
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/reducelogs.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/reducelogs.service"
+
+  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
+  echo "/usr/bin/reducelogs.sh -r" >>/tmpRoot/usr/arc/revert.sh
+  echo "rm -f /usr/bin/reducelogs.sh" >>/tmpRoot/usr/arc/revert.sh
 }
 
 case "${1}" in
@@ -113,9 +130,6 @@ case "${1}" in
     ;;
   uninstall)
     uninstall_addon "${1}"
-    ;;
-  *)
-    exit 0
     ;;
 esac
 
