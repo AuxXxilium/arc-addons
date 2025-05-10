@@ -538,11 +538,7 @@ case ${1} in
   fi
   ;;
 *)
-  echo "Usage: $0 [--create|--update]"
-  echo
-  echo "       --create: create dts file and update synoinfo.conf"
-  echo "       --update: update dts file and update synoinfo.conf"
-  exit 1
+  exit 0
   ;;
 esac
 
