@@ -14,12 +14,20 @@ fi
 TEMP="on"
 VENDOR=""
 FAMILY=""
-SERIES=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs)
-COREC=$(grep -m1 'cpu cores' /proc/cpuinfo | cut -d: -f2 | head -1 | xargs)
-THREADC=$(grep -m1 'siblings' /proc/cpuinfo | cut -d: -f2 | head -1 | xargs)
-SPEED=$(grep -m1 'MHz' /proc/cpuinfo | cut -d: -f2 | awk '{print int($1)}')
+SERIES=$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)
+SPEED=$(grep 'MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | cut -d. -f1 | xargs)
 GOVERNOR=$(grep -oP '(?<=\bgovernor=)[^ ]+' /proc/cmdline | xargs)
-CORES="Cores: ${COREC:-1} | Threads: ${THREADC:-1} | Governor: ${GOVERNOR:-performance}"
+COREC=$(grep -m1 'cpu cores' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)
+if [ -z "${COREC}" ]; then
+  COREC=$(grep -c 'MHz' /proc/cpuinfo 2>/dev/null | xargs)
+else
+  THREADC=$(grep -m1 'siblings' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)
+  if [ "${COREC}" -gt 0 ] && [ "${THREADC}" -gt "${COREC}" ]; then
+    CORES="Cores: ${COREC} | Threads: ${THREADC} | Governor: ${GOVERNOR:-performance}"
+  else
+    CORES="Cores: ${COREC} | Governor: ${GOVERNOR:-performance}"
+  fi
+fi
 SPEED="${SPEED:-0}"
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
