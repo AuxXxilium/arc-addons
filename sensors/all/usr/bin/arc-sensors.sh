@@ -6,12 +6,12 @@
 # See /LICENSE for more information.
 #
 
-if ! type perl &>/dev/null; then
+if ! type -p perl; then
   echo "Installing Perl..."
   synopkg install_from_server Perl
 fi
 
-if ! type perl &>/dev/null; then
+if ! type -p perl; then
   echo "Perl not found"
   exit 1
 fi
