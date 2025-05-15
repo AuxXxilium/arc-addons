@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (C) 2023 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -36,8 +36,7 @@ fi
 gzip -dc "${FILE_GZ}" >"${FILE_JS}"
 # 64570
 sed -i "s/e.portType||e.isCacheTray()/e.portType||false/g" "${FILE_JS}" # [42962,?)
-sed -i 's/notSupportM2Pool_addOnCard:this.T("disk_info","disk_reason_m2_add_on_card"),//g' "${FILE_JS}" # [64570,?)
-sed -i 's/},{isConditionInvalid:0<this.pciSlot,invalidReason:"notSupportM2Pool_addOnCard"//g' "${FILE_JS}" # [64570,?)
+sed -i 's/("normal"!==this.portType)/(("normal"!==this.portType)&&("cache"!==this.portType))/g' "${FILE_JS}" # [64570,?)
 # 42218
 sed -i "s/\!u.isCacheTray()/(\!u.isCacheTray()||true)/g" "${FILE_JS}" # [42218,42962)
 sed -i 's/t="normal"!==this.portType/t="normal"!==this.portType\&\&"cache"!==this.portType/g' "${FILE_JS}" # [42218,64570)

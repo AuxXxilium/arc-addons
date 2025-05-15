@@ -6,30 +6,6 @@
 # See /LICENSE for more information.
 #
 
-if [ "$1" == "-r" ]; then
-  restoreCpuinfo
-  exit 0
-fi
-
-TEMP="on"
-VENDOR=""
-FAMILY=""
-SERIES=$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)
-SPEED=$(grep 'MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | cut -d. -f1 | xargs)
-GOVERNOR=$(grep -oP '(?<=\bgovernor=)[^ ]+' /proc/cmdline | xargs)
-COREC=$(grep -m1 'cpu cores' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)
-if [ -z "${COREC}" ]; then
-  COREC=$(grep -c 'MHz' /proc/cpuinfo 2>/dev/null | xargs)
-else
-  THREADC=$(grep -m1 'siblings' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)
-  if [ "${COREC}" -gt 0 ] && [ "${THREADC}" -gt "${COREC}" ]; then
-    CORES="Cores: ${COREC} | Threads: ${THREADC} | Governor: ${GOVERNOR:-performance}"
-  else
-    CORES="Cores: ${COREC} | Governor: ${GOVERNOR:-performance}"
-  fi
-fi
-SPEED="${SPEED:-0}"
-
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
 
@@ -53,6 +29,30 @@ restoreCpuinfo() {
   [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
 }
+
+if [ "$1" == "-r" ]; then
+  restoreCpuinfo
+  exit 0
+fi
+
+TEMP="on"
+VENDOR=""
+FAMILY=""
+SERIES=$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)
+SPEED=$(grep 'MHz' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | cut -d. -f1 | xargs)
+GOVERNOR=$(grep -oP '(?<=\bgovernor=)[^ ]+' /proc/cmdline | xargs)
+COREC=$(grep -m1 'cpu cores' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)
+if [ -z "${COREC}" ]; then
+  COREC=$(grep -c 'MHz' /proc/cpuinfo 2>/dev/null | xargs)
+else
+  THREADC=$(grep -m1 'siblings' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)
+  if [ "${COREC}" -gt 0 ] && [ "${THREADC}" -gt "${COREC}" ]; then
+    CORES="Cores: ${COREC} | Threads: ${THREADC} | Governor: ${GOVERNOR:-performance}"
+  else
+    CORES="Cores: ${COREC} | Governor: ${GOVERNOR:-performance}"
+  fi
+fi
+SPEED="${SPEED:-0}"
 
 if [ -f "${FILE_GZ}" ]; then
   [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
