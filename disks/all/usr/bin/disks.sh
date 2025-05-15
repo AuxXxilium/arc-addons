@@ -56,6 +56,7 @@ _atoi() {
   while [ ${IDX} -lt ${#DISKNAME} ]; do
     N=$(($(printf '%d' "'$(expr substr "${DISKNAME}" $((${IDX} + 1)) 1)") - $(printf '%d' "'a") + 1))
     BIT=$(($(expr length "${DISKNAME}") - 1 - ${IDX}))
+    # shellcheck disable=SC3019
     NUM=$((NUM + (BIT == 0 ? N : 26 ** BIT * N)))
     IDX=$((IDX + 1))
   done
@@ -406,6 +407,7 @@ nondtModel() {
     USBPORTCFG=$(($(__get_conf_kv usbportcfg)))
     printf 'get usbportcfg=0x%.2x\n' "${USBPORTCFG}"
   else
+    # shellcheck disable=SC3019
     USBPORTCFG=$(($((2 ** $((${USBMAXIDX} + 1)) - 1)) ^ $((2 ** ${USBMINIDX} - 1))))
     __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
     printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
@@ -422,6 +424,7 @@ nondtModel() {
     INTERNALPORTCFG=$(($(__get_conf_kv internalportcfg)))
     printf 'get internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   else
+    # shellcheck disable=SC3019
     INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
     __set_conf_kv "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
     printf 'set internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
