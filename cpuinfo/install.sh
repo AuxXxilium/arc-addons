@@ -35,7 +35,7 @@ if [ "${1}" = "late" ]; then
   ln -vsf /usr/lib/systemd/system/cpuinfo.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo.service
 
   # synoscgiproxy
-  cp -vpf /usr/sbin/synoscgiproxy /tmpRoot/usr/sbin/synoscgiproxy
+  cp -vpf /usr/sbin/cpuinfo /tmpRoot/usr/sbin/cpuinfo
 
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon cpuinfo - ${1}"
@@ -47,6 +47,7 @@ elif [ "${1}" = "uninstall" ]; then
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/cpuinfo.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/cpuinfo.sh" >>/tmpRoot/usr/arc/revert.sh
+  echo "rm -f /usr/sbin/cpuinfo" >>/tmpRoot/usr/arc/revert.sh
 
   # synoscgiproxy
   rm -f /tmpRoot/usr/sbin/synoscgiproxy
