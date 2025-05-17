@@ -6,33 +6,36 @@
 # See /LICENSE for more information.
 #
 
-if ! type perl >/dev/null 2>&1; then
-  echo "Installing Perl..."
-  synopkg install_from_server Perl
-fi
+#            fullfan        coolfan        quietfan
+#               |              |              |
+DEFMODES=("20 40 255 127" "30 60 255 63" "40 80 192 63")
+#           ^  ^  ^  ^
+#           1  2  3  4
+# 1: MINTEMP  2: MAXTEMP  3: MINSTART  4: MINSTOP
 
-if ! type perl >/dev/null 2>&1; then
-  echo "Perl not found"
-  exit 1
-fi
+_log() {
+  echo "arc-sensors: $*"
+  /bin/logger -p "error" -t "arc-sensors" "$@"
+}
 
-modprobe hwmon-vid
-modprobe it87
-modprobe adt7470
-modprobe adt7475
-modprobe nct6683
-modprobe nct6775
-modprobe coretemp
-modprobe k10temp
-
-echo 'Y' | sensors-detect --auto >"/tmp/sensors.log"
-grep -Eo 'Driver\s*:\s*\w+' "/tmp/sensors.log" | awk -F': ' '{print $2}'
-
-sensors
+set_fan_conf() {
+  for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
+    for K in "support_fan" "supportadt7490" "support_fan_adjust_dual_mode"; do
+      /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-"no"}"
+    done
+  done
+}
 
 generate_fancontrol_config() {
+  local OPERATION FANMODE M=${1:-0}
+  unset FANMODES
+  OPERATION="$(synowebapi -s --exec api=SYNO.Core.EventScheduler method=get task_name=\"Fancontrol\" | jq -r '.data.operation' 2>/dev/null)"
+  eval "${OPERATION}" >/dev/null 2>&1 || true
+  [[ ${FANMODES[${M}]} =~ ^([0-9]+)\ ([0-9]+)\ ([0-9]+)\ ([0-9]+)$ ]] && FANMODE="${FANMODES[${M}]}" || FANMODE="${DEFMODES[${M}]}"
+
   # Or use pwmconfig to generate /etc/fancontrol interactively.
   local DEVPATH DEVNAME FCTEMPS FCFANS MINTEMP MAXTEMP MINSTART MINSTOP
+
   CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
   # shellcheck disable=SC2044
   for P in $(find "/sys/devices/platform/" -name "temp1_input"); do
@@ -44,10 +47,10 @@ generate_fancontrol_config() {
       IDX="$(echo "${F}" | sed -n 's|.*fan\([0-9]\)_input|\1|p')"
       FCTEMPS="${FCTEMPS} hwmon${I}/pwm${IDX}=${CORETEMP}"
       FCFANS="${FCFANS} hwmon${I}/pwm${IDX}=hwmon${I}/fan${IDX}_input"
-      MINTEMP="${MINTEMP} hwmon${I}/pwm${IDX}=30"
-      MAXTEMP="${MAXTEMP} hwmon${I}/pwm${IDX}=70"
-      MINSTART="${MINSTART} hwmon${I}/pwm${IDX}=150"
-      MINSTOP="${MINSTOP} hwmon${I}/pwm${IDX}=50"
+      MINTEMP="${MINTEMP} hwmon${I}/pwm${IDX}=$(echo "${FANMODE}" | cut -d' ' -f1)"
+      MAXTEMP="${MAXTEMP} hwmon${I}/pwm${IDX}=$(echo "${FANMODE}" | cut -d' ' -f2)"
+      MINSTART="${MINSTART} hwmon${I}/pwm${IDX}=$(echo "${FANMODE}" | cut -d' ' -f3)"
+      MINSTOP="${MINSTOP} hwmon${I}/pwm${IDX}=$(echo "${FANMODE}" | cut -d' ' -f4)"
     done
     i=$((i + 1))
   done
@@ -64,15 +67,35 @@ generate_fancontrol_config() {
     echo "MAXTEMP=$(echo ${MAXTEMP})"
     echo "MINSTART=$(echo ${MINSTART})"
     echo "MINSTOP=$(echo ${MINSTOP})"
-  } | tee "${DEST}" >/dev/null
+  } >"${DEST}"
+
 }
 
-echo "$@" | grep -wq "\-f" && rm -f /etc/fancontrol
-if [ ! -f /etc/fancontrol ]; then
-  generate_fancontrol_config
-fi
+main() {
+  if [ -z "$(find /sys/ -name "fan*_input")" ]; then
+    _log "No fan detected is not installed, exiting..."
+    set_fan_conf "no"
+    exit 0
+  fi
 
-killall fancontrol
-fancontrol &
+  set_fan_conf "yes"
 
-exit 0
+  FanBaseMode=""
+  while true; do
+    sleep 1
+    FanCurtMode="$(/usr/bin/arc-sensors)"
+    if echo "0 1 2" | grep -wq "${FanCurtMode}"; then
+      if [ ! "${FanCurtMode}" = "${FanBaseMode}" ]; then
+        _log "Fan speed mode changed from ${FanBaseMode} to ${FanCurtMode}"
+        FanBaseMode="${FanCurtMode}"
+        generate_fancontrol_config "${FanBaseMode}"
+        pkill -f "/usr/sbin/fancontrol" && rm -f "/run/fancontrol.pid"
+        /usr/sbin/fancontrol &
+      fi
+    fi
+  done
+}
+
+trap 'pkill -f "/usr/sbin/fancontrol" && rm -f "/run/fancontrol.pid"' EXIT INT TERM HUP
+
+main &

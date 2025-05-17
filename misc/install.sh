@@ -148,19 +148,16 @@ install_patches() {
         MACX=$(cat "/sys/class/net/${ETH}/address" 2>/dev/null | sed 's/://g; s/.*/\L&/')
         if [ "${MACR}" = "${MACX}" ]; then
           echo "Setting IP for ${ETH} to ${IPRS}"
-          mkdir -p /etc/sysconfig/network-scripts
-          {
-            echo "DEVICE=${ETH}"
-            echo "BOOTPROTO=static"
-            echo "ONBOOT=yes"
-            echo "IPADDR=$(echo "${IPRS}" | cut -d/ -f1)"
-            echo "NETMASK=$(echo "${IPRS}" | cut -d/ -f2)"
-            echo "GATEWAY=$(echo "${IPRS}" | cut -d/ -f3)"
-          } >"/etc/sysconfig/network-scripts/ifcfg-${ETH}"
+          F="/etc/sysconfig/network-scripts/ifcfg-${ETH}"
+          /bin/set_key_value "${F}" BOOTPROTO "static"
+          /bin/set_key_value "${F}" "IPADDR" "$(echo "${IPRS}" | cut -d/ -f1)"
+          /bin/set_key_value "${F}" "NETMASK" "$(echo "${IPRS}" | cut -d/ -f2)"
+          /bin/set_key_value "${F}" "GATEWAY" "$(echo "${IPRS}" | cut -d/ -f3)"
           echo "${ETH}" >>"/etc/ifcfgs"
         fi
       done
     done
+    /etc/rc.network restart >/dev/null 2>&1
   fi
 }
 
@@ -278,10 +275,25 @@ install_late() {
   if grep -q 'network.' /proc/cmdline && [ -f "/etc/ifcfgs" ]; then
     for ETH in $(cat "/etc/ifcfgs"); do
       echo "Copy ifcfg-${ETH}"
-      if [ -f "/etc/sysconfig/network-scripts/ifcfg-${ETH}" ]; then
-        rm -vf /tmpRoot/etc/sysconfig/network-scripts/ifcfg-*${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-*${ETH}
-        cp -vpf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc/sysconfig/network-scripts/
-        cp -vpf /etc/sysconfig/network-scripts/ifcfg-${ETH} /tmpRoot/etc.defaults/sysconfig/network-scripts/
+      FF="/etc/sysconfig/network-scripts/ifcfg-${ETH}"
+      if [ -f "/tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-ovs_${ETH}" ]; then
+        for TF in "/tmpRoot/etc/sysconfig/network-scripts/ifcfg-ovs_${ETH}" "/tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-ovs_${ETH}"; do
+          if [ -f "${TF}" ]; then
+            /bin/set_key_value "${TF}" BOOTPROTO "static"
+            /bin/set_key_value "${TF}" "IPADDR" "$(/bin/get_key_value "${FF}" "IPADDR")"
+            /bin/set_key_value "${TF}" "NETMASK" "$(/bin/get_key_value "${FF}" "NETMASK")"
+            /bin/set_key_value "${TF}" "GATEWAY" "$(/bin/get_key_value "${FF}" "GATEWAY")"
+          fi
+        done
+      else
+        for TF in "/tmpRoot/etc/sysconfig/network-scripts/ifcfg-${ETH}" "/tmpRoot/etc.defaults/sysconfig/network-scripts/ifcfg-${ETH}"; do
+          if [ -f "${TF}" ]; then
+            /bin/set_key_value "${TF}" BOOTPROTO "static"
+            /bin/set_key_value "${TF}" "IPADDR" "$(/bin/get_key_value "${FF}" "IPADDR")"
+            /bin/set_key_value "${TF}" "NETMASK" "$(/bin/get_key_value "${FF}" "NETMASK")"
+            /bin/set_key_value "${TF}" "GATEWAY" "$(/bin/get_key_value "${FF}" "GATEWAY")"
+          fi
+        done
       fi
     done
   fi

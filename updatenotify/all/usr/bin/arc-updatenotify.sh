@@ -13,7 +13,7 @@ Create() {
     echo "Create tasks"
     schedule='{"date_type":0,"week_day":"0,1,2,3,4,5,6","repeat_date":1001,"monthly_week":[],"hour":0,"minute":0,"repeat_hour":2,"repeat_min":0,"last_work_hour":0,"repeat_min_store_config":[1,5,10,15,20,30],"repeat_hour_store_config":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]}'
     extra='{"notify_enable":false,"script":"/usr/bin/arc-updatenotify.sh","notify_mail":"","notify_if_error":false}'
-    synowebapi --exec api=SYNO.Core.TaskScheduler.Root method=create version=4 name='"Arc-UpdateNotify"' owner='"root"' enable=true schedule="${schedule}" extra="${extra}" type='"script"'
+    synowebapi -s --exec api=SYNO.Core.TaskScheduler.Root method=create version=4 name='"Arc-UpdateNotify"' owner='"root"' enable=true schedule="${schedule}" extra="${extra}" type='"script"'
   fi
   exit 0
 }
