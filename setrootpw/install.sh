@@ -37,7 +37,7 @@ DELETE FROM task WHERE task_name LIKE 'SetRootPw';
 INSERT INTO task VALUES('SetRootPw', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
 PW=""    # Please change to the password you need.
 [ -n "\${PW}" ] && /usr/syno/sbin/synouser --setpw root \${PW} && synogroup --memberadd administrators root && systemctl restart sshd
-synowebapi --exec api=SYNO.Core.Terminal method=set version=3 enable_ssh=true ssh_port=22
+synowebapi -s --exec api=SYNO.Core.Terminal method=set version=3 enable_ssh=true ssh_port=22
 ', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi

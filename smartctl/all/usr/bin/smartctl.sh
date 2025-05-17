@@ -7,22 +7,5 @@
 #
 
 args=()
-
-HBA=false
-for argv in "$@"; do
-  if [ -e "${argv}" ] && ! readlink -f "/sys/block/$(basename "${argv}")/device" 2>/dev/null | grep -q "/ata"; then
-    HBA=true
-  fi
-done
-
-argp=""
-for argv in "$@"; do
-  if [ "${argp}" = "-d" ] && [ "${argv}" = "ata" ] && [ "${HBA}" = "true" ]; then
-    args+=("sat")
-  else
-    args+=("${argv}")
-  fi
-  argp="${argv}"
-done
-
+for arg in "$@"; do [[ "$arg" = "ata" ]] && args+=("auto") || args+=("$arg"); done
 smartctl.bak "${args[@]}"
