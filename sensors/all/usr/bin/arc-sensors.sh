@@ -13,11 +13,6 @@ DEFMODES=("20 40 255 127" "30 60 255 63" "40 80 192 63")
 #           1  2  3  4
 # 1: MINTEMP  2: MAXTEMP  3: MINSTART  4: MINSTOP
 
-_log() {
-  echo "arc-sensors: $*"
-  /bin/logger -p "error" -t "arc-sensors" "$@"
-}
-
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
     for K in "support_fan" "supportadt7490" "support_fan_adjust_dual_mode"; do
@@ -81,16 +76,28 @@ main() {
   set_fan_conf "yes"
 
   FanBaseMode=""
+  SYNOINFO="/etc/synoinfo.conf"
+  LAST_MTIME=0
+
   while true; do
     sleep 1
-    FanCurtMode="$(/usr/bin/arc-sensors)"
-    if echo "0 1 2" | grep -wq "${FanCurtMode}"; then
-      if [ ! "${FanCurtMode}" = "${FanBaseMode}" ]; then
-        _log "Fan speed mode changed from ${FanBaseMode} to ${FanCurtMode}"
-        FanBaseMode="${FanCurtMode}"
-        generate_fancontrol_config "${FanBaseMode}"
-        pkill -f "/usr/sbin/fancontrol" && rm -f "/run/fancontrol.pid"
-        /usr/sbin/fancontrol &
+    CUR_MTIME=$(stat -c %Y "$SYNOINFO" 2>/dev/null)
+    if [ "$CUR_MTIME" != "$LAST_MTIME" ]; then
+      LAST_MTIME="$CUR_MTIME"
+      FanCurtMode="$(grep -w 'fan_config_type_internal' "$SYNOINFO" | cut -d'=' -f2)"
+      case "${FanCurtMode}" in
+        full) FanCurtMode=0 ;;
+        high) FanCurtMode=1 ;;
+        low)  FanCurtMode=2 ;;
+        *)    FanCurtMode=0 ;;
+      esac
+      if echo "0 1 2" | grep -wq "${FanCurtMode}"; then
+        if [ ! "${FanCurtMode}" = "${FanBaseMode}" ]; then
+          FanBaseMode="${FanCurtMode}"
+          generate_fancontrol_config "${FanBaseMode}"
+          pkill -f "/usr/sbin/fancontrol" && rm -f "/run/fancontrol.pid"
+          /usr/sbin/fancontrol &
+        fi
       fi
     fi
   done
