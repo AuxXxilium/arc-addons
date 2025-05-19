@@ -44,6 +44,7 @@ uninstall_addon() {
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/arc-updatenotify.sh delete" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/arc-updatenotify.sh" >>/tmpRoot/usr/arc/revert.sh
+}
 
 case "${1}" in
   late)
