@@ -75,7 +75,7 @@ generate_fancontrol_config() {
 
 main() {
   if [ -z "$(find /sys/ -name "fan*_input")" ]; then
-    _log "No fan detected is not installed, exiting..."
+    _log "No fan detected, exiting..."
     set_fan_conf "no"
     exit 0
   fi
@@ -100,13 +100,12 @@ main() {
       FanBaseMode="${FanCurtMode}"
       echo "Fan mode changed to ${FanBaseMode}"
       generate_fancontrol_config "${FanBaseMode}"
-      pkill -f "/usr/sbin/fancontrol"
-      rm -f "/var/run/fancontrol.pid"
+      /usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/var/run/fancontrol.pid"
       /usr/sbin/fancontrol &
     fi
   done
 }
 
-trap 'pkill -f "/usr/sbin/fancontrol" && rm -f "/var/run/fancontrol.pid"' EXIT INT TERM HUP
+trap '/usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/var/run/fancontrol.pid"' EXIT INT TERM HUP
 
 main &

@@ -36,7 +36,7 @@ fi
 gzip -dc "${FILE_GZ}" >"${FILE_JS}"
 # 64570
 sed -i "s/e.portType||e.isCacheTray()/e.portType||false/g" "${FILE_JS}" # [42962,?)
-sed -i 's/("normal"!==this.portType)/(("normal"!==this.portType)&&("cache"!==this.portType))/g' "${FILE_JS}" # [64570,?)
+sed -i 's/("normal"!==this.portType)/("normal"!==this.portType\&\&"cache"!==this.portType)/g' "${FILE_JS}" # [64570,?)
 # 42218
 sed -i "s/\!u.isCacheTray()/(\!u.isCacheTray()||true)/g" "${FILE_JS}" # [42218,42962)
 sed -i 's/t="normal"!==this.portType/t="normal"!==this.portType\&\&"cache"!==this.portType/g' "${FILE_JS}" # [42218,64570)

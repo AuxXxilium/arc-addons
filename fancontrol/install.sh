@@ -51,7 +51,7 @@ EOF
     echo "[Service]"
     echo "Type=forking"
     echo "ExecStart=/usr/bin/arc-fancontrol.sh"
-    echo "ExecReload=pkill -f /usr/bin/arc-fancontrol.sh"
+    echo "ExecReload=/usr/bin/pkill -f /usr/bin/arc-fancontrol.sh"
     echo "Restart=always"
     echo
     echo "[Install]"

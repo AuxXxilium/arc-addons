@@ -23,7 +23,7 @@ restoreCpuinfo() {
     mv -f "${FILE_JS}.bak" "${FILE_JS}"
   fi
   if ps -aux | grep -v grep | grep -q "/usr/sbin/synoscgiproxy" >/dev/null; then
-    pkill -f "/usr/sbin/synoscgiproxy"
+    /usr/bin/pkill -f "/usr/sbin/synoscgiproxy"
   fi
   [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
   [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
