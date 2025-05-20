@@ -11,7 +11,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
+  tar -zxf /addons/fancontrol-7.1.tgz -C /tmpRoot/usr/
   cp -vpf /usr/bin/arc-fancontrol.sh /tmpRoot/usr/bin/arc-fancontrol.sh
 
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
