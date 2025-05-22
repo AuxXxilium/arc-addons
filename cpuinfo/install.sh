@@ -12,6 +12,7 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   # cpuinfo
+  cp -vpf /usr/sbin/cpuinfo /tmpRoot/usr/sbin/cpuinfo
   cp -vpf /usr/bin/cpuinfo.sh /tmpRoot/usr/bin/cpuinfo.sh
 
   shift
@@ -33,9 +34,6 @@ if [ "${1}" = "late" ]; then
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/cpuinfo.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo.service
-
-  # synoscgiproxy
-  cp -vpf /usr/sbin/cpuinfo /tmpRoot/usr/sbin/cpuinfo
 
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon cpuinfo - ${1}"
