@@ -16,7 +16,7 @@ DEFMODES=("20 50 100 50" "20 60 80 20" "20 80 50 20")
 
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-    for K in "support_fan" "supportadt7490" "support_fan_adjust_dual_mode"; do
+    for K in "support_fan" "support_fan_adjust_dual_mode"; do
       /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-"no"}"
     done
   done
@@ -39,12 +39,14 @@ generate_fancontrol_config() {
 
   CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
   # shellcheck disable=SC2044
-  for P in $(find "/sys/devices/platform/" -name "temp1_input"); do
+  for P in $(find "/sys/devices/platform/" -type f -name "temp1_input"); do
     D="$(echo "${P}" | sed -n 's|.*/\(devices/platform/[^/]*\)/.*|\1|p')"
     I="$(echo "${P}" | sed -n 's|.*hwmon\([0-9]\).*|\1|p')"
     DEVPATH="${DEVPATH} hwmon${I}=${D}"
     DEVNAME="${DEVNAME} hwmon${I}=$(cat /sys/${D}/*/*/name)"
-    for F in $(find "/sys/${D}" -name "fan[0-9]_input"); do
+    for F in $(find "/sys/${D}" -type f -name "fan[0-9]_input"); do
+      R="$(cat "${F}" 2>/dev//null)"
+      [ "${R:-0}" -le 0 ] && continue
       IDX="$(echo "${F}" | sed -n 's|.*fan\([0-9]\)_input|\1|p')"
       FCTEMPS="${FCTEMPS} hwmon${I}/pwm${IDX}=${CORETEMP}"
       FCFANS="${FCFANS} hwmon${I}/pwm${IDX}=hwmon${I}/fan${IDX}_input"
@@ -86,22 +88,16 @@ main() {
 
   while true; do
     sleep 1
-    FanReadMode="$(grep -w 'fan_config_type_internal' "/etc/synoinfo.conf" | cut -d'=' -f2 | tr -d '"')"
-    MODES=("full" "high" "low")
-    FanCurtMode=1
-    
-    for idx in "${!MODES[@]}"; do
-      if [ "$FanReadMode" = "${MODES[$idx]}" ]; then
-        FanCurtMode=$idx
-        break
+    FanType="$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)"
+    case "${FanType}" in fullfan | full) FanCurtMode="0" ;; coolfan | high) FanCurtMode="1" ;; quietfan | low) FanCurtMode="2" ;; *) FanCurtMode="-1" ;; esac
+    if echo "0 1 2" | grep -wq "${FanCurtMode}"; then
+      if [ ! "${FanCurtMode}" = "${FanBaseMode}" ]; then
+        _log "Fan speed mode changed from ${FanBaseMode} to ${FanCurtMode}"
+        FanBaseMode="${FanCurtMode}"
+        generate_fancontrol_config "${FanBaseMode}"
+        /usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/run/fancontrol.pid"
+        /usr/sbin/fancontrol &
       fi
-    done
-    if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
-      FanBaseMode="${FanCurtMode}"
-      echo "Fan mode changed to ${FanBaseMode}"
-      generate_fancontrol_config "${FanBaseMode}"
-      /usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/var/run/fancontrol.pid"
-      /usr/sbin/fancontrol &
     fi
   done
 }
