@@ -24,7 +24,6 @@ get_section_kv() {
 }
 
 set_section_kv() {
-  # 用法: set_section_key_value1 <文件> <section> <key> <value>
   local file="${1}"
   local section="${2}"
   local key="${3}"
@@ -56,9 +55,6 @@ GSKV=$([ -x "/usr/syno/bin/get_section_key_value" ] && echo "/usr/syno/bin/get_s
 SSKV=$([ -x "/usr/syno/bin/set_section_key_value" ] && echo "/usr/syno/bin/set_section_key_value" || echo "set_section_kv")
 
 ###############################################################################
-
-# durex
-/usr/sbin/durex arc 2>/dev/null || true
 
 # packages
 if [ ! -f /usr/syno/etc/packages/feeds ]; then
