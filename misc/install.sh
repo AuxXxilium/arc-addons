@@ -157,6 +157,10 @@ elif [ "${1}" = "late" ]; then
   # beep
   cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
   cp -vpdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/
+  cp -vpf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
+  cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
+  cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
+  cp -vpf /usr/bin/sveinstaller /tmpRoot/usr/bin/sveinstaller
   # [ ! -f /tmpRoot/usr/syno/bin/synoschedtool.bak ] && cp -vpf /tmpRoot/usr/syno/bin/synoschedtool /tmpRoot/usr/syno/bin/synoschedtool.bak
   # printf '#!/bin/sh\ncase "${1}" in\n  --beep)\n  beep -r ${2}\n  ;;\n  *)\n    /usr/syno/bin/synoschedtool.bak "$@"  ;;\nesac\n' >/tmpRoot/usr/syno/bin/synoschedtool
 
@@ -183,7 +187,6 @@ elif [ "${1}" = "late" ]; then
   done
   # arc-misc
   cp -vpf /usr/bin/arc-misc.sh /tmpRoot/usr/bin/arc-misc.sh
-  cp -vpf /usr/sbin/durex /tmpRoot/usr/sbin/durex
 
   DEST="/tmpRoot/usr/lib/systemd/system/arc-misc.service"
   {

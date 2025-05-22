@@ -57,9 +57,6 @@ SSKV=$([ -x "/usr/syno/bin/set_section_key_value" ] && echo "/usr/syno/bin/set_s
 
 ###############################################################################
 
-# durex
-/usr/sbin/durex arc 2>/dev/null || true
-
 # packages
 if [ ! -f /usr/syno/etc/packages/feeds ]; then
   mkdir -p /usr/syno/etc/packages
