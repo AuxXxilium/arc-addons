@@ -90,9 +90,11 @@ if ! ps -aux | grep -v grep | grep -q "/usr/sbin/cpuinfo" >/dev/null; then
   "/usr/sbin/cpuinfo" &
   [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
   sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|' /etc/nginx/nginx.conf
+  sed -i 's|/run/synoscgi_arc.sock;|/run/arc_synoscgi.sock;|' /etc/nginx/nginx.conf
   sed -i 's|/run/synoscgi_rr.sock;|/run/arc_synoscgi.sock;|' /etc/nginx/nginx.conf
   [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
   sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|' /usr/syno/share/nginx/nginx.mustache
+  sed -i 's|/run/synoscgi_arc.sock;|/run/arc_synoscgi.sock;|' /usr/syno/share/nginx/nginx.mustache
   sed -i 's|/run/synoscgi_rr.sock;|/run/arc_synoscgi.sock;|' /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
 fi

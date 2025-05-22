@@ -11,8 +11,8 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
+  tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
   if [ ! -f "/tmpRoot/usr/arc/addons/fancontrol.sh" ]; then
-    tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
     [ -f "/tmpRoot/etc/fancontrol" ] && rm -f /tmpRoot/etc/fancontrol
   fi
 
