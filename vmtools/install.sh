@@ -125,3 +125,4 @@ elif [ "${1}" = "uninstall" ]; then
   rm -rf /tmpRoot/etc/open-vm-tools
   rm -rf /tmpRoot/usr/vmtools
 fi
+exit 0

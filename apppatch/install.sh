@@ -67,3 +67,4 @@ elif [ "${1}" = "uninstall" ]; then
   echo "/usr/bin/apppatch.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/apppatch.sh" >>/tmpRoot/usr/arc/revert.sh
 fi
+exit 0

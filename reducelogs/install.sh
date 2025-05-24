@@ -76,7 +76,7 @@ install_addon() {
   # syno-dump-core
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
   [ ! -f "${SH_FILE}.bak" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak"
-  printf '#!/bin/sh\nexit 0\n' >"${SH_FILE}"
+  printf '#!/usr/bin/env sh\nexit 0\n' >"${SH_FILE}"
 
   # reducelogs.service
   cp -vpf /usr/bin/reducelogs.sh /tmpRoot/usr/bin/reducelogs.sh
@@ -132,5 +132,4 @@ case "${1}" in
     uninstall_addon "${1}"
     ;;
 esac
-
 exit 0

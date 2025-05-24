@@ -78,3 +78,4 @@ DELETE FROM task WHERE task_name LIKE 'Fancontrol';
 EOF
   fi
 fi
+exit 0
