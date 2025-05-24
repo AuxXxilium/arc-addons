@@ -100,8 +100,5 @@ case "${1}" in
   patches)
     install_patches
     ;;
-  *)
-    exit 0
-    ;;
 esac
 exit 0

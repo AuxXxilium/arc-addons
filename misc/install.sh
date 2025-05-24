@@ -152,7 +152,7 @@ elif [ "${1}" = "late" ]; then
 
   # sdcard
   [ ! -f /tmpRoot/usr/lib/udev/script/sdcard.sh.bak ] && cp -vpf /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
-  printf '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
+  printf '#!/usr/bin/env sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
 
   # beep
   cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
@@ -162,7 +162,7 @@ elif [ "${1}" = "late" ]; then
   cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
   cp -vpf /usr/bin/sveinstaller /tmpRoot/usr/bin/sveinstaller
   # [ ! -f /tmpRoot/usr/syno/bin/synoschedtool.bak ] && cp -vpf /tmpRoot/usr/syno/bin/synoschedtool /tmpRoot/usr/syno/bin/synoschedtool.bak
-  # printf '#!/bin/sh\ncase "${1}" in\n  --beep)\n  beep -r ${2}\n  ;;\n  *)\n    /usr/syno/bin/synoschedtool.bak "$@"  ;;\nesac\n' >/tmpRoot/usr/syno/bin/synoschedtool
+  # printf '#!/usr/bin/env sh\ncase "${1}" in\n  --beep)\n  beep -r ${2}\n  ;;\n  *)\n    /usr/syno/bin/synoschedtool.bak "$@"  ;;\nesac\n' >/tmpRoot/usr/syno/bin/synoschedtool
 
   # service
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
@@ -239,5 +239,4 @@ elif [ "${1}" = "late" ]; then
   fi
 
 fi
-
 exit 0

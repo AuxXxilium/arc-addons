@@ -45,8 +45,5 @@ case "${1}" in
   early)
     install_addon "${1}"
     ;;
-  *)
-    exit 0
-    ;;
 esac
 exit 0

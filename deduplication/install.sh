@@ -55,7 +55,5 @@ uninstall_addon() {
 case "${1}" in
   late) install_addon ;;
   uninstall) uninstall_addon ;;
-  *) exit 0 ;;
 esac
-
 exit 0

@@ -35,7 +35,10 @@ install_addon() {
 
 uninstall_addon() {
   echo "Uninstalling addon arcdns - ${1}"
-  # To-Do: Add uninstallation steps here
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arcdns.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/arcdns.service"
+  rm -f "/tmpRoot/usr/bin/arcdns.php"
+  rm -f "/tmpRoot/usr/bin/arcdns.sh"
 }
 
 case "${1}" in
@@ -44,9 +47,6 @@ case "${1}" in
     ;;
   uninstall)
     uninstall_addon "${1}"
-    ;;
-  *)
-    exit 0
     ;;
 esac
 exit 0

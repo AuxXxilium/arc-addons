@@ -66,3 +66,4 @@ elif [ "${1}" = "uninstall" ]; then
   echo "/usr/bin/nvmevolume.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/nvmevolume.sh" >>/tmpRoot/usr/arc/revert.sh
 fi
+exit 0

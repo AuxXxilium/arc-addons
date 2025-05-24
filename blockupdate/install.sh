@@ -9,7 +9,7 @@
 install_patches() {
   echo "Installing addon blockupdates - patches"
   cp -pf /usr/syno/sbin/bootup-smallupdate.sh /usr/syno/sbin/bootup-smallupdate.sh.bak
-  printf '#!/bin/sh\nexit 0\n' >/usr/syno/sbin/bootup-smallupdate.sh
+  printf '#!/usr/bin/env sh\nexit 0\n' >/usr/syno/sbin/bootup-smallupdate.sh
 }
 
 install_late() {

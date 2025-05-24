@@ -27,7 +27,7 @@ else
   if [ -z "$(cat "/etc/application_key.conf")" ] && [ -f "${FILE}" ]; then
     [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
     /usr/bin/killall "${FILE}" 2>/dev/null || true
-    echo -e '#!/bin/sh\necho "key=304403268" > /etc/application_key.conf\nexit 0' >"${FILE}"
+    echo -e '#!/usr/bin/env sh\necho "key=304403268" > /etc/application_key.conf\nexit 0' >"${FILE}"
   fi
 
   SO_FILE="/var/packages/SynologyPhotos/target/usr/lib/libsynophoto-plugin-platform.so.1.0"

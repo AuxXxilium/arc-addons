@@ -59,8 +59,5 @@ case "${1}" in
   uninstall)
     uninstall_addon "${1}"
     ;;
-  *)
-    exit 0
-    ;;
 esac
 exit 0

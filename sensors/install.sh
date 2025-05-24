@@ -26,3 +26,4 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sensors.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/sensors.service"
 fi
+exit 0
