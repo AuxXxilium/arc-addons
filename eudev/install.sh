@@ -127,8 +127,5 @@ case "${1}" in
   late)
     install_late
     ;;
-  *)
-    exit 0
-    ;;
 esac
 exit 0

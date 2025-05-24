@@ -99,3 +99,4 @@ elif [ "${1}" = "uninstall" ]; then
   SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
 fi
+exit 0
