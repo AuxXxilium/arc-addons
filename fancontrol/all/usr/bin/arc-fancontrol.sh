@@ -8,7 +8,7 @@
 
 #            fullfan        coolfan        quietfan
 #               |              |              |
-DEFMODES=("20 50 100 50" "20 60 80 20" "20 80 50 20")
+DEFMODES=("20 50 100 50" "20 60 80 20" "20 80 50 10")
 #           ^  ^  ^  ^
 #           1  2  3  4
 # 1: MINTEMP  2: MAXTEMP  3: MINSTART  4: MINSTOP
