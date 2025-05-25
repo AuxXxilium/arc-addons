@@ -12,7 +12,7 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
-  if [ ! -f "/tmpRoot/usr/arc/addons/fancontrol.sh" ]; then
+  if [ ! -f "/addons/fancontrol.sh" ]; then
     [ -f "/tmpRoot/etc/fancontrol" ] && rm -f /tmpRoot/etc/fancontrol
   fi
 

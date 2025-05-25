@@ -16,7 +16,7 @@ DEFMODES=("20 50 100 50" "20 60 80 20" "20 80 50 10")
 
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-    for K in "support_fan" "support_fan_adjust_dual_mode"; do
+    for K in "support_fan" "supportadt7490" "support_fan_adjust_dual_mode"; do
       /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-"no"}"
     done
   done
@@ -77,7 +77,7 @@ generate_fancontrol_config() {
 
 main() {
   if [ -z "$(find /sys/ -name "fan*_input")" ]; then
-    _log "No fan detected, exiting..."
+    echo "No fan detected, exiting..."
     set_fan_conf "no"
     exit 0
   fi
@@ -92,10 +92,10 @@ main() {
     case "${FanType}" in fullfan | full) FanCurtMode="0" ;; coolfan | high) FanCurtMode="1" ;; quietfan | low) FanCurtMode="2" ;; *) FanCurtMode="-1" ;; esac
     if echo "0 1 2" | grep -wq "${FanCurtMode}"; then
       if [ ! "${FanCurtMode}" = "${FanBaseMode}" ]; then
-        _log "Fan speed mode changed from ${FanBaseMode} to ${FanCurtMode}"
+        echo "Fan speed mode changed from ${FanBaseMode} to ${FanCurtMode}"
         FanBaseMode="${FanCurtMode}"
         generate_fancontrol_config "${FanBaseMode}"
-        /usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/run/fancontrol.pid"
+        /usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/var/run/fancontrol.pid"
         /usr/sbin/fancontrol &
       fi
     fi
