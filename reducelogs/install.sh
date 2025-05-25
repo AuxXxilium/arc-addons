@@ -77,28 +77,6 @@ install_addon() {
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
   [ ! -f "${SH_FILE}.bak" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak"
   printf '#!/usr/bin/env sh\nexit 0\n' >"${SH_FILE}"
-
-  # reducelogs.service
-  cp -vpf /usr/bin/reducelogs.sh /tmpRoot/usr/bin/reducelogs.sh
-
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/reducelogs.service"
-  {
-    echo "[Unit]"
-    echo "Description=reducelogs daemon"
-    echo "After=multi-user.target"
-    echo
-    echo "[Service]"
-    echo "Type=oneshot"
-    echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/reducelogs.sh"
-    echo
-    echo "[Install]"
-    echo "WantedBy=multi-user.target"
-  } >"${DEST}"
-
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/reducelogs.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/reducelogs.service
 }
 
 uninstall_addon() {
@@ -114,10 +92,6 @@ uninstall_addon() {
   # syno-dump-core
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
   [ -f "${SH_FILE}.bak" ] && mv -f "${SH_FILE}.bak" "${SH_FILE}"
-
-  # reducelogs.service
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/reducelogs.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/reducelogs.service"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/reducelogs.sh -r" >>/tmpRoot/usr/arc/revert.sh
