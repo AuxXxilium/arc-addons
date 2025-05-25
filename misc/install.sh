@@ -157,6 +157,7 @@ elif [ "${1}" = "late" ]; then
   # beep
   cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
   cp -vpdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/
+  cp -vpdf /usr/lib/libblkid.so* /tmpRoot/usr/lib/
   cp -vpf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
   cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
