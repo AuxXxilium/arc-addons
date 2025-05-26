@@ -37,13 +37,14 @@ fi
 
 if [ -f "${FILE_GZ}" ]; then
   [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
-  rm -f "${FILE_JS}"
-  if [ -f "${FILE_GZ}.bak" ]; then
-    gzip -dc "${FILE_GZ}.bak" > "${FILE_JS}"
-  fi
 else
   [ ! -f "${FILE_JS}.bak" ] && cp -pf "${FILE_JS}" "${FILE_JS}.bak"
-  rm -f "${FILE_JS}"
+fi
+
+rm -f "${FILE_JS}"
+if [ -f "${FILE_GZ}.bak" ]; then
+  gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
+else
   cp -pf "${FILE_JS}.bak" "${FILE_JS}"
 fi
 
@@ -70,15 +71,16 @@ fi
 
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
-if ! ps -aux | awk '$0 ~ /\/usr\/sbin\/cpuinfo/ && $0 !~ /awk/ { found=1 } END { exit !found }'; then
+if ! ps aux | grep -F "/usr/sbin/cpuinfo" | grep -v grep >/dev/null; then
   "/usr/sbin/cpuinfo" &
-  [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-  [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
   if grep -qE "/run/synoscgi(_rr)?\.sock;" /etc/nginx/nginx.conf; then
     for f in /etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache; do
+      [ -f "$f" ] || continue
+      [ -f "${f}.bak" ] || cp -pf "$f" "${f}.bak"
       sed -i -E 's|/run/synoscgi(_rr)?\.sock;|/run/arc_synoscgi.sock;|g' "$f"
     done
   fi
   systemctl reload nginx
 fi
+
 exit 0

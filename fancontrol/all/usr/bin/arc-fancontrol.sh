@@ -8,7 +8,7 @@
 
 #            fullfan        coolfan        quietfan
 #               |              |              |
-DEFMODES=("20 50 100 50" "20 60 80 20" "20 80 50 10")
+DEFMODES=("20 50 100 50" "20 60 80 20" "20 60 50 10")
 #           ^  ^  ^  ^
 #           1  2  3  4
 # 1: MINTEMP  2: MAXTEMP  3: MINSTART  4: MINSTOP
@@ -17,7 +17,7 @@ DEFMODES=("20 50 100 50" "20 60 80 20" "20 80 50 10")
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
     for K in "support_fan" "supportadt7490" "support_fan_adjust_dual_mode"; do
-      /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-"no"}"
+      /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-no}"
     done
   done
 }
@@ -95,13 +95,13 @@ main() {
         echo "Fan speed mode changed from ${FanBaseMode} to ${FanCurtMode}"
         FanBaseMode="${FanCurtMode}"
         generate_fancontrol_config "${FanBaseMode}"
-        /usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/var/run/fancontrol.pid"
+        /usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/run/fancontrol.pid"
         /usr/sbin/fancontrol &
       fi
     fi
   done
 }
 
-trap '/usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/var/run/fancontrol.pid"' EXIT INT TERM HUP
+trap '/usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/run/fancontrol.pid"' EXIT INT TERM HUP
 
 main &
