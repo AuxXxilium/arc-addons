@@ -12,7 +12,7 @@ install_addon() {
   # Create necessary directories and copy files
   mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
-  cp -pf /usr/bin/amepatch.sh /tmpRoot/usr/bin/
+  cp -pf /usr/bin/amepatch.sh /tmpRoot/usr/bin/amepatch.sh
 
   # Create systemd service file
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/amepatch.service"
@@ -37,8 +37,7 @@ uninstall_addon() {
 
   # Remove systemd files and binaries
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/amepatch.service" \
-        "/tmpRoot/usr/lib/systemd/system/amepatch.service" \
-        "/tmpRoot/usr/bin/amepatch.sh"
+        "/tmpRoot/usr/lib/systemd/system/amepatch.service"
 
   # Create revert script if not present
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && {
