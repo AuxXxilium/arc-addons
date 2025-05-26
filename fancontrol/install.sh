@@ -31,11 +31,11 @@ INSERT INTO task VALUES('Fancontrol', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
 #
 #                       fullfan             coolfan               quietfan
 #                          |                      |                        |
-FANMODES=("20 50 100 50" "20 60 80 20" "20 80 50 10")
+FANMODES=("20 50 100 50" "20 60 80 20" "20 60 50 10")
 #                    ^  ^   ^   ^
 #                    1  2    3    4
 # 1: MINTEMP  2: MAXTEMP  3: MINSTART  4: MINSTOP
-# MINSTART and MINSTOP are in percent (0–100)
+# MINSTART and MINSTOP are in percent (0-100)
 ', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
