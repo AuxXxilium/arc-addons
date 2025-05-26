@@ -35,39 +35,23 @@ if [ "$1" == "-r" ]; then
   exit 0
 fi
 
-TEMP="on"
-VENDOR=""
-FAMILY=""
-SERIES=""
-CORES=""
-SPEED=""
-
 if [ -f "${FILE_GZ}" ]; then
   [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
+  rm -f "${FILE_JS}"
+  if [ -f "${FILE_GZ}.bak" ]; then
+    gzip -dc "${FILE_GZ}.bak" > "${FILE_JS}"
+  fi
 else
   [ ! -f "${FILE_JS}.bak" ] && cp -pf "${FILE_JS}" "${FILE_JS}.bak"
-fi
-
-rm -f "${FILE_JS}"
-if [ -f "${FILE_GZ}.bak" ]; then
-  gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
-else
+  rm -f "${FILE_JS}"
   cp -pf "${FILE_JS}.bak" "${FILE_JS}"
 fi
 
-if [ "${TEMP^^}" = "ON" ]; then
+if grep -q "mev=physical" /proc/cmdline; then
   sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
   sed -i 's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g' "${FILE_JS}"
   sed -i 's/_T("rcpower",n),/_T("rcpower", n)?e.fan_list?_T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", n):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", n),/g' "${FILE_JS}"
 fi
-
-[ -n "${VENDOR}" ] && sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" "${FILE_JS}" # str
-[ -n "${FAMILY}" ] && sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}" # str
-[ -n "${SERIES}" ] && sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}" # str
-[ -n "${CORES}" ] && sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"    # str
-[ -n "${SPEED}" ] && sed -i "s/\(\(,\)\|\((\)\).\.cpu_clock_speed/\1${SPEED//\"/}/g" "${FILE_JS}"  # int
-
-# sed -i 's/(d.push([_T("status","status_version"),t.firmware_ver,f]);)/\1d.push(["bootloader",t.bootloader_ver,f]);/g' "${FILE_JS}"
 
 CARDN=$(ls -d /sys/class/drm/card* 2>/dev/null | head -1)
 if [ -d "${CARDN}" ]; then
@@ -86,17 +70,15 @@ fi
 
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
-if ! ps -aux | grep -v grep | grep -q "/usr/sbin/cpuinfo" >/dev/null; then
+if ! ps -aux | awk '$0 ~ /\/usr\/sbin\/cpuinfo/ && $0 !~ /awk/ { found=1 } END { exit !found }'; then
   "/usr/sbin/cpuinfo" &
   [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-  sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|' /etc/nginx/nginx.conf
-  sed -i 's|/run/synoscgi_arc.sock;|/run/arc_synoscgi.sock;|' /etc/nginx/nginx.conf
-  sed -i 's|/run/synoscgi_rr.sock;|/run/arc_synoscgi.sock;|' /etc/nginx/nginx.conf
   [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
-  sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|' /usr/syno/share/nginx/nginx.mustache
-  sed -i 's|/run/synoscgi_arc.sock;|/run/arc_synoscgi.sock;|' /usr/syno/share/nginx/nginx.mustache
-  sed -i 's|/run/synoscgi_rr.sock;|/run/arc_synoscgi.sock;|' /usr/syno/share/nginx/nginx.mustache
+  if grep -qE "/run/synoscgi(_rr)?\.sock;" /etc/nginx/nginx.conf; then
+    for f in /etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache; do
+      sed -i -E 's|/run/synoscgi(_rr)?\.sock;|/run/arc_synoscgi.sock;|g' "$f"
+    done
+  fi
   systemctl reload nginx
 fi
-
 exit 0
