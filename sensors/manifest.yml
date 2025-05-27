@@ -1,7 +1,7 @@
 version: 1
 name: sensors
 description: "Install sensors package to monitor temperature of CPU and other components"
-system: true
+system: false
 beta: false
 all:
   install-script: "install.sh"
