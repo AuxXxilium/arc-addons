@@ -12,3 +12,4 @@ for F in /sys/class/net/eth*; do
   echo "set ${F} wol g"
   /usr/bin/ethtool -s "${ETH}" wol g 2>/dev/null
 done
+exit 0

@@ -9,3 +9,4 @@
 args=()
 for arg in "$@"; do [[ "$arg" = "ata" ]] && args+=("auto") || args+=("$arg"); done
 smartctl.bak "${args[@]}"
+exit 0

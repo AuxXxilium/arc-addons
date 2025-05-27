@@ -32,3 +32,4 @@ if [ -f "/etc.defaults/ddns_provider.conf" ]; then
     fi
 fi
 done
+exit 0

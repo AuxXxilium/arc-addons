@@ -58,3 +58,4 @@ if [ -d "/var/packages/Synology\ Photos" ]; then
         /usr/syno/bin/synosetkeyvalue "/var/packages/Synology\ Photos/INFO" version "10.6.2-0710"
     fi
 fi
+exit 0

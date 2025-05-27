@@ -6,23 +6,7 @@
 # See /LICENSE for more information.
 #
 
-if [ "${1}" = "-r" ]; then
-  # Synology Photos
-  FILE="/var/packages/SynologyPhotos/target/usr/bin/synofoto-bin-push-service"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
-
-  SO_FILE="/var/packages/SynologyPhotos/target/usr/lib/libsynophoto-plugin-platform.so.1.0"
-  [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
-
-  # Surveillance Station -- local_display
-  SS_PATH="/var/packages/SurveillanceStation/target"
-  [ -d "${SS_PATH}/@SSData/AddOns/LocalDisplay" ] &&
-    rm -f "${SS_PATH}/@SSData/AddOns/LocalDisplay/disabled"
-else
-  # Synology Photos
-  # From: /usr/local/lib/systemd/system/pkg-SynologyPhotos-js-server.service
-  #       synocloudserviceauth[27951]: cloudservice_register_api_key.cpp:293 Register api key failed: Invalid device info
-  #       synocloudserviceauth[28129]: cloudservice_get_api_key.cpp:21 Cannot get key
+patch_photos() {
   FILE="/var/packages/SynologyPhotos/target/usr/bin/synofoto-bin-push-service"
   if [ -z "$(cat "/etc/application_key.conf")" ] && [ -f "${FILE}" ]; then
     [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
@@ -40,8 +24,9 @@ else
     # force no Gpu
     PatchELFSharp "${SO_FILE}" "_ZN9synophoto6plugin8platform23IsSupportedIENetworkGpuEv" "B8 00 00 00 00 C3"
   fi
+}
 
-  # Surveillance Station -- local_display
+patch_surveillance() {
   SS_PATH="/var/packages/SurveillanceStation/target"
   if [ -d "${SS_PATH}/@SSData/AddOns/LocalDisplay" ]; then
     echo -n "" >"${SS_PATH}/@SSData/AddOns/LocalDisplay/disabled"
@@ -49,4 +34,35 @@ else
       rm -rf "${SS_PATH}/local_display/.config/chromium-local-display/BrowserMetrics/"*
     fi
   fi
-fi
+}
+
+restore_all() {
+  # Synology Photos
+  FILE="/var/packages/SynologyPhotos/target/usr/bin/synofoto-bin-push-service"
+  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
+
+  SO_FILE="/var/packages/SynologyPhotos/target/usr/lib/libsynophoto-plugin-platform.so.1.0"
+  [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
+
+  # Surveillance Station -- local_display
+  SS_PATH="/var/packages/SurveillanceStation/target"
+  [ -d "${SS_PATH}/@SSData/AddOns/LocalDisplay" ] &&
+    rm -f "${SS_PATH}/@SSData/AddOns/LocalDisplay/disabled"
+}
+
+case "$1" in
+  -r)
+    restore_all
+    ;;
+  surveillance)
+    patch_surveillance
+    ;;
+  photosface)
+    patch_photos
+    ;;
+  *)
+    patch_photos
+    patch_surveillance
+    ;;
+esac
+exit 0
