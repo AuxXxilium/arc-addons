@@ -3,6 +3,7 @@ name: sensors
 description: "Install sensors package to monitor temperature of CPU and other components"
 system: false
 beta: false
+target: system
 all:
   install-script: "install.sh"
   copy: "all"
