@@ -76,7 +76,5 @@ case "${ACTION,,}" in
     shift
     Check "$@"
     ;;
-  *)
-    echo "Unknown command!"
-    ;;
 esac
+exit 0

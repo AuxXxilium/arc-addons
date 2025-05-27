@@ -37,3 +37,4 @@ else
   # SUBJECT="Welcome to <a href=\\\"https://github.com/AuxXxilium\\" target=blank>AuxXxilium</a>!"
   # synodsmnotify -e false -b false "@administrators" "arc_notify_subject" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\", \"%SUBJECT%\": \"${SUBJECT}\"}"
 fi
+exit 0
