@@ -43,7 +43,7 @@ if [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/nvmevolume.sh"
+    echo "ExecStart=/usr/bin/nvmevolume.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
