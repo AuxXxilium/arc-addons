@@ -29,14 +29,14 @@ install_modules() {
   udevadm settle --timeout=30 || echo "udevadm settle failed"
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
-  /usr/bin/killall udevd
+  /usr/bin/killall udevd || true
   # modprobe pcspeaker, pcspkr
   # modprobe modules for the beep
-  /usr/sbin/modprobe pcspeaker
-  /usr/sbin/modprobe pcspkr
+  /usr/sbin/modprobe pcspeaker || true
+  /usr/sbin/modprobe pcspkr || true
   # modprobe modules for the sensors
   for I in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
-    /usr/sbin/modprobe "${I}"
+    /usr/sbin/modprobe "${I}" || true
   done
   # Remove kvm modules
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_intel && /usr/sbin/modprobe -r kvm_intel || true
@@ -100,19 +100,19 @@ install_late() {
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
-  {
-    echo "[Unit]"
-    echo "Description=Reload udev rules"
-    echo
-    echo "[Service]"
-    echo "Type=oneshot"
-    echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/udevadm hwdb --update"
-    echo "ExecStart=/usr/bin/udevadm control --reload-rules"
-    echo
-    echo "[Install]"
-    echo "WantedBy=multi-user.target"
-  } >"${DEST}"
+  cat <<EOF >"${DEST}"
+[Unit]
+Description=Reload udev rules
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/udevadm hwdb --update
+ExecStart=/usr/bin/udevadm control --reload-rules
+
+[Install]
+WantedBy=multi-user.target
+EOF
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/udevrules.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/udevrules.service
 }

@@ -180,7 +180,7 @@ elif [ "${1}" = "late" ]; then
     if [ -n "${TTYN}" ] && [ -e "/dev/${TTYN}" ]; then
       echo "Make getty\@${TTYN}.service"
       cp -vpf /tmpRoot/usr/lib/systemd/system/serial-getty\@.service /tmpRoot/usr/lib/systemd/system/getty\@${TTYN}.service
-      sed -i "s|^ExecStart=.*|ExecStart=-/sbin/agetty %I ${BAUD:-115200} linux|" /tmpRoot/usr/lib/systemd/system/getty\@${TTYN}.service
+      sed -i "s|^ExecStart=.*|ExecStart=/sbin/agetty %I ${BAUD:-115200} linux|" /tmpRoot/usr/lib/systemd/system/getty\@${TTYN}.service
       mkdir -vp /tmpRoot/usr/lib/systemd/system/getty.target.wants
       ln -vsf /usr/lib/systemd/system/getty\@${TTYN}.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@${TTYN}.service
     fi
@@ -198,7 +198,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/arc-misc.sh"
+    echo "ExecStart=/usr/bin/arc-misc.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
@@ -219,7 +219,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/arc-once.sh"
+    echo "ExecStart=/usr/bin/arc-once.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
