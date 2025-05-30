@@ -51,14 +51,6 @@ install_addon() {
     mkdir -p "/tmpRoot/usr/arc"
     cp -rpf /usr/arc/* "/tmpRoot/usr/arc/"
   fi
-
-  # Version
-  {
-    echo "LOADERLABEL=\"${LOADERLABEL}\""
-    echo "LOADERVERSION=\"${LOADERVERSION}\""
-    echo "LOADERBUILD=\"${LOADERBUILD}\""
-    echo "LOADERBRANCH=\"${LOADERBRANCH}\""
-  } | tee "/tmpRoot/usr/arc/VERSION" >/dev/null
 }
 
 case "${1}" in
