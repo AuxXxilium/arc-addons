@@ -54,7 +54,7 @@ if grep -q "mev=physical" /proc/cmdline; then
   sed -i 's/_T("rcpower",n),/_T("rcpower", n)?e.fan_list?_T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", n):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", n),/g' "${FILE_JS}"
 fi
 
-CARDN=$(ls -d /sys/class/drm/card* 2>/dev/null | head -1)
+CARDN=$(ls -d /sys/class/drm/card[0-9]*/ 2>/dev/null | head -1)
 if [ -d "${CARDN}" ]; then
   PCIDN="$(awk -F= '/DEVNAME/ {print $2}' "${CARDN}/device/uevent" 2>/dev/null)"
   LNAME="$(lspci -Q -s ${PCIDN:-"99:99.9"} 2>/dev/null | sed "s/.*: //")"
