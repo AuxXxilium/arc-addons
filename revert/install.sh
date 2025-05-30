@@ -46,11 +46,10 @@ install_addon() {
     rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/revert.service"
   fi
 
-  # backup current loader configs
-  rm -rf "/tmpRoot/usr/arc/backup"
-  if [ -d "/usr/arc/backup" ]; then
-    mkdir -p "/tmpRoot/usr/arc/backup"
-    cp -rf /usr/arc/backup/* "/tmpRoot/usr/arc/backup/"
+  # Backup loader config
+  if [ -d "/usr/arc" ]; then
+    mkdir -p "/tmpRoot/usr/arc"
+    cp -rpf /usr/arc/* "/tmpRoot/usr/arc/"
   fi
 
   # Version

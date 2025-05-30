@@ -165,6 +165,9 @@ elif [ "${1}" = "late" ]; then
   # printf '#!/usr/bin/env sh\ncase "${1}" in\n  --beep)\n  beep -r ${2}\n  ;;\n  *)\n    /usr/syno/bin/synoschedtool.bak "$@"  ;;\nesac\n' >/tmpRoot/usr/syno/bin/synoschedtool
 
   # service
+  # systemd-modules-load
+  rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
+
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
