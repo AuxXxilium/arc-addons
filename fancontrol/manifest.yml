@@ -1,6 +1,6 @@
 version: 1
 name: fancontrol
-description: "Install fancontrol to monitor and control fan speeds (Includes sensors addon, only for supported devices)."
+description: "Control fan speeds from DSM (Incl. sensors addon, only for supported devices)."
 system: false
 beta: true
 target: system
@@ -14,8 +14,10 @@ broadwellnkv2: true
 broadwellntbap: true
 denverton: true
 geminilake: true
+geminilakenk: true
 purley: true
 v1000: true
 v1000nk: true
 r1000: true
+r1000nk: true
 epyc7002: true
