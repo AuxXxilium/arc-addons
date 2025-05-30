@@ -75,9 +75,9 @@ if ! ps aux | grep -F "/usr/sbin/cpuinfo" | grep -v grep >/dev/null; then
   "/usr/sbin/cpuinfo" &
   if grep -qE "/run/synoscgi(_rr)?\.sock;" /etc/nginx/nginx.conf; then
     for f in /etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache; do
-      [ -f "$f" ] || continue
-      [ -f "${f}.bak" ] || cp -pf "$f" "${f}.bak"
-      sed -i -E 's|/run/synoscgi(_rr)?\.sock;|/run/arc_synoscgi.sock;|g' "$f"
+      [ -f "${f}" ] || continue
+      [ -f "${f}.bak" ] || cp -pf "${f}" "${f}.bak"
+      sed -i -E 's|/run/synoscgi(_rr)?\.sock;|/run/arc_synoscgi.sock;|g' "${f}"
     done
   fi
   systemctl reload nginx
