@@ -41,7 +41,7 @@ else
   [ ! -f "${FILE_JS}.bak" ] && cp -pf "${FILE_JS}" "${FILE_JS}.bak"
 fi
 
-rm -f "${FILE_JS}"
+rm -f "${FILE_JS}" 2>/dev/null
 if [ -f "${FILE_GZ}.bak" ]; then
   gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
 else
