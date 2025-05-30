@@ -1,6 +1,6 @@
 version: 1
 name: redpill
-description: "Delay redpill for epyc7002"
+description: "Delay redpill for Linux 5.10.x"
 system: true
 beta: false
 all:
@@ -13,8 +13,10 @@ broadwellnkv2: false
 broadwellntbap: false
 denverton: false
 geminilake: false
+geminilakenk: true
 purley: false
 v1000: false
 v1000nk: true
 r1000: false
+r1000nk: true
 epyc7002: true

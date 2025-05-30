@@ -1,6 +1,6 @@
 version: 1
 name: ledcontrol
-description: "Add Ugreen Ledcontrol to DSM (Need sensors Addon)"
+description: "Add Ugreen Ledcontrol to DSM (requires sensors)"
 system: false
 beta: true
 target: system
@@ -14,8 +14,10 @@ broadwellnkv2: false
 broadwellntbap: false
 denverton: false
 geminilake: false
+geminilakenk: true
 purley: false
 v1000: false
 v1000nk: true
 r1000: false
+r1000nk: true
 epyc7002: true

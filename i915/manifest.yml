@@ -14,8 +14,10 @@ broadwellnkv2: false
 broadwellntbap: false
 denverton: false
 geminilake: true
+geminilakenk: true
 purley: false
 v1000: false
 v1000nk: false
 r1000: false
+r1000nk: false
 epyc7002: false
