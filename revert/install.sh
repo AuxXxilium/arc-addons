@@ -47,6 +47,7 @@ install_addon() {
   fi
 
   # Backup loader config
+  rm -rf "/tmpRoot/usr/arc"
   if [ -d "/usr/arc" ]; then
     mkdir -p "/tmpRoot/usr/arc"
     cp -rpf /usr/arc/* "/tmpRoot/usr/arc/"
