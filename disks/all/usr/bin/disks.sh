@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 #
-# Copyright (C) 2022 Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -54,10 +54,14 @@ _atoi() {
   NUM=0
   IDX=0
   while [ ${IDX} -lt ${#DISKNAME} ]; do
-    N=$(($(printf '%d' "'$(expr substr "${DISKNAME}" $((${IDX} + 1)) 1)") - $(printf '%d' "'a") + 1))
+    char="${DISKNAME:IDX:1}"
+    N=$(( $(printf '%d' "'$char") - $(printf '%d' "'a") + 1 ))
     BIT=$(($(expr length "${DISKNAME}") - 1 - ${IDX}))
-    # shellcheck disable=SC3019
-    NUM=$((NUM + (BIT == 0 ? N : 26 ** BIT * N)))
+    if [ ${BIT} -eq 0 ]; then
+      NUM=$((NUM + N))
+    else
+      NUM=$((NUM + 26 ** BIT * N))
+    fi
     IDX=$((IDX + 1))
   done
   echo $((NUM - 1))
@@ -73,8 +77,8 @@ _itol() {
   while [ ${NUM} -gt 0 ]; do
     if [ "$((NUM & 1))" = 1 ]; then
       case $((IDX / 26)) in
-      0) dev="$(printf sd\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;;                                                              # sda-z
-      *) dev="$(printf sd\\x"$(printf "%x" "$((IDX / 26 - 1 + $(printf '%d' "'a")))")"\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;; # sdaa-zz
+      0) dev="$(printf sd\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;;
+      *) dev="$(printf sd\\x"$(printf "%x" "$((IDX / 26 - 1 + $(printf '%d' "'a")))")"\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;;
       esac
       DISKLIST="${DISKLIST:+${DISKLIST}${IFS}}${dev}"
     fi
@@ -493,24 +497,18 @@ if type flock >/dev/null 2>&1 && type trap >/dev/null 2>&1; then
   trap 'flock -u 3; rm -f "$LOCKFILE"' EXIT INT TERM HUP # Release lock on exit or error or signal or hangup
 fi
 
-# get the boot disk info
+# get the boot disk info (alternative, compact style)
 [ -z "$(/sbin/blkid -L ARC3 2>/dev/null)" ] && checkAlldisk
 
 BOOTDISK_PART3_PATH="$(/sbin/blkid -L ARC3 2>/dev/null)"
-if [ -n "${BOOTDISK_PART3_PATH}" ]; then
-  BOOTDISK_PART3_MAJORMINOR="$(stat -c '%t:%T' "${BOOTDISK_PART3_PATH}" | awk -F: '{printf "%d:%d", strtonum("0x" $1), strtonum("0x" $2)}')"
-  BOOTDISK_PART3="$(awk -F= '/DEVNAME/ {print $2}' "/sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent" 2>/dev/null)"
-fi
+[ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR="$((0x$(stat -c '%t' "${BOOTDISK_PART3_PATH}"))):$((0x$(stat -c '%T' "${BOOTDISK_PART3_PATH}")))" || BOOTDISK_PART3_MAJORMINOR=""
+[ -n "${BOOTDISK_PART3_MAJORMINOR}" ] && BOOTDISK_PART3="$(cat "/sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent" 2>/dev/null | grep 'DEVNAME' | cut -d'=' -f2)" || BOOTDISK_PART3=""
 
-if [ -n "${BOOTDISK_PART3}" ]; then
-  BOOTDISK="$(basename "$(dirname /sys/block/*/${BOOTDISK_PART3} 2>/dev/null)" 2>/dev/null)"
-  BOOTDISK_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "/sys/block/${BOOTDISK}/uevent" 2>/dev/null)"
-fi
+[ -n "${BOOTDISK_PART3}" ] && BOOTDISK="$(ls -d /sys/block/*/${BOOTDISK_PART3} 2>/dev/null | cut -d'/' -f4)" || BOOTDISK=""
+[ -n "${BOOTDISK}" ] && BOOTDISK_PHYSDEVPATH="$(cat "/sys/block/${BOOTDISK}/uevent" 2>/dev/null | grep 'PHYSDEVPATH' | cut -d'=' -f2)" || BOOTDISK_PHYSDEVPATH=""
 
-if [ -n "${BOOTDISK}" ]; then
-  BOOTDISK_PCIEPATH="$(grep 'pciepath' /sys/block/${BOOTDISK}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
-  BOOTDISK_ATAPORT="$(grep 'ata_port_no' /sys/block/${BOOTDISK}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
-fi
+[ -n "${BOOTDISK}" ] && BOOTDISK_PCIEPATH="$(grep 'pciepath' /sys/block/${BOOTDISK}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)" || BOOTDISK_PCIEPATH=""
+[ -n "${BOOTDISK}" ] && BOOTDISK_ATAPORT="$(grep 'ata_port_no' /sys/block/${BOOTDISK}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)" || BOOTDISK_ATAPORT=""
 
 echo "BOOTDISK=${BOOTDISK}"
 echo "BOOTDISK_PHYSDEVPATH=${BOOTDISK_PHYSDEVPATH}"
@@ -539,9 +537,6 @@ case ${1} in
       nondtUpdate "${2:-}"
     fi
   fi
-  ;;
-*)
-  exit 0
   ;;
 esac
 
