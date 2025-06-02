@@ -8,11 +8,9 @@
 
 install_jrExit() {
   echo "Installing addon wol - jrExit"
-  for F in /sys/class/net/eth*; do
-    [ ! -e "${F}" ] && continue
-    ETH="$(basename "${F}")"
-    /usr/bin/ethtool -s "${ETH}" wol g 2>/dev/null
-  done
+
+  /usr/bin/wol.sh
+
 }
 
 install_late() {
