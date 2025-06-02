@@ -82,7 +82,6 @@ elif [ "${1}" = "rcExit" ]; then
 
   # reboot
   sed -i 's/reboot$/reboot -f/' /usr/syno/web/webman/reboot.cgi 2>/dev/null
-  sed -i 's/reboot$/reboot -f/' /usr/syno/web/webman/reboot.cgi 2>/dev/null
 
   # recovery
   if grep -wq "recovery" /proc/cmdline 2>/dev/null && [ -x /usr/syno/web/webman/recovery.cgi ]; then
