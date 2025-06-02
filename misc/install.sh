@@ -46,7 +46,8 @@ elif [ "${1}" = "patches" ]; then
         if [ "${MACR}" = "${MACX}" ]; then
           echo "Setting IP for ${ETH} to ${IPRS}"
           F="/etc/sysconfig/network-scripts/ifcfg-${ETH}"
-          /bin/set_key_value "${F}" BOOTPROTO "static"
+          /bin/set_key_value "${F}" "BOOTPROTO" "static"
+          /bin/set_key_value "${F}" "ONBOOT" "yes"
           /bin/set_key_value "${F}" "IPADDR" "$(echo "${IPRS}" | cut -d/ -f1)"
           /bin/set_key_value "${F}" "NETMASK" "$(echo "${IPRS}" | cut -d/ -f2)"
           /bin/set_key_value "${F}" "GATEWAY" "$(echo "${IPRS}" | cut -d/ -f3)"
@@ -78,6 +79,10 @@ elif [ "${1}" = "rcExit" ]; then
 
   # disable DisabledPortDisks
   sed -i 's/^DisabledPortDisks=.*$/DisabledPortDisks=""/' /usr/syno/web/webman/get_state.cgi 2>/dev/null
+
+  # reboot
+  sed -i 's/reboot$/reboot -f/' /usr/syno/web/webman/reboot.cgi 2>/dev/null
+  sed -i 's/reboot$/reboot -f/' /usr/syno/web/webman/reboot.cgi 2>/dev/null
 
   # recovery
   if grep -wq "recovery" /proc/cmdline 2>/dev/null && [ -x /usr/syno/web/webman/recovery.cgi ]; then
