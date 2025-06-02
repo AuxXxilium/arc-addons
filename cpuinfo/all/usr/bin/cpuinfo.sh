@@ -6,6 +6,8 @@
 # See /LICENSE for more information.
 #
 
+TEMP="on"
+
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
 
@@ -22,8 +24,8 @@ restoreCpuinfo() {
   elif [ -f "${FILE_JS}.bak" ]; then
     mv -f "${FILE_JS}.bak" "${FILE_JS}"
   fi
-  if ps -aux | grep -v grep | grep -q "/usr/sbin/synoscgiproxy" >/dev/null; then
-    /usr/bin/pkill -f "/usr/sbin/synoscgiproxy"
+  if ps -aux | grep -v grep | grep -q "/usr/sbin/cpuinfo" >/dev/null; then
+    /usr/bin/pkill -f "/usr/sbin/cpuinfo"
   fi
   [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
   [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
@@ -48,9 +50,11 @@ else
   cp -pf "${FILE_JS}.bak" "${FILE_JS}"
 fi
 
-sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
-sed -i 's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g' "${FILE_JS}"
-sed -i 's/_T("rcpower",n),/(typeof _T === "function" ? (_T("rcpower", n) ? (e.fan_list ? _T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join("") : _T("rcpower", n)) : (e.fan_list ? e.fan_list.map(fan => `${fan} RPM`).join(" | ") : _T("rcpower", n))) : "Power"),/g' "${FILE_JS}"
+if [ "${TEMP^^}" = "ON" ]; then
+  sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
+  sed -i 's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g' "${FILE_JS}"
+  #sed -i 's/_T("rcpower",n),/_T("rcpower", n)?e.fan_list?_T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", n):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", n),/g' "${FILE_JS}"
+fi
 
 CARDN=$(ls -d /sys/class/drm/card[0-9] 2>/dev/null | head -1)
 if [ -d "${CARDN}" ]; then

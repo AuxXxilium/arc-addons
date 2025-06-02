@@ -45,9 +45,7 @@ elif [ "${1}" = "uninstall" ]; then
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/cpuinfo.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/cpuinfo.sh" >>/tmpRoot/usr/arc/revert.sh
-  echo "rm -f /usr/sbin/cpuinfo" >>/tmpRoot/usr/arc/revert.sh
-
-  # synoscgiproxy
-  rm -f /tmpRoot/usr/sbin/synoscgiproxy
+  
+  rm -f /tmpRoot/usr/sbin/cpuinfo
 fi
 exit 0
