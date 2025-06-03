@@ -46,4 +46,3 @@ case "${1}" in
   late) install_late ;;
   uninstall) uninstall ;;
 esac
-exit 0

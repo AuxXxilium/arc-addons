@@ -77,4 +77,3 @@ elif [ "${1}" = "late" ]; then
   echo "Installing addon dbgutils - ${1}"
   getlog "${1}"
 fi
-exit 0

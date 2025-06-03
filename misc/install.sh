@@ -192,6 +192,17 @@ elif [ "${1}" = "late" ]; then
       ln -vsf /usr/lib/systemd/system/getty\@${TTYN}.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@${TTYN}.service
     fi
   done
+
+  # vmtools
+  if [ -d "/tmpRoot/var/packages/open-vm-tools" ] && [ ! -f "/tmpRoot/usr/arc/addons/vmtools.sh" ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege >/dev/null 2>&1 || true
+  fi
+
+  # qemu-ga
+  if [ -d "/tmpRoot/var/packages/qemu-ga" ] && [ ! -f "/tmpRoot/usr/arc/addons/vmtools.sh" ]; then
+    sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege >/dev/null 2>&1 || true
+  fi
+
   # arc-misc
   cp -vpf /usr/bin/arc-misc.sh /tmpRoot/usr/bin/arc-misc.sh
 
@@ -235,15 +246,4 @@ elif [ "${1}" = "late" ]; then
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/arc-once.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arc-once.service
 
-  # vmtools
-  if [ -d "/tmpRoot/var/packages/open-vm-tools" ] && [ ! -f "/tmpRoot/usr/arc/addons/vmtools.sh" ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege >/dev/null 2>&1 || true
-  fi
-
-  # qemu-ga
-  if [ -d "/tmpRoot/var/packages/qemu-ga" ] && [ ! -f "/tmpRoot/usr/arc/addons/vmtools.sh" ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege >/dev/null 2>&1 || true
-  fi
-
 fi
-exit 0

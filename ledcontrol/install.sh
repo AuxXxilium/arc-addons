@@ -70,4 +70,3 @@ case "${1}" in
   late) install_addon "${1}" "${2}" ;;
   uninstall) uninstall_addon "${1}" ;;
 esac
-exit 0

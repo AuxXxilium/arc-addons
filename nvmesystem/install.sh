@@ -88,4 +88,3 @@ elif [ "${1}" = "uninstall" ]; then
   echo "/usr/bin/nvmesystem.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/nvmesystem.sh" >>/tmpRoot/usr/arc/revert.sh
 fi
-exit 0

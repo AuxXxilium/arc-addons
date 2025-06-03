@@ -30,7 +30,6 @@ install_modules() {
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
   /usr/bin/killall udevd || true
-  # modprobe pcspeaker, pcspkr
   # modprobe modules for the beep
   /usr/sbin/modprobe pcspeaker || true
   /usr/sbin/modprobe pcspkr || true
@@ -51,26 +50,26 @@ install_late() {
   [ ! -f "/tmpRoot/usr/bin/eject" ] && cp -vpf /usr/bin/eject /tmpRoot/usr/bin/eject
 
   echo "copy modules"
-  isChange="false"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
-  
+  isChange=false
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-  
   if grep -q 'RR@RR' /proc/version 2>/dev/null; then
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
-      /tmpRoot/bin/cp -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
+      /tmpRoot/bin/mkdir -p /tmpRoot/usr/lib/modules
+      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules.bak/* /tmpRoot/usr/lib/modules/
     else
       echo "Custom Kernel - backup modules."
-      /tmpRoot/bin/cp -rf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
+      /tmpRoot/bin/mkdir -p /tmpRoot/usr/lib/modules.bak
+      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules/* /tmpRoot/usr/lib/modules.bak/
     fi
-    /tmpRoot/bin/cp -rf /usr/lib/modules/* /tmpRoot/usr/lib/modules
-    echo "true" >/tmp/modulesChange
+    /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules/
+    isChange=true
   else
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
-      echo "Custom Kernel - restore modules from backup."
+      echo "Custom Kernel Restore - restore modules from backup."
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
-      /tmpRoot/bin/mv -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
+      /tmpRoot/bin/mv -f /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
     for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
       O=$(echo "${L}" | awk -F'###' '{print $1}')
@@ -81,16 +80,12 @@ install_late() {
       else
         /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
       fi
-      echo "true" >/tmp/modulesChange
+      isChange=true
     done
   fi
-  
-  isChange="$(cat /tmp/modulesChange 2>/dev/null || echo "false")"
   echo "isChange: ${isChange}"
   
-  if [ "${isChange}" = "true" ]; then
-    /usr/sbin/depmod -a -b /tmpRoot
-  fi
+  [ "${isChange}" = "true" ] && /usr/sbin/depmod -a -b /tmpRoot
 
   /usr/sbin/modprobe kvm_intel || true
   /usr/sbin/modprobe kvm_amd || true
@@ -128,4 +123,3 @@ case "${1}" in
     install_late
     ;;
 esac
-exit 0

@@ -70,4 +70,3 @@ case "${1}" in
     uninstall_addon "${1}"
     ;;
 esac
-exit 0

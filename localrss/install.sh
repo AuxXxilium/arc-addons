@@ -101,4 +101,3 @@ case "${1}" in
     install_patches
     ;;
 esac
-exit 0
