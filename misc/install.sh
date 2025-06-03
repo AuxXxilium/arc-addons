@@ -170,7 +170,7 @@ elif [ "${1}" = "late" ]; then
 
   # service
   # systemd-modules-load
-  rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
+  # rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
 
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
