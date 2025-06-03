@@ -14,6 +14,7 @@ if [ "${1}" = "late" ]; then
   # cpuinfo
   cp -vpf /usr/sbin/cpuinfo /tmpRoot/usr/sbin/cpuinfo
   cp -vpf /usr/bin/cpuinfo.sh /tmpRoot/usr/bin/cpuinfo.sh
+  cp -vpf /usr/arc/cpuinfofix/* /tmpRoot/usr/syno/synoman/webman/modules/AdminCenter/
 
   shift
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
@@ -48,4 +49,3 @@ elif [ "${1}" = "uninstall" ]; then
   
   rm -f /tmpRoot/usr/sbin/cpuinfo
 fi
-exit 0

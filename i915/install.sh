@@ -63,4 +63,3 @@ elif [ "${1}" = "uninstall" ]; then
   KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
   [ -f "${KO_FILE}.bak" ] && mv -f "${KO_FILE}.bak" "${KO_FILE}"
 fi
-exit 0

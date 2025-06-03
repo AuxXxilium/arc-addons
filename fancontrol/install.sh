@@ -11,4 +11,3 @@ if [ "${1}" = "late" ]; then
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon fancontrol - ${1}"
 fi
-exit 0

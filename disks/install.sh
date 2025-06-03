@@ -52,4 +52,3 @@ elif [ "${1}" = "uninstall" ]; then
   rm -rf "/tmpRoot/usr/lib/udev/rules.d/04-system-disk-dtb.rules"
   rm -rf "/tmpRoot/usr/bin/dtc"
 fi
-exit 0

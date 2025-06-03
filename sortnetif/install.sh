@@ -45,4 +45,3 @@ if [ "${1}" = "patches" ]; then
     /etc/rc.network start
   fi
 fi
-exit 0

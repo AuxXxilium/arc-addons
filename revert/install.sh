@@ -59,4 +59,3 @@ case "${1}" in
     install_addon "${1}"
     ;;
 esac
-exit 0

@@ -22,4 +22,3 @@ for F in /sys/class/net/eth*; do
     for CONF in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do "${SKV}" "${CONF}" "${ETH}_wol_options" "d"; done
   fi
 done
-exit 0
