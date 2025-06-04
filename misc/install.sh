@@ -230,9 +230,10 @@ elif [ "${1}" = "late" ]; then
   DEST="/tmpRoot/usr/lib/systemd/system/arc-once.service"
   {
     echo "[Unit]"
-    echo "Description=ARC addon arc-once daemon"
+    echo "Description=arc-once daemon"
     echo "After=multi-user.target"
     echo "After=scemd.service rc-network.service"
+    echo "After=synoscgi.service nginx.service syno-mkcert.service"
     echo
     echo "[Service]"
     echo "Type=oneshot"
