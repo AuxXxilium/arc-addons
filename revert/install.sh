@@ -34,7 +34,7 @@ install_addon() {
       echo "[Service]"
       echo "Type=oneshot"
       echo "RemainAfterExit=yes"
-      echo "ExecStart=-/usr/arc/revert.sh"
+      echo "ExecStart=/usr/arc/revert.sh"
       echo
       echo "[Install]"
       echo "WantedBy=multi-user.target"

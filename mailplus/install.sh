@@ -24,7 +24,7 @@ After=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=-/usr/bin/mailplus.sh
+ExecStart=/usr/bin/mailplus.sh
 
 [Install]
 WantedBy=multi-user.target

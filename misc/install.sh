@@ -173,7 +173,6 @@ elif [ "${1}" = "late" ]; then
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
 
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno_update_disk_logs.service 2>/dev/null
@@ -218,7 +217,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/arc-misc.sh"
+    echo "ExecStart=/usr/bin/arc-misc.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
@@ -240,7 +239,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/arc-once.sh"
+    echo "ExecStart=/usr/bin/arc-once.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
