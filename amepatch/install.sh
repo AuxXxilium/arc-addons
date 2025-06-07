@@ -23,7 +23,7 @@ After=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/amepatch.sh
+ExecStart=-/usr/bin/amepatch.sh
 
 [Install]
 WantedBy=multi-user.target

@@ -39,7 +39,7 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=10
-ExecStart=/usr/bin/ledcontrol.sh ${2}
+ExecStart=-/usr/bin/ledcontrol.sh ${2}
 
 [Install]
 WantedBy=multi-user.target

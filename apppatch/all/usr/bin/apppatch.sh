@@ -7,22 +7,22 @@
 #
 
 patch_photos() {
-  FILE="/var/packages/SynologyPhotos/target/usr/bin/synofoto-bin-push-service"
-  if [ -z "$(cat "/etc/application_key.conf")" ] && [ -f "${FILE}" ]; then
-    [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
-    /usr/bin/killall "${FILE}" 2>/dev/null || true
-    echo -e '#!/usr/bin/env sh\necho "key=304403268" > /etc/application_key.conf\nexit 0' >"${FILE}"
+  PHOTOS_PATH="/var/packages/SynologyPhotos/target/usr/bin/synofoto-bin-push-service"
+  if [ -z "$(cat "/etc/application_key.conf")" ] && [ -f "${PHOTOS_PATH}" ]; then
+    [ ! -f "${PHOTOS_PATH}.bak" ] && cp -pf "${PHOTOS_PATH}" "${PHOTOS_PATH}.bak"
+    /usr/bin/killall "${PHOTOS_PATH}" 2>/dev/null || true
+    echo -e '#!/usr/bin/env sh\necho "key=304403268" > /etc/application_key.conf\nexit 0' >"${PHOTOS_PATH}"
   fi
 
-  SO_FILE="/var/packages/SynologyPhotos/target/usr/lib/libsynophoto-plugin-platform.so.1.0"
-  if [ -f "${SO_FILE}" ]; then
-    [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
+  PHOTOS_SO_FILE="/var/packages/SynologyPhotos/target/usr/lib/libsynophoto-plugin-platform.so.1.0"
+  if [ -f "${PHOTOS_SO_FILE}" ]; then
+    [ ! -f "${PHOTOS_SO_FILE}.bak" ] && cp -pf "${PHOTOS_SO_FILE}" "${PHOTOS_SO_FILE}.bak"
     # support face and concept
-    PatchELFSharp "${SO_FILE}" "_ZN9synophoto6plugin8platform20IsSupportedIENetworkEv" "B8 00 00 00 00 C3"
+    PatchELFSharp "${PHOTOS_SO_FILE}" "_ZN9synophoto6plugin8platform20IsSupportedIENetworkEv" "B8 00 00 00 00 C3"
     # force to support concept
-    PatchELFSharp "${SO_FILE}" "_ZN9synophoto6plugin8platform18IsSupportedConceptEv" "B8 01 00 00 00 C3"
+    PatchELFSharp "${PHOTOS_SO_FILE}" "_ZN9synophoto6plugin8platform18IsSupportedConceptEv" "B8 01 00 00 00 C3"
     # force no Gpu
-    PatchELFSharp "${SO_FILE}" "_ZN9synophoto6plugin8platform23IsSupportedIENetworkGpuEv" "B8 00 00 00 00 C3"
+    PatchELFSharp "${PHOTOS_SO_FILE}" "_ZN9synophoto6plugin8platform23IsSupportedIENetworkGpuEv" "B8 00 00 00 00 C3"
   fi
 }
 
@@ -36,18 +36,31 @@ patch_surveillance() {
   fi
 }
 
+patch_hybridshare() {
+  HS_PATH=/var/packages/HybridShare/target/ui/C2FS.js
+  if [ -f "${HS_PATH}" ]; then
+    [ ! -f "${HS_PATH}.bak" ] && cp -pf "${HS_PATH}" "${HS_PATH}.bak"
+    sed -i 's/Beijing/Xeijing/' "${HS_PATH}"
+    gzip -c "${HS_PATH}" >"${HS_PATH}.gz"
+  fi
+}
+
 restore_all() {
   # Synology Photos
-  FILE="/var/packages/SynologyPhotos/target/usr/bin/synofoto-bin-push-service"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
+  PHOTOS_PATH="/var/packages/SynologyPhotos/target/usr/bin/synofoto-bin-push-service"
+  [ -f "${PHOTOS_PATH}.bak" ] && mv -f "${PHOTOS_PATH}.bak" "${PHOTOS_PATH}"
 
-  SO_FILE="/var/packages/SynologyPhotos/target/usr/lib/libsynophoto-plugin-platform.so.1.0"
-  [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
+  PHOTOS_SO_FILE="/var/packages/SynologyPhotos/target/usr/lib/libsynophoto-plugin-platform.so.1.0"
+  [ -f "${PHOTOS_SO_FILE}.bak" ] && mv -f "${PHOTOS_SO_FILE}.bak" "${PHOTOS_SO_FILE}"
 
   # Surveillance Station -- local_display
   SS_PATH="/var/packages/SurveillanceStation/target"
   [ -d "${SS_PATH}/@SSData/AddOns/LocalDisplay" ] &&
     rm -f "${SS_PATH}/@SSData/AddOns/LocalDisplay/disabled"
+
+  # HybridShare
+  HS_PATH=/var/packages/HybridShare/target/ui/C2FS.js
+  [ -f "${HS_PATH}.bak" ] && mv -f "${HS_PATH}.bak" "${HS_PATH}" && gzip -c "${HS_PATH}" >"${HS_PATH}.gz"
 }
 
 case "$1" in
@@ -60,9 +73,13 @@ case "$1" in
   photosface)
     patch_photos
     ;;
+  hybridshare)
+    patch_hybridshare
+    ;;
   *)
     patch_photos
     patch_surveillance
+    patch_hybridshare
     ;;
 esac
 exit 0

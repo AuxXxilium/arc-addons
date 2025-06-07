@@ -24,7 +24,7 @@ After=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/vmmpatch.sh
+ExecStart=-/usr/bin/vmmpatch.sh
 
 [Install]
 WantedBy=multi-user.target

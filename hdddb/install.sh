@@ -28,7 +28,7 @@ After=smpkg-custom-install.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/hdddb.sh -nrwpeSI
+ExecStart=-/usr/bin/hdddb.sh -nrwpeSI
 
 [Install]
 WantedBy=multi-user.target

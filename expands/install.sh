@@ -23,7 +23,7 @@ install_addon() {
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/expands.sh"
+    echo "ExecStart=-/usr/bin/expands.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
