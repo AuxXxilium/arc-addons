@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-TEMP="on"
+MEV=$(cat "/proc/cmdline" 2>/dev/null | grep -oE 'mev=[^ ]+' | cut -d= -f2)
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
@@ -50,7 +50,7 @@ else
   cp -pf "${FILE_JS}.bak" "${FILE_JS}"
 fi
 
-if [ "${TEMP^^}" = "ON" ]; then
+if [ "${MEV}" = "physical" ]; then
   sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
   sed -i 's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g' "${FILE_JS}"
   sed -i 's/_T("rcpower",n),/_T("rcpower", n)?e.fan_list?_T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", n):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", n),/g' "${FILE_JS}"
