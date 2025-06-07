@@ -24,7 +24,7 @@ install_addon() {
     echo "User=root"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/allowdowngrade.sh"
+    echo "ExecStart=/usr/bin/allowdowngrade.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
