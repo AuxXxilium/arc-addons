@@ -205,6 +205,7 @@ elif [ "${1}" = "late" ]; then
   fi
 
   # arc-misc
+  cp -vpf /usr/bin/arc-misc.sh /tmpRoot/usr/bin/arc-misc.sh
   cp -vpf /usr/bin/arc-once.sh /tmpRoot/usr/bin/arc-once.sh
 
   DEST="/tmpRoot/usr/lib/systemd/system/arc-misc.service"
