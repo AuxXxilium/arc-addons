@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-MEV=$(cat "/proc/cmdline" 2>/dev/null | grep -oE 'mev=[^ ]+' | cut -d= -f2)
+TEMP="on"
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
@@ -50,7 +50,7 @@ else
   cp -pf "${FILE_JS}.bak" "${FILE_JS}"
 fi
 
-if [ "${MEV}" = "physical" ]; then
+if [ "${TEMP^^}" = "ON" ]; then
   sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
   sed -i 's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g' "${FILE_JS}"
   # sed -i 's/_T("rcpower",n),/_T("rcpower", n)?e.fan_list?_T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", n):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", n),/g' "${FILE_JS}"
@@ -63,7 +63,7 @@ if [ -d "${CARDN}" ]; then
   # LABLE="$(cat "/sys/class/drm/card0/device/label" 2>/dev/null)"
   CLOCK="$(cat "${CARDN}/gt_max_freq_mhz" 2>/dev/null)"
   [ -n "${CLOCK}" ] && CLOCK="${CLOCK} MHz"
-  if [ -n "${LNAME}" ] && [ -n "${CLOCK}" ]; then
+  if [ -n "${LNAME}" ]; then
     echo "GPU Info set to: \"${LNAME}\" \"${CLOCK}\""
     sed -i "s/_D(\"support_nvidia_gpu\")},/_D(\"support_nvidia_gpu\")||true},/g" "${FILE_JS}"
     # t.gpu={};t.gpu.clock=\"455 MHz\";t.gpu.memory=\"8192 MiB\";t.gpu.name=\"Tesla P4\";t.gpu.temperature_c=47;t.gpu.tempwarn=false;
@@ -75,11 +75,11 @@ fi
 
 if ! ps aux | grep -F "/usr/sbin/cpuinfo" | grep -v grep >/dev/null; then
   "/usr/sbin/cpuinfo" &
-  if grep -qE "/run/synoscgi(_rr)?\.sock;" /etc/nginx/nginx.conf; then
+  if grep -q "/run/synoscgi.sock;" /etc/nginx/nginx.conf; then
     for f in /etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache; do
       [ -f "${f}" ] || continue
       [ -f "${f}.bak" ] || cp -pf "${f}" "${f}.bak"
-      sed -i -E 's|/run/synoscgi(_rr)?\.sock;|/run/arc_synoscgi.sock;|g' "${f}"
+      sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' "${f}"
     done
   fi
   systemctl reload nginx
