@@ -16,8 +16,8 @@ DEFMODES=("20 50 100 50" "20 60 80 20" "20 60 50 10")
 
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-    for K in "support_fan" "supportadt7490" "support_fan_adjust_dual_mode"; do
-      /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-no}"
+    for K in "support_fan" "support_fan_adjust_dual_mode" "supportadt7490"; do
+      /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-"no"}"
     done
   done
 }
@@ -84,8 +84,7 @@ main() {
 
   set_fan_conf "yes"
 
-  FanCurtMode=""
-
+  FanBaseMode=""
   while true; do
     sleep 1
     FanType="$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)"
