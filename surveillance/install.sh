@@ -24,7 +24,7 @@ After=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/sspatch.sh
+ExecStart=-/usr/bin/sspatch.sh
 
 [Install]
 WantedBy=multi-user.target
