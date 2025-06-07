@@ -25,7 +25,7 @@ After=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=-/usr/bin/deduplication.sh -t
+ExecStart=/usr/bin/deduplication.sh -t
 
 [Install]
 WantedBy=multi-user.target

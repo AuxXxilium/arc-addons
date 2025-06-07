@@ -24,7 +24,7 @@ install_addon() {
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/arcdns.sh"
+    echo "ExecStart=/usr/bin/arcdns.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"

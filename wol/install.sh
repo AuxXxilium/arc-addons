@@ -31,7 +31,7 @@ install_late() {
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/wol.sh"
+    echo "ExecStart=/usr/bin/wol.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"

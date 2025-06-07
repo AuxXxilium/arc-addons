@@ -25,7 +25,7 @@ install_addon() {
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/storagepanel.sh ${2} ${3}"
+    echo "ExecStart=/usr/bin/storagepanel.sh ${2} ${3}"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
