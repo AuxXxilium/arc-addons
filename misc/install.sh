@@ -119,7 +119,7 @@ elif [ "${1}" = "late" ]; then
     else
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
-      cp -vpf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
+      cp -vpf /usr/lib/modules/{acpi_cpufreq.ko,cpufreq_*.ko,processor.ko} /tmpRoot/usr/lib/modules/
     fi
   fi
   modprobe -r acpi-cpufreq
@@ -160,19 +160,20 @@ elif [ "${1}" = "late" ]; then
 
   # beep
   cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
+
+  # san
   cp -vpdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/
+
+  # arc
   cp -vpf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
   cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
   cp -vpf /usr/bin/sveinstaller /tmpRoot/usr/bin/sveinstaller
-  # [ ! -f /tmpRoot/usr/syno/bin/synoschedtool.bak ] && cp -vpf /tmpRoot/usr/syno/bin/synoschedtool /tmpRoot/usr/syno/bin/synoschedtool.bak
-  # printf '#!/usr/bin/env sh\ncase "${1}" in\n  --beep)\n  beep -r ${2}\n  ;;\n  *)\n    /usr/syno/bin/synoschedtool.bak "$@"  ;;\nesac\n' >/tmpRoot/usr/syno/bin/synoschedtool
 
   # service
-  # systemd-modules-load
-  rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
-
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
+  rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
+  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno_update_disk_logs.service 2>/dev/null

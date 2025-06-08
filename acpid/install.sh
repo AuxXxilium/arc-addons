@@ -13,6 +13,8 @@ install_addon() {
 
   tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/usr/ ./bin ./sbin ./lib
   tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/ ./etc
+
+  cp -vpf /usr/lib/modules/button.ko /tmpRoot/usr/lib/modules/button.ko
 }
 
 uninstall_addon() {
