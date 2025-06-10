@@ -6,45 +6,56 @@
 # See /LICENSE for more information.
 #
 
-# Load the correct cpufreq module
-touch /tmp/scaling.log
-SCALINGCOUNT=$(cat /tmp/scaling.count 2>/dev/null || echo 0)
-GOVERNOR="$(grep -o 'governor=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
-SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
+set_governor() {
+  echo "CPUFreqScaling: Setting governor to ${GOVERNOR}"
 
-if [ ${SCALINGCOUNT} -gt 3 ]; then
-  echo "CPUFreqScaling: Failed to set governor to ${GOVERNOR} after ${SCALINGCOUNT} retries" >> /tmp/scaling.log
-  exit 0
-fi
-
-if [ "${SYSGOVERNOR}" != "${GOVERNOR}" ]; then
-  case "${GOVERNOR}" in
-    ondemand|conservative)
-      insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" 2>/dev/null || true
-      echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null
-      ;;
-    schedutil|powersave)
-      echo "${GOVERNOR}" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null
-      ;;
-  esac
-  sleep 3
-  SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
-  if [ "${SYSGOVERNOR}" = "${GOVERNOR}" ]; then
-    echo "CPUFreqScaling: governor set to ${GOVERNOR}" >> /tmp/scaling.log
-  else
-    echo "CPUFreqScaling: failed to set governor to ${GOVERNOR}" >> /tmp/scaling.log
+  if [ -z "${GOVERNOR}" ]; then
+    echo "CPUFreqScaling: No governor specified, exiting"
     exit 1
   fi
 
-  sleep 10
-  echo "CPUFreqScaling: ReChecking governor" >> /tmp/scaling.log
+  scaling_files=()
+  for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+    if [ -d "${cpu}/cpufreq" ]; then
+      scaling_files+=("${cpu}/cpufreq/scaling_governor")
+    fi
+  done
 
-  SYSGOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
-  if [ "${SYSGOVERNOR}" = "${GOVERNOR}" ]; then
-    echo "CPUFreqScaling: governor set to ${GOVERNOR}" >> /tmp/scaling.log
-    exit 0
+  if [ "${#scaling_files[@]}" -gt 0 ]; then
+    echo "${GOVERNOR}" | tee "${scaling_files[@]}" > /dev/null
+    echo "CPUFreqScaling: Governor set to ${GOVERNOR} for all CPUs"
   else
-    echo "CPUFreqScaling: failed to set governor to ${GOVERNOR}" >> /tmp/scaling.log
+    echo "CPUFreqScaling: No CPUs with cpufreq support found"
   fi
-fi
-exit 1
+}
+
+all_cpus_set() {
+  for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+    if [ -d "${cpu}/cpufreq" ]; then
+      current_gov=$(cat "${cpu}/cpufreq/scaling_governor" 2>/dev/null)
+      [ "${current_gov}" != "${GOVERNOR}" ] && return 1
+    fi
+  done
+  return 0
+}
+
+main() {
+  echo "CPUFreqScaling: Starting CPU frequency scaling setup"
+
+  if ! lsmod | grep -qw "cpufreq_${GOVERNOR}"; then
+    echo "CPUFreqScaling: No cpufreq module loaded, exiting"
+    exit 1
+  fi
+
+  while ! all_cpus_set; do
+    set_governor
+    sleep 10
+  done
+
+  echo "CPUFreqScaling: All CPUs set to ${GOVERNOR}, exiting."
+}
+
+# Load governor from kernel cmdline
+GOVERNOR="$(grep -o 'governor=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
+
+main &
