@@ -13,8 +13,12 @@ install_addon() {
 
   tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/usr/ ./bin ./sbin ./lib
   tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/ ./etc
-
-  cp -vpf /usr/lib/modules/button.ko /tmpRoot/usr/lib/modules/button.ko
+  sed -i '/^Exec/s|=/|=-/|g' /tmpRoot/usr/lib/systemd/system/acpid.service
+  if [ -f /usr/lib/modules/button.ko ]; then
+    cp -vpf /usr/lib/modules/button.ko /tmpRoot/usr/lib/modules/button.ko
+  else
+    echo "No button.ko found"
+  fi
 }
 
 uninstall_addon() {
