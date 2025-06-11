@@ -42,9 +42,9 @@ all_cpus_set() {
 main() {
   echo "CPUFreqScaling: Starting CPU frequency scaling setup"
 
-  if ! lsmod | grep -qw "cpufreq_${GOVERNOR}"; then
-    echo "CPUFreqScaling: No cpufreq module loaded, exiting"
-    exit 1
+  if [ "${GOVERNOR}" != "schedutil" ] && ! lsmod | grep -qw "cpufreq_${GOVERNOR}"; then
+      echo "CPUFreqScaling: No cpufreq module loaded, exiting"
+      exit 1
   fi
 
   while ! all_cpus_set; do
