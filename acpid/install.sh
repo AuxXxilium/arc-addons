@@ -11,9 +11,7 @@ install_addon() {
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/usr/ ./bin ./sbin ./lib
-  tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/ ./etc
-  sed -i '/^Exec/s|=/|=-/|g' /tmpRoot/usr/lib/systemd/system/acpid.service
+  tar -zxf /addons/acpid-7.1.tgz -C /tmpRoot/
   if [ -f /usr/lib/modules/button.ko ]; then
     cp -vpf /usr/lib/modules/button.ko /tmpRoot/usr/lib/modules/button.ko
   else
@@ -29,6 +27,7 @@ uninstall_addon() {
 
   rm -rf /tmpRoot/etc/acpi
   rm -f /tmpRoot/usr/bin/acpi_listen
+  rm -f /tmpRoot/usr/bin/acpitool
   rm -f /tmpRoot/usr/sbin/acpid
   rm -f /tmpRoot/usr/sbin/kacpimon
 }
