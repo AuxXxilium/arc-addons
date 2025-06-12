@@ -119,7 +119,7 @@ elif [ "${1}" = "late" ]; then
     else
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
-      cp -vpf /usr/lib/modules/{acpi_cpufreq.ko,cpufreq_*.ko,processor.ko} /tmpRoot/usr/lib/modules/
+      cp -vpf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
     fi
   fi
   modprobe -r acpi-cpufreq

@@ -10,10 +10,13 @@ install_addon() {
   echo "Installing cpufreqscaling - ${1}"
 
   # Create necessary directories and copy files
-  mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/sbin/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
+  mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
+
+  mkdir -p "/tmpRoot/usr/sbin/"
   cp -pf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/"
 
+  mkdir -p "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
   # Create systemd service file
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
 [Unit]
@@ -21,10 +24,9 @@ Description=Enable CPU Freq scaling
 After=multi-user.target
 
 [Service]
-User=root
-Type=simple
-Restart=on-failure
-RestartSec=10
+Type=oneshot
+RemainAfterExit=yes
+Restart=no
 ExecStart=/usr/sbin/scaling.sh
 
 [Install]

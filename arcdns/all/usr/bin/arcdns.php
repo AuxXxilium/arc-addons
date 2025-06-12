@@ -1,11 +1,6 @@
 #!/usr/bin/php -d open_basedir=/usr/syno/bin/ddns
 <?php
 
-if ($argc !== 5) {
-    echo 'badparam';
-    exit();
-}
-
 $account = (string)$argv[1];
 $pwd = (string)$argv[2];
 $hostname = (string)$argv[3];
