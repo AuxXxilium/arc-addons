@@ -24,6 +24,7 @@ install_modules() {
   }
   echo "Triggering add events to udev"
   udevadm trigger --type=subsystems --action=add
+  udevadm trigger --type=subsystem --action=change
   udevadm trigger --type=devices --action=add
   udevadm trigger --type=devices --action=change
   udevadm settle --timeout=30 || echo "udevadm settle failed"
