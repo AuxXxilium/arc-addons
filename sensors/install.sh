@@ -63,6 +63,10 @@ EOF
     ln -vsf /usr/lib/systemd/system/sensors.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sensors.service
   else
     echo "fancontrol disabled, skipping installation"
+    rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sensors.service"
+    rm -f "/tmpRoot/usr/lib/systemd/system/sensors.service"
+    rm -f "/tmpRoot/etc/fancontrol"
+    rm -f "/tmpRoot/usr/bin/arc-sensors.sh"
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
     if [ -f "${ESYNOSCHEDULER_DB}" ]; then
