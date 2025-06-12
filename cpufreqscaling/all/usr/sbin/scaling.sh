@@ -43,7 +43,7 @@ main() {
   echo "CPUFreqScaling: Starting CPU frequency scaling setup"
 
   if [ "${GOVERNOR}" != "schedutil" ] && ! lsmod | grep -qw "cpufreq_${GOVERNOR}"; then
-        /sbin/modprobe "cpufreq_${GOVERNOR}" || {
+        insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" || {
         echo "CPUFreqScaling: Failed to load cpufreq module for ${GOVERNOR}, exiting"
         exit 1
       }
