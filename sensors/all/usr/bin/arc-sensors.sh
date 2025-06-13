@@ -8,7 +8,7 @@
 
 #            fullfan        coolfan        quietfan
 #               |              |              |
-DEFMODES=("20 50 100 50" "20 60 80 20" "20 60 50 10")
+DEFMODES=("20 50 100 50" "20 70 80 20" "20 70 50 10")
 #           ^  ^  ^  ^
 #           1  2  3  4
 # 1: MINTEMP  2: MAXTEMP  3: MINSTART  4: MINSTOP
@@ -16,7 +16,7 @@ DEFMODES=("20 50 100 50" "20 60 80 20" "20 60 50 10")
 
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-    for K in "support_fan" "support_fan_adjust_dual_mode"; do
+    for K in "support_fan" "support_fan_adjust_dual_mode" "supportadt7490"; do
       /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-no}"
     done
   done
@@ -29,7 +29,7 @@ percent_to_pwm() {
 
 generate_fancontrol_config() {
   local OPERATION FANMODE M=${1:-0}
-  unset FANMODES
+  local FANMODES=("${DEFMODES[@]}")
   OPERATION="$(synowebapi -s --exec api=SYNO.Core.EventScheduler method=get task_name=\"Fancontrol\" | jq -r '.data.operation' 2>/dev/null)"
   eval "${OPERATION}" >/dev/null 2>&1 || true
   [[ ${FANMODES[${M}]} =~ ^([0-9]+)\ ([0-9]+)\ ([0-9]+)\ ([0-9]+)$ ]] && FANMODE="${FANMODES[${M}]}" || FANMODE="${DEFMODES[${M}]}"
