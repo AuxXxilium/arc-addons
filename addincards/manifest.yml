@@ -1,6 +1,6 @@
 version: 1
 name: addincards
-description: "Remove the Modelrestrictions for official Addin Cards"
+description: "Add support for Addin Cards (e.q. QNAP QM2 or Syno E10Mxx / M2Dxx cards)"
 system: false
 beta: false
 target: system
