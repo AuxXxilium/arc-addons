@@ -169,6 +169,7 @@ elif [ "${1}" = "late" ]; then
   cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
   cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
   cp -vpf /usr/bin/sveinstaller /tmpRoot/usr/bin/sveinstaller
+  [ ! -f /tmpRoot/usr/bin/jq ] && cp -vpf /usr/bin/jq /tmpRoot/usr/bin/jq
 
   # service
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
