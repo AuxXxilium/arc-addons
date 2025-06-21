@@ -29,11 +29,8 @@ install_modules() {
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
   /usr/bin/killall udevd || true
-  # modprobe modules for the beep
-  /usr/sbin/modprobe pcspeaker || true
-  /usr/sbin/modprobe pcspkr || true
-  # modprobe modules for the sensors
-  for I in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
+  # modprobe modules for the speaker and sensors
+  for I in pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
     /usr/sbin/modprobe "${I}" || true
   done
   # Remove kvm modules
@@ -43,9 +40,9 @@ install_modules() {
 
 install_late() {
   echo "Installing addon eudev - late"
+  # [ ! -L "/tmpRoot/usr/sbin/modprobe" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modprobe
   [ ! -L "/tmpRoot/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modinfo
   [ ! -L "/tmpRoot/usr/sbin/depmod" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/depmod
-
   [ ! -f "/tmpRoot/usr/bin/eject" ] && cp -vpf /usr/bin/eject /tmpRoot/usr/bin/eject
 
   echo "copy modules"
