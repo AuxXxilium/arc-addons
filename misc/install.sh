@@ -66,11 +66,8 @@ elif [ "${1}" = "rcExit" ]; then
   inetd
 
   # invalid_disks
-  # method 1
   SH_FILE="/usr/syno/share/get_hcl_invalid_disks.sh"
   [ -f "${SH_FILE}" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak" && printf '#!/bin/sh\nexit 0\n' >"${SH_FILE}"
-  # method 2
-  # while true; do [ ! -f "/tmp/installable_check_pass" ] && touch "/tmp/installable_check_pass"; sleep 1; done &  # using a while loop in case DSM is running in a VM
 
   # error message
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
@@ -168,10 +165,8 @@ elif [ "${1}" = "late" ]; then
   cp -vpf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
   cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
-  cp -vpf /usr/bin/sveinstaller /tmpRoot/usr/bin/sveinstaller
-  [ ! -f /tmpRoot/usr/bin/jq ] && cp -vpf /usr/bin/jq /tmpRoot/usr/bin/jq
+  [ ! -f "/tmpRoot/usr/bin/jq" ] && cp -vpf /usr/bin/jq /tmpRoot/usr/bin/jq
 
-  # service
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
@@ -194,16 +189,6 @@ elif [ "${1}" = "late" ]; then
       ln -vsf /usr/lib/systemd/system/getty\@${TTYN}.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@${TTYN}.service
     fi
   done
-
-  # vmtools
-  if [ -d "/tmpRoot/var/packages/open-vm-tools" ] && [ ! -f "/tmpRoot/usr/arc/addons/vmtools.sh" ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/open-vm-tools/conf/privilege >/dev/null 2>&1 || true
-  fi
-
-  # qemu-ga
-  if [ -d "/tmpRoot/var/packages/qemu-ga" ] && [ ! -f "/tmpRoot/usr/arc/addons/vmtools.sh" ]; then
-    sed -i 's/package/root/g' /tmpRoot/var/packages/qemu-ga/conf/privilege >/dev/null 2>&1 || true
-  fi
 
   # arc-misc
   cp -vpf /usr/bin/arc-misc.sh /tmpRoot/usr/bin/arc-misc.sh
