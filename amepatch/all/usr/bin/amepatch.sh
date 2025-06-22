@@ -14,12 +14,7 @@ if [ -d "/var/packages/CodecPack" ] && [ "${AMEVERSION}" = "3.1.0-3005" ]; then
 
     AME_PATH="/var/packages/CodecPack/target/usr"
     AME_SO="${AME_PATH}/lib/libsynoame-license.so"
-    AME_SO_BAK="${AME_PATH}/lib/libsynoame-license.so.orig"
     AME_LIC="/usr/syno/etc/license/data/ame/offline_license.json"
-    AME_LIC_BAK="/usr/syno/etc/license/data/ame/offline_license.json.orig"
-    
-    [ ! -f "${AME_SO_BAK}" ] && cp -pf "${AME_SO}" "${AME_SO_BAK}"
-    [ ! -f "${AME_LIC_BAK}" ] && cp -pf "${AME_LIC}" "${AME_LIC_BAK}"
     
     AME_HASH="$(md5sum -b "${AME_SO}" | awk '{print $1}')"
     
@@ -59,11 +54,9 @@ if [ -d "/var/packages/CodecPack" ] && [ "${AMEVERSION}" = "3.1.0-3005" ]; then
         "${AME_PATH}"/bin/synoame-bin-auto-install-needed-codec
         echo -e "AME Patch: Successful!"
     else
-        [ -f "${AME_SO_BAK}" ] && cp -pf "${AME_SO_BAK}" "${AME_SO}" || true
-        [ -f "${AME_LIC_BAK}" ] && cp -pf "${AME_LIC_BAK}" "${AME_LIC}" || true
         echo -e "AME Patch: Unsuccessful!"
         exit 1
     fi
 fi
 
-exit 0
+exit
