@@ -41,12 +41,11 @@ all_cpus_set() {
 
 main() {
   echo "CPUFreqScaling: Starting CPU frequency scaling setup"
+  GOVERNOR="$(grep -o 'governor=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
 
   if [ "${GOVERNOR}" != "schedutil" ] && ! lsmod | grep -qw "cpufreq_${GOVERNOR}"; then
-        insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" || {
-        echo "CPUFreqScaling: Failed to load cpufreq module for ${GOVERNOR}, exiting"
-        exit 1
-      }
+    insmod "/usr/lib/modules/cpufreq_governor.ko" 2>/dev/null
+    insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" 2>/dev/null
   fi
 
   while ! all_cpus_set; do
@@ -55,9 +54,7 @@ main() {
   done
 
   echo "CPUFreqScaling: All CPUs set to ${GOVERNOR}, exiting."
+  pkill -f "scaling.sh" || true
 }
-
-# Load governor from kernel cmdline
-GOVERNOR="$(grep -o 'governor=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
 
 main &
