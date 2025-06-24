@@ -6,8 +6,6 @@
 # See /LICENSE for more information.
 #
 
-# shellcheck disable=SC3037
-
 echo -ne "Content-type: text/plain; charset=\"UTF-8\"\r\n\r\n"
 
 echo "Starting ttyd ..."
@@ -26,7 +24,7 @@ echo "Starting ttyd ..."
   echo "'System partition /dev/md0 mounted to': /tmpRoot"
   echo "To 'Force re-install DSM': http://<ip>:5000/web_install.html"
   echo "To 'Reboot to Config Mode': http://<ip>:5000/webman/reboot_to_loader.cgi"
-  echo "To 'Show Boot Log': http://<ip>:5000/webman/get_logs.cgi""
+  echo "To 'Show Boot Log': http://<ip>:5000/webman/get_logs.cgi"
 } >/etc/motd
 
 /usr/bin/killall ttyd 2>/dev/null || true
@@ -39,5 +37,5 @@ echo "Starting dufs ..."
 cp -pf /usr/syno/web/web_index.html /usr/syno/web/web_install.html
 cp -pf /addons/web_index.html /usr/syno/web/web_index.html
 mkdir -p /tmpRoot
-mount /dev/md0 /tmpRoot
+[ -b /dev/md0 ] && ! mountpoint -q /tmpRoot && mount /dev/md0 /tmpRoot
 echo "Recovery mode is ready"
