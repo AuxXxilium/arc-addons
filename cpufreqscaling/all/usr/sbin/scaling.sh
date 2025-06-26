@@ -36,6 +36,7 @@ if [ -z "${GOVERNOR}" ]; then
 fi
 
 if [ "${GOVERNOR}" != "schedutil" ] && ! lsmod | grep -qw "cpufreq_${GOVERNOR}"; then
+  depmod -a || true
   insmod "/usr/lib/modules/cpufreq_governor.ko" 2>/dev/null || true
   insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" 2>/dev/null || true
 fi
