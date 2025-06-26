@@ -6,57 +6,59 @@
 # See /LICENSE for more information.
 #
 
-mountLoaderDisk() {
-  while true; do
-    if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
-      echo "Loader disk not found!"
-      break
-    fi
+set -e
 
-    # Mount partitions
-    modprobe -q vfat
-    modprobe -q ext2
-    modprobe -q ext4
-    echo 1 | ${ARC_SUDO} tee /proc/sys/kernel/syno_install_flag >/dev/null
+if [ -z "$ARCSU_ACTIVE" ]; then
+  exec env ARCSU_ACTIVE=1 arcsu "$0" "$@"
+fi
 
-    for i in {1..3}; do
-      ${ARC_SUDO} mount | grep -q "/dev/synoboot${i}" && ${ARC_SUDO} umount "/dev/synoboot${i}" 2>/dev/null || true
+reset_arcsu() {
+  unset ARCSU_ACTIVE
+}
 
-      ${ARC_SUDO} rm -rf "/mnt/p${i}" 2>/dev/null || true
-      ${ARC_SUDO} mkdir -p "/mnt/p${i}"
-      if ! ${ARC_SUDO} mount "/dev/synoboot${i}" "/mnt/p${i}"; then
-        echo "Can't mount /dev/synoboot${i}."
+WORK_PATHS="/mnt/p1 /mnt/p2 /mnt/p3"
+LOADER_DISK="/dev/synoboot"
+LOADER_PARTS="/dev/synoboot1 /dev/synoboot2 /dev/synoboot3"
 
-        for j in {1..3}; do
-          ${ARC_SUDO} umount "/mnt/p${i}" 2>/dev/null || true
-          ${ARC_SUDO} rm -rf "/mnt/p${i}" 2>/dev/null || true
-        done
-        break 2
-      fi
-    done
-
-    mkdir -p "/usr/arc"
-    ${ARC_SUDO} touch "/usr/arc/.mountloader"
-    {
-      echo "export LOADER_DISK=\"/dev/synoboot\""
-      echo "export LOADER_DISK_PART1=\"/dev/synoboot1\""
-      echo "export LOADER_DISK_PART2=\"/dev/synoboot2\""
-      echo "export LOADER_DISK_PART3=\"/dev/synoboot3\""
-    } | ${ARC_SUDO} tee "/usr/arc/.mountloader" >/dev/null
-    ${ARC_SUDO} chmod a+x "/usr/arc/.mountloader"
-
-    sync
-
-    break
+cleanup() {
+  for i in 1 2 3; do
+    umount "/mnt/p${i}" 2>/dev/null || true
+    rm -rf "/mnt/p${i}" 2>/dev/null || true
   done
-  if [ -f "/usr/arc/.mountloader" ]; then
-    echo "Loader disk mount success!"
-    ${ARC_SUDO} "/usr/arc/.mountloader"
-    return 0
-  else
-    echo "Loader disk mount failed!"
-    return 1
+  reset_arcsu
+  echo 0 >/proc/sys/kernel/syno_install_flag 2>/dev/null
+}
+
+mountLoaderDisk() {
+  for part in $LOADER_DISK $LOADER_PARTS; do
+    [ ! -b "$part" ] && echo "Loader disk not found: $part" && cleanup && exit 1
+  done
+
+  if ! lsmod | grep -qw vfat; then
+    modprobe -q vfat
   fi
+  echo 1 >/proc/sys/kernel/syno_install_flag 2>/dev/null
+
+  for i in 1 2 3; do
+    umount "/dev/synoboot${i}" 2>/dev/null || true
+    rm -rf "/mnt/p${i}" 2>/dev/null || true
+    mkdir -p "/mnt/p${i}"
+    mount "/dev/synoboot${i}" "/mnt/p${i}" || { echo "Can't mount /dev/synoboot${i}."; cleanup; exit 1; }
+  done
+
+  mkdir -p "/usr/arc"
+  {
+    echo "export LOADER_DISK=\"/dev/synoboot\""
+    echo "export LOADER_DISK_PART1=\"/dev/synoboot1\""
+    echo "export LOADER_DISK_PART2=\"/dev/synoboot2\""
+    echo "export LOADER_DISK_PART3=\"/dev/synoboot3\""
+  } > "/usr/arc/.mountloader"
+  chmod a+x "/usr/arc/.mountloader"
+
+  sync
+
+  echo "Loader disk mount success!"
+  "/usr/arc/.mountloader"
 }
 
 unmountLoaderDisk() {
@@ -66,33 +68,27 @@ unmountLoaderDisk() {
       echo "export LOADER_DISK_PART1=\"\""
       echo "export LOADER_DISK_PART2=\"\""
       echo "export LOADER_DISK_PART3=\"\""
-    } | ${ARC_SUDO} tee "/usr/arc/.mountloader" >/dev/null
-    ${ARC_SUDO} chmod a+x "/usr/arc/.mountloader"
-    ${ARC_SUDO} "/usr/arc/.mountloader"
-    ${ARC_SUDO} rm -f "/usr/arc/.mountloader"
-
+    } > "/usr/arc/.mountloader"
+    chmod a+x "/usr/arc/.mountloader"
+    "/usr/arc/.mountloader"
+    rm -f "/usr/arc/.mountloader"
     sync
-
-    for i in {1..3}; do
-      if ${ARC_SUDO} mount | grep -q "/mnt/p${i}"; then
-        ${ARC_SUDO} umount "/mnt/p${i}" 2>/dev/null || true
-        ${ARC_SUDO} rm -rf "/mnt/p${i}" 2>/dev/null || true
-      fi
-    done
-
-    echo 0 | ${ARC_SUDO} tee /proc/sys/kernel/syno_install_flag >/dev/null
-
     echo "Loader disk unmount successful!"
+    cleanup
   else
     echo "Loader disk isn't currently mounted."
   fi
-  return 0
 }
 
-[ -x "/usr/bin/arcsu" ] && ARC_SUDO="/usr/bin/arcsu" || ARC_SUDO=""
-${ARC_SUDO} ls /root >/dev/null 2>&1 || {
-  echo "No root permission!"
-  exit 1
-}
-
-"$@"
+case "$1" in
+  mountLoaderDisk)
+    mountLoaderDisk
+    ;;
+  unmountLoaderDisk)
+    unmountLoaderDisk
+    ;;
+  *)
+    echo "Usage: $0 {mountLoaderDisk|unmountLoaderDisk}"
+    exit 1
+    ;;
+esac
