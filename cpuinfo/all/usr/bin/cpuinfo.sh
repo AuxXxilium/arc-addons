@@ -73,15 +73,12 @@ fi
 
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
-if ! ps aux | grep -F "/usr/sbin/cpuinfo" | grep -v grep >/dev/null; then
+if ! ps aux | grep -v grep | grep -q "/usr/sbin/cpuinfo" >/dev/null; then
   "/usr/sbin/cpuinfo" &
-  if grep -q "/run/synoscgi.sock;" /etc/nginx/nginx.conf; then
-    for f in /etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache; do
-      [ -f "${f}" ] || continue
-      [ -f "${f}.bak" ] || cp -pf "${f}" "${f}.bak"
-      sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' "${f}"
-    done
-  fi
+  [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+  sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /etc/nginx/nginx.conf
+  [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
+  sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
 fi
 
