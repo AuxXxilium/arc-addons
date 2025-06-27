@@ -100,6 +100,7 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/udevadm hwdb --update
 ExecStart=/usr/bin/udevadm control --reload-rules
+ExecStart=/usr/bin/udevadm trigger --action=change
 
 [Install]
 WantedBy=multi-user.target
