@@ -56,11 +56,10 @@ if [ "${MEV}" = "physical" ]; then
   sed -i 's/_T("rcpower",n),/(typeof _T==="function"?_T("rcpower", n):"rcpower")?e.fan_list?(typeof _T==="function"?_T("rcpower", n):"rcpower")+e.fan_list.map(fan=>` | ${fan} RPM`).join(""):(typeof _T==="function"?_T("rcpower", n):"rcpower"):e.fan_list?e.fan_list.map(fan=>`${fan} RPM`).join(" | "):(typeof _T==="function"?_T("rcpower", n):"rcpower"),/g' "${FILE_JS}"
 fi
 
-CARDN=$(ls -d /sys/class/drm/card[0-9] 2>/dev/null | head -1)
+CARDN=$(ls -d /sys/class/drm/card[0-9]* 2>/dev/null | head -1)
 if [ -d "${CARDN}" ]; then
-  PCIDN="$(awk -F= '/DEVNAME/ {print $2}' "${CARDN}/device/uevent" 2>/dev/null)"
-  LNAME="$(lspci -Q -s ${PCIDN:-"99:99.9"} 2>/dev/null | sed "s/.*: //")"
-  # LABLE="$(cat "/sys/class/drm/card0/device/label" 2>/dev/null)"
+  PCIDN="$(grep '^DEVNAME=' "${CARDN}/device/uevent" 2>/dev/null | cut -d= -f2)"
+  LNAME="$(lspci -s ${PCIDN:-"99:99.9"} 2>/dev/null | sed "s/.*: //")"
   CLOCK="$(cat "${CARDN}/gt_max_freq_mhz" 2>/dev/null)"
   [ -n "${CLOCK}" ] && CLOCK="${CLOCK} MHz"
   if [ -n "${LNAME}" ]; then

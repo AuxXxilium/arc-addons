@@ -9,15 +9,10 @@
 install_addon() {
   echo "Installing cpufreqscaling - ${1}"
 
-  # Create necessary directories and copy files
-  mkdir -p "/tmpRoot/usr/arc/addons/"
+  mkdir -p /tmpRoot/usr/arc/addons/ /tmpRoot/usr/sbin /tmpRoot/usr/bin /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
-
-  mkdir -p "/tmpRoot/usr/sbin/"
   cp -pf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/"
 
-  mkdir -p "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
-  # Create systemd service file
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
 [Unit]
 Description=Enable CPU Freq scaling
@@ -32,14 +27,13 @@ ExecStart=/usr/sbin/scaling.sh
 [Install]
 WantedBy=multi-user.target
 EOF
-
+  
   ln -vsf "/usr/lib/systemd/system/cpufreqscaling.service" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service"
 }
 
 uninstall_addon() {
   echo "Uninstalling cpufreqscaling - ${1}"
 
-  # Remove systemd files and scripts
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpufreqscaling.service" \
         "/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service" \
         "/tmpRoot/usr/sbin/scaling.sh"
