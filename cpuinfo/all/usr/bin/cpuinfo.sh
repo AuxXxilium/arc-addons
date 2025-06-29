@@ -6,7 +6,19 @@
 # See /LICENSE for more information.
 #
 
-MEV=$(cat "/proc/cmdline" 2>/dev/null | grep -oE 'mev=[^ ]+' | cut -d= -f2)
+VENDOR=""                                                                               # str
+FAMILY=""                                                                               # str
+SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)"       # str
+SERIES="$(echo "${SERIES}" | sed -E 's/@ [0-9.]+[[:space:]]*GHz//g')"
+CORES="$(grep -c 'cpu cores' /proc/cpuinfo 2>/dev/null)"                                # str
+SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)" # int
+GOVERNOR="$(cat /proc/cmdline 2>/dev/null | grep -oE 'governor=[^ ]+' | cut -d= -f2 | xargs)" # str
+MEV="$(cat "/proc/cmdline" 2>/dev/null | grep -oE 'mev=[^ ]+' | cut -d= -f2 | xargs)" # str
+if [ -n "${MEV}" ] && [ "${MEV}" != "physical" ]; then
+  SERIES="${SERIES} @ ${MEV}"
+elif [ -n "${GOVERNOR}" ]; then
+  SERIES="${SERIES} @ ${GOVERNOR}"
+fi
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
@@ -49,6 +61,11 @@ if [ -f "${FILE_GZ}.bak" ]; then
 else
   cp -pf "${FILE_JS}.bak" "${FILE_JS}"
 fi
+
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"
 
 if [ "${MEV}" = "physical" ]; then
   sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
