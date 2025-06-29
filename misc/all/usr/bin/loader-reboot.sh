@@ -41,6 +41,10 @@ mkdir -p "$WORK_PATH"
 
 cleanup() {
   umount "$LOADER_DISK_PART1" 2>/dev/null || return 1
+  if mount | grep -q "$WORK_PATH"; then
+    echo "Still mounted, not deleting $WORK_PATH"
+    return 1
+  fi
   rm -rf "$WORK_PATH" || return 1
   echo 0 >/proc/sys/kernel/syno_install_flag 2>/dev/null
 }
