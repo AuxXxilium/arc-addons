@@ -8,8 +8,7 @@
 
 VENDOR=""                                                                               # str
 FAMILY=""                                                                               # str
-SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs)"       # str
-SERIES="$(echo "${SERIES}" | sed -E 's/@ [0-9.]+[[:space:]]*GHz//g')"
+SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed -E 's/@ [0-9.]+[[:space:]]*GHz//g' | sed -E 's/ CPU//g' | xargs)"       # str
 CORES="$(grep -c 'cpu cores' /proc/cpuinfo 2>/dev/null)"                                # str
 SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)" # int
 GOVERNOR="$(cat /proc/cmdline 2>/dev/null | grep -oE 'governor=[^ ]+' | cut -d= -f2 | xargs)" # str
