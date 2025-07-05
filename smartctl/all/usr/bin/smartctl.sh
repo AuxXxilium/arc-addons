@@ -13,23 +13,23 @@
 
 args=()
 
-#TYPE=ata
-for argv in "$@"; do
-  if [ -e "${argv}" ]; then
-    info=$(/usr/bin/smartctl.bak -i "${argv}" 2>/dev/null)
-    if echo "${info}" | grep -q "NVMe"; then
-      TYPE="nvme"
-    elif echo "${info}" | grep -q "SATA Version\|ATA Version"; then
-      TYPE="ata"
-    elif echo "${info}" | grep -q "Transport protocol: SAS"; then
-      TYPE="scsi"
-    elif echo "${info}" | grep -q "Unknown USB bridge"; then
-      TYPE="usbcypress"
-    else
-      TYPE="auto"
-    fi
-  fi
-done
+TYPE=ata
+# for argv in "$@"; do
+#   if [ -e "${argv}" ]; then
+#     info=$(/usr/bin/smartctl.bak -i "${argv}" 2>/dev/null)
+#     if echo "${info}" | grep -q "NVMe"; then
+#       TYPE="nvme"
+#     elif echo "${info}" | grep -q "SATA Version\|ATA Version"; then
+#       TYPE="ata"
+#     elif echo "${info}" | grep -q "Transport protocol: SAS"; then
+#       TYPE="scsi"
+#     elif echo "${info}" | grep -q "Unknown USB bridge"; then
+#       TYPE="usbcypress"
+#     else
+#       TYPE="auto"
+#     fi
+#   fi
+# done
 
 argp=""
 for argv in "$@"; do
