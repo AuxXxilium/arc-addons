@@ -10,18 +10,14 @@ install_addon() {
   echo "Installing addon ledcontrol - ${1}"
 
   # Create necessary directories and copy files
-  mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/lib/modules/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
+  mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/sbin/" "/tmpRoot/usr/lib/modules/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   cp -pf /usr/bin/ledcontrol.sh /tmpRoot/usr/bin/
-  cp -pf /usr/bin/ugreen_leds_cli /tmpRoot/usr/bin/
-  cp -pf /usr/bin/modules/i2c-algo-bit.ko /tmpRoot/usr/lib/modules/
-  cp -pf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/
-  cp -pf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/
-
-  # Set permissions for binaries
-  for file in /tmpRoot/usr/bin/ledcontrol.sh /tmpRoot/usr/bin/ugreen_leds_cli /tmpRoot/usr/bin/ping /tmpRoot/usr/bin/sensors; do
-    [ -f "${file}" ] && chmod u+s "${file}"
-  done
+  cp -pf /usr/sbin/ugreen_leds_cli /tmpRoot/usr/sbin/
+  cp -pf /usr/sbin/ugreen_led /tmpRoot/usr/sbin/
+  cp -pf /usr/lib/modules/i2c-algo-bit.ko /tmpRoot/usr/lib/modules/ || true
+  cp -pf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/ || true
+  cp -pf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/ || true
 
   # Load kernel modules
   insmod i2c-algo-bit
@@ -35,11 +31,9 @@ Description=Adds uGreen LED control
 After=multi-user.target
 
 [Service]
-User=root
-Type=simple
-Restart=on-failure
-RestartSec=10
-ExecStart=/usr/bin/ledcontrol.sh ${2}
+Type=one-shot
+RemainAfterExit=yes
+ExecStart=/usr/bin/ledcontrol.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -53,7 +47,10 @@ uninstall_addon() {
 
   # Remove systemd files
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service" \
-        "/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
+        "/tmpRoot/usr/lib/systemd/system/ledcontrol.service" \
+        "/tmpRoot/usr/arc/addons/ledcontrol.sh" \
+        "/tmpRoot/usr/bin/ugreen_leds_cli" \
+        "/tmpRoot/usr/bin/ugreen_led"
 
   # Create revert script if not present
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && {
