@@ -23,8 +23,25 @@ set_fan_conf() {
 }
 
 percent_to_pwm() {
-  local percent=$1
-  echo $(( percent * 255 / 100 ))
+  local PERCENT=$1
+  local FAN="hwmon${I}/fan${IDX}_input"
+  local PWM="hwmon${I}/pwm${IDX}"
+  local PWM_FILE="/etc/pwm.conf"
+  if [ ! -f "${PWM_FILE}" ]; then
+    echo $(( PERCENT * 255 / 100 ))
+  else
+    local MAX_RPM
+    MAX_RPM=$(awk -v fan="$FAN" -v pwm="$PWM" '$1==fan && $3==pwm {if($2>m)m=$2} END{print m+0}' "${PWM_FILE}")
+    [ "$MAX_RPM" -eq 0 ] && echo $(( PERCENT * 255 / 100 )) && return
+    local TARGET_RPM=$(( MAX_RPM * PERCENT / 100 ))
+    awk -v fan="$FAN" -v pwm="$PWM" -v target="$TARGET_RPM" '
+      $1==fan && $3==pwm {
+        diff = ($2-target); if(diff<0) diff=-diff;
+        if(min=="" || diff<min) { min=diff; best=$4 }
+      }
+      END { if(best!="") print best; else print int(target/10)*10 }
+    ' "${PWM_FILE}"
+  fi
 }
 
 generate_fancontrol_config() {
@@ -93,13 +110,13 @@ main() {
         echo "Fan speed mode changed from ${FanBaseMode} to ${FanCurtMode}"
         FanBaseMode="${FanCurtMode}"
         generate_fancontrol_config "${FanBaseMode}"
-        /usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/run/fancontrol.pid"
+        /usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null && rm -f "/run/fancontrol.pid"
         /usr/sbin/fancontrol &
       fi
     fi
   done
 }
 
-trap '/usr/bin/pkill -f "/usr/sbin/fancontrol" && rm -f "/run/fancontrol.pid"' EXIT INT TERM HUP
+trap '/usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null && rm -f "/run/fancontrol.pid"' EXIT INT TERM HUP
 
 main &
