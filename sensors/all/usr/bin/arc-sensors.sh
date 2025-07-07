@@ -17,7 +17,7 @@ DEFMODES=("20 50 100 50" "20 70 80 20" "20 70 50 10")
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
     for K in "support_fan" "support_fan_adjust_dual_mode" "supportadt7490"; do
-      /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-no}"
+      /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-"no"}"
     done
   done
 }
@@ -34,11 +34,9 @@ generate_fancontrol_config() {
   eval "${OPERATION}" >/dev/null 2>&1 || true
   [[ ${FANMODES[${M}]} =~ ^([0-9]+)\ ([0-9]+)\ ([0-9]+)\ ([0-9]+)$ ]] && FANMODE="${FANMODES[${M}]}" || FANMODE="${DEFMODES[${M}]}"
 
-  # Or use pwmconfig to generate /etc/fancontrol interactively.
-  local DEVPATH DEVNAME FCTEMPS FCFANS MINTEMP MAXTEMP MINSTART MINSTOP
+  local DEVPATH DEVNAME FCTEMPS FCFANS MINTEMP MAXTEMP MINSTART MINSTOP MINSTARTP MINSTOPP
 
   CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
-  # shellcheck disable=SC2044
   for P in $(find "/sys/devices/platform/" -type f -name "temp1_input"); do
     D="$(echo "${P}" | sed -n 's|.*/\(devices/platform/[^/]*\)/.*|\1|p')"
     I="$(echo "${P}" | sed -n 's|.*hwmon\([0-9]\).*|\1|p')"
@@ -52,10 +50,11 @@ generate_fancontrol_config() {
       FCFANS="${FCFANS} hwmon${I}/pwm${IDX}=hwmon${I}/fan${IDX}_input"
       MINTEMP="${MINTEMP} hwmon${I}/pwm${IDX}=$(echo "${FANMODE}" | cut -d' ' -f1)"
       MAXTEMP="${MAXTEMP} hwmon${I}/pwm${IDX}=$(echo "${FANMODE}" | cut -d' ' -f2)"
-      MINSTART="${MINSTART} hwmon${I}/pwm${IDX}=$(percent_to_pwm $(echo "${FANMODE}" | cut -d' ' -f3))"
-      MINSTOP="${MINSTOP} hwmon${I}/pwm${IDX}=$(percent_to_pwm $(echo "${FANMODE}" | cut -d' ' -f4))"
+      MINSTARTP="$(percent_to_pwm $(echo "${FANMODE}" | cut -d' ' -f3))"
+      MINSTOPP="$(percent_to_pwm $(echo "${FANMODE}" | cut -d' ' -f4))"
+      MINSTART="${MINSTART} hwmon${I}/pwm${IDX}=${MINSTARTP}"
+      MINSTOP="${MINSTOP} hwmon${I}/pwm${IDX}=${MINSTOPP}"
     done
-    i=$((i + 1))
   done
 
   DEST="/etc/fancontrol"
