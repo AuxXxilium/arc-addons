@@ -15,6 +15,7 @@ if [ "${1}" = "late" ]; then
 
   if [ -f "/addons/fancontrol.sh" ]; then
     cp -vpf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
+    cp -vpf /usr/bin/arc-pwm.sh /tmpRoot/usr/bin/arc-pwm.sh
 
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
