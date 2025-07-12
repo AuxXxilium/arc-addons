@@ -19,6 +19,8 @@ install_addon() {
   cp -pf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/ || true
   cp -pf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/ || true
 
+  chmod u+s "/tmpRoot/usr/sbin/ugreen_leds_cli" "/tmpRoot/usr/sbin/ugreen_led"
+
   # Load kernel modules
   insmod i2c-algo-bit
   insmod i2c-i801
