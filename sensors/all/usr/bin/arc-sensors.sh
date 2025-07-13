@@ -8,11 +8,11 @@
 
 #            fullfan        coolfan        quietfan
 #               |              |              |
-DEFMODES=("20 50 100 50" "20 70 80 20" "20 70 50 10")
+DEFMODES=("20 50 50 100" "20 60 20 60" "20 70 10 50")
 #           ^  ^  ^  ^
 #           1  2  3  4
-# 1: MINTEMP  2: MAXTEMP  3: MINSTART  4: MINSTOP
-# MINSTART and MINSTOP are in percent (0–100)
+# 1: MINTEMP  2: MAXTEMP  3: MINPWM  4: MAXPWM
+# MINPWM and MAXPWM are in percent (0–100)
 
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
@@ -26,6 +26,8 @@ percent_to_pwm() {
   local PERCENT=$1
   local FAN="hwmon${I}/fan${IDX}_input"
   local PWM="hwmon${I}/pwm${IDX}"
+  [ "${PERCENT}" -lt 0 ] && PERCENT=0
+  [ "${PERCENT}" -gt 100 ] && PERCENT=100
   local PWM_FILE="/etc/pwm.conf"
   if [ ! -f "${PWM_FILE}" ]; then
     echo $(( PERCENT * 255 / 100 ))
@@ -35,11 +37,11 @@ percent_to_pwm() {
     [ "$MAX_RPM" -eq 0 ] && echo $(( PERCENT * 255 / 100 )) && return
     local TARGET_RPM=$(( MAX_RPM * PERCENT / 100 ))
     awk -v fan="$FAN" -v pwm="$PWM" -v target="$TARGET_RPM" '
-      $1==fan && $3==pwm {
-        diff = ($2-target); if(diff<0) diff=-diff;
-        if(min=="" || diff<min) { min=diff; best=$4 }
-      }
-      END { if(best!="") print best; else print int(target/10)*10 }
+        $1==fan && $3==pwm {
+            diff = ($2-target); if(diff<0) diff=-diff;
+            if(min=="" || diff<min) { min=diff; best=$4 }
+        }
+        END { if(best!="") print best; else print int(target/10)*10 }
     ' "${PWM_FILE}"
   fi
 }
@@ -67,10 +69,13 @@ generate_fancontrol_config() {
       FCFANS="${FCFANS} hwmon${I}/pwm${IDX}=hwmon${I}/fan${IDX}_input"
       MINTEMP="${MINTEMP} hwmon${I}/pwm${IDX}=$(echo "${FANMODE}" | cut -d' ' -f1)"
       MAXTEMP="${MAXTEMP} hwmon${I}/pwm${IDX}=$(echo "${FANMODE}" | cut -d' ' -f2)"
-      MINSTARTP="$(percent_to_pwm $(echo "${FANMODE}" | cut -d' ' -f3))"
-      MINSTOPP="$(percent_to_pwm $(echo "${FANMODE}" | cut -d' ' -f4))"
-      MINSTART="${MINSTART} hwmon${I}/pwm${IDX}=${MINSTARTP}"
-      MINSTOP="${MINSTOP} hwmon${I}/pwm${IDX}=${MINSTOPP}"
+      MINPWMP="$(percent_to_pwm $(echo "${FANMODE}" | cut -d' ' -f3))"
+      MAXPWMP="$(percent_to_pwm $(echo "${FANMODE}" | cut -d' ' -f4))"
+      [ "${MAXPWMP}" -le "${MINPWMP}" ] && MAXPWMP="$((MINPWMP + 10))"
+      MINSTART="${MINSTART} hwmon${I}/pwm${IDX}=${MINPWMP}"
+      MINSTOP="${MINSTOP} hwmon${I}/pwm${IDX}=${MINPWMP}"
+      MINPWM="${MINPWM} hwmon${I}/pwm${IDX}=${MINPWMP}"
+      MAXPWM="${MAXPWM} hwmon${I}/pwm${IDX}=${MAXPWMP}"
     done
   done
 
@@ -87,36 +92,66 @@ generate_fancontrol_config() {
     echo "MAXTEMP=$(echo ${MAXTEMP})"
     echo "MINSTART=$(echo ${MINSTART})"
     echo "MINSTOP=$(echo ${MINSTOP})"
+    echo "MINPWM=$(echo ${MINPWM})"
+    echo "MAXPWM=$(echo ${MAXPWM})"
   } >"${DEST}"
 
 }
 
 main() {
-  if [ -z "$(find /sys/ -name "fan*_input")" ]; then
-    echo "No fan detected, exiting..."
-    set_fan_conf "no"
-    exit 0
+  OFFMODE=0
+  if [ "$1" = "off" ]; then
+    OFFMODE=1
   fi
 
-  set_fan_conf "yes"
+if [ -z "$(find /sys/ -name "fan*_input")" ]; then
+  echo "No fan detected, exiting..."
+  set_fan_conf "no"
+  exit 0
+fi
 
-  FanBaseMode=""
-  while true; do
-    sleep 1
-    FanType="$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)"
-    case "${FanType}" in fullfan | full) FanCurtMode="0" ;; coolfan | high) FanCurtMode="1" ;; quietfan | low) FanCurtMode="2" ;; *) FanCurtMode="1" ;; esac
-    if echo "0 1 2" | grep -wq "${FanCurtMode}"; then
-      if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
-        echo "Fan speed mode changed from ${FanBaseMode} to ${FanCurtMode}"
-        FanBaseMode="${FanCurtMode}"
-        generate_fancontrol_config "${FanBaseMode}"
-        /usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null && rm -f "/run/fancontrol.pid"
-        /usr/sbin/fancontrol &
+set_fan_conf "yes"
+
+FanBaseMode=""
+while true; do
+  sleep 1
+  FanType="$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)"
+  case "${FanType}" in
+    fullfan | full) FanCurtMode="0" ;;
+    coolfan | high) FanCurtMode="1" ;;
+    quietfan | low) FanCurtMode="2" ;;
+    *) FanCurtMode="1" ;;
+  esac
+  if echo "0 1 2" | grep -wq "${FanCurtMode}"; then
+    if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
+      echo "Fan speed mode changed to ${FanCurtMode}"
+      FanBaseMode="${FanCurtMode}"
+      generate_fancontrol_config "${FanBaseMode}"
+
+      # Set all PWM outputs to manual or automatic mode based on switch
+      for pwm in $(echo "${FCFANS}" | sed -n 's/.*=\(hwmon[0-9]*\/pwm[0-9]*\).*/\1/p'); do
+        PWM_PATH="/sys/class/hwmon/${pwm}"
+        if [ -w "${PWM_PATH}_enable" ]; then
+          if [ "$OFFMODE" -eq 1 ]; then
+            echo 2 > "${PWM_PATH}_enable"
+          else
+            echo 1 > "${PWM_PATH}_enable"
+          fi
+        fi
+      done
+
+      /usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null && rm -f "/run/fancontrol.pid"
+      if [ "$OFFMODE" -eq 1 ]; then
+        echo "Fan control disabled, exiting..."
+      else
+        echo "Starting fancontrol with new configuration..."
       fi
+      /usr/sbin/fancontrol &
     fi
-  done
+  fi
+done
 }
 
 trap '/usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null && rm -f "/run/fancontrol.pid"' EXIT INT TERM HUP
 
-main &
+main "$1" &

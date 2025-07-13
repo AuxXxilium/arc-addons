@@ -35,11 +35,11 @@ INSERT INTO task VALUES('Fancontrol', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
 #
 #                       fullfan             coolfan               quietfan
 #                          |                      |                        |
-FANMODES=("20 50 100 50" "20 70 80 20" "20 70 50 10")
+FANMODES=("20 50 50 100" "20 60 20 60" "20 70 10 50")
 #                    ^  ^   ^   ^
 #                    1  2    3    4
-# 1: MINTEMP  2: MAXTEMP  3: MINSTART  4: MINSTOP
-# MINSTART and MINSTOP are in percent (0-100)
+# 1: MINTEMP  2: MAXTEMP  3: MINPWM  4: MAXPWM
+# MINPWM and MAXPWM are in percent (0–100)
 ', 'script', '{}', '', '', '{}', '{}');
 EOF
     fi
@@ -69,6 +69,7 @@ EOF
     rm -f "/tmpRoot/usr/lib/systemd/system/sensors.service"
     rm -f "/tmpRoot/etc/fancontrol"
     rm -f "/tmpRoot/usr/bin/arc-sensors.sh"
+    rm -f "/tmpRoot/usr/bin/arc-pwm.sh"
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
     if [ -f "${ESYNOSCHEDULER_DB}" ]; then
@@ -86,6 +87,7 @@ elif [ "${1}" = "uninstall" ]; then
 
   rm -f "/tmpRoot/etc/fancontrol"
   rm -f "/tmpRoot/usr/bin/arc-sensors.sh"
+  rm -f "/tmpRoot/usr/bin/arc-pwm.sh"
 
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
