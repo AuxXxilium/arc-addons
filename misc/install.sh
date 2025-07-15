@@ -214,7 +214,6 @@ elif [ "${1}" = "late" ]; then
   ln -vsf /usr/lib/systemd/system/arc-misc.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arc-misc.service
 
   # arc-once
-  cp -vpf /usr/bin/arc-misc.sh /tmpRoot/usr/bin/arc-misc.sh
   DEST="/tmpRoot/usr/lib/systemd/system/arc-once.service"
   {
     echo "[Unit]"
