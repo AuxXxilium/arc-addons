@@ -51,8 +51,8 @@ if [ "${1}" = "patches" ]; then
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon i915le10th - ${1}"
-  mkdir -p "/tmpRoot/usr/rr/addons/"
-  cp -pf "${0}" "/tmpRoot/usr/rr/addons/"
+  mkdir -p "/tmpRoot/usr/arc/addons/"
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
   [ ! -f "${KO_FILE}.bak" ] && cp -pf "${KO_FILE}" "${KO_FILE}.bak"
