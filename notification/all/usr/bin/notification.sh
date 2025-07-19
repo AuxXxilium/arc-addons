@@ -52,8 +52,8 @@ done
 ARC_VERSION="Arc $(cat /usr/arc/VERSION 2>/dev/null | grep LOADERVERSION | cut -d'=' -f2 | sed 's/"//g')" || ARC_VERSION="Arc Loader"
 
 if [ -n "${WEBHOOKURL}" ]; then
-  sendWebhook "${WEBHOOKURL}" "${ARC_VERSION}:" "DSM is running @ ${IPCON}!"
+  sendWebhook "${WEBHOOKURL}" "${ARC_VERSION}" "DSM is running @ ${IPCON}"
 fi
 if [ -n "${DISCORDUSERID}" ]; then
-  sendDiscord "${DISCORDUSERID}" "${ARC_VERSION}:" "DSM is running @ ${IPCON}!"
+  sendDiscord "${DISCORDUSERID}" "${ARC_VERSION}" "DSM is running @ ${IPCON}"
 fi
