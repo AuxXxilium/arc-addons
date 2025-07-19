@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
+
+# shellcheck disable=SC2034,SC3043
 
 get_section_kv() {
   local file="${1}"
@@ -104,27 +106,5 @@ else
       done
     done
     rm -f /etc/sysconfig/network-cmdline.txt
-  fi
-fi
-
-if [ -f "/etc/sysctl.conf" ]; then
-  if grep -q 'kernel.sysrq' /etc/sysctl.conf; then
-    : # Sysctl already configured, do nothing
-  else
-    {
-      echo "kernel.sysrq=1"
-      echo "kernel.perf_event_paranoid=0"
-      echo "kernel.yama.ptrace_scope=1"
-      echo "kernel.printk=3 4 1 3"
-      echo "kernel.split_lock_mitigate=0"
-      echo "kernel.task_delayacct=1"
-      echo "vm.max_map_count=262144"
-      echo "vm.oom_kill_allocating_task=1"
-      echo "kernel.core_pattern=|/bin/false"
-      echo "fs.file-max=10000000"
-      echo "fs.inotify.max_user_watches=524288"
-      echo "net.unix.max_dgram_qlen=8192"
-    } >>/etc/sysctl.conf
-    sysctl -p >/dev/null 2>&1
   fi
 fi
