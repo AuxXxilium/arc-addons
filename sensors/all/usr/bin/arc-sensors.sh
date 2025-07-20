@@ -53,7 +53,7 @@ generate_fancontrol_config() {
   eval "${OPERATION}" >/dev/null 2>&1 || true
   [[ ${FANMODES[${M}]} =~ ^([0-9]+)\ ([0-9]+)\ ([0-9]+)\ ([0-9]+)$ ]] && FANMODE="${FANMODES[${M}]}" || FANMODE="${DEFMODES[${M}]}"
 
-  local DEVPATH DEVNAME FCTEMPS FCFANS MINTEMP MAXTEMP MINSTART MINSTOP MINSTARTP MINSTOPP
+  local DEVPATH DEVNAME FCTEMPS FCFANS MINTEMP MAXTEMP MINSTART MINSTOP MINPWM MAXPWM
 
   CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
   for P in $(find "/sys/devices/platform/" -type f -name "temp1_input"); do
@@ -62,7 +62,7 @@ generate_fancontrol_config() {
     DEVPATH="${DEVPATH} hwmon${I}=${D}"
     DEVNAME="${DEVNAME} hwmon${I}=$(cat /sys/${D}/*/*/name)"
     for F in $(find "/sys/${D}" -type f -name "fan[0-9]_input"); do
-      R="$(cat "${F}" 2>/dev//null)"
+      R="$(cat "${F}" 2>/dev/null)"
       [ "${R:-0}" -le 0 ] && continue
       IDX="$(echo "${F}" | sed -n 's|.*fan\([0-9]\)_input|\1|p')"
       FCTEMPS="${FCTEMPS} hwmon${I}/pwm${IDX}=${CORETEMP}"
@@ -95,7 +95,6 @@ generate_fancontrol_config() {
     echo "MINPWM=$(echo ${MINPWM})"
     echo "MAXPWM=$(echo ${MAXPWM})"
   } >"${DEST}"
-
 }
 
 main() {
@@ -128,16 +127,23 @@ while true; do
       echo "Fan speed mode changed to ${FanCurtMode}"
       FanBaseMode="${FanCurtMode}"
       generate_fancontrol_config "${FanBaseMode}"
-
-      for ((count=0; count<5; count++)); do
-          if ! ps aux | grep "/usr/sbin/fancontrol" | grep -v grep >/dev/null && [ ! -e "/run/fancontrol.pid" ]; then
-              break
-          fi
-          /usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null
-          rm -f "/run/fancontrol.pid" 2>/dev/null
-          sleep 0.2
+    
+      # Wait for fancontrol to stop and PID file to disappear
+      for ((count=0; count<10; count++)); do
+        /usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null
+        rm -f "/run/fancontrol.pid" 2>/dev/null
+        sleep 0.2
+        if ! ps aux | grep "[/]usr/sbin/fancontrol" >/dev/null && [ ! -e "/run/fancontrol.pid" ]; then
+          break
+        fi
       done
-      /usr/sbin/fancontrol &
+    
+      # Only start fancontrol if config exists and is not empty
+      if [ -s /etc/fancontrol ]; then
+        /usr/sbin/fancontrol &
+      else
+        echo "Warning: /etc/fancontrol not generated or empty, not starting fancontrol"
+      fi
     fi
   fi
 done
