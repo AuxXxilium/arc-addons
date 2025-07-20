@@ -11,7 +11,7 @@ install_notification() {
   mkdir -p /tmpRoot/usr/arc/addons/ /tmpRoot/usr/bin /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
 
   cp -pf "$0" /tmpRoot/usr/arc/addons/
-  cp -vpf /usr/bin/notification.sh /tmpRoot/usr/bin/notification.sh
+  cp -vpf /usr/bin/notification /tmpRoot/usr/bin/notification
 
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/notification.service"
 [Unit]
@@ -19,9 +19,9 @@ Description=notification daemon
 After=synoscgi.service nginx.service
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/notification.sh ${1} ${2}
+Type=simple
+Restart=always
+ExecStart=/usr/bin/notification ${1} ${2}
 
 [Install]
 WantedBy=multi-user.target
