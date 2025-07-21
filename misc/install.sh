@@ -158,6 +158,10 @@ elif [ "${1}" = "late" ]; then
   # beep
   cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
 
+  # pci.ids
+  mkdir -p /tmpRoot/usr/share/misc
+  cp -vpf /addons/pci.ids /tmpRoot/usr/share/misc/pci.ids
+
   # san
   cp -vpdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/
 
@@ -165,7 +169,7 @@ elif [ "${1}" = "late" ]; then
   cp -vpf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
   cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
-  [ ! -f "/tmpRoot/usr/bin/jq" ] && cp -vpf /usr/bin/jq /tmpRoot/usr/bin/jq
+  cp -vpf /usr/bin/jq /tmpRoot/usr/bin/jq
 
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
@@ -192,7 +196,6 @@ elif [ "${1}" = "late" ]; then
 
   # arc-misc
   cp -vpf /usr/bin/arc-misc.sh /tmpRoot/usr/bin/arc-misc.sh
-  cp -vpf /usr/bin/arc-once.sh /tmpRoot/usr/bin/arc-once.sh
 
   DEST="/tmpRoot/usr/lib/systemd/system/arc-misc.service"
   {
@@ -214,6 +217,8 @@ elif [ "${1}" = "late" ]; then
   ln -vsf /usr/lib/systemd/system/arc-misc.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arc-misc.service
 
   # arc-once
+  cp -vpf /usr/bin/arc-once.sh /tmpRoot/usr/bin/arc-once.sh
+
   DEST="/tmpRoot/usr/lib/systemd/system/arc-once.service"
   {
     echo "[Unit]"
