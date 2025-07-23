@@ -24,7 +24,7 @@ if [ "${1}" = "late" ]; then
       mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
       cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
     fi
-    if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -E "Fancontrol" -A10 | grep -Eq "^FANMODES=(.*)$"; then
+    if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -E "Fancontrol" -A11 | grep -Eq "^FANMODES=(.*)$"; then
       echo "Fancontrol task already exists"
     else
         echo "insert sensors task to esynoscheduler.db"

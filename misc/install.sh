@@ -105,6 +105,10 @@ elif [ "${1}" = "late" ]; then
     for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do /bin/set_key_value "${F}" "${KEY}" "${VALUE}"; done
   done
 
+  # pci.ids
+  mkdir -vp /tmpRoot/usr/local/share
+  cp -vpf /usr/local/share/pci.ids.gz /tmpRoot/usr/local/share/pci.ids.gz
+
   # CPU performance scaling
   mount -t sysfs sysfs /sys
   modprobe acpi-cpufreq
@@ -157,10 +161,6 @@ elif [ "${1}" = "late" ]; then
 
   # beep
   cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
-
-  # pci.ids
-  mkdir -p /tmpRoot/usr/share/misc
-  cp -vpf /addons/pci.ids /tmpRoot/usr/share/misc/pci.ids
 
   # san
   cp -vpdf /usr/lib/libubsan.so* /tmpRoot/usr/lib/

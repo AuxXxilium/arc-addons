@@ -39,7 +39,7 @@ getlog() {
 
   dmesg >"${DEST_PATH}/dmesg.log"
   lsmod >"${DEST_PATH}/lsmod.log"
-  lspci -Qnnk >"${DEST_PATH}/lspci.log" || true
+  lspci -nnk >"${DEST_PATH}/lspci.log" || true
   ip addr >"${DEST_PATH}/ip-addr.log" || true
   ip link >"${DEST_PATH}/ip-link.log" || true
   ip route >"${DEST_PATH}/ip-route.log" || true
