@@ -6,13 +6,13 @@
 # See /LICENSE for more information.
 #
 
-VENDOR=""                                                                               # str
-FAMILY=""                                                                               # str
-SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed -E 's/@ [0-9.]+[[:space:]]*GHz//g' | sed -E 's/ CPU//g' | xargs)"       # str
-CORES="$(grep -c 'cpu cores' /proc/cpuinfo 2>/dev/null)"                                # str
-SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)" # int
-GOVERNOR="$(cat /proc/cmdline 2>/dev/null | grep -oE 'governor=[^ ]+' | cut -d= -f2 | xargs)" # str
-MEV="$(cat "/proc/cmdline" 2>/dev/null | grep -oE 'mev=[^ ]+' | cut -d= -f2 | xargs)" # str
+VENDOR=""
+FAMILY=""
+SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed -E 's/@ [0-9.]+[[:space:]]*GHz//g' | sed -E 's/ CPU//g' | xargs)"
+CORES="$(grep -c 'core id' /proc/cpuinfo 2>/dev/null)C\/$(grep -c 'processor' /proc/cpuinfo 2>/dev/null)T"
+SPEED="$(grep -m1 'MHz' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | cut -d. -f1 | xargs)"
+GOVERNOR="$(cat /proc/cmdline 2>/dev/null | grep -oE 'governor=[^ ]+' | cut -d= -f2 | xargs)"
+MEV="$(cat "/proc/cmdline" 2>/dev/null | grep -oE 'mev=[^ ]+' | cut -d= -f2 | xargs)"
 if [ -n "${MEV}" ] && [ "${MEV}" != "physical" ]; then
   SERIES="${SERIES} @ ${MEV}"
 elif [ -n "${GOVERNOR}" ]; then
@@ -27,7 +27,7 @@ if [ ! -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ]; then
   exit 0
 fi
 
-restoreCpuinfo() {
+if [ "${1}" = "-r" ]; then
   if [ -f "${FILE_GZ}.bak" ]; then
     rm -f "${FILE_JS}" "${FILE_GZ}"
     mv -f "${FILE_GZ}.bak" "${FILE_GZ}"
@@ -41,24 +41,19 @@ restoreCpuinfo() {
   [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
   [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
-}
-
-if [ "$1" == "-r" ]; then
-  restoreCpuinfo
-  exit 0
-fi
-
-if [ -f "${FILE_GZ}" ]; then
-  [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
 else
-  [ ! -f "${FILE_JS}.bak" ] && cp -pf "${FILE_JS}" "${FILE_JS}.bak"
-fi
+  if [ -f "${FILE_GZ}" ]; then
+    [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
+  else
+    [ ! -f "${FILE_JS}.bak" ] && cp -pf "${FILE_JS}" "${FILE_JS}.bak"
+  fi
 
-rm -f "${FILE_JS}" 2>/dev/null
-if [ -f "${FILE_GZ}.bak" ]; then
-  gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
-else
-  cp -pf "${FILE_JS}.bak" "${FILE_JS}"
+  rm -f "${FILE_JS}" 2>/dev/null
+  if [ -f "${FILE_GZ}.bak" ]; then
+    gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
+  else
+    cp -pf "${FILE_JS}.bak" "${FILE_JS}"
+  fi
 fi
 
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" "${FILE_JS}"
@@ -72,29 +67,36 @@ if [ "${MEV}" = "physical" ]; then
   sed -i 's/_T("rcpower",n),/(typeof _T==="function"?_T("rcpower", n):"rcpower")?e.fan_list?(typeof _T==="function"?_T("rcpower", n):"rcpower")+e.fan_list.map(fan=>` | ${fan} RPM`).join(""):(typeof _T==="function"?_T("rcpower", n):"rcpower"):e.fan_list?e.fan_list.map(fan=>`${fan} RPM`).join(" | "):(typeof _T==="function"?_T("rcpower", n):"rcpower"),/g' "${FILE_JS}"
 fi
 
-CARDN=$(ls -d /sys/class/drm/card[0-9]* 2>/dev/null | head -1)
+CARDN=$(ls -d /sys/class/drm/card* 2>/dev/null | head -1)
 if [ -d "${CARDN}" ]; then
-  PCIDN="$(grep '^DEVNAME=' "${CARDN}/device/uevent" 2>/dev/null | cut -d= -f2)"
+  PCIDN="$(awk -F= '/DEVNAME/ {print $2}' "${CARDN}/device/uevent" 2>/dev/null)"
   LNAME="$(lspci -s ${PCIDN:-"99:99.9"} 2>/dev/null | sed "s/.*: //")"
   CLOCK="$(cat "${CARDN}/gt_max_freq_mhz" 2>/dev/null)"
   [ -n "${CLOCK}" ] && CLOCK="${CLOCK} MHz"
   if [ -n "${LNAME}" ]; then
-    echo "GPU Info set to: \"${LNAME}\" \"${CLOCK}\""
     sed -i "s/_D(\"support_nvidia_gpu\")},/_D(\"support_nvidia_gpu\")||true},/g" "${FILE_JS}"
     # t.gpu={};t.gpu.clock=\"455 MHz\";t.gpu.memory=\"8192 MiB\";t.gpu.name=\"Tesla P4\";t.gpu.temperature_c=47;t.gpu.tempwarn=false;
     sed -i "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!t.gpu){t.gpu={};t.gpu.clock=\"${CLOCK}\";t.gpu.name=\"${LNAME}\";}let/g" "${FILE_JS}"
   fi
-fi
 
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
-if ! ps aux | grep -v grep | grep -q "/usr/sbin/cpuinfo" >/dev/null; then
-  "/usr/sbin/cpuinfo" &
-  [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-  sed -E 's|/run/synoscgi(_rr)?\.sock;|/run/arc_synoscgi.sock;|g' -i /etc/nginx/nginx.conf
-  [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
-  sed -E 's|/run/synoscgi(_rr)?\.sock;|/run/arc_synoscgi.sock;|g' -i /usr/syno/share/nginx/nginx.mustache
+if [ "${1}" = "-s" ] || [ ! -f "/usr/sbin/synoscgiproxy" ]; then
+  if ps -aux | grep -v grep | grep -q "/usr/sbin/synoscgiproxy" >/dev/null; then
+    /usr/bin/pkill -f "/usr/sbin/synoscgiproxy"
+  fi
+  [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
+  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
+else
+  if ! ps aux | grep -v grep | grep -q "/usr/sbin/cpuinfo" >/dev/null; then
+    "/usr/sbin/cpuinfo" &
+    [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+    sed -E -i 's|/run/synoscgi(_rr)?\.sock;|/run/arc_synoscgi.sock;|g' -i /etc/nginx/nginx.conf
+    [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
+    sed -E -i 's|/run/synoscgi(_rr)?\.sock;|/run/arc_synoscgi.sock;|g' -i /usr/syno/share/nginx/nginx.mustache
+    systemctl reload nginx
+  fi
 fi
 
 exit 0

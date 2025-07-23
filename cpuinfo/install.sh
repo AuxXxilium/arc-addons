@@ -22,7 +22,7 @@ After=synoscgi.service nginx.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/cpuinfo.sh
+ExecStart=/usr/bin/cpuinfo.sh ${2}
 
 [Install]
 WantedBy=multi-user.target
