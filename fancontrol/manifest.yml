@@ -1,23 +1,23 @@
 version: 1
 name: fancontrol
-description: "Control fan PWM from DSM (Depending on sensors addon, only for supported devices)."
+description: "Control fan PWM from DSM (Depending on sensors addon, only if PWM is supported)."
 system: false
 beta: true
 target: system
 all:
   install-script: "install.sh"
   copy: ""
-apollolake: false
-broadwell: false
-broadwellnk: false
-broadwellnkv2: false
-broadwellntbap: false
-denverton: false
-geminilake: false
+apollolake: true
+broadwell: true
+broadwellnk: true
+broadwellnkv2: true
+broadwellntbap: true
+denverton: true
+geminilake: true
 geminilakenk: true
-purley: false
-v1000: false
+purley: true
+v1000: true
 v1000nk: true
-r1000: false
+r1000: true
 r1000nk: true
 epyc7002: true
