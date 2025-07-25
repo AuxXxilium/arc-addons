@@ -24,9 +24,9 @@ install_modules() {
   }
   echo "Triggering add events to udev"
   udevadm trigger --action=add
-  # udevadm trigger --action=change
+  udevadm trigger --action=change
   udevadm settle --timeout=30 || echo "udevadm settle failed"
-  # sleep 10
+  sleep 10
   # Remove from memory to not conflict with RAID mount scripts
   /usr/bin/killall udevd || true
   # modprobe modules for the speaker and sensors
