@@ -9,7 +9,6 @@
 if [ "${1}" = "-r" ]; then
   FILE="/sbin/dmidecode"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
-
 else
   FILE="/sbin/dmidecode"
   if [ -x "${FILE}" ]; then
