@@ -59,7 +59,7 @@ SSKV=$([ -x "/usr/syno/bin/set_section_key_value" ] && echo "/usr/syno/bin/set_s
 # packages
 if [ ! -f /usr/syno/etc/packages/feeds ]; then
   mkdir -p /usr/syno/etc/packages
-  echo '[{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/usr/syno/etc/packages/feeds
+  echo '[{"feed":"https://app.auxxxilium.tech","name":"arc"},{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/usr/syno/etc/packages/feeds
 fi
 
 # network
