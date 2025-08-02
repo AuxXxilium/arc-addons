@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-
-# shellcheck disable=SC2034,SC3043
 
 get_section_kv() {
   local file="${1}"
@@ -57,10 +55,9 @@ SSKV=$([ -x "/usr/syno/bin/set_section_key_value" ] && echo "/usr/syno/bin/set_s
 ###############################################################################
 
 # packages
-if [ ! -f /usr/syno/etc/packages/feeds ]; then
-  mkdir -p /usr/syno/etc/packages
-  echo '[{"feed":"https://apps.auxxxilium.tech","name":"arc"},{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/usr/syno/etc/packages/feeds
-fi
+[ -f /usr/syno/etc/packages/feeds ] && rm -f /usr/syno/etc/packages/feeds
+mkdir -p /usr/syno/etc/packages
+echo '[{"feed":"https://apps.auxxxilium.tech","name":"arc"},{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/usr/syno/etc/packages/feeds
 
 # network
 if grep -q 'network.' /proc/cmdline; then
