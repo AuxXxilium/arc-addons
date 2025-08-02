@@ -17,14 +17,8 @@ jobs:
     strategy:
       matrix:
         include:
-          #- version: 6.2
-          #  platform: apollolake
-
           - version: 7.1
             platform: apollolake
-
-          #- version: 7.2
-          #  platform: apollolake
 
     if: inputs.eudev == true
     runs-on: ubuntu-latest
@@ -158,7 +152,7 @@ jobs:
           tar caf ${{ github.workspace }}/source/eudev-${{ matrix.version }}.tgz -C ${{ github.workspace }}/source/output .
 
       - name: Upload to Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: addons
           path: |
@@ -183,7 +177,7 @@ jobs:
           sudo timedatectl set-timezone "Europe/Berlin"
 
       - name: download to artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: addons
           path: ./artifacts
