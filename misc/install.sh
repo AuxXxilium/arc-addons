@@ -85,9 +85,15 @@ elif [ "${1}" = "rcExit" ]; then
     /usr/syno/web/webman/recovery.cgi
   fi
 
+elif [ "${1}" = "jrExit" ]; then
+  echo "Installing addon misc - ${1}"
+
+  /usr/bin/wol.sh
+
 elif [ "${1}" = "late" ]; then
   echo "Installing addon misc - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
+  mkdir -p "/tmpRoot/usr/lib/systemd/system"
   # cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   echo "Killing ttyd ..."
@@ -239,4 +245,25 @@ elif [ "${1}" = "late" ]; then
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/arc-once.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arc-once.service
 
+  # wol
+  [ ! -f "/tmpRoot/usr/bin/ethtool" ] && cp -pf /usr/bin/ethtool /tmpRoot/usr/bin/ethtool
+  cp -pf /usr/bin/wol.sh /tmpRoot/usr/bin/wol.sh
+
+  DEST="/tmpRoot/usr/lib/systemd/system/wol.service"
+  {
+    echo "[Unit]"
+    echo "Description=Force WOL on ethN"
+    echo "After=multi-user.target"
+    echo
+    echo "[Service]"
+    echo "Type=oneshot"
+    echo "RemainAfterExit=yes"
+    echo "ExecStart=/usr/bin/wol.sh"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } >"${DEST}"
+
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -vsf /usr/lib/systemd/system/wol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/wol.service
 fi
