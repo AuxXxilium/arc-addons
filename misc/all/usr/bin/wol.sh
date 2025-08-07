@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-SKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
+SSKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
 
 for F in /sys/class/net/eth*; do
   [ ! -e "${F}" ] && continue
@@ -16,9 +16,9 @@ for F in /sys/class/net/eth*; do
   if [ "${WOL}" = "g" ]; then
     echo "${ETH} supports wol and set to g"
     /usr/bin/ethtool -s "${ETH}" wol g 2>/dev/null
-    for CONF in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do "${SKV}" "${CONF}" "${ETH}_wol_options" "g"; done
+    for CONF in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do "${SSKV}" "${CONF}" "${ETH}_wol_options" "g"; done
   else
     echo "${ETH} does not support wol"
-    for CONF in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do "${SKV}" "${CONF}" "${ETH}_wol_options" "d"; done
+    for CONF in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do "${SSKV}" "${CONF}" "${ETH}_wol_options" "d"; done
   fi
 done
