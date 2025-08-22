@@ -145,6 +145,7 @@ while true; do
       fi
     fi
   fi
+  rm -f /etc/synoinfo.conf.?????? 2>/dev/null
 done
 }
 

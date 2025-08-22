@@ -10,7 +10,7 @@ install_notification() {
   echo "Installing addon notification - late"
   mkdir -p /tmpRoot/usr/arc/addons/ /tmpRoot/usr/bin /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
 
-  cp -pf "$0" /tmpRoot/usr/arc/addons/
+  cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   cp -vpf /usr/bin/notification /tmpRoot/usr/bin/notification
 
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/notification.service"
@@ -21,6 +21,7 @@ After=synoscgi.service nginx.service
 [Service]
 Type=simple
 Restart=always
+ExecStartPre=/bin/sleep 10
 ExecStart=/usr/bin/notification ${1} ${2}
 
 [Install]
