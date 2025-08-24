@@ -39,7 +39,7 @@ FANMODES=("20 50 50 100" "20 60 20 60" "20 70 10 50")
 #                    ^  ^   ^   ^
 #                    1  2    3    4
 # 1: MINTEMP  2: MAXTEMP  3: MINPWM  4: MAXPWM
-# MINPWM and MAXPWM are in percent (0–100)
+# MINPWM and MAXPWM are in percent (0-100)
 ', 'script', '{}', '', '', '{}', '{}');
 EOF
     fi
@@ -67,7 +67,6 @@ EOF
     echo "fancontrol disabled, skipping installation"
     rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sensors.service"
     rm -f "/tmpRoot/usr/lib/systemd/system/sensors.service"
-    rm -f "/tmpRoot/etc/fancontrol"
     rm -f "/tmpRoot/usr/bin/arc-sensors.sh"
     rm -f "/tmpRoot/usr/bin/arc-pwm.sh"
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
