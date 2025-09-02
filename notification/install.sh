@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_notification() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon notification - late"
   mkdir -p /tmpRoot/usr/arc/addons/ /tmpRoot/usr/bin /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
 
@@ -29,18 +29,11 @@ WantedBy=multi-user.target
 EOF
 
   ln -vsf /usr/lib/systemd/system/notification.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/notification.service
-}
-
-uninstall_notification() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon notification - uninstall"
   rm -f /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/notification.service
   rm -f /tmpRoot/usr/lib/systemd/system/notification.service
   [ ! -f /tmpRoot/usr/arc/revert.sh ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/notification.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/notification.sh" >>/tmpRoot/usr/arc/revert.sh
-}
-
-case "$1" in
-  late) install_notification ${2:-false} ${3:-false} ;;
-  uninstall) uninstall_notification ;;
-esac
+fi

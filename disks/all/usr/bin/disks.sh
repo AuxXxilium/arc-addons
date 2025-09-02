@@ -31,7 +31,7 @@ __set_conf_kv() {
 # Check if the user has customized the key
 # Args: $1 key
 _check_user_conf() {
-  [ -f "/addons/synoinfo.conf" ] && UCONF="/addons/synoinfo.conf" || UCONF="/usr/arc/addons/synoinfo.conf"
+  [ -f "/addons/synoinfo.conf" ] && UCONF="/addons/synoinfo.conf" || UCONF="/usr/rr/addons/synoinfo.conf"
   grep -Eq "^${1}=" "${UCONF}" 2>/dev/null
 }
 
@@ -56,6 +56,7 @@ _atoi() {
   while [ ${IDX} -lt ${#DISKNAME} ]; do
     N=$(($(printf '%d' "'$(expr substr "${DISKNAME}" $((${IDX} + 1)) 1)") - $(printf '%d' "'a") + 1))
     BIT=$(($(expr length "${DISKNAME}") - 1 - ${IDX}))
+    # shellcheck disable=SC3019
     NUM=$((NUM + (BIT == 0 ? N : 26 ** BIT * N)))
     IDX=$((IDX + 1))
   done
@@ -72,8 +73,8 @@ _itol() {
   while [ ${NUM} -gt 0 ]; do
     if [ "$((NUM & 1))" = 1 ]; then
       case $((IDX / 26)) in
-        0) dev="$(printf sd\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;;
-        *) dev="$(printf sd\\x"$(printf "%x" "$((IDX / 26 - 1 + $(printf '%d' "'a")))")"\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;;
+      0) dev="$(printf sd\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;;                                                              # sda-z
+      *) dev="$(printf sd\\x"$(printf "%x" "$((IDX / 26 - 1 + $(printf '%d' "'a")))")"\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;; # sdaa-zz
       esac
       DISKLIST="${DISKLIST:+${DISKLIST}${IFS}}${dev}"
     fi
@@ -185,6 +186,7 @@ dtModel() {
         continue
       fi
       CONTPCI=""
+      # shellcheck disable=SC2046
       PORTNUM=$(ls -ld /sys/devices/pci0000:00/*$(echo "${PCIEPATH}" | sed 's/,/\/*:/g')/ata* 2>/dev/null | wc -l)
       if [ "${HDDSORT}" = "true" ] && [ "${PORTNUM}" -gt 0 ]; then
         CONTPCI=${PCIEPATH}
@@ -405,6 +407,7 @@ nondtModel() {
     USBPORTCFG=$(($(__get_conf_kv usbportcfg)))
     printf 'get usbportcfg=0x%.2x\n' "${USBPORTCFG}"
   else
+    # shellcheck disable=SC3019
     USBPORTCFG=$(($((2 ** $((${USBMAXIDX} + 1)) - 1)) ^ $((2 ** ${USBMINIDX} - 1))))
     __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
     printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
@@ -421,6 +424,7 @@ nondtModel() {
     INTERNALPORTCFG=$(($(__get_conf_kv internalportcfg)))
     printf 'get internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   else
+    # shellcheck disable=SC3019
     INTERNALPORTCFG=$(($((2 ** ${MAXDISKS} - 1)) ^ ${USBPORTCFG} ^ ${ESATAPORTCFG}))
     __set_conf_kv "internalportcfg" "$(printf "0x%.2x" ${INTERNALPORTCFG})"
     printf 'set internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
@@ -460,6 +464,8 @@ nondtModel() {
   if [ "${COUNT}" -gt 0 ]; then
     __set_conf_kv "supportnvme" "yes"
     __set_conf_kv "support_m2_pool" "yes"
+    #__set_conf_kv "support_ssd_cache" "yes"  # block nvmesystem addon
+    #__set_conf_kv "support_write_cache" "yes"
   fi
 }
 
@@ -483,8 +489,8 @@ if type flock >/dev/null 2>&1 && type trap >/dev/null 2>&1; then
   flock -w 60 3 || {
     _log "Failed to acquire lock after 60 seconds. Exiting."
     exit 1
-  }
-  trap 'flock -u 3; rm -f "$LOCKFILE"' EXIT INT TERM HUP
+  }                                                      # 60 seconds timeout
+  trap 'flock -u 3; rm -f "$LOCKFILE"' EXIT INT TERM HUP # Release lock on exit or error or signal or hangup
 fi
 
 # get the boot disk info
@@ -516,27 +522,31 @@ checkSynoboot
 ###################
 
 case ${1} in
-  "--create")
-    if [ "$(__get_conf_kv supportportmappingv2)" = "yes" ]; then
-      dtModel
-    else
-      nondtModel
+"--create")
+  if [ "$(__get_conf_kv supportportmappingv2)" = "yes" ]; then
+    dtModel
+  else
+    nondtModel
+  fi
+  ;;
+"--update")
+  if [ "$(__get_conf_kv supportportmappingv2)" = "yes" ]; then
+    if [ ! -f "/etc/user_model.dts" ]; then
+      dtUpdate "${2:-}"
     fi
-    ;;
-  "--update")
-    if [ "$(__get_conf_kv supportportmappingv2)" = "yes" ]; then
-      if [ ! -f "/etc/user_model.dts" ]; then
-        dtUpdate "${2:-}"
-      fi
-    else
-      if ! _check_user_conf "usbportcfg" || ! _check_user_conf "esataportcfg" || ! _check_user_conf "internalportcfg"; then
-        nondtUpdate "${2:-}"
-      fi
+  else
+    if ! _check_user_conf "usbportcfg" || ! _check_user_conf "esataportcfg" || ! _check_user_conf "internalportcfg"; then
+      nondtUpdate "${2:-}"
     fi
-    ;;
-  *)
-    exit 0
-    ;;
+  fi
+  ;;
+*)
+  echo "Usage: $0 [--create|--update]"
+  echo
+  echo "       --create: create dts file and update synoinfo.conf"
+  echo "       --update: update dts file and update synoinfo.conf"
+  exit 1
+  ;;
 esac
 
 exit 0

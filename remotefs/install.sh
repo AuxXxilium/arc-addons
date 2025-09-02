@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon remotefs - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -20,20 +20,9 @@ install_addon() {
   else
     echo "libsynosdk.so.7 not found"
   fi
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon remotefs - ${1}"
 
   SO_FILE="/tmpRoot/usr/lib/libsynosdk.so.7"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

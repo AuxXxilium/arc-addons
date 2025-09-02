@@ -8,18 +8,17 @@
 
 _release=$(/bin/uname -r)
 if [ "$(/bin/echo ${_release%%[-+]*} | /usr/bin/cut -d'.' -f1)" -lt 5 ]; then
-  echo "Kernel version < 5 is not supported redpill addon!"
+  echo " Kernel version < 5 is not supported by redpill addon!"
   exit 0
 fi
 
-# Handle installation based on the argument
-case "${1}" in
-  early)
-    echo "Installing addon redpill - early"
-    insmod /usr/lib/modules/rp.ko
-    ;;
-  jrExit)
-    echo "Installing addon redpill - jrExit"
-    #rmmod redpill
-    ;;
-esac
+if [ "${1}" = "early" ]; then
+  echo "Installing addon redpill - ${1}"
+
+  insmod /usr/lib/modules/rp.ko
+
+elif [ "${1}" = "jrExit" ]; then
+  echo "Installing addon redpill - ${1}"
+
+  #rmmod redpill
+fi

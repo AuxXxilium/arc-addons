@@ -54,7 +54,6 @@ elif [ "${1}" = "late" ]; then
   [ ! -f "/tmpRoot/usr/bin/gzip" ] && cp -vpf /usr/bin/gzip /tmpRoot/usr/bin/gzip
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
   {
     echo "[Unit]"
     echo "Description=nvmesystem daemon"
@@ -69,11 +68,10 @@ elif [ "${1}" = "late" ]; then
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
-  } >"${DEST}"
+  } >"/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/nvmesystem.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmesystem.service
-
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon nvmesystem - ${1}"
 

@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon setrootpw - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -21,13 +21,13 @@ install_addon() {
   sed -i 's|^.*PermitRootLogin.*$|PermitRootLogin yes|' ${FILE}
   sed -i 's|^Subsystem.*$|Subsystem	sftp	/usr/lib/openssh/sftp-server|' ${FILE}
 
+  if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+    echo "copy esynoscheduler.db"
+    mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
+    cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+  fi
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
-    echo "copy esynoscheduler.db"
-    mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
-    cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
-  fi
   if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "SetRootPw||bootup||1|0|0|0||0|"; then
     echo "setrootpw task already exists and it is enabled"
   else
@@ -41,9 +41,7 @@ synowebapi -s --exec api=SYNO.Core.Terminal method=set version=3 enable_ssh=true
 ', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon setrootpw - ${1}"
 
   rm -f /tmpRoot/usr/lib/openssh/sftp-server
@@ -60,13 +58,4 @@ uninstall_addon() {
 DELETE FROM task WHERE task_name LIKE 'SetRootPw';
 EOF
   fi
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

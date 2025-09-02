@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon synoconfbkp - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -18,18 +18,16 @@ install_addon() {
     mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
     cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
   fi
-  echo "insert synoconfbkp task to esynoscheduler.db"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-  /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+  echo "insert synoconfbkp task to esynoscheduler.db"
+  /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'SynoconfbkpBootup';
 INSERT INTO task VALUES('SynoconfbkpBootup', '', 'bootup', '', 1, 0, 0, 0, '', 0, "/usr/bin/dsmconfigbackup.sh ${2:-7} ${3:-bkp}_bootup", 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'SynoconfbkpShutdown';
 INSERT INTO task VALUES('SynoconfbkpShutdown', '', 'shutdown', '', 1, 0, 0, 0, '', 0, "/usr/bin/dsmconfigbackup.sh ${2:-7} ${3:-bkp}_shutdown", 'script', '{}', '', '', '{}', '{}');
 EOF
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon synoconfbkp - ${1}"
 
   rm -f "/tmpRoot/usr/bin/dsmconfigbackup.sh"
@@ -38,18 +36,9 @@ uninstall_addon() {
     echo "delete synoconfbkp task from esynoscheduler.db"
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'SynoconfbkpBootup';
 DELETE FROM task WHERE task_name LIKE 'SynoconfbkpShutdown';
 EOF
   fi
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}" "${2}" "${3}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

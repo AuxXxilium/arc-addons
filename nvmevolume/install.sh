@@ -31,7 +31,6 @@ if [ "${1}" = "late" ]; then
   [ ! -f "/tmpRoot/usr/bin/gzip" ] && cp -vpf /usr/bin/gzip /tmpRoot/usr/bin/gzip
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/nvmevolume.service"
   {
     echo "[Unit]"
     echo "Description=nvmevolume daemon"
@@ -47,7 +46,7 @@ if [ "${1}" = "late" ]; then
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
-  } >"${DEST}"
+  } >"/tmpRoot/usr/lib/systemd/system/nvmevolume.service"
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/nvmevolume.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmevolume.service

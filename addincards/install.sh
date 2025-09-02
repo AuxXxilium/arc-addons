@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon addincards - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -24,22 +24,11 @@ install_addon() {
     done
     rm -f "${FILE}.tmp"
   done
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon addincards - ${1}"
 
   FILES="/tmpRoot/usr/syno/etc.defaults/adapter_cards.conf /tmpRoot/usr/syno/etc/adapter_cards.conf"
   for FILE in $FILES; do
     [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
   done
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

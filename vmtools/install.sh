@@ -21,7 +21,6 @@ if [ "${1}" = "late" ]; then
   VMTOOLS_PID="/var/run/vmtools.pid"
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/vmtools.service"
 
   if grep -Eq 'mev=vmware' /proc/cmdline; then
     VMWARE_CONF="${VMTOOLS_PATH}/etc/vmware-tools/tools.conf"
@@ -66,7 +65,7 @@ if [ "${1}" = "late" ]; then
       echo
       echo "[Install]"
       echo "WantedBy=multi-user.target"
-    } >"${DEST}"
+    } >"/tmpRoot/usr/lib/systemd/system/vmtools.service"
   elif grep -Eq 'mev=kvm|mev=qemu' /proc/cmdline; then
     GUEST_AGENT="/dev/virtio-ports/org.qemu.guest_agent.0"
     {
@@ -88,7 +87,7 @@ if [ "${1}" = "late" ]; then
       echo
       echo "[Install]"
       echo "WantedBy=multi-user.target"
-    } >"${DEST}"
+    } >"/tmpRoot/usr/lib/systemd/system/vmtools.service"
   else
     {
       echo "[Unit]"
@@ -109,9 +108,10 @@ if [ "${1}" = "late" ]; then
       echo
       echo "[Install]"
       echo "WantedBy=multi-user.target"
-    } >"${DEST}"
+    } >"/tmpRoot/usr/lib/systemd/system/vmtools.service"
     exit 1
   fi
+
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/vmtools.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/vmtools.service
 elif [ "${1}" = "uninstall" ]; then

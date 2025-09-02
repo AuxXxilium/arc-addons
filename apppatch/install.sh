@@ -15,7 +15,6 @@ if [ "${1}" = "late" ]; then
   cp -vpf /usr/bin/apppatch.sh /tmpRoot/usr/bin/apppatch.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/apppatch.service"
   {
     echo "[Unit]"
     echo "Description=Arc apppatch daemon"
@@ -31,12 +30,11 @@ if [ "${1}" = "late" ]; then
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
-  } >"${DEST}"
+  } >"/tmpRoot/usr/lib/systemd/system/apppatch.service"
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/apppatch.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/apppatch.service
 
-  DEST="/tmpRoot/usr/lib/systemd/system/apppatch.path"
   {
     echo "[Unit]"
     echo "Description=Arc apppatch path"
@@ -50,7 +48,7 @@ if [ "${1}" = "late" ]; then
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
-  } >"${DEST}"
+  } >"/tmpRoot/usr/lib/systemd/system/apppatch.path"
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/apppatch.path /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/apppatch.path

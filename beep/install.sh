@@ -6,19 +6,19 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon beep - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
+  if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+    echo "copy esynoscheduler.db"
+    mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
+    cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+  fi
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-  if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
-    echo "copy esynoscheduler.db"
-    mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
-    cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
-  fi
-  if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -Eq "BeepOnBoot|BeepOnShutdown"; then
+  if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -Eq "BeepOnBoot|BeepOnShutdown"; then
     echo "beep task already exists"
   else
     echo "insert beep task to esynoscheduler.db"
@@ -29,34 +29,23 @@ install_addon() {
       BB="beep -f 500 -l 500 -d 500 -r 1"
       BS="beep -f 500 -l 500 -d 500 -r 1"
     fi
-    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'BeepOnBoot';
 INSERT INTO task VALUES('BeepOnBoot', '', 'bootup', '', 1, 0, 0, 0, '', 0, "${BB}", 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'BeepOnShutdown';
 INSERT INTO task VALUES('BeepOnShutdown', '', 'shutdown', '', 1, 0, 0, 0, '', 0, "${BS}", 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon beep - ${1}"
 
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete beep task from esynoscheduler.db"
-    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'BeepOnBoot';
 DELETE FROM task WHERE task_name LIKE 'BeepOnShutdown';
 EOF
   fi
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

@@ -6,11 +6,11 @@
 # See /LICENSE for more information.
 #
 
-install_cpuinfo() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon cpuinfo - late"
   mkdir -p /tmpRoot/usr/arc/addons/ /tmpRoot/usr/sbin /tmpRoot/usr/bin /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
 
-  cp -pf "$0" /tmpRoot/usr/arc/addons/
+  cp -pf "${0}" /tmpRoot/usr/arc/addons/
   cp -vpf /usr/sbin/cpuinfo /tmpRoot/usr/sbin/cpuinfo
   cp -vpf /usr/bin/cpuinfo.sh /tmpRoot/usr/bin/cpuinfo.sh
 
@@ -29,9 +29,7 @@ WantedBy=multi-user.target
 EOF
 
   ln -vsf /usr/lib/systemd/system/cpuinfo.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo.service
-}
-
-uninstall_cpuinfo() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon cpuinfo - uninstall"
   rm -f /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo.service
   rm -f /tmpRoot/usr/lib/systemd/system/cpuinfo.service
@@ -39,9 +37,4 @@ uninstall_cpuinfo() {
   echo "/usr/bin/cpuinfo.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/cpuinfo.sh" >>/tmpRoot/usr/arc/revert.sh
   rm -f /tmpRoot/usr/sbin/cpuinfo
-}
-
-case "$1" in
-  late) install_cpuinfo ;;
-  uninstall) uninstall_cpuinfo ;;
-esac
+fi

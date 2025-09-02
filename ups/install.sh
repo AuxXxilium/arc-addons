@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon ups - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -24,13 +24,13 @@ install_addon() {
       sed -i "/\/usr\/syno\/sbin\/synopoweroff/i\ \ \ \ ${EVENT_POWEROFF}" "${FILE}"
     fi
 
+    if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+      echo "copy esynoscheduler.db"
+      mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
+      cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+    fi
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-    if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
-      echo "copy esynoscheduler.db"
-      mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
-      cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
-    fi
     echo "insert start/stop ScsiTarget task to esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'StartScsiTarget';
@@ -39,9 +39,7 @@ DELETE FROM task WHERE task_name LIKE 'StopScsiTarget';
 INSERT INTO task VALUES('StopScsiTarget', '', 'shutdown', '', 1, 0, 0, 0, '', 0, "synopkg stop ScsiTarget", 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon ups - ${1}"
 
   FILE="/tmpRoot/usr/syno/bin/synoups"
@@ -56,13 +54,4 @@ DELETE FROM task WHERE task_name LIKE 'StartScsiTarget';
 DELETE FROM task WHERE task_name LIKE 'StopScsiTarget';
 EOF
   fi
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}" "${2}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi
