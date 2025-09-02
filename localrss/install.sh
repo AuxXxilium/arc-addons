@@ -6,21 +6,22 @@
 # See /LICENSE for more information.
 #
 
+# shellcheck disable=SC2154
+
 # External incoming required ${MLINK} and ${MCHECKSUM}
 if [ -z "${MLINK}" ] || [ -z "${MCHECKSUM}" ]; then
   echo "MLINK or MCHECKSUM is null"
-  exit 1
+  return
 fi
 
-install_patches() {
-  echo "Installing addon localrss - patches"
+if [ "${1}" = "patches" ]; then
+  echo "Installing addon localrss - ${1}"
 
-  . /etc.defaults/VERSION
+  # MajorVersion=`/bin/get_key_value /etc.defaults/VERSION majorversion`
+  # MinorVersion=`/bin/get_key_value /etc.defaults/VERSION minorversion`
+  . "/etc.defaults/VERSION"
 
-  JSON_FILE="/usr/syno/web/localrss.json"
-  XML_FILE="/usr/syno/web/localrss.xml"
-
-  cat >"${JSON_FILE}" <<EOF
+  cat >"/usr/syno/web/localrss.json" <<EOF
 {
   "version": "2.0",
   "channel": {
@@ -56,7 +57,7 @@ install_patches() {
 }
 EOF
 
-  cat >"${XML_FILE}" <<EOF
+  cat >"/usr/syno/web/localrss.xml" <<EOF
 <?xml version="1.0"?>
 <rss version="2.0">
   <channel>
@@ -86,18 +87,14 @@ EOF
 </rss>
 EOF
 
-  if [ -f "${XML_FILE}" ]; then
+  if [ -f "/usr/syno/web/localrss.xml" ]; then
+    # cat /usr/syno/web/localrss.xml
     sed -i "s|rss_server=.*$|rss_server=\"http://localhost:5000/localrss.xml\"|g" "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"
     sed -i "s|rss_server_ssl=.*$|rss_server_ssl=\"http://localhost:5000/localrss.xml\"|g" "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"
   fi
-  if [ -f "${JSON_FILE}" ]; then
+  if [ -f "/usr/syno/web/localrss.json" ]; then
+    # cat /usr/syno/web/localrss.json
     sed -i "s|rss_server_v2=.*$|rss_server_v2=\"http://localhost:5000/localrss.json\"|g" "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"
   fi
   grep "rss_server" "/etc.defaults/synoinfo.conf"
-}
-
-case "${1}" in
-  patches)
-    install_patches
-    ;;
-esac
+fi

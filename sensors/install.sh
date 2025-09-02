@@ -17,18 +17,18 @@ if [ "${1}" = "late" ]; then
     cp -vpf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
     cp -vpf /usr/bin/arc-pwm.sh /tmpRoot/usr/bin/arc-pwm.sh
 
+    if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
+      echo "copy esynoscheduler.db"
+      mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
+      cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
+    fi
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-    if [ ! -f "${ESYNOSCHEDULER_DB}" ] || ! /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" ".tables" | grep -wq "task"; then
-      echo "copy esynoscheduler.db"
-      mkdir -p "$(dirname "${ESYNOSCHEDULER_DB}")"
-      cp -vpf /addons/esynoscheduler.db "${ESYNOSCHEDULER_DB}"
-    fi
     if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -E "Fancontrol" -A11 | grep -Eq "^FANMODES=(.*)$"; then
       echo "Fancontrol task already exists"
     else
-        echo "insert sensors task to esynoscheduler.db"
-      /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+      echo "insert sensors task to esynoscheduler.db"
+      /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'Fancontrol';
 INSERT INTO task VALUES('Fancontrol', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
 # You only need to modify the following 12 values. You need to change the FanMode once. You do not need to run the task.
@@ -73,7 +73,7 @@ EOF
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
     if [ -f "${ESYNOSCHEDULER_DB}" ]; then
       echo "delete fancontrol task from esynoscheduler.db"
-      /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+      /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'Fancontrol';
 EOF
     fi
@@ -92,7 +92,7 @@ elif [ "${1}" = "uninstall" ]; then
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete fancontrol task from esynoscheduler.db"
-    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'Fancontrol';
 EOF
   fi

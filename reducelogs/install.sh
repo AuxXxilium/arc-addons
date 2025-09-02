@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon reducelogs - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -77,9 +77,7 @@ install_addon() {
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
   [ ! -f "${SH_FILE}.bak" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak"
   printf '#!/usr/bin/env sh\nexit 0\n' >"${SH_FILE}"
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon reducelogs - ${1}"
 
   # syslog-ng
@@ -96,13 +94,4 @@ uninstall_addon() {
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/reducelogs.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/reducelogs.sh" >>/tmpRoot/usr/arc/revert.sh
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

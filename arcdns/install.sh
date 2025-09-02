@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon arcdns - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -31,21 +31,10 @@ install_addon() {
   } >"${DEST}"
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/arcdns.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arcdns.service
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon arcdns - ${1}"
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arcdns.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/arcdns.service"
   rm -f "/tmpRoot/usr/bin/arcdns.php"
   rm -f "/tmpRoot/usr/bin/arcdns.sh"
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

@@ -6,10 +6,9 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon revert - ${1}"
 
-  mkdir -p "/tmpRoot/usr/arc/"
   mkdir -p "/tmpRoot/usr/arc/addons/"
 
   echo '#!/usr/bin/env bash' >"/tmpRoot/usr/arc/revert.sh"
@@ -52,10 +51,4 @@ install_addon() {
     mkdir -p "/tmpRoot/usr/arc"
     cp -rpf /usr/arc/* "/tmpRoot/usr/arc/"
   fi
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-esac
+fi

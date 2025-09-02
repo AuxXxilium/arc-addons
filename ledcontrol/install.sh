@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon ledcontrol - ${1}"
 
   # Create necessary directories and copy files
@@ -42,9 +42,7 @@ WantedBy=multi-user.target
 EOF
 
   ln -vsf /usr/lib/systemd/system/ledcontrol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon ledcontrol - ${1}"
 
   # Remove systemd files
@@ -63,9 +61,4 @@ uninstall_addon() {
   # Add revert commands
   echo "/usr/bin/ledcontrol.sh" >> /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/ledcontrol.sh" >> /tmpRoot/usr/arc/revert.sh
-}
-
-case "${1}" in
-  late) install_addon "${1}" "${2}" ;;
-  uninstall) uninstall_addon "${1}" ;;
-esac
+fi

@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon powersched - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -21,20 +21,9 @@ install_addon() {
 
   # Add line to crontab, execute each minute
   echo "*       *       *       *       *       root    /usr/sbin/powersched #arpl powersched addon" >>/tmpRoot/etc/crontab
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon powersched - ${1}"
 
   [ -f "/tmpRoot/usr/sbin/powersched.bak" ] && mv -f "/tmpRoot/usr/sbin/powersched.bak" "/tmpRoot/usr/sbin/powersched"
   [ -f "/tmpRoot/etc/crontab.bak" ] && mv -f "/tmpRoot/etc/crontab.bak" "/tmpRoot/etc/crontab"
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

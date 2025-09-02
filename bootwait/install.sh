@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "early" ]; then
   echo "Installing addon bootwait - ${1}"
   wait_time=30 # maximum wait time in seconds
 
@@ -39,10 +39,4 @@ install_addon() {
   fi
 
   echo "Confirmed a valid-looking /dev/synoboot device"
-}
-
-case "${1}" in
-  early)
-    install_addon "${1}"
-    ;;
-esac
+fi
