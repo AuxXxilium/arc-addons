@@ -8,7 +8,7 @@
 # From：https://github.com/007revad/Synology_enable_Deduplication
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing deduplication addon"
 
   # Create necessary directories and copy files
@@ -32,9 +32,7 @@ WantedBy=multi-user.target
 EOF
 
   ln -vsf /usr/lib/systemd/system/deduplication.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/deduplication.service
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling deduplication addon"
 
   # Remove systemd files
@@ -50,9 +48,4 @@ uninstall_addon() {
   # Add revert commands
   echo "/usr/bin/deduplication.sh --restore" >> /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/deduplication.sh" >> /tmpRoot/usr/arc/revert.sh
-}
-
-case "${1}" in
-  late) install_addon ;;
-  uninstall) uninstall_addon ;;
-esac
+fi

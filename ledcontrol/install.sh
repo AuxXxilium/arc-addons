@@ -6,18 +6,18 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon ledcontrol - ${1}"
 
   # Create necessary directories and copy files
   mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/sbin/" "/tmpRoot/usr/lib/modules/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
-  cp -pf /usr/bin/ledcontrol.sh /tmpRoot/usr/bin/
-  cp -pf /usr/sbin/ugreen_leds_cli /tmpRoot/usr/sbin/
-  cp -pf /usr/sbin/ugreen_led /tmpRoot/usr/sbin/
-  cp -pf /usr/lib/modules/i2c-algo-bit.ko /tmpRoot/usr/lib/modules/ || true
-  cp -pf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/ || true
-  cp -pf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/ || true
+  cp -pf /usr/bin/ledcontrol.sh /tmpRoot/usr/bin/ledcontrol.sh || true
+  cp -pf /usr/sbin/ugreen_leds_cli /tmpRoot/usr/sbin/ugreen_leds_cli || true
+  cp -pf /usr/sbin/ugreen_led /tmpRoot/usr/sbin/ugreen_led || true
+  cp -pf /usr/lib/modules/i2c-algo-bit.ko /tmpRoot/usr/lib/modules/i2c-algo-bit.ko || true
+  cp -pf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/i2c-i801.ko || true
+  cp -pf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/i2c-smbus.ko || true
 
   chmod u+s "/tmpRoot/usr/sbin/ugreen_leds_cli" "/tmpRoot/usr/sbin/ugreen_led"
 
@@ -42,9 +42,7 @@ WantedBy=multi-user.target
 EOF
 
   ln -vsf /usr/lib/systemd/system/ledcontrol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon ledcontrol - ${1}"
 
   # Remove systemd files
@@ -63,9 +61,4 @@ uninstall_addon() {
   # Add revert commands
   echo "/usr/bin/ledcontrol.sh" >> /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/ledcontrol.sh" >> /tmpRoot/usr/arc/revert.sh
-}
-
-case "${1}" in
-  late) install_addon "${1}" "${2}" ;;
-  uninstall) uninstall_addon "${1}" ;;
-esac
+fi

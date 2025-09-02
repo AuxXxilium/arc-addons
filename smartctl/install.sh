@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon smartctl - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -15,20 +15,9 @@ install_addon() {
   [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
   
   cp -vpf /usr/bin/smartctl.sh "${FILE}"
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon smartctl - ${1}"
 
   FILE="/tmpRoot/usr/bin/smartctl"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

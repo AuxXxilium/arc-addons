@@ -8,15 +8,15 @@
 # https://github.com/007revad/Synology_HDD_db
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon hdddb - ${1}"
 
   # Create necessary directories and copy files
   mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/sbin/" "/tmpRoot/usr/syno/sbin/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
-  cp -pf /usr/bin/hdddb.sh /tmpRoot/usr/bin/
-  cp -pf /usr/sbin/dtc /tmpRoot/usr/sbin/
-  cp -pf /usr/syno/sbin/dhm_tool /tmpRoot/usr/syno/sbin/
+  cp -pf /usr/bin/hdddb.sh /tmpRoot/usr/bin/hdddb.sh
+  cp -pf /usr/sbin/dtc /tmpRoot/usr/sbin/dtc
+  cp -pf /usr/syno/sbin/dhm_tool /tmpRoot/usr/syno/sbin/dhm_tool
 
   # Create systemd service file
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/hdddb.service"
@@ -35,9 +35,7 @@ WantedBy=multi-user.target
 EOF
 
   ln -vsf /usr/lib/systemd/system/hdddb.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/hdddb.service
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon hdddb - ${1}"
 
   # Remove systemd files
@@ -53,9 +51,4 @@ uninstall_addon() {
   # Add revert commands
   echo "/usr/bin/hdddb.sh --restore" >> /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/hdddb.sh" >> /tmpRoot/usr/arc/revert.sh
-}
-
-case "${1}" in
-  late) install_addon "${1}" ;;
-  uninstall) uninstall_addon "${1}" ;;
-esac
+fi

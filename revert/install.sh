@@ -6,10 +6,9 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon revert - ${1}"
 
-  mkdir -p "/tmpRoot/usr/arc/"
   mkdir -p "/tmpRoot/usr/arc/addons/"
 
   echo '#!/usr/bin/env bash' >"/tmpRoot/usr/arc/revert.sh"
@@ -25,7 +24,6 @@ install_addon() {
 
   if [ "$(cat "/tmpRoot/usr/arc/revert.sh")" != '#!/usr/bin/env bash' ]; then
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
-    DEST="/tmpRoot/usr/lib/systemd/system/revert.service"
     {
       echo "[Unit]"
       echo "Description=revert"
@@ -38,7 +36,8 @@ install_addon() {
       echo
       echo "[Install]"
       echo "WantedBy=multi-user.target"
-    } >"${DEST}"
+    } >"/tmpRoot/usr/lib/systemd/system/revert.service"
+
     mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
     ln -vsf /usr/lib/systemd/system/revert.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/revert.service
   else
@@ -52,10 +51,4 @@ install_addon() {
     mkdir -p "/tmpRoot/usr/arc"
     cp -rpf /usr/arc/* "/tmpRoot/usr/arc/"
   fi
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-esac
+fi

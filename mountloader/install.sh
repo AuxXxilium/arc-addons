@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon mountloader - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -14,30 +14,19 @@ install_addon() {
   mkdir -p /tmpRoot/usr/mountloader
   tar -zxf /addons/mountloader-7.1.tgz -C /tmpRoot/usr/mountloader
 
-  rm -f /tmpRoot/usr/sbin/arcsu
-
   cp -vpf /usr/bin/yq /tmpRoot/usr/bin/yq
   cp -vpf /usr/bin/unzip /tmpRoot/usr/bin/unzip
-  cp -vpf /usr/bin/arcsu /tmpRoot/usr/bin/arcsu
-  chown root:root /tmpRoot/usr/bin/arcsu
-  chmod 4755 /tmpRoot/usr/bin/arcsu
+  if [ -f /usr/bin/arcsu ]; then
+    cp -vpf /usr/bin/arcsu /tmpRoot/usr/bin/arcsu
+    chown root:root /tmpRoot/usr/bin/arcsu
+    chmod 4755 /tmpRoot/usr/bin/arcsu
+  fi
   cp -pf /usr/bin/arc-loaderdisk.sh /tmpRoot/usr/bin/arc-loaderdisk.sh
   
   rm -f /tmpRoot/usr/arc/.mountloader
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon mountloader - ${1}"
 
   rm -f "/tmpRoot/usr/bin/arc-loaderdisk.sh"
   rm -f "/tmpRoot/usr/bin/arcsu"
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

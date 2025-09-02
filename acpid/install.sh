@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon acpid - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -17,9 +17,7 @@ install_addon() {
   else
     echo "No button.ko found"
   fi
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon acpid - ${1}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/acpid.service"
@@ -30,13 +28,4 @@ uninstall_addon() {
   rm -f /tmpRoot/usr/bin/acpitool
   rm -f /tmpRoot/usr/sbin/acpid
   rm -f /tmpRoot/usr/sbin/kacpimon
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+fi

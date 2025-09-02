@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-install_addon() {
+if [ "${1}" = "late" ]; then
   echo "Installing addon allowdowngrade - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -14,7 +14,6 @@ install_addon() {
   cp -pf /usr/bin/allowdowngrade.sh /tmpRoot/usr/bin/allowdowngrade.sh
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
-  DEST="/tmpRoot/usr/lib/systemd/system/allowdowngrade.service"
   {
     echo "[Unit]"
     echo "Description=addon allowdowngrade"
@@ -28,21 +27,13 @@ install_addon() {
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
-  } >"${DEST}"
+  } >"/tmpRoot/usr/lib/systemd/system/allowdowngrade.service"
+
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/allowdowngrade.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/allowdowngrade.service
-}
-
-uninstall_addon() {
+elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon allowdowngrade - ${1}"
-  # To-Do: Add uninstallation steps here
-}
-
-case "${1}" in
-  late)
-    install_addon "${1}"
-    ;;
-  uninstall)
-    uninstall_addon "${1}"
-    ;;
-esac
+  rm -f "/tmpRoot/usr/bin/allowdowngrade.sh"
+  rm -f "/tmpRoot/usr/lib/systemd/system/allowdowngrade.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/allowdowngrade.service"
+fi
