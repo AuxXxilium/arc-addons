@@ -43,9 +43,15 @@ if [ "${1}" = "patches" ]; then
   GPU_BIN="$(echo "${GPU}" | cut -c3-4)$(echo "${GPU}" | cut -c1-2)0000$(echo "${GPU}" | cut -c7-8)$(echo "${GPU}" | cut -c5-6)0000"
   echo "GPU:${GPU} GPU_BIN:${GPU_BIN}"
   cp -pf "${KO_FILE}" "${KO_FILE}.tmp"
-  xxd -c "$(xxd -p "${KO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${KO_FILE}.tmp" 2>/dev/null |
-    sed "s/${GPU_DEF}/${GPU_BIN}/; s/308201f706092a86.*70656e6465647e0a//" |
-    xxd -r -p >"${KO_FILE}" 2>/dev/null
+  if xxd -c "$(xxd -p "${KO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${KO_FILE}.tmp" 2>/dev/null | grep -q "${GPU_BIN}"; then
+    echo "${GPU} already patched"
+  else
+    echo "Patching i915.ko"
+    xxd -c "$(xxd -p "${KO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${KO_FILE}.tmp" 2>/dev/null |
+      sed "s/${GPU_DEF}/${GPU_BIN}/; s/308201f706092a86.*70656e6465647e0a//" |
+      xxd -r -p >"${KO_FILE}" 2>/dev/null
+    echo "true" >"/etc/i915patched"
+  fi
   rm -f "${KO_FILE}.tmp"
   [ "${isLoad}" = "1" ] && /usr/sbin/modprobe i915
 
@@ -54,9 +60,11 @@ elif [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
-  [ ! -f "${KO_FILE}.bak" ] && cp -pf "${KO_FILE}" "${KO_FILE}.bak"
-  cp -vpf "/usr/lib/modules/i915.ko" "${KO_FILE}"
+  if [ -f "/etc/i915patched" ]; then
+    KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
+    [ ! -f "${KO_FILE}.bak" ] && cp -pf "${KO_FILE}" "${KO_FILE}.bak"
+    cp -vpf "/usr/lib/modules/i915.ko" "${KO_FILE}"
+  fi
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon i915le10th - ${1}"
 

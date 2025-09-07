@@ -95,7 +95,7 @@ else
           echo "Setting IP for ${ETH} to dhcp"
           CF="/etc/sysconfig/network-scripts/ifcfg-${ETH}"
           SF="/etc/iproute2/config/gateway_database"
-          sed -i "s|^BOOTPROTO=.*|BOOTPROTO=dhcp|; s|^ONBOOT=.*|ONBOOT=yes|; s|^IPV6INIT=.*|IPV6INIT=no|; /^IPADDR/d; /NETMASK/d; /GATEWAY/d; /DNS1/d; /DNS2/d" "${CF}"
+          sed -i "s|^BOOTPROTO=.*|BOOTPROTO=dhcp|; s|^ONBOOT=.*|ONBOOT=yes|; s|^IPV6INIT=.*|IPV6INIT=auto_dhcp|; /^IPADDR/d; /NETMASK/d; /GATEWAY/d; /DNS1/d; /DNS2/d" "${CF}"
           ${SSKV} "${SF}" "${ETH}" dns ""
           ${SSKV} "${SF}" "${ETH}" gateway ""
           /etc/rc.network restart "${ETH}" >/dev/null 2>&1

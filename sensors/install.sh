@@ -55,6 +55,8 @@ EOF
       echo "ExecStart=/usr/bin/arc-sensors.sh"
       echo "ExecReload=/usr/bin/pkill -f /usr/bin/arc-sensors.sh"
       echo "Restart=always"
+      echo "StartLimitBurst=5"
+      echo "StartLimitInterval=10"
       echo
       echo "[Install]"
       echo "WantedBy=multi-user.target"

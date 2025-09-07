@@ -1,0 +1,23 @@
+version: 1
+name: monitor
+description: "Monitor Power Management (Only for supported graphics card drivers)."
+system: false
+beta: true
+target: system
+all:
+  install-script: "install.sh"
+  copy: "all"
+apollolake: true
+broadwell: true
+broadwellnk: true
+broadwellnkv2: true
+broadwellntbap: true
+denverton: true
+geminilake: true
+geminilakenk: true
+purley: true
+v1000: true
+v1000nk: true
+r1000: true
+r1000nk: true
+epyc7002: true
