@@ -46,9 +46,7 @@ if [ "${1}" = "late" ]; then
   fi
 
   # Backup loader config
-  rm -rf "/tmpRoot/usr/arc"
-  if [ -d "/usr/arc" ]; then
-    mkdir -p "/tmpRoot/usr/arc"
-    cp -rpf /usr/arc/* "/tmpRoot/usr/arc/"
-  fi
+  rm -rf "/tmpRoot/usr/arc/VERSION" "/tmpRoot/usr/arc/backup"
+  [ -f "/usr/arc/VERSION" ] && cp -pf /usr/arc/VERSION "/tmpRoot/usr/arc/VERSION"
+  [ -d "/usr/arc/backup" ] && cp -rpf /usr/arc/backup/* "/tmpRoot/usr/arc/backup/"
 fi
