@@ -88,12 +88,11 @@ elif [ "${1}" = "rcExit" ]; then
 elif [ "${1}" = "jrExit" ]; then
   echo "Installing addon misc - ${1}"
 
-  /usr/bin/wol.sh
+  /usr/bin/wol.sh 2>/dev/null || true
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon misc - ${1}"
-  mkdir -p "/tmpRoot/usr/arc/addons/"
-  mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  mkdir -vp /tmpRoot/usr/arc/addons
   # cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   echo "Killing ttyd ..."
@@ -103,10 +102,10 @@ elif [ "${1}" = "late" ]; then
   /usr/bin/killall dufs 2>/dev/null || true
 
   # synoinfo.conf
-  cp -vpf "/addons/synoinfo.conf" /tmpRoot/usr/arc/addons/synoinfo.conf
+  cp -vpf "/addons/synoinfo.conf" "/tmpRoot/usr/arc/addons/synoinfo.conf"
   for KEY in $(cat "/addons/synoinfo.conf" 2>/dev/null | cut -d= -f1); do
     [ -z "${KEY}" ] && continue
-    VALUE="$(/bin/get_key_value /etc/synoinfo.conf "${KEY}")" # Do not use the value in /addons/synoinfo.conf
+    VALUE="$(/bin/get_key_value /addons/synoinfo.conf "${KEY}")"
     echo "Setting ${KEY} to ${VALUE}"
     for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do /bin/set_key_value "${F}" "${KEY}" "${VALUE}"; done
   done
@@ -178,6 +177,7 @@ elif [ "${1}" = "late" ]; then
   cp -vpf /usr/bin/jq /tmpRoot/usr/bin/jq
 
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
+  mkdir -vp /tmpRoot/usr/lib/systemd/system
   rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
