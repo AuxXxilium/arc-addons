@@ -103,10 +103,10 @@ elif [ "${1}" = "late" ]; then
   /usr/bin/killall dufs 2>/dev/null || true
 
   # synoinfo.conf
-  cp -vpf "/addons/synoinfo.conf" /tmpRoot/usr/arc/addons/synoinfo.conf
+  cp -vpf "/addons/synoinfo.conf" "/tmpRoot/usr/arc/addons/synoinfo.conf"
   for KEY in $(cat "/addons/synoinfo.conf" 2>/dev/null | cut -d= -f1); do
     [ -z "${KEY}" ] && continue
-    VALUE="$(/bin/get_key_value /etc/synoinfo.conf "${KEY}")" # Do not use the value in /addons/synoinfo.conf
+    VALUE="$(/bin/get_key_value /addons/synoinfo.conf "${KEY}")"
     echo "Setting ${KEY} to ${VALUE}"
     for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do /bin/set_key_value "${F}" "${KEY}" "${VALUE}"; done
   done
