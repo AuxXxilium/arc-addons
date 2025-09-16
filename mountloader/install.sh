@@ -16,6 +16,7 @@ if [ "${1}" = "late" ]; then
 
   cp -vpf /usr/bin/yq /tmpRoot/usr/bin/yq
   cp -vpf /usr/bin/unzip /tmpRoot/usr/bin/unzip
+  cp -vpf /usr/bin/ttyd /tmpRoot/usr/bin/ttyd
   if [ -f /usr/bin/arcsu ]; then
     cp -vpf /usr/bin/arcsu /tmpRoot/usr/bin/arcsu
     chown root:root /tmpRoot/usr/bin/arcsu
