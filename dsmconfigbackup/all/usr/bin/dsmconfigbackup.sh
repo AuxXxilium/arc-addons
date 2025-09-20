@@ -24,7 +24,7 @@ for I in $(ls ${DSMBPATH}/${PRE}*.dss | sort -r | awk "NR>${NUM}"); do
   rm -f "${I}"
 done
 
-LOADER_DISK_PART1="$(/sbin/blkid -L ARC1 2>/dev/null)"
+LOADER_DISK_PART1="$(/sbin/blkid -L AR1 2>/dev/null)"
  if [ ! -b "${LOADER_DISK_PART1}" ] && [ -b "/dev/synoboot1" ]; then
   LOADER_DISK_PART1="/dev/synoboot1"
 fi

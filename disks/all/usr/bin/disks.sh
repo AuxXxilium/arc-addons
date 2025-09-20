@@ -494,9 +494,9 @@ if type flock >/dev/null 2>&1 && type trap >/dev/null 2>&1; then
 fi
 
 # get the boot disk info
-[ -z "$(/sbin/blkid -L ARC3 2>/dev/null)" ] && checkAlldisk
+[ -z "$(/sbin/blkid -L AR3 2>/dev/null)" ] && checkAlldisk
 
-BOOTDISK_PART3_PATH="$(/sbin/blkid -L ARC3 2>/dev/null)"
+BOOTDISK_PART3_PATH="$(/sbin/blkid -L AR3 2>/dev/null)"
 if [ -n "${BOOTDISK_PART3_PATH}" ]; then
   BOOTDISK_PART3_MAJORMINOR="$(stat -c '%t:%T' "${BOOTDISK_PART3_PATH}" | awk -F: '{printf "%d:%d", strtonum("0x" $1), strtonum("0x" $2)}')"
   BOOTDISK_PART3="$(awk -F= '/DEVNAME/ {print $2}' "/sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent" 2>/dev/null)"

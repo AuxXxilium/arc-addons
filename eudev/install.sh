@@ -26,9 +26,8 @@ elif [ "${1}" = "modules" ]; then
     exit 1
   }
   echo "Triggering add events to udev"
-  udevadm trigger --type=subsystems --action=add
-  udevadm trigger --type=devices --action=add
-  udevadm trigger --type=devices --action=change
+  udevadm trigger --action=add
+  udevadm trigger --action=change
   udevadm settle --timeout=30 || echo "udevadm settle failed"
   # Give more time
   sleep 10

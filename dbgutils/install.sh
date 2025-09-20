@@ -12,7 +12,7 @@ getlog() {
     exit 1
   fi
 
-  LOADER_DISK_PART1="$(/sbin/blkid -L ARC1 2>/dev/null)"
+  LOADER_DISK_PART1="$(/sbin/blkid -L AR1 2>/dev/null)"
    if [ ! -b "${LOADER_DISK_PART1}" ] && [ -b "/dev/synoboot1" ]; then
     LOADER_DISK_PART1="/dev/synoboot1"
   fi

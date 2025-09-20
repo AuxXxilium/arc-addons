@@ -28,7 +28,7 @@ usage() {
 
 echo "Rebooting to $1 mode"
 
-LOADER_DISK_PART1="$(/sbin/blkid -L ARC1 2>/dev/null)"
+LOADER_DISK_PART1="$(/sbin/blkid -L AR1 2>/dev/null)"
 [ ! -b "$LOADER_DISK_PART1" ] && [ -b "/dev/synoboot1" ] && LOADER_DISK_PART1="/dev/synoboot1"
 [ ! -b "$LOADER_DISK_PART1" ] && echo "Boot disk not found" && reset_arcsu && exit 1
 
