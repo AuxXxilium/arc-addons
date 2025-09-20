@@ -46,6 +46,8 @@ elif [ "${1}" = "patches" ]; then
         if [ "${MACR}" = "${MACX}" ]; then
           echo "Setting IP for ${ETH} to ${IPRS}"
           F="/etc/sysconfig/network-scripts/ifcfg-${ETH}"
+          BRIDGE=$(/bin/get_key_value "${F}" "BRIDGE")
+          [ -n "${BRIDGE}" ] && F="/etc/sysconfig/network-scripts/ifcfg-${BRIDGE}"
           /bin/set_key_value "${F}" "BOOTPROTO" "static"
           /bin/set_key_value "${F}" "ONBOOT" "yes"
           /bin/set_key_value "${F}" "IPADDR" "$(echo "${IPRS}" | cut -d/ -f1)"

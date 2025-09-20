@@ -49,8 +49,8 @@ use POSIX qw(ceil uname strftime ttyname);
 
 ## INXI INFO ##
 my $self_name='inxi';
-my $self_version='3.3.38';
-my $self_date='2025-04-06';
+my $self_version='3.3.39';
+my $self_date='2025-08-29';
 my $self_patch='00';
 ## END INXI INFO ##
 
@@ -515,6 +515,9 @@ sub set_os {
 	if ($cpu_arch =~ /arm|aarch/){
 		$risc{'arm'} = 1;
 		$risc{'id'} = 'arm';}
+	elsif ($cpu_arch =~ /loong|godson/){
+		$risc{'loongson'} = 1;
+		$risc{'id'} = 'loongson';}
 	elsif ($cpu_arch =~ /mips/){
 		$risc{'mips'} = 1;
 		$risc{'id'} = 'mips';}
@@ -527,7 +530,7 @@ sub set_os {
 	elsif ($cpu_arch =~ /(sparc|sun4[uv])/){
 		$risc{'sparc'} = 1;
 		$risc{'id'} = 'sparc';}
-	# aarch32 mips32, i386. centaur/via/intel/amd handled in cpu
+	# aarch32 mips32, i386. amd/centaur/intel/via/zhaoxin handled in cpu
 	if ($cpu_arch =~ /(armv[1-7]|32|[23456]86)/){
 		$bits_sys = 32;
 	}
@@ -1922,6 +1925,12 @@ sub disk_data {
 	['vmstat', '-H'],
 	);
 	run_commands(\@cmds,'disk-bsd');
+	# for issue 56, which will probably never be done, but bootloader data
+	@cmds = (
+	['efibootmgr', ''], # root, of course
+	);
+	run_commands(\@cmds,'bootleader');
+	
 }
 
 sub display_data {
@@ -1961,6 +1970,7 @@ sub display_data {
 	'kde-full-session' => $ENV{'KDE_FULL_SESSION'},
 	'kde-session-version' => $ENV{'KDE_SESSION_VERSION'},
 	'vdpau-driver' => $ENV{'VDPAU_DRIVER'},
+	'windowmanager' => $ENV{'WINDOWMANAGER'},
 	'xdg-current-desktop' => $ENV{'XDG_CURRENT_DESKTOP'},
 	'xdg-session-desktop' => $ENV{'XDG_SESSION_DESKTOP'},
 	'xdg-vtnr' => $ENV{'XDG_VTNR'},
@@ -2787,7 +2797,10 @@ sub download_file {
 sub get_file_http_tiny {
 	my ($type,$url,$file,$ua) = @_;
 	$ua = ($ua && $dl{'ua'}) ? $dl{'ua'} . $ua:  '';
-	my %headers = ($ua) ? ('agent' => $ua) : ();
+	my %headers;
+	$headers{'agent'} = $ua if $ua;
+	# default behavior of no check may change to check, not sure why, be explicit
+	$headers{'verify_SSL'} = 0 if $force{'no-ssl'};
 	my $tiny = HTTP::Tiny->new(%headers);
 	# note: default is no verify, so default here actually is to verify unless overridden
 	$tiny->verify_SSL => 1 if !$force{'no-ssl'};
@@ -4045,7 +4058,7 @@ sub is_hex {
 }
 
 ## NOTE: for perl pre 5.012 length(undef) returns warning
-# receives string, returns boolean 1 if integer
+# receives string, returns boolean 1 if integer. tr/// 4x faster than regex
 sub is_int {
 	if (defined $_[0] && length($_[0]) && 
 	length($_[0]) == ($_[0] =~ tr/0123456789//)){
@@ -5106,6 +5119,10 @@ sub get {
 		}},
 	'irc' => sub {
 		$b_irc = 1;},
+	'loongson' => sub {
+		undef %risc;
+		$risc{'id'} = 'loongson';
+		$risc{'loongson'} = 1;},
 	'man' => sub {
 		$force{'man'} = 1;},
 	'max-wrap|wrap-max|indent-min:i' => sub {
@@ -5153,13 +5170,8 @@ sub get {
 		}},
 	'output-file|export-file:s' => sub {
 		my ($opt,$arg) = @_;
-		if ($arg){
-			if ($arg eq 'print' || main::check_output_path($arg)){
-				$output_file = $arg;
-			}
-			else {
-				main::error_handler('output-file-bad', $opt, $arg);
-			}
+		if ($arg =~ /^(json|screen|xml)$/){
+			$output_type = $arg;
 		}
 		else {
 			main::error_handler('bad-arg', $opt, $arg);
@@ -5172,6 +5184,16 @@ sub get {
 		$risc{'ppc'} = 1;},
 	'recommends' => sub {
 		$show{'recommends'} = 1;},
+	'risc' => sub {
+		my ($opt,$arg) = @_;
+		if ($arg =~ /^(arm|loongson|mips|ppc|riscv|sparc)$/){
+			undef %risc;
+			$risc{'id'} = $arg;
+			$risc{$arg} = 1;
+		}
+		else {
+			main::error_handler('bad-arg', $opt, $arg);
+		}},
 	'riscv' => sub {
 		undef %risc;
 		$risc{'id'} = 'riscv';
@@ -5480,8 +5502,9 @@ sub show_options {
 	['1', '-b', '--basic', "Basic report: System (-S); basic CPU; Machine (-M); 
 	Battery (-B) (if found); Graphics (-G); Network devices (-N); basic Disk; 
 	Info (-I). Same as $self_name^-v2. See -e for expanded report."],
-	['1', '-B', '--battery', "System battery info, including charge, condition
-	voltage (if critical), plus extra info (if battery present/detected)."],
+	['1', '-B', '--battery', "System battery info, including charge, condition, 
+	health (if avalable and not good), voltage (if critical), plus extra info 
+	(if battery present/detected)."],
 	['1', '-C', '--cpu', "CPU report (if each item available): basic topology,
 	model, type (see man for types), cache, average CPU speed, min/max speeds, 
 	per core clock speeds."],
@@ -5664,8 +5687,9 @@ sub show_options {
 	['2', '-A', '', "Specific vendor/product information (if relevant); 
 	PCI/USB ID of device; Version/port(s)/driver version (if available);
 	inactive sound servers/APIs."],
-	['2', '-B', '', "Current/minimum voltage, vendor/model, status (if available); 
-	attached devices (e.g. wireless mouse, keyboard, if present)."],
+	['2', '-B', '', "Health, if available; urrent/minimum voltage, vendor/model, 
+	status (if available); temperature (if available); attached devices (e.g. 
+	wireless mouse, keyboard, if present)."],
 	['2', '-C', '', "L1/L3 cache (if most Linux, or if root and dmidecode 
 	installed); smt if disabled, CPU $flags (short list, use -f to see full list);
 	Highest core speed (if > 1 core); CPU boost (turbo) enabled/disabled, if
@@ -5722,7 +5746,8 @@ sub show_options {
 	['2', '-A', '', "Chip vendor:product ID for each audio device; PCIe speed,
 	lanes (if found); USB rev, speed, lanes (if found); sound server/api helper 
 	daemons/plugins."],
-	['2', '-B', '', "Power used, in watts; serial number."],
+	['2', '-B', '', "Power used, in watts; serial number/ adds 'charging:'
+	section for charge info; charge cycles."],
 	['2', '-D', '', "Disk transfer speed; NVMe lanes; USB rev, speed, lanes (if 
 	found); Disk serial number; LVM volume group free space (if available); disk 
 	duid (some BSDs)."],
@@ -5773,7 +5798,8 @@ sub show_options {
 	['1', '-xxx', '--extra 3', "Show extra, extra, extra data (only works 
 	with verbose or line reports, not short form):"],
 	['2', '-A', '', "Serial number, class ID."],
-	['2', '-B', '', "Chemistry, cycles, location (if available)."],
+	['2', '-B', '', "Manufacure date (uncommen); chemistry; location (uncommon);
+	temp min, max (uncommon); charge type (uncommon)."],
 	['2', '-C', '', "CPU voltage, external clock speed (if root and dmidecode
 	installed); smt status, if available."],
 	['2', '-D', '', "Firmware rev. if available; partition scheme, in some cases; 
@@ -5817,6 +5843,8 @@ sub show_options {
 	['2', '-A', '', "If available: list of alternate kernel modules/drivers 
 	for device(s); PCIe lanes-max: gen, speed, lanes (if relevant); USB mode (if 
 	found); list of installed tools for servers."],
+	['2', '-B', '', "Charge control min/max (if available); available charging 
+	types (uncommon)."],
 	['2', '-C', '', "If available:  microarchitecture level (64 bit AMD/Intel 
 	only).CPU generation, process node, built years; CPU socket type, base/boost 
 	speeds (dmidecode+root/sudo/doas required); Full topology line, with dies, 
@@ -6476,7 +6504,7 @@ sub clean_disk {
 	my ($item) = @_;
 	return $item if !$item;
 	# <?unknown>?|
-	$item =~ s/vendor.*|product.*|O\.?E\.?M\.?//gi;
+	$item =~ s/vendor.*|product.*|(name\s)?n\/a|O\.?E\.?M\.?//gi;
 	$item =~ s/^\s+|\s+$//g;
 	$item =~ s/\s\s+/ /g;
 	return $item;
@@ -6484,8 +6512,8 @@ sub clean_disk {
 
 sub clean_dmi {
 	my ($string) = @_;
-	$string = clean_unset($string,'AssetTagNum|^Base Board .*|^Chassis .*|' .
-	'Manufacturer.*| Or Motherboard|\bOther\b.*|PartNum.*|SerNum|' .
+	$string = clean_unset($string,'Asset\s?Tag\s?Num.*|^Base\s?Board.*|^Chassis.*|' .
+	'Manufacturer.*| Or Motherboard|\bOther\b.*|Part\s?Num.*|Ser(ial)?\s?Num.*|' .
 	'^System .*|^0x[0]+$');
 	$string =~ s/\bbios\b|\bacpi\b//gi;
 	$string =~ s/http:\/\/www.abit.com.tw\//Abit/i;
@@ -6698,11 +6726,11 @@ sub message {
 	$id ||= '';
 	$id2 ||= '';
 	my %message = (
-	'arm-cpu-f' => 'Use -f option to see features',
 	'audio-server-on-pipewire-pulse' => 'off (using pipewire-pulse)',
 	'audio-server-process-on' => 'active (process)',
 	'audio-server-root-na' => 'n/a (root, process)',
 	'audio-server-root-on' => 'active (root, process)',
+	'battery-bad' => 'bad battery?',
 	'battery-data' => 'No system battery data found. Is one present?',
 	'battery-data-bsd' => 'No battery data found. Try with --dmidecode',
 	'battery-data-sys' => 'No /sys data found.',
@@ -6794,6 +6822,7 @@ sub message {
 	'recommends' => 'see --recommends',
 	'repo-data', "No repo data detected. Does $self_name support your package manager?",
 	'repo-data-bsd', "No repo data detected. Does $self_name support $id?",
+	'risc-cpu-f' => 'Use -f option to see features',
 	'risc-pci' => 'No ' . uc($id) . ' data found for this feature.',
 	'root-feature' => 'Feature requires superuser permissions.',
 	'root-item-incomplete' => "Full $id report requires superuser permissions.",
@@ -7986,11 +8015,11 @@ sub sound_tools {
 {
 package BatteryItem;
 my (@upower_items,$b_upower,$upower);
+my $battery = {};
 
 sub get {
 	eval $start if $b_log;
 	my ($key1,$val1);
-	my $battery = {};
 	my $rows = [];
 	my $num = 0;
 	if ($force{'dmidecode'}){
@@ -8001,7 +8030,7 @@ sub get {
 			@$rows = ({main::key($num++,0,1,$key1) => $val1});
 		}
 		else {
-			battery_data_dmi($battery);
+			battery_data_dmi();
 			if (!%$battery){
 				if ($show{'battery-forced'}){
 					$key1 = 'Message';
@@ -8010,12 +8039,12 @@ sub get {
 				}
 			}
 			else {
-				battery_output($rows,$battery);
+				battery_output($rows);
 			}
 		}
 	}
 	elsif ($bsd_type && ($sysctl{'battery'} || $show{'battery-forced'})){
-		battery_data_sysctl($battery) if $sysctl{'battery'};
+		battery_data_sysctl() if $sysctl{'battery'};
 		if (!%$battery){
 			if ($show{'battery-forced'}){
 				$key1 = 'Message';
@@ -8024,11 +8053,11 @@ sub get {
 			}
 		}
 		else {
-			battery_output($rows,$battery);
+			battery_output($rows);
 		}
 	}
 	elsif (-d '/sys/class/power_supply/'){
-		battery_data_sys($battery);
+		battery_data_sys();
 		if (!%$battery){
 			if ($show{'battery-forced'}){
 				$key1 = 'Message';
@@ -8037,7 +8066,7 @@ sub get {
 			}
 		}
 		else {
-			battery_output($rows,$battery);
+			battery_output($rows);
 		}
 	}
 	else {
@@ -8052,146 +8081,231 @@ sub get {
 	return $rows;
 }
 
-# alarm capacity capacity_level charge_full charge_full_design charge_now 
-# cycle_count energy_full energy_full_design energy_now location manufacturer model_name 
-# power_now present serial_number status technology type voltage_min_design voltage_now
-# 0:  name - battery id, not used
-# 1:  status
-# 2:  present
-# 3:  technology
-# 4:  cycle_count
-# 5:  voltage_min_design
-# 6:  voltage_now
-# 7:  power_now
-# 8:  energy_full_design
-# 9:  energy_full
-# 10: energy_now
-# 11: capacity
-# 12: capacity_level
-# 13: of_orig
-# 14: model_name
-# 15: manufacturer
-# 16: serial_number
-# 17: location
+# sys files, these form the names used for sysctl and dmi sources too.
+# see: pinxi/docs/inxi-battery.txt for more info on these items.
+#
+# %$battery keys:
+# alarm
+# capacity
+# capacity_level
+# charge_behaviour
+# charge_control_end_threshold
+# charge_control_start_threshold
+# cycle_count
+# energy_capacity
+# energy_capacity_check
+# energy_full
+# energy_full_design
+# energy_full_raw - use if low battery wh, < 1
+# energy_now
+# energy_now_raw - use if low battery wh, < 1
+# health
+# location - dmidecode has sometimes, but not usual
+# manufacter_date
+# manufacturer
+# model_name
+# name - battery id, not used
+# of_orig
+# of_orig_raw - use if low battery wh, < 1
+# power_now
+# present
+# purpose
+# serial_number
+# status
+# technology
+# temp
+# temp_max
+# temp_min
+# voltage_min_design
+# voltage_now
 sub battery_output {
 	eval $start if $b_log;
-	my ($rows,$battery) = @_;
-	my ($key);
+	my $rows = $_[0];
 	my $num = 0;
 	my $j = 0;
 	# print Data::Dumper::Dumper $battery;
-	foreach $key (sort keys %$battery){
+	foreach my $id (sort keys %$battery){
 		$num = 0;
 		my ($charge,$condition,$model,$serial,$status) = ('','','','','');
 		my ($chemistry,$cycles,$location) = ('','','');
-		next if !$battery->{$key}{'purpose'} || $battery->{$key}{'purpose'} ne 'primary';
-		# $battery->{$key}{''};
+		next if !$battery->{$id}{'purpose'} || $battery->{$id}{'purpose'} ne 'primary';
+		# $battery->{$id}{''};
 		# we need to handle cases where charge or energy full is 0
-		if (defined $battery->{$key}{'energy_now'} && $battery->{$key}{'energy_now'} ne ''){
-			$charge = "$battery->{$key}{'energy_now'} Wh";
-			if ($battery->{$key}{'energy_full'} && 
-			 main::is_numeric($battery->{$key}{'energy_full'})){
-				my $percent = sprintf("%.1f", $battery->{$key}{'energy_now'}/$battery->{$key}{'energy_full'}*100);
-				$charge .= ' (' . $percent  . '%)';
+		if (defined $battery->{$id}{'energy_now'}){
+			if (defined $battery->{$id}{'energy_now_raw'}){
+				$battery->{$id}{'energy_now'} = $battery->{$id}{'energy_now_raw'};
+			}
+			$charge = "$battery->{$id}{'energy_now'} Wh";
+			# if energy_full is non zero or zero, and less than 1, capacity is not set
+			if ($battery->{$id}{'energy_capacity'}){
+				$charge .= ' (' . $battery->{$id}{'energy_capacity'}  . '%';
+				# Got 'critical' for an almost fully charged battery, hold off on this.
+				# if ($extra > 0 && $battery->{$id}{'capacity_level'}){
+				#	$charge .= ' ' . $battery->{$id}{'capacity_level'};
+				# }
+				$charge .= ')';
 			}
 		}
 		# better than nothing, shows the charged percent
-		elsif (defined $battery->{$key}{'capacity'} && $battery->{$key}{'capacity'} ne ''){
-			$charge = $battery->{$key}{'capacity'} . '%'
+		elsif (defined $battery->{$id}{'energy_capacity'} && 
+		main::is_numeric($battery->{$id}{'energy_capacity'})){
+			$charge = $battery->{$id}{'energy_capacity'} . '%'
+		}
+		elsif (defined $battery->{$id}{'capacity'} && 
+		main::is_numeric($battery->{$id}{'capacity'})){
+			$charge = $battery->{$id}{'capacity'} . '%'
 		}
 		else {
 			$charge = 'N/A';
 		}
-		if ($battery->{$key}{'energy_full'} || $battery->{$key}{'energy_full_design'}){
-			$battery->{$key}{'energy_full_design'} ||= 'N/A';
-			$battery->{$key}{'energy_full'} = (defined $battery->{$key}{'energy_full'} && 
-			 $battery->{$key}{'energy_full'} ne '') ? $battery->{$key}{'energy_full'} : 'N/A';
-			$condition = "$battery->{$key}{'energy_full'}/$battery->{$key}{'energy_full_design'} Wh";
-			if ($battery->{$key}{'of_orig'}){
-				$condition .= " ($battery->{$key}{'of_orig'}%)"; 
+		if ($battery->{$id}{'energy_full'} || $battery->{$id}{'energy_full_design'}){
+			$battery->{$id}{'energy_full_design'} ||= 'N/A';
+			# can be zero or close to it.
+			if (!defined $battery->{$id}{'energy_full'}){
+				$battery->{$id}{'energy_full'} = 'N/A';
+			}
+			elsif (defined $battery->{$id}{'energy_full_raw'}){
+				$battery->{$id}{'energy_full'} = $battery->{$id}{'energy_full_raw'};
+			}
+			$condition = "$battery->{$id}{'energy_full'}/$battery->{$id}{'energy_full_design'} Wh";
+			if ($battery->{$id}{'of_orig'}){
+				$condition .= " ($battery->{$id}{'of_orig'}%)"; 
+			}
+			# if energy_full is non zero or zero, but less than 1, of_origin is 0
+			# and of_origin_raw is the actual decimal value
+			elsif (defined $battery->{$id}{'of_orig'} && 
+			$battery->{$id}{'of_orig'} == 0){
+				if ($battery->{$id}{'of_orig_raw'}){
+					$battery->{$id}{'of_orig'} = $battery->{$id}{'of_orig_raw'};
+				}
+				$condition .= ' (' . $battery->{$id}{'of_orig'} . '%)';
 			}
 		}
 		$condition ||= 'N/A';
 		$j = scalar @$rows;
 		push(@$rows, {
-		main::key($num++,1,1,'ID') => $key,
-		main::key($num++,0,2,'charge') => $charge,
-		main::key($num++,0,2,'condition') => $condition,
+		main::key($num++,1,1,'ID') => $id,
 		});
-		if ($extra > 2){
-			if ($battery->{$key}{'power_now'}){
-				$rows->[$j]{main::key($num++,0,2,'power')} = sprintf('%0.1f W',($battery->{$key}{'power_now'}/10**6));
+		$rows->[$j]{main::key($num++,1,2,'charge')} = $charge;
+		if ($battery->{$id}{'energy_capacity_check'}){
+			$rows->[$j]{main::key($num++,0,3,'note')} = $battery->{$id}{'energy_capacity_check'};
+		}
+		$rows->[$j]{main::key($num++,1,2,'condition')} = $condition;
+		if ($battery->{$id}{'battery_bad'}){
+			$rows->[$j]{main::key($num++,0,3,'alert')} = $battery->{$id}{'battery_bad'};
+		}
+		if ($battery->{$id}{'health'} && 
+		($extra > 0 || $battery->{$id}{'health'} ne 'good')){
+			$rows->[$j]{main::key($num++,0,3,'health')} = $battery->{$id}{'health'};
+		}
+		if ($extra > 0 && $battery->{$id}{'temp'}){
+			$rows->[$j]{main::key($num++,1,3,'temp')} = $battery->{$id}{'temp'} . ' C';
+			if ($extra > 2 && $battery->{$id}{'temp_max'}){
+				if ($battery->{$id}{'temp_min'}){
+					$rows->[$j]{main::key($num++,0,4,'min')} = $battery->{$id}{'temp_min'} . ' C';
+				}
+				$rows->[$j]{main::key($num++,0,4,'max')} = $battery->{$id}{'temp_max'} . ' C';
 			}
 		}
-		if ($extra > 0 || ($battery->{$key}{'voltage_now'} && 
-		 $battery->{$key}{'voltage_min_design'} && 
-		 ($battery->{$key}{'voltage_now'} - $battery->{$key}{'voltage_min_design'}) < 0.5)){
-			$battery->{$key}{'voltage_now'} ||= 'N/A';
-			$rows->[$j]{main::key($num++,1,2,'volts')} = $battery->{$key}{'voltage_now'};
-			if ($battery->{$key}{'voltage_now'} ne 'N/A' || $battery->{$key}{'voltage_min_design'}){
-				$battery->{$key}{'voltage_min_design'} ||= 'N/A';
-				$rows->[$j]{main::key($num++,0,3,'min')} = $battery->{$key}{'voltage_min_design'};
+		if ($extra > 2 && $battery->{$id}{'power_now'}){
+			$rows->[$j]{main::key($num++,0,2,'power')} = $battery->{$id}{'power_now'} . ' W';
+		}
+		if ($extra > 0 || ($battery->{$id}{'voltage_now'} && 
+		 $battery->{$id}{'voltage_min_design'} && 
+		 ($battery->{$id}{'voltage_now'} - $battery->{$id}{'voltage_min_design'}) < 0.5)){
+			$battery->{$id}{'voltage_now'} ||= 'N/A';
+			$rows->[$j]{main::key($num++,1,2,'volts')} = $battery->{$id}{'voltage_now'};
+			if ($battery->{$id}{'voltage_now'} ne 'N/A' || $battery->{$id}{'voltage_min_design'}){
+				$battery->{$id}{'voltage_min_design'} ||= 'N/A';
+				$rows->[$j]{main::key($num++,0,3,'min')} = $battery->{$id}{'voltage_min_design'};
 			}
 		}
 		if ($extra > 0){
-			if ($battery->{$key}{'manufacturer'} || $battery->{$key}{'model_name'}){
-				if ($battery->{$key}{'manufacturer'} && $battery->{$key}{'model_name'}){
-					$model = "$battery->{$key}{'manufacturer'} $battery->{$key}{'model_name'}";
+			if ($battery->{$id}{'manufacturer'} || $battery->{$id}{'model_name'}){
+				if ($battery->{$id}{'manufacturer'} && $battery->{$id}{'model_name'}){
+					$model = "$battery->{$id}{'manufacturer'} $battery->{$id}{'model_name'}";
 				}
-				elsif ($battery->{$key}{'manufacturer'}){
-					$model = $battery->{$key}{'manufacturer'};
+				elsif ($battery->{$id}{'manufacturer'}){
+					$model = $battery->{$id}{'manufacturer'};
 				}
-				elsif ($battery->{$key}{'model_name'}){
-					$model = $battery->{$key}{'model_name'};
+				elsif ($battery->{$id}{'model_name'}){
+					$model = $battery->{$id}{'model_name'};
 				}
 			}
 			else {
 				$model = 'N/A';
 			}
-			$rows->[$j]{main::key($num++,0,2,'model')} = $model;
+			$rows->[$j]{main::key($num++,1,2,'model')} = $model;
 			if ($extra > 2){
-				$chemistry = ($battery->{$key}{'technology'}) ? $battery->{$key}{'technology'}: 'N/A';
+				if ($battery->{$id}{'manufacture_date'}){
+					$rows->[$j]{main::key($num++,0,3,'made')} = $battery->{$id}{'manufacture_date'};
+				}
+				$chemistry = ($battery->{$id}{'technology'}) ? $battery->{$id}{'technology'}: 'N/A';
 				$rows->[$j]{main::key($num++,0,2,'type')} = $chemistry;
 			}
 			if ($extra > 1){
-				$serial = main::filter($battery->{$key}{'serial_number'});
+				$serial = main::filter($battery->{$id}{'serial_number'});
 				$rows->[$j]{main::key($num++,0,2,'serial')} = $serial;
 			}
-			$status = ($battery->{$key}{'status'}) ? $battery->{$key}{'status'}: 'N/A';
-			$rows->[$j]{main::key($num++,0,2,'status')} = $status;
-			if ($extra > 2){
-				if ($battery->{$key}{'cycle_count'}){
-					$rows->[$j]{main::key($num++,0,2,'cycles')} = $battery->{$key}{'cycle_count'};
+			if ($extra > 2 && $battery->{$id}{'location'}){
+				$rows->[$j]{main::key($num++,0,2,'location')} = $battery->{$id}{'location'};
+			}
+			$status = ($battery->{$id}{'status'}) ? $battery->{$id}{'status'}: 'N/A';
+			if ($extra > 1){
+				$rows->[$j]{main::key($num++,1,2,'charging')} = '';
+				$rows->[$j]{main::key($num++,0,3,'status')} = $status;
+				if ($b_admin && defined $battery->{$id}{'charge_control_end_threshold'} || 
+				defined $battery->{$id}{'charge_control_start_threshold'} ||
+				$battery->{$id}{'charge_behavior'}){
+					$rows->[$j]{main::key($num++,1,3,'control')} = '';
+					my $start = (defined $battery->{$id}{'charge_control_start_threshold'}) ? 
+					  $battery->{$id}{'charge_control_start_threshold'} . '%': 'N/A';
+					my $end = (defined $battery->{$id}{'charge_control_end_threshold'}) ? 
+					  $battery->{$id}{'charge_control_end_threshold'} . '%': 'N/A';
+					$rows->[$j]{main::key($num++,0,4,'start')} = $start;
+					$rows->[$j]{main::key($num++,0,4,'end')} = $end;
+					if ($battery->{$id}{'charge_behavior'}){
+						$rows->[$j]{main::key($num++,0,4,'behavior')} = $battery->{$id}{'charge_behavior'};
+					}
 				}
-				if ($battery->{$key}{'location'}){
-					$rows->[$j]{main::key($num++,0,2,'location')} = $battery->{$key}{'location'};
+				if ($extra > 2 && $battery->{$id}{'charge_type'}){
+					$rows->[$j]{main::key($num++,1,3,'type')} = $battery->{$id}{'charge_type'};
+					if ($b_admin && $battery->{$id}{'charge_types'}){
+						$rows->[$j]{main::key($num++,0,4,'avail')} = $battery->{$id}{'charge_types'};
+					}
 				}
+				# this is surprisingly uncommon, and sometimes is 0, which is false
+				my $cycles = ($battery->{$id}{'cycle_count'}) ? $battery->{$id}{'cycle_count'}: 'N/A';
+				$rows->[$j]{main::key($num++,0,3,'cycles')} = $cycles;
+			}
+			else {
+				$rows->[$j]{main::key($num++,0,2,'status')} = $status;
 			}
 		}
-		$battery->{$key} = undef;
+		# dump the primary battery now
+		$battery->{$id} = undef;
 	}
-	# print Data::Dumper::Dumper \%$battery;
 	# now if there are any devices left, print them out, excluding Mains
 	if ($extra > 0){
+		# print Data::Dumper::Dumper \%$battery;
 		$upower = main::check_program('upower');
-		foreach $key (sort keys %$battery){
+		foreach my $id (sort keys %$battery){
 			$num = 0;
-			next if !defined $battery->{$key} || $battery->{$key}{'purpose'} eq 'mains';
+			next if !defined $battery->{$id} || $battery->{$id}{'purpose'} eq 'mains';
 			my ($charge,$model,$serial,$percent,$status,$vendor) = ('','','','','','');
 			$j = scalar @$rows;
-			my $upower_data = ($upower) ? upower_data($key) : {};
+			my $upower_data = ($upower) ? upower_data($id) : {};
 			if ($upower_data->{'percent'}){
 				$charge = $upower_data->{'percent'};
 			}
-			elsif ($battery->{$key}{'capacity_level'} &&
-			 lc($battery->{$key}{'capacity_level'}) ne 'unknown'){
-				$charge = $battery->{$key}{'capacity_level'};
+			elsif ($battery->{$id}{'capacity_level'}){
+				$charge = $battery->{$id}{'capacity_level'};
 			}
 			else {
 				$charge = 'N/A';
 			}
-			$model = $battery->{$key}{'model_name'} if $battery->{$key}{'model_name'};
-			$vendor = $battery->{$key}{'manufacturer'} if $battery->{$key}{'manufacturer'};
+			$model = $battery->{$id}{'model_name'} if $battery->{$id}{'model_name'};
+			$vendor = $battery->{$id}{'manufacturer'} if $battery->{$id}{'manufacturer'};
 			if ($vendor || $model){
 				if ($vendor && $model){
 					$model = "$vendor $model";
@@ -8204,58 +8318,185 @@ sub battery_output {
 				$model = 'N/A';
 			}
 			push(@$rows, {
-			main::key($num++,1,1,'Device') => $key,
+			main::key($num++,1,1,'Device') => $id,
 			main::key($num++,0,2,'model') => $model,
 			},);
 			if ($extra > 1){
-				$serial = main::filter($battery->{$key}{'serial_number'});
+				$serial = main::filter($battery->{$id}{'serial_number'});
 				$rows->[$j]{main::key($num++,0,2,'serial')} = $serial;
 			}
 			$rows->[$j]{main::key($num++,0,2,'charge')} = $charge;
 			if ($extra > 2 && $upower_data->{'rechargeable'}){
 				$rows->[$j]{main::key($num++,0,2,'rechargeable')} = $upower_data->{'rechargeable'};
 			}
-			$status = ($battery->{$key}{'status'}) ? $battery->{$key}{'status'}: 'N/A' ;
+			$status = ($battery->{$id}{'status'}) ? $battery->{$id}{'status'}: 'N/A' ;
 			$rows->[$j]{main::key($num++,0,2,'status')} = $status;
 		}
 	}
 	eval $end if $b_log;
 }
 
+## BATTERY DATA ##
+
+# BATTERY DATA PROCESSOR #
+sub process_battery_data {
+	eval $start if $b_log;
+	for my $id (keys %$battery){
+		# note:voltage_now fluctuates, which will make capacity numbers change a bit
+		# if any of these values failed, the math will be wrong, but no way to fix that
+		# tests show more systems give right capacity/charge with voltage_min_design 
+		# than with voltage_now. Because of this, only use these as fallbacks to energy_*.
+		if ($battery->{$id}{'voltage_min_design'}){
+			# CHARGE is Ah, which are converted to Wh by: Ah x voltage.
+			if (!$battery->{$id}{'energy_now'} && $battery->{$id}{'charge_now'}){
+				$battery->{$id}{'energy_now'} = $battery->{$id}{'charge_now'} * $battery->{$id}{'voltage_min_design'};
+			}
+			if (!$battery->{$id}{'energy_full'} && $battery->{$id}{'charge_full'}){
+				$battery->{$id}{'energy_full'} = $battery->{$id}{'charge_full'}*$battery->{$id}{'voltage_min_design'};
+			}
+			if (!$battery->{$id}{'energy_full_design'} && $battery->{$id}{'charge_full_design'}){
+				$battery->{$id}{'energy_full_design'} = $battery->{$id}{'charge_full_design'} * $battery->{$id}{'voltage_min_design'};
+			}
+		}
+		# Emulation data:
+		# $battery->{$id}{'energy_full'} = 0.01;
+		# $battery->{$id}{'energy_now'} = 0.01;
+		# Format Percentages
+		# Even with failing battery now and full should retain right proportions
+		if ($battery->{$id}{'energy_now'} && $battery->{$id}{'energy_full'}){
+			$battery->{$id}{'energy_capacity'} = 100 * ($battery->{$id}{'energy_now'}/$battery->{$id}{'energy_full'});
+			$battery->{$id}{'energy_capacity'} = sprintf('%.1f',$battery->{$id}{'energy_capacity'}) + 0;
+			if ($battery->{$id}{'energy_capacity'} > 100){
+				$battery->{$id}{'energy_capacity_check'} = main::message('note-check');
+			}
+		}
+		if ($battery->{$id}{'energy_full_design'} && $battery->{$id}{'energy_full'}){
+			$battery->{$id}{'of_orig'} = 100 * ($battery->{$id}{'energy_full'}/$battery->{$id}{'energy_full_design'});
+			if ($battery->{$id}{'of_orig'} < 1){
+				# note: g prints only significant digits
+				$battery->{$id}{'of_orig_raw'} = sprintf('%.1g',$battery->{$id}{'of_orig'});
+			}
+			elsif ($battery->{$id}{'of_orig'} < 5){
+				$battery->{$id}{'battery_bad'} = main::message('battery-bad');
+			}
+			$battery->{$id}{'of_orig'} = sprintf('%.1f',$battery->{$id}{'of_orig'}) + 0;
+		}
+		# format energy
+		if ($battery->{$id}{'energy_full'}){
+			if ($battery->{$id}{'energy_full'} < 1){
+				# note: g prints only significant digits
+				$battery->{$id}{'energy_full_raw'} = sprintf('%.1g',$battery->{$id}{'energy_full'});
+				if (!$battery->{$id}{'battery_bad'}){
+					$battery->{$id}{'battery_bad'} = main::message('battery-bad');
+				}
+			}
+			$battery->{$id}{'energy_full'} = sprintf('%.1f',$battery->{$id}{'energy_full'}) + 0;
+		}
+		if ($battery->{$id}{'energy_full_design'}){
+			$battery->{$id}{'energy_full_design'} = sprintf('%.1f',$battery->{$id}{'energy_full_design'}) + 0;
+		}
+		if ($battery->{$id}{'energy_now'}){
+			if ($battery->{$id}{'energy_now'} < 1){
+				# note: g prints only significant digits
+				$battery->{$id}{'energy_now_raw'} = sprintf('%.1g',$battery->{$id}{'energy_now'});
+			}
+			$battery->{$id}{'energy_now'} = sprintf('%.1f',$battery->{$id}{'energy_now'}) + 0;
+		}
+		if ($battery->{$id}{'power_now'}){
+			$battery->{$id}{'power_now'} = sprintf('%.1f',$battery->{$id}{'power_now'}) + 0;
+		}
+		# format voltages 
+		if ($battery->{$id}{'voltage_min_design'}){
+			$battery->{$id}{'voltage_min_design'} = sprintf("%.2f", $battery->{$id}{'voltage_min_design'}) + 0;
+		}
+		# could be zero
+		if (defined $battery->{$id}{'voltage_now'}){
+			$battery->{$id}{'voltage_now'} = sprintf("%.2f", $battery->{$id}{'voltage_now'}) + 0;
+		}
+		# Format special values
+		if ($battery->{$id}{'manufacture_year'}){
+			$battery->{$id}{'manufacture_date'} = $battery->{$id}{'manufacture_year'};
+			if ($battery->{$id}{'manufacture_month'}){
+				$battery->{$id}{'manufacture_date'} .= sprintf('-%02d',$battery->{$id}{'manufacture_month'});
+				if ($battery->{$id}{'manufacture_day'}){
+					$battery->{$id}{'manufacture_date'} .= sprintf('-%02d',$battery->{$id}{'manufacture_day'});
+				}
+			}
+		}
+	}
+	print Data::Dumper::Dumper $battery if $dbg[33];
+	main::log_data('dump','process: %$battery',$battery) if $b_log;
+	eval $end if $b_log;
+}
+
+# BATTERY DATA SOURCES #
+
 # charge: mAh energy: Wh
 sub battery_data_sys {
 	eval $start if $b_log;
-	my $battery = $_[0];
-	my ($b_ma,$file,$id,$item,$path,$value);
+	my ($file,$id,$item,$path,$value);
 	my $num = 0;
 	my @batteries = main::globber("/sys/class/power_supply/*");
 	# note: there is no 'location' file, but dmidecode has it
 	# 'type' is generic, like: Battery, Mains
 	# capacity_level is a string, like: Normal
-	my @items = qw(alarm capacity capacity_level charge_full charge_full_design 
-	charge_now constant_charge_current constant_charge_current_max cycle_count 
-	energy_full energy_full_design energy_now location manufacturer model_name 
-	power_now present scope serial_number status technology type voltage_min_design 
-	voltage_now);
+	my @items = qw(alarm capacity capacity_level charge_behaviour 
+	charge_control_end_threshold charge_control_start_threshold 
+	charge_full charge_full_design charge_now charge_type charge_types 
+	constant_charge_current constant_charge_current_max cycle_count 
+	energy_full energy_full_design energy_now health location manufacture_day 
+	manufacture_month manufacture_year manufacturer model_name 
+	power_now present scope serial_number status technology temp temp_alert_max 
+	temp_alert_min temp_max temp_min type voltage_min_design voltage_now);
 	foreach $item (@batteries){
-		$b_ma = 0;
 		$id = $item;
 		$id =~ s%/sys/class/power_supply/%%g;
 		foreach $file (@items){
 			$path = "$item/$file";
+			undef $value;
 			# android shows some files only root readable
-			$value = (-r $path) ? main::reader($path,'',0): '';
+			$value = main::reader($path,'',0) if -r $path;
 			# mains, plus in psu
 			if ($file eq 'type' && $value && lc($value) ne 'battery'){
 				$battery->{$id}{'purpose'} = 'mains';
 			}
 			if ($value){
 				$value = main::trimmer($value);
-				if ($file eq 'voltage_min_design'){
-					$value = sprintf("%.1f", $value/1000000);
+				if ($file eq 'capacity_level'){
+					$value = lc($value);
+					$value =~ s/unknown//;
 				}
-				elsif ($file eq 'voltage_now'){
-					$value = sprintf("%.1f", $value/1000000);
+				# overides threshhold behavior
+				elsif ($file eq 'charge_behaviour'){
+					$value = lc($value);
+				}
+				# note: the following 3 were off, 100000 instead of 1000000
+				# why this is, I do not know. I did not document any reason for that
+				# so going on assumption it is a mistake. 
+				# CHARGE is mAh, which are converted to Wh by: mAh x voltage. 
+				# Note: voltage fluctuates so will make results vary slightly.
+				if ($file eq 'charge_full_design'){
+					$value = $value/1000000;
+				}
+				elsif ($file eq 'charge_full'){
+					$value = $value/1000000;
+				}
+				elsif ($file eq 'charge_now'){
+					$value = $value/1000000;
+				}
+				elsif ($file eq 'charge_type'){
+					$value = lc($value);
+					$value =~ s/unknown|n\/a//; # both are valid values
+				}
+				# active in []
+				elsif ($file eq 'charge_types'){
+					$value = lc($value);
+					$value =~ s/\bunknown|n\/a\b//g; # both are valid values
+					if (!$battery->{$id}{'charge_type'} && $value =~ /\[([^]]+)\]/){
+						$battery->{$id}{'charge_type'} = $1;
+					}
+					$value =~ s/\[|\]//g;
+					$value = join(',',sort(split(/\s+/,$value)));
 				}
 				elsif ($file eq 'energy_full_design'){
 					$value = $value/1000000;
@@ -8264,24 +8505,11 @@ sub battery_data_sys {
 					$value = $value/1000000;
 				}
 				elsif ($file eq 'energy_now'){
-					$value = sprintf("%.1f", $value/1000000);
-				}
-				# note: the following 3 were off, 100000 instead of 1000000
-				# why this is, I do not know. I did not document any reason for that
-				# so going on assumption it is a mistake. 
-				# CHARGE is mAh, which are converted to Wh by: mAh x voltage. 
-				# Note: voltage fluctuates so will make results vary slightly.
-				elsif ($file eq 'charge_full_design'){
 					$value = $value/1000000;
-					$b_ma = 1;
 				}
-				elsif ($file eq 'charge_full'){
-					$value = $value/1000000;
-					$b_ma = 1;
-				}
-				elsif ($file eq 'charge_now'){
-					$value = $value/1000000;
-					$b_ma = 1;
+				elsif ($file eq 'health'){
+					$value = lc($value);
+					$value =~ s/unknown//;
 				}
 				elsif ($file eq 'manufacturer'){
 					$value = main::clean_dmi($value);
@@ -8289,15 +8517,38 @@ sub battery_data_sys {
 				elsif ($file eq 'model_name'){
 					$value = main::clean_dmi($value);
 				}
+				elsif ($file eq 'power_now'){
+					$value = $value/1000000;
+				}
 				# Valid values: Unknown,Charging,Discharging,Not charging,Full
 				# don't use clean_unset because Not charging is a valid value.
 				elsif ($file eq 'status'){
 					$value = lc($value);
 					$value =~ s/unknown//;
-					
+				}
+				elsif ($file eq 'temp'){
+					$value = $value/10;
+				}
+				elsif ($file eq 'temp_alert_max'){
+					$value = $value/10;
+				}
+				elsif ($file eq 'temp_alert_min'){
+					$value = $value/10;
+				}
+				elsif ($file eq 'temp_max'){
+					$value = $value/10;
+				}
+				elsif ($file eq 'temp_min'){
+					$value = $value/10;
+				}
+				elsif ($file eq 'voltage_min_design'){
+					$value = $value/1000000;
+				}
+				elsif ($file eq 'voltage_now'){
+					$value = $value/1000000;
 				}
 			}
-			elsif ($b_root && -e $path && ! -r $path){
+			elsif (!$b_root && -e $path && ! -r $path){
 				$value = main::message('root-required');
 			}
 			$battery->{$id}{$file} = $value;
@@ -8319,48 +8570,16 @@ sub battery_data_sys {
 				$battery->{$id}{'purpose'} =  'device';
 			}
 		}
-		# note:voltage_now fluctuates, which will make capacity numbers change a bit
-		# if any of these values failed, the math will be wrong, but no way to fix that
-		# tests show more systems give right capacity/charge with voltage_min_design 
-		# than with voltage_now
-		if ($b_ma && $battery->{$id}{'voltage_min_design'}){
-			if ($battery->{$id}{'charge_now'}){
-				$battery->{$id}{'energy_now'} = $battery->{$id}{'charge_now'} * $battery->{$id}{'voltage_min_design'};
-			}
-			if ($battery->{$id}{'charge_full'}){
-				$battery->{$id}{'energy_full'} = $battery->{$id}{'charge_full'}*$battery->{$id}{'voltage_min_design'};
-			}
-			if ($battery->{$id}{'charge_full_design'}){
-				$battery->{$id}{'energy_full_design'} = $battery->{$id}{'charge_full_design'} * $battery->{$id}{'voltage_min_design'};
-			}
-		}
-		if ($battery->{$id}{'energy_now'} && $battery->{$id}{'energy_full'}){
-			$battery->{$id}{'capacity'} = 100 * $battery->{$id}{'energy_now'}/$battery->{$id}{'energy_full'};
-			$battery->{$id}{'capacity'} = sprintf("%.1f", $battery->{$id}{'capacity'});
-		}
-		if ($battery->{$id}{'energy_full_design'} && $battery->{$id}{'energy_full'}){
-			$battery->{$id}{'of_orig'} = 100 * $battery->{$id}{'energy_full'}/$battery->{$id}{'energy_full_design'};
-			$battery->{$id}{'of_orig'} = sprintf("%.1f", $battery->{$id}{'of_orig'});
-		}
-		if ($battery->{$id}{'energy_now'}){
-			$battery->{$id}{'energy_now'} = sprintf("%.1f", $battery->{$id}{'energy_now'});
-		}
-		if ($battery->{$id}{'energy_full_design'}){
-			$battery->{$id}{'energy_full_design'} = sprintf("%.1f",$battery->{$id}{'energy_full_design'});
-		}
-		if ($battery->{$id}{'energy_full'}){
-			$battery->{$id}{'energy_full'} = sprintf("%.1f", $battery->{$id}{'energy_full'});
-		}
 	}
 	print Data::Dumper::Dumper $battery if $dbg[33];
 	main::log_data('dump','sys: %$battery',$battery) if $b_log;
+	process_battery_data();
 	eval $end if $b_log;
 }
 
 sub battery_data_sysctl {
 	eval $start if $b_log;
-	my $battery = $_[0];
-	my ($id);
+	my $id;
 	for (@{$sysctl{'battery'}}){
 		if (/^(hw\.sensors\.)acpi([^\.]+)(\.|:)/){
 			$id = uc($2);
@@ -8407,48 +8626,19 @@ sub battery_data_sysctl {
 			}
 		}
 	}
-	# then do the condition/charge percent math
+	# then set to primary
 	for my $id (keys %$battery){
 		$battery->{$id}{'purpose'} = 'primary';
-		# CHARGE is Ah, which are converted to Wh by: Ah x voltage. 
-		if ($battery->{$id}{'voltage_min_design'}){
-			if ($battery->{$id}{'charge_now'}){
-				$battery->{$id}{'energy_now'} = $battery->{$id}{'charge_now'} * $battery->{$id}{'voltage_min_design'};
-			}
-			if ($battery->{$id}{'charge_full'}){
-				$battery->{$id}{'energy_full'} = $battery->{$id}{'charge_full'}*$battery->{$id}{'voltage_min_design'};
-			}
-			if ($battery->{$id}{'charge_full_design'}){
-				$battery->{$id}{'energy_full_design'} = $battery->{$id}{'charge_full_design'} * $battery->{$id}{'voltage_min_design'};
-			}
-		}
-		if ($battery->{$id}{'energy_full_design'} && $battery->{$id}{'energy_full'}){
-			$battery->{$id}{'of_orig'} = 100 * $battery->{$id}{'energy_full'}/$battery->{$id}{'energy_full_design'};
-			$battery->{$id}{'of_orig'} = sprintf("%.1f", $battery->{$id}{'of_orig'});
-		}
-		if ($battery->{$id}{'energy_now'} && $battery->{$id}{'energy_full'}){
-			$battery->{$id}{'capacity'} = 100 * $battery->{$id}{'energy_now'}/$battery->{$id}{'energy_full'};
-			$battery->{$id}{'capacity'} = sprintf("%.1f", $battery->{$id}{'capacity'});
-		}
-		if ($battery->{$id}{'energy_now'}){
-			$battery->{$id}{'energy_now'} = sprintf("%.1f", $battery->{$id}{'energy_now'});
-		}
-		if ($battery->{$id}{'energy_full'}){
-			$battery->{$id}{'energy_full'} = sprintf("%.1f", $battery->{$id}{'energy_full'});
-		}
-		if ($battery->{$id}{'energy_full_design'}){
-			$battery->{$id}{'energy_full_design'} = sprintf("%.1f", $battery->{$id}{'energy_full_design'});
-		}
 	}
 	print Data::Dumper::Dumper $battery if $dbg[33];
 	main::log_data('dump','dmi: %$battery',$battery) if $b_log;
+	process_battery_data();
 	eval $end if $b_log;
 }
 
 # note, dmidecode does not have charge_now or charge_full
 sub battery_data_dmi {
 	eval $start if $b_log;
-	my $battery = $_[0];
 	my ($id);
 	my $i = 0;
 	foreach my $row (@dmi){
@@ -8473,20 +8663,12 @@ sub battery_data_dmi {
 					$battery->{$id}{'model_name'} = main::clean_dmi($value[1])}
 				elsif ($value[0] eq 'Design Capacity'){
 					$value[1] =~ s/\s*mwh$//i;
-					$battery->{$id}{'energy_full_design'} = sprintf("%.1f", $value[1]/1000);
+					$battery->{$id}{'energy_full_design'} = $value[1]/1000;
 				}
 				elsif ($value[0] eq 'Design Voltage'){
 					$value[1] =~ s/\s*mv$//i;
-					$battery->{$id}{'voltage_min_design'} = sprintf("%.1f", $value[1]/1000);
+					$battery->{$id}{'voltage_min_design'} = $value[1]/1000;
 				}
-			}
-			if ($battery->{$id}{'energy_now'} && $battery->{$id}{'energy_full'}){
-				$battery->{$id}{'capacity'} = 100 * $battery->{$id}{'energy_now'} / $battery->{$id}{'energy_full'};
-				$battery->{$id}{'capacity'} = sprintf("%.1f%", $battery->{$id}{'capacity'});
-			}
-			if ($battery->{$id}{'energy_full_design'} && $battery->{$id}{'energy_full'}){
-				$battery->{$id}{'of_orig'} = 100 * $battery->{$id}{'energy_full'} / $battery->{$id}{'energy_full_design'};
-				$battery->{$id}{'of_orig'} = sprintf("%.0f%", $battery->{$id}{'of_orig'});
 			}
 		}
 		elsif ($row->[0] > 22){
@@ -8495,11 +8677,12 @@ sub battery_data_dmi {
 	}
 	print Data::Dumper::Dumper $battery if $dbg[33];
 	main::log_data('dump','dmi: %$battery',$battery) if $b_log;
+	process_battery_data();
 	eval $end if $b_log;
 }
 
 sub upower_data {
-	my ($id) = @_;
+	my $id = $_[0];
 	eval $start if $b_log;
 	my $data = {};
 	if (!$b_upower && $upower){
@@ -9367,25 +9550,29 @@ sub full_output {
 	if (($extra > 0 && !$show{'cpu-flag'}) || $show{'cpu-flag'}){
 		my @flags = ($cpu->{'flags'}) ? split(/\s+/, $cpu->{'flags'}) : ();
 		my $flag_key = (%risc || $bsd_type) ? 'Features': 'Flags';
-		my $flag = 'N/A';
+		my $flag_list = 'N/A';
 		if (!$show{'cpu-flag'}){
-			if (@flags){
-				# failure to read dmesg.boot: dmesg.boot permissions; then short -Cx list flags
-				@flags = grep {/^(dmesg.boot|permissions|avx[2-9]?|ht|lm|nx|pae|pni|(sss|ss)e([2-9])?([a-z])?(_[0-9])?|svm|vmx)$/} @flags;
-				@flags = map {s/pni/sse3/; $_} @flags if @flags;
-				@flags = sort @flags;
+			$flag_key .= '-basic' if !%risc;
+			# failure to read dmesg.boot: dmesg.boot permissions
+			if ($bsd_type && (@flags = grep {/^(dmesg.boot|permissions)$/} @flags)){
+				# do nothing, we're done, it's bad data
 			}
-			# only ARM has Features, never seen them for MIPS/PPC/SPARC/RISCV, but check
-			if ($risc{'arm'} && $flag eq 'N/A'){
-				$flag = main::message('arm-cpu-f');
+			# ARM/Loongson have Features, never seen them for MIPS/PPC/SPARC/RISCV, but check
+			elsif (%risc && @flags){
+				$flag_list = main::message('risc-cpu-f');
+				@flags = (); # dump it, we're not printing it
+			}
+			# not risc or bad bsd data, create the short list 
+			elsif (@flags) {
+				@flags = grep {/^(avx[2-9]?|ht|lm|nx|pae|pni|(sss|ss)e([2-9])?([a-z])?(_[0-9])?|svm|vmx)$/} @flags;
+				@flags = map {s/pni/sse3/; $_} @flags if @flags;
 			}
 		}
 		if (@flags){
-			@flags = sort @flags;
-			$flag = join(' ', @flags);
+			$flag_list = join(' ', sort @flags);
 		}
 		push(@$rows, {
-		main::key($num++,0,1,$flag_key) => $flag,
+		main::key($num++,0,1,$flag_key) => $flag_list,
 		},);
 	}
 	if ($b_admin){
@@ -9603,38 +9790,56 @@ sub set_fake_cpu_data {
 	# $ci = "$fake_data_dir/cpu/loongson/3A5000M-4-core-4.19.0.txt";
 	
 	## CPU CPUINFO/SYS PAIRS DATA FILES ##
+	## Android
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/android-pocom3-fake-cpuinfo.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/android-pocom3-fake-sys.txt";
+	## ARM
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/arm-pine64-cpuinfo-1.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/arm-pine64-sys-1.txt";
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/arm-riscyslack2-cpuinfo-1.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/arm-riscyslack2-sys-1.txt";
+	## Elbrus
+	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/elbrus-e16c-1-cpuinfo.txt";
+	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/elbrus-e16c-1-sys.txt";
+	## PPC
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/ppc-stuntkidz~cpuinfo.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/ppc-stuntkidz~sys.txt";
+	## RISCV
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/riscv-unmatched-2021~cpuinfo-1.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/riscv-unmatched-2021~sys-1.txt";
-	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/x86-brickwizard-atom-n270~cpuinfo-1.txt";
-	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/x86-brickwizard-atom-n270~sys-1.txt";
+	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/risc-v-spacemit-8-core-cpuinfo.txt";
+	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/risc-v-spacemit-8-core-sys.txt";
+	## Loongson
+	 $ci = "$fake_data_dir/cpu/sys-ci-pairs/loongson/loongson-3a5000-hv/cpuinfo.txt";
+	 $sys = "$fake_data_dir/cpu/sys-ci-pairs/loongson/loongson-3a5000-hv/cpu-sys.txt";
+	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/loongson/loongson-3a5000m/cpuinfo.txt";
+	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/loongson/loongson-3a5000m/cpu-sys.txt";
+	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/loongson/loongson-3c5000/cpuinfo.txt";
+	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/loongson/loongson-3c5000/cpu-sys.txt";
+	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/loongson/loongson-3d5000/cpuinfo.txt";
+	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/loongson/loongson-3d5000/cpu-sys.txt";
+	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/loongson/loongson-3a6000-hw/cpuinfo.txt";
+	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/loongson/loongson-3a6000-hw/cpu-sys.txt";
+	# AMD
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/x86-amd-phenom-chrisretusn-cpuinfo-1.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/x86-amd-phenom-chrisretusn-sys-1.txt";
-	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/x86-drgibbon-intel-i7-cpuinfo.txt";
-	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/x86-drgibbon-intel-i7-sys.txt";
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/ryzen-threadripper-1x64-3950x-cpuinfo.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/ryzen-threadripper-1x64-3950x-sys.txt";
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/amd-threadripper-1x12-5945wx-cpuinfo-1.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/amd-threadripper-1x12-5945wx-sys-1.txt";
+	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/amd-epyc-2x-16-core-4-die-cpuinfo-1.txt";
+	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/amd-epyc-2x-16-core-4-die-sys-1.txt";
+	# Intel
+	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/x86-brickwizard-atom-n270~cpuinfo-1.txt";
+	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/x86-brickwizard-atom-n270~sys-1.txt";
+	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/x86-drgibbon-intel-i7-cpuinfo.txt";
+	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/x86-drgibbon-intel-i7-sys.txt";
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/intel-i7-1165G7-4-core-no-smt-cpuinfo.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/intel-i7-1165G7-4-core-no-smt-sys.txt";
-	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/elbrus-e16c-1-cpuinfo.txt";
-	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/elbrus-e16c-1-sys.txt";
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/intel-raptor-lake-10-core-cpuinfo-1.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/intel-raptor-lake-10-core-sys-1.txt";
-	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/risc-v-spacemit-8-core-cpuinfo.txt";
-	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/risc-v-spacemit-8-core-sys.txt";
 	# $ci = "$fake_data_dir/cpu/sys-ci-pairs/intel-xeon-2x12-core-mt-cpuinfo-1.txt";
 	# $sys = "$fake_data_dir/cpu/sys-ci-pairs/intel-xeon-2x12-core-mt-sys-1.txt";
-	 $ci = "$fake_data_dir/cpu/sys-ci-pairs/amd-epyc-2x-16-core-4-die-cpuinfo-1.txt";
-	 $sys = "$fake_data_dir/cpu/sys-ci-pairs/amd-epyc-2x-16-core-4-die-sys-1.txt";
 	$fake_data{'cpuinfo'} = $ci;
 	$fake_data{'sys'} = $sys;
 }
@@ -9687,8 +9892,8 @@ sub cpuinfo_data_grabber {
 		main::log_data('dump','%cpuinfo_machine',\%cpuinfo_machine);
 	}
 	if ($dbg[41]){
-		print Data::Dumper::Dumper \@cpuinfo;
-		print Data::Dumper::Dumper \%cpuinfo_machine;
+		print 'cpuinfo: ', Data::Dumper::Dumper \@cpuinfo;
+		print 'cpuinfo_machine: ', Data::Dumper::Dumper \%cpuinfo_machine;
 	}
 	eval $end if $b_log;
 }
@@ -9722,7 +9927,7 @@ sub cpuinfo_data {
 		next if !$block;
 		if ($b_block_1){
 			$b_block_1 = 0;
-			# this may also kick in for centaur/via types, but no data available, guess
+			# this may also kick in for centaur/via/zhaoxin types. zhaoxin shows as centaur
 			if (!$cpu->{'type'} && $block->{'vendor_id'}){
 				$cpu->{'type'} = cpu_vendor($block->{'vendor_id'});
 			}
@@ -9747,11 +9952,14 @@ sub cpuinfo_data {
 						# print "p0:\n";
 					}
 				}
-				elsif ($cpu->{'model_name'} =~ /loongson|godson/i){
+				elsif ($risc{'loongson'} || $cpu->{'model_name'} =~ /loong|godson/i){
 					$cpu->{'type'} = 'loongson';
 				}
 				elsif ($risc{'mips'} || $cpu->{'model_name'} =~ /mips/i){
 					$cpu->{'type'} = 'mips';
+				}
+				elsif (!%risc && $cpu->{'model_name'} =~ /zhaoxin/i){
+					$cpu->{'type'} = 'zhaoxin';
 				}
 			}
 			$temp = main::get_defined($block->{'architecture'},
@@ -9761,11 +9969,14 @@ sub cpuinfo_data {
 					# translate integers to hex
 					$cpu->{'family'} = uc(sprintf("%x",$temp));
 				}
+				elsif ($risc{'loongson'}){
+					$cpu->{'family'} = $temp;
+				}
 				elsif ($risc{'arm'}){
 					$cpu->{'arch'} = $temp;
 				}
 			}
-			# note: stepping and ARM cpu revision are integers
+			# note: stepping and ARM cpu revision integers, loongson hex
 			$temp = main::get_defined($block->{'stepping'},$block->{'cpu revision'});
 			# can be 0, but can be 'unknown'
 			if (defined $temp || 
@@ -9816,7 +10027,7 @@ sub cpuinfo_data {
 				 $block->{'l3 cache size'} =~ /(\d+\s*[KMG])i?B?$/){
 					$cpu->{'l3-cache'} = main::translate_size($1);
 				}
-				$temp = main::get_defined($block->{'flags'} || $block->{'features'});
+				$temp = main::get_defined($block->{'flags'},$block->{'features'});
 				if ($temp){
 					$cpu->{'flags'} = $temp;
 				}
@@ -11637,6 +11848,8 @@ sub cp_cpu_arch {
 	# print "type:$type fam:$family model:$model step:$stepping\n";
 	# Note: AMD family is not Ext fam . fam but rather Ext-fam + fam.
 	# But model is Ext model . model...
+	# This is very confusing because cpuinfo shows say, family: 23 for 17h, aka 8F
+	# which gives: 8 + F = 23. hex of which is 17h
 	if ($type eq 'amd'){
 		if ($family eq '3'){
 			$arch = 'Am386';
@@ -11712,7 +11925,7 @@ sub cp_cpu_arch {
 				$year = '2003-14';}
 		}
 		# note: family F K8 needs granular breakdowns, was a long lived family
-		elsif ($family eq 'F'){
+		elsif ($family eq 'F'){ # F, aka 15
 			## verified 
 			# check: B|E|F
 			if ($model =~ /^(4|5|7|8|B|C|E|F)$/){
@@ -11740,7 +11953,7 @@ sub cp_cpu_arch {
 				$year = '2004-2008';}
 		}
 		# K9 was planned but skipped
-		elsif ($family eq '10'){ # 1F
+		elsif ($family eq '10'){ # 1F, aka 16
 			## verified
 			if ($model =~ /^(2)$/){
 				$arch = 'K10'; # 2:2:budapest;2:1,3:barcelona
@@ -11759,7 +11972,7 @@ sub cp_cpu_arch {
 		}
 		# very loose, all stepping 1: covers athlon x2, sempron, turion x2
 		# years unclear, could be 2005 start, or 2008
-		elsif ($family eq '11'){ # 2F
+		elsif ($family eq '11'){ # 2F, aka 17
 			if ($model =~ /^(3)$/){
 				$arch = 'K11 Turion X2'; # mix of K8/K10
 				$note = $check;
@@ -11767,7 +11980,7 @@ sub cp_cpu_arch {
 				$year = ''; } 
 		}
 		# might also need cache handling like 14/16
-		elsif ($family eq '12'){ # 3F
+		elsif ($family eq '12'){ # 3F, aka 18
 			if ($model =~ /^(1)$/){
 				$arch = 'K12 Fusion'; # K10 based apu, llano
 				$process = 'GF 32nm';
@@ -11778,7 +11991,7 @@ sub cp_cpu_arch {
 				$year = '2011';} # check years
 		}
 		# SOC, apu
-		elsif ($family eq '14'){ # 5F
+		elsif ($family eq '14'){ # 5F, aka 20
 			if ($model =~ /^(1|2)$/){
 				$arch = 'Bobcat';
 				$process = 'GF 40nm';
@@ -11788,7 +12001,7 @@ sub cp_cpu_arch {
 				$process = 'GF 40nm';
 				$year = '2011-13';}
 		}
-		elsif ($family eq '15'){ # 6F
+		elsif ($family eq '15'){ # 6F, aka 21
 			# note: only model 1 confirmd
 			if ($model =~ /^(0|1|3|4|5|6|7|8|9|A|B|C|D|E|F)$/){
 				$arch = 'Bulldozer';
@@ -11815,7 +12028,7 @@ sub cp_cpu_arch {
 				$year = '2011-12';}
 		}
 		# SOC, apu
-		elsif ($family eq '16'){ # 7F
+		elsif ($family eq '16'){ # 7F, aka 22
 			if ($model =~ /^(0|1|2|3|4|5|6|7|8|9|A|B|C|D|E|F)$/){
 				$arch = 'Jaguar';
 				$process = 'GF 28nm';
@@ -11829,7 +12042,7 @@ sub cp_cpu_arch {
 				$process = 'GF 28nm';
 				$year = '2013-14';}
 		}
-		elsif ($family eq '17'){ # 8F
+		elsif ($family eq '17'){ # 8F, aka 23
 			# can't find stepping/model for no ht 2x2 core/die models, only first ones
 			if ($model =~ /^(1|11|20)$/){
 				$arch = 'Zen';
@@ -11863,13 +12076,13 @@ sub cp_cpu_arch {
 				$year = '';}
 		}
 		# Joint venture between AMD and Chinese companies. Type amd? or hygon?
-		elsif ($family eq '18'){ # 9F
+		elsif ($family eq '18'){ # 9F, aka 24
 			# model 0, zen 1 
 			$arch = 'Zen (Hygon Dhyana)';
 			$gen = '1';
 			$process = 'GF 14nm';
 			$year = '';}
-		elsif ($family eq '19'){ # AF
+		elsif ($family eq '19'){ # AF, aka 25
 			# zen 4 raphael, phoenix 1 use n5 I believe
 			# Epyc Bergamo zen4c 4nm, only few full model IDs, update when appear
 			# zen4c is for cloud hyperscale
@@ -11904,7 +12117,7 @@ sub cp_cpu_arch {
 				$year = '2021-22';}
 		}
 		# Zen 5: TSMC n3/n4, epyc turin / granite ridge? / turin dense zen 5c 3nm
-		elsif ($family eq '20'){ # BF
+		elsif ($family eq '1A'){ # BF, aka 26
 			if ($model =~ /^(0)$/){
 				$arch = 'Zen 5';
 				$gen = '5';
@@ -11916,17 +12129,38 @@ sub cp_cpu_arch {
 				$process = 'TSMC n3 (3nm)'; # turin could be 4nm, need more data
 				$year = '2024+';}
 			# Strix Point; Granite Ridge; Krackan Point; Strix Halo
-			elsif ($model =~ /^(2.|4.|6.|7.)$/){
+			elsif ($model =~ /^[2-7].$/){
 				$arch = 'Zen 5';
 				$gen = '5';
 				$process = 'TSMC n4 (4nm)'; # desktop, granite ridge, confirm 2024
 				$year = '2024+';}
+			# seen: 90,A0,C0
+			elsif ($model =~ /^(9|[A-G]).$/){
+				$arch = 'Zen 6';
+				$note = '6';
+				$process = 'TSMC n2/n3 (2,3nm)';
+				$year = '2025+';}
 			else {
 				$arch = 'Zen 5';
 				$note = $check;
 				$process = 'TSMC n3/n4 (3,4nm)';
 				$year = '2024+';}
 		}
+		# note: no live data on zen 7 yet 
+		elsif ($family eq '1B'){ # CF, aka 27
+			$arch = 'Zen 7';
+			$note = $check;
+			$process = 'TSMC n2/n3 (2,3nm)';
+			$year = '2026+';
+		}
+		# this is a guess
+		elsif ($family eq '1D'){ # DF, aka 28
+			$arch = 'Zen 8';
+			$note = $check;
+			$process = 'TSMC a14 (1.4nm)';
+			$year = '2027+';
+		}
+		
 		# Roadmap: check to verify, AMD is usually closer to target than Intel
 		# Epyc 4 genoa: zen 4, nm, 2022+ (dec 2022), cxl-1.1,pcie-5, ddr-5
 	}
@@ -11983,18 +12217,16 @@ sub cp_cpu_arch {
 				elsif ($stepping <= 12){
 					$arch = 'Via Isaah';}
 				elsif ($stepping <= 13){
+					$arch = 'Via Isaah';}
+				# these are both stepping E
+				elsif ($stepping <= 14){
 					$arch = 'Via Eden';}
 				elsif ($stepping <= 14){
 					$arch = 'Zhaoxin ZX';}
-				$process = '90nm'; # guess
-				$year = '';} 
-		}
-		elsif ($family eq '7'){
-			if ($model =~ /^(1.|3.)$/){
-				$arch = 'Zhaoxin ZX';
-				$process = '90nm'; # guess
-				$year = '';
-			}
+					$process = '40nm'; 
+					$year = '2014';} 
+			elsif ($model =~ /^(47)$/){
+				$arch = 'Centaur CNS';}
 		}
 	}
 	# note, to test uncoment $cpu{'type'} = Elbrus in proc/cpuinfo logic
@@ -12433,6 +12665,15 @@ sub cp_cpu_arch {
 				$arch = 'Emerald Rapids'; # 5th gen xeon
 				$process = 'Intel 7 (10nm)';
 				$year = '2023+';}
+			elsif ($model =~ /^(D5)$/){
+				$arch = 'Wildcat Lake'; 
+				$process = 'Intel 18a (1.8nm)';
+				$year = '2025+';}
+			elsif ($model =~ /^(D7)$/){
+				$arch = 'Bartlett Lake'; 
+				$note = $check; # confirm process
+				$process = 'Intel 18a (1.8nm)';
+				$year = '2026+';}
 			elsif ($model =~ /^(DD)$/){
 				$arch = 'Clearwater Forest'; 
 				$process = 'Intel 18a (1.8nm)';
@@ -12530,27 +12771,27 @@ sub cp_cpu_arch {
 		# can't safely match model 1, but nobody will run inxi on that
 		# Not certain when SMIC took over from STM, which is a swiss firm.
 		if ($name =~ /\b2[BCE]\b/){
-			$arch = 'Godson';
+			$arch = 'Godson-1';
 			$process = 'STM 180nm';
 			$year = '2003-2006';}
 		elsif ($name =~ /\b1[ABCD]\b/){
-			$arch = 'Loongson-1';
+			$arch = 'Godson-1/Loongson-1';
 			$process = 'STM 130nm';
 			$year = '2010-2014';}
 		elsif ($name =~ /\b1C101/){
-			$arch = 'Loongson-1';
+			$arch = 'Godson-1/Loongson-1';
 			$process = 'STM 130nm';
 			$year = '2018';}
 		elsif ($name =~ /\b2F\b/){
-			$arch = 'Loongson-2';
+			$arch = 'Godson-2/Loongson-2';
 			$process = 'STM 90nm';
 			$year = '2007';}
 		elsif ($name =~ /\b2[GIH]\b/){
-			$arch = 'Loongson-2';
+			$arch = 'Godson-2/Loongson-2';
 			$process = 'STM 65nm';
 			$year = '2012-2013';}
 		elsif ($name =~ /\b2K(1000)?\b/){
-			$arch = 'Loongson-2';
+			$arch = 'Godson-2/Loongson-2';
 			$process = 'STM 40nm';
 			$year = '2017';}
 		elsif ($name =~ /3A1000/){
@@ -12581,10 +12822,71 @@ sub cp_cpu_arch {
 			$arch = 'Loongson-3/LoongArch';
 			$process = 'SMIC 12-14nm';
 			$year = '2021+';}
-		elsif ($name =~ /3[A-C]6000/){
+		elsif ($name =~ /3[D]5000/){
 			$arch = 'Loongson-3/LoongArch';
 			$process = 'SMIC 12-14nm';
 			$year = '2023+';}
+		elsif ($name =~ /3[AB]6000/){
+			$arch = 'Loongson-3/LoongArch';
+			$process = 'SMIC 12-14nm';
+			$year = '2023+';}
+		elsif ($name =~ /3[CD]6000/){
+			$arch = 'Loongson-3/LoongArch';
+			$process = 'SMIC 12-14nm';
+			$year = '2024+';}
+		elsif ($name =~ /3[A-D]7000/){
+			$arch = 'Loongson-3/LoongArch';
+			$process = 'SMIC 7nm';
+			$year = '2025+';}
+	}
+	# this is an x86_64 cpu so has full CPUID
+	elsif ($type eq 'zhaoxin'){
+		# family 1-6 was via and very early zhaoxin
+		if ($family eq '6'){
+			# no model IDs for first gen via clones
+			# A?000 KaiXian, A??000 Kaisheng;  Successor to via isiah 2
+			if ($model =~ /^\d$/){ # guess early
+				$arch = 'VIA-Isaiah2';
+				$process = 'TSMC 40nm';
+				$year = '2014+';}
+			# B3000 KaiXian, B3000 Kaisheng;  Successor to via isiah 2
+			elsif ($model =~ /^x$/){
+				$arch = 'VIA-Isaiah2';
+				$process = 'TSMC 40nm';
+				$year = '2014-15+';}
+			# C,C+4000 KaiXian, C+4000 Kaisheng;  Successor to via isiah 2
+			elsif ($model =~ /^([A-F]|1\d)$/){ # seen F, 19
+				$arch = 'ZhangJian';
+				$process = 'HLMC 28nm'; # also reported as TSMC
+				$year = '2015+';}
+			# D4600
+			elsif ($model =~ /^(1[A-F])$/){ # seen 1F
+				$arch = 'ZhangJian';
+				$process = 'HLMC 28nm'; # also reported as TSMC
+				$year = '2015+';}
+		}
+		elsif ($family eq '7'){
+			# KX5000 KaiXian, KH20000 Kaisheng, seen: 1B
+			if ($model =~ /^(.|1.)$/){ # seen B
+				$arch = 'WuDaoKou';
+				$process = 'HLMC 28nm'; # also reported as TSMC
+				$year = '2017+';}
+			# KX6000 KaiXian, KH30000 Kaisheng, seen: 3B
+			elsif ($model =~ /^3.$/){
+				$arch = 'LuJiaZui';
+				$process = 'TSMC 16nm';
+				$year = '2019+';}
+			# KH40000 Kaisheng
+			elsif ($model =~ /^(5.)$/){ # seen 5B for 40000
+				$arch = 'YongFeng'; #  世纪大道
+				$process = '16nm'; # smic?
+				$year = '2023+';}
+			# KZ,KX7000 KaiXian
+			elsif ($model =~ /^[67].$/){ # guess
+				$arch = 'Shijidadao';
+				$process = '7nm'; # smic,huawei 7nm?
+				$year = '2024+';}
+		}
 	}
 	eval $end if $b_log;
 	return [$arch,$note,$process,$gen,$year];
@@ -12800,15 +13102,15 @@ sub cpu_vendor {
 	my $string = $_[0];
 	my $vendor = '';
 	$string = lc($string);
-	if ($string =~ /intel/){
+	if ($string =~ /intel/i){
 		$vendor = "intel";
 	}
-	elsif ($string =~ /amd/){
+	elsif ($string =~ /amd/i){
 		$vendor = "amd";
 	}
-	# via/centaur/zhaoxin branding
-	elsif ($string =~ /centaur|zhaoxin/){
-		$vendor = "centaur";
+	# via/centaur/zhaoxin branding, but zhaoxin shows centaurhauls as vendor
+	elsif ($string =~ /(centaur|zhaoxin)/i){
+		$vendor = lc($1);
 	}
 	elsif ($string eq 'elbrus'){
 		$vendor = "elbrus";
@@ -14219,14 +14521,14 @@ sub set_disk_vendors {
 	['(\bINTEL\b|^(SSD(PAM|SA2)|HBR|(MEM|SSD)PEB?K|SSD(MCE|S[AC])))','\bINTEL\b','Intel',''], 
 	['^(Intel[\s_-]?)?SRCSAS?','^Intel','Intel RAID',''], 
 	# note: S[AV][1-9]\d can trigger false positives
-	['(K(ING)?STON|^(A400|ASTC|OM8P|RBU|S100\d\d|S[AV][1234]00|S[HMN]S|SK[CY]|SQ5|SS200|SVP|SS0|SUV|SNV|T52|T[ABY]29|Y29\d|Ultimate CF)|V100|DataTraveler|DT\s?(DUO|Microduo|101)|HyperX|13fe\b)','(KINGSTON|13fe)','Kingston',''], # maybe SHS: SHSS37A SKC SUV
+	['(K(ING)?STON|^(A29\d\d\d|A400|ASTC|OM8P|Fury|RBU|S100\d\d|S[AV][1234]00|S[HMN]S|SK[CY]|SQ5|SS200|SVP|SS0|SUV|SNV|T52|T[ABY]29|Y29\d|Ultimate CF)|V100|DataTraveler|DT\s?(DUO|Microduo|101)|HyperX|13fe\b)','(KINGSTON|13fe)','Kingston',''], # maybe SHS: SHSS37A SKC SUV
 	# must come before samsung MU. NOTE: toshiba can have: TOSHIBA_MK6475GSX: mush: MKNSSDCR120GB_
 	['(^MKN|Mushkin)','Mushkin','Mushkin',''], # MKNS
 	# MU = Multiple_Flash_Reader too risky: |M[UZ][^L] HD103SI HD start risky
 	# HM320II HM320II HM
-	['(SAMSUNG|^(AGN[BD]|AWMB|[BC]DS20|[BCD]WB|BJ[NT]|[BC]GND|CJ[NT]|CKT|CUT|[DG]3 Station|DUO\b|DUT|EB\dMW|E[CS]\d[A-Z]\d|ED2|EE4|FD\d[A-Z]\d|[GS]2 Portable|GE4|GN|HD\d{3}[A-Z]{2}$|(HM|SP)\d{2}|HS\d|KLUD|M[AB]G\d[FG]|MCC|MCBOE|MCG\d+GC|[CD]JN|MZ|^G[CD][1-9][QS]|P[BM]\d|(SSD\s?)?SM\s?841)|^SSD\s?[89]\d{2}\s(DCT|PRO|QVD|\d+[GT]B)|\bEVO\b|SV\d|[BE][A-Z][1-9]QT|YP\b|[CH]N-M|MMC[QR]E)','SAMSUNG','Samsung',''], # maybe ^SM, ^HM
+	['(SAMSUNG|^(A[GJ]N[BD]|AWMB|[BC]DS20|[BCD]WB|BJ[NT]|[BC]GND|CJ[NT]|CKT|CUT|[DG]3 Station|DUO\b|DUT|EB\dMW|E[CS]\d[A-Z]\d|ED2|EE4|FD\d[A-Z]\d|[GS]2 Portable|GE4|GN|HD\d{3}[A-Z]{2}$|(HM|SP)\d{2}|HS\d|KLUD|M[AB]G\d[FG]|MCC|MCBOE|MCG\d+GC|[CD]JN|MZ|^G[CD][1-9][QS]|P[BM]\d|(SSD\s?)?SM\s?841)|^SSD\s?[89]\d{2}\s(DCT|PRO|QVD|\d+[GT]B)|\bEVO\b|SV\d|[BE][A-Z][1-9]QT|YP\b|[CH]N-M|MMC[QR]E)','SAMSUNG','Samsung',''], # maybe ^SM, ^HM
 	# Android UMS Composite?U1
-	['(SanDisk|0781|^(A[BCD]LC[DE]|AFGCE|D[AB]4|DX[1-9]|Extreme|EZSD|Firebird|S[CD]\d{2}G|SB\d+G|SC\d{3,4}|SD(CF|S[S]?[ADQ]|SL\d+G|SU\d|U\d|\sUltra)|SDW[1-9]|SE\d{2}|SEM\d{2}|\d[STU]|U(3\b|1\d0))|Clip Sport|Cruzer|iXpand|SN(\d+G|128|256)|SSD (Plus|U1[01]0) [1-9]|SU(02|04|08|16|32|64)G|ULTRA\s(FIT|trek|II)|^X[1-6]\d{2})','(SanDisk|0781)','SanDisk',''],
+	['(SanDisk|0781|^(A[BCD]LC[DE]|AFGCE|D[AB]4|DX[1-9]|Extreme|EZSD|Firebird|MDG|S[CD]\d{2}G|SB\d+G|SC\d{3,4}|SD(CF|S[S]?[ADQ]|SL\d+G|SU\d|U\d|\sUltra)|SDW[1-9]|SE\d{2}|SEM\d{2}|\d[STU]|U(3\b|1\d0))|Clip Sport|Cruzer|iXpand|SN(\d+G|128|256)|SSD (Plus|U1[01]0) [1-9]|SU(02|04|08|16|32|64)G|ULTRA\s(FIT|trek|II)|^X[1-6]\d{2})','(SanDisk|0781)','SanDisk',''],
 	# these are HP/Sandisk cobranded. DX110064A5xnNMRI ids as HP and Sandisc
 	['(^DX[1-9])','^(HP\b|SANDDISK)','Sandisk/HP',''], # ssd drive, must come before seagate ST test
 	# real, SSEAGATE Backup+; XP1600HE30002 | 024 HN (spinpoint) ; possible usb: 24AS
@@ -14335,7 +14637,7 @@ sub set_disk_vendors {
 	['^BIOSTAR','^BIOSTAR','Biostar',''],
 	['^BIWIN','^BIWIN','BIWIN',''],
 	['^Blackpcs','^Blackpcs','Blackpcs',''],
-	['^(BlitzWolf|BW-?PSSD)','^BlitzWolf','BlitzWolf',''],
+	['^(BlitzWolf|BW)','^BlitzWolf','BlitzWolf',''],
 	['^(BlueCase|BS2N\d)','^BlueCase[\s-]?(Horizon)?','BlueCase Horizon',''],
 	['^(Blue[\s-]?Feather|BF\d)','^Blue[\s-]?Feather','Blue Feather',''],
 	['^(BlueRay|SDM\d)','^BlueRay','BlueRay',''],
@@ -14364,6 +14666,7 @@ sub set_disk_vendors {
 	['^CnMemory|Spaceloop','^CnMemory','CnMemory',''],
 	['^(Creative|(Nomad\s?)?MuVo)','^Creative','Creative',''],
 	['^CSD','^CSD','CSD',''],
+	['^(Cusu|CV\d\d\d)','^Cusu','Cusu',''], 
 	['^CYX\b','^CYX','CYX',''],
 	['^(Dane-?Elec|Z Mate)','^Dane-?Elec','DaneElec',''],
 	['^DATABAR','^DATABAR','DataBar',''],
@@ -14473,6 +14776,7 @@ sub set_disk_vendors {
 	# Wilk Elektronik SA, poland
 	['^((Wilk|WE)\s*)?(GOODRAM|GOODDRIVE|IR[\s-]?SSD|IRP|SSDPR|Iridium)','^GOODRAM','GOODRAM',''],
 	['^(Gost)','^Gost','Gost',''],
+	['^(Graviton)','^Graviton','Graviton-Enclosure',''],
 	['^(GreatWall|GW\d{3})','^GreatWall','GreatWall',''],
 	['^(GreenHouse|GH\b)','^GreenHouse','GreenHouse',''],
 	['^Gritronix','^Gritronixx?','Gritronix',''],
@@ -14497,6 +14801,7 @@ sub set_disk_vendors {
 	['^(HMZM)','^HMZM','HMZM',''],
 	['^Hoodisk','^Hoodisk','Hoodisk',''],
 	['^(HRUIYL)','^HRUIYL','HRUIYL',''],
+	['^(HUADISK|HY)','^HUADISK','HUADISK',''],
 	['^(HUAWEI|HWE)','^HUAWEI','Huawei',''],
 	['^Hypertec','^Hypertec','Hypertec',''],
 	['^HyperX','^HyperX','HyperX',''],
@@ -14515,7 +14820,7 @@ sub set_disk_vendors {
 	['^(Infokit)','^Infokit','Infokit',''],
 	# note: Initio default controller, means master/slave jumper is off/wrong, not a vendor
 	['^Inland','^Inland','Inland',''],
-	['^(InnoDisk|DEM\d|Innolite|SATA\s?Slim|DRPS)','^InnoDisk( Corp.)?','InnoDisk',''],
+	['^(InnoDisk|DEM\d|EverGreen|Innolite|SATA\s?Slim|DRPS)','^InnoDisk( Corp.)?','InnoDisk',''],
 	['(Innostor|1f75)','(Innostor|1f75)','Innostor',''],
 	['(^Innovation|Innovation\s?IT)','Innovation(\s*IT)?','Innovation IT',''],
 	['^Innovera','^Innovera','Innovera',''],
@@ -14547,7 +14852,7 @@ sub set_disk_vendors {
 	['(Kaizen|KZ\d\d)','Kaizen','Kaizen',''],
 	['^Kazuk','^Kazuk','Kazuk',''],
 	['(\bKDI\b|^OM3P)','\bKDI\b','KDI',''],
-	['^KEEPDATA','^KEEPDATA','KeepData',''],
+	['^(KEEPDATA|KD)','^KEEPDATA','KeepData',''],
 	['^KLLISRE','^KLLISRE','KLLISRE',''],
 	['^KimMIDI','^KimMIDI','KimMIDI',''],
 	['^Kimtigo','^Kimtigo','Kimtigo',''],
@@ -14558,6 +14863,7 @@ sub set_disk_vendors {
 	['(KingDian|^NGF|S(280|400))','KingDian','KingDian',''],
 	['^(Kingfast|TYFS|2710)','^Kingfast','Kingfast',''],
 	['^KingMAX','^KingMAX','KingMAX',''],
+	['^(KingPrice|KP)','^KingPrice','KingPrice',''],
 	['^Kingrich','^Kingrich','Kingrich',''],
 	['^Kingsand','^Kingsand','Kingsand',''],
 	['KING\s?SHA\s?RE','KING\s?SHA\s?RE','KingShare',''],
@@ -14573,10 +14879,12 @@ sub set_disk_vendors {
 	['^(KNUP|KP\b)','^KNUP','KNUP',''],
 	['^(Kodak|Memory\s?Saver)','^Kodak','Kodak',''],
 	['^(KOOTION|X12)','^KOOTION','KOOTION',''],
+	['^(Kowin|KW)','^Kowin','Kowin',''],
 	['^(KUAIKAI|MSAM)','^KUAIKAI','KuaKai',''],
 	['(KUIJIA|DAHUA)','^KUIJIA','KUIJIA',''],
 	['^KUNUP','^KUNUP','KUNUP',''],
 	['^KUU','^KUU\b','KUU',''], # KUU-128GB
+	['^(Kioxia|KYO)','^Kioxia','Kioxia',''],
 	['^(Lacie|P92|itsaKey|iamaKey)','^Lacie','LaCie',''],
 	['^LANBO','^LANBO','LANBO',''],
 	['^LankXin','^LankXin','LankXin',''],
@@ -14616,6 +14924,7 @@ sub set_disk_vendors {
 	['^MARVELL','^MARVELL','Marvell',''],
 	['^Maxsun','^Maxsun','Maxsun',''],
 	['^(McQuest)','^McQuest([\s-]?Digital)?','McQuest Digital',''],
+	['^(MCTECH)','^MCTECH','MCTECH',''],
 	['^MDT\b','^MDT','MDT (rebuilt WD/Seagate)',''], # mdt rebuilds wd/seagate hdd
 	# MD1TBLSSHD, careful with this MD starter!!
 	['^MD[1-9]','^Max\s*Digital','MaxDigital',''],
@@ -14624,6 +14933,7 @@ sub set_disk_vendors {
 	['^(MEDIAMAX|WL\d{2})','^MEDIAMAX','MediaMax',''],
 	['^(Memorex|TravelDrive|TD\s?Classic)','^Memorex','Memorex',''],
 	['^Mengmi','^Mengmi','Mengmi',''],
+	['^MLD','^MLD','MLD',''],
 	['^MGTEC','^MGTEC','MGTEC',''],
 	['^MicroFrom','^MicroFrom','MicroFrom',''],
 	['^(MILLENNIUM[\s-]?TECHNOLOGY|MIL\d\d)','^MILLENNIUM[\s-]?TECHNOLOGY','Millenium Technology',''],
@@ -14672,6 +14982,7 @@ sub set_disk_vendors {
 	['(Origin|Inception|^TLC\d)','^Origin','Origin',''],
 	['^Ortial','^Ortial','Ortial',''],
 	['^OSC','^OSC\b','OSC',''],
+	['^OV','^OV','OV',''],
 	['^(Ovation)','^Ovation','Ovation',''],
 	['^oyunkey','^oyunkey','Oyunkey',''],
 	['^PALIT','PALIT','Palit',''], # ssd 
@@ -14682,7 +14993,7 @@ sub set_disk_vendors {
 	['^PERC\b','','Dell PowerEdge RAID Card',''], # ssd
 	['(\bPhilips)','\bPhilips','Philips',''],
 	['(PHISON[\s-]?|ESR\d|PS[5E]|311CD|\bSSG\d\d)','PHISON[\s-]?','Phison',''],# E12-256G-PHISON-SSD-B3-BB1
-	['^(Pichau[\s-]?Gaming|PG\d{2})','^Pichau[\s-]?Gaming','Pichau Gaming',''],
+	['^(Pichau|PG\d{2}|PCH[-s_-])','^Pichau[\s-]?(Gaming)?','Pichau',''],
 	['^Pioneer','Pioneer','Pioneer',''],
 	['^Platinet','Platinet','Platinet',''],
 	['^(PLEXTOR|PX-)','^PLEXTOR','Plextor',''],
@@ -14751,8 +15062,9 @@ sub set_disk_vendors {
 	['^(SMART( Storage Systems)?|TX)','^(SMART( Storage Systems)?)','Smart Storage Systems',''],
 	['^Sobetter','^Sobetter','Sobetter',''],
 	['^Solidata','^Solidata','Solidata',''],
-	['^(SOLIDIGM|SSDPFK)','^SOLIDIGM\b','solidgm',''],
+	['^(SOLIDIGM|SSDPFK|P41PL)','^SOLIDIGM\b','Solidgm',''],
 	['^(Sony|IM9|Microvalut|S[FR]-)','^Sony','Sony',''],
+	['^Speed[\s_-]?Star','^Speed[\s_-]?Star','Speed Star',''],
 	# Note: SSC can be prefix for several companies
 	['^SSK\b','^SSK','SSK',''],
 	['^(SSSTC|CL1-)','^SSSTC','SSSTC',''],
@@ -14781,6 +15093,7 @@ sub set_disk_vendors {
 	['^(TDK|TF[1-9]\d|LoR)','^TDK','TDK',''],
 	['(^TEAC|\bUF00)','^TEAC','TEAC',''],
 	['^(TEAM|T[\s-]?Create|CX[12]\b|L\d\s?Lite|T\d{3,}[A-Z]|TM\d|(Dark\s?)?L3\b|T[\s-]?Force)','^TEAM(\s*Group)?','TeamGroup',''],
+	['^(Techbyte|TEC[\s_-])','^Techbyte','Techbyte',''],
 	['^(Teclast|CoolFlash)','^Teclast','Teclast',''],
 	['^(tecmiyo)','^tecmiyo','TECMIYO',''],
 	['^Teelkoou','^Teelkoou','Teelkoou',''],
@@ -14797,11 +15110,12 @@ sub set_disk_vendors {
 	['^TopSunligt','^TopSunligt','TopSunligt',''], # is this a typo? hard to know
 	['^TopSunlight','^TopSunlight','TopSunlight',''],
 	['^TOROSUS','^TOROSUS','Torosus',''],
-	['(Transcend|^((SSD\s|F)?TS|ESD\d|EZEX|USDU)|1307|JetDrive|JetFlash)','\b(Transcend|1307)\b','Transcend',''], 
+	['(Transcend|^((ATA\s|SSD\s|F)?TS|ESD\d|EZEX|USDU)|1307|JetDrive|JetFlash)','\b(Transcend|1307)\b','Transcend',''], 
 	['^(TrekStor|DS (maxi|pocket)|DataStation)','^TrekStor','TrekStor',''],
 	['^Turbox','^Turbox','Turbox',''],
 	['^TurXun','^TurXun','TurXun',''],
 	['^(TwinMOS|TW\d)','^TwinMOS','TwinMOS',''],
+	['^(TWSC|TSC\d)','^TWSC','TWSC',''],
 	# note: udisk means usb disk, it's not a vendor ID
 	['^UDinfo','^UDinfo','UDinfo',''],
 	['^UMAX','^UMAX','UMAX',''],
@@ -14829,6 +15143,7 @@ sub set_disk_vendors {
 	['^(Visipro|SDVP)','^Visipro','Visipro',''],
 	['^VISIONTEK','^VISIONTEK','VisionTek',''],
 	['^VMware','^VMware','VMware',''],
+	['^(VSP)','^VSP[\s_-]?Tech(nology)?','VSP Technology',''],
 	['^(Vseky|Vaseky|V8\d{2})','^Vaseky','Vaseky',''], # ata-Vseky_V880_350G_
 	['^(Walgreen|Infinitive)','^Walgreen','Walgreen',''],
 	['^Walram','^Walram','WALRAM',''],
@@ -14840,7 +15155,7 @@ sub set_disk_vendors {
 	['^(wicgtyp|[MN][V]?900)','^wicgtyp','wicgtyp',''],
 	['^Wilk','^Wilk','Wilk',''],
 	['^(WinMemory|SW[GR]\d)','^WinMemory','WinMemory',''],
-	['^(Winton|WT\d{2})','^Winton','Winton',''],
+	['^(Winten|WT(\d{2}|M2))','^Winten','Winten',''],
 	['^(WISE)','^WISE','WISE',''],
 	['^WPC','^WPC','WPC',''], # WPC-240GB
 	['^(Wortmann(\sAG)?|Terra\s?US)','^Wortmann(\sAG)?','Wortmann AG',''],
@@ -18448,7 +18763,7 @@ sub set_amd_data {
 	'years' => '2022+',
 	},
 	{'arch' => 'RDNA-3',
-	'ids' => '73f0|7480|7481|7483|7487|7489|748b|7499',
+	'ids' => '73f0|7480|7481|7483|7487|7489|748b|7499|749f',
 	'code' => 'Navi-3x',
 	'process' => 'TSMC n6 (6nm)',
 	'years' => '2023+',
@@ -18458,6 +18773,12 @@ sub set_amd_data {
 	'code' => 'Phoenix',
 	'process' => 'TSMC n4 (4nm)',
 	'years' => '2023+',
+	},
+	{'arch' => 'RDNA-4',
+	'ids' => '7550|7551|7590',
+	'code' => 'Navi-4x',
+	'process' => 'TSMC n4 (4nm)',
+	'years' => '2025+',
 	},
 	{'arch' => 'CDNA-1',
 	'ids' => '7388|738c|738e',
@@ -18472,7 +18793,7 @@ sub set_amd_data {
 	'years' => '2021-22+',
 	},
 	{'arch' => 'CDNA-3',
-	'ids' => '74a0|74a1|74a2|74a5|74a9|74b5|74bd',
+	'ids' => '74a0|74a1|74a2|74a5|74a9|74b5|74b9|74bd',
 	'code' => 'Instinct-MI3xx',
 	'process' => 'TSMC n5 (5nm)',
 	'years' => '2023+',
@@ -18576,8 +18897,9 @@ sub set_intel_data {
 	'years' => '2012-13',
 	},
 	{'arch' => 'Gen-8',
-	'ids' => '1602|1606|160a|160b|160d|160e|1612|1616|161a|161b|161d|161e|1622|' .
-	'1626|162a|162b|162d|162e|1632|1636|163a|163b|163d|163e|22b0|22b1|22b2|22b3',
+	'ids' => '0d22|1602|1606|160a|160b|160d|160e|1612|1616|161a|161b|161d|161e|' .
+	'1622|1626|162a|162b|162d|162e|1632|1636|163a|163b|163d|163e|22b0|22b1|22b2|' .
+	'22b3',
 	'code' => '',
 	'process' => 'Intel 14nm',
 	'years' => '2014-15',
@@ -18602,9 +18924,9 @@ sub set_intel_data {
 	},
 	# gen10 was cancelled.
 	{'arch' => 'Gen-11',
-	'ids' => '0d16|0d26|0d36|4541|4551|4555|4557|4571|4e51|4e55|4e57|4e61|4e71|' .
-	'8a50|8a51|8a52|8a53|8a54|8a56|8a57|8a58|8a59|8a5a|8a5b|8a5c|8a5d|8a70|8a71|' .
-	'9840|9841',
+	'ids' => '0d12|0d16|0d26|0d36|4541|4551|4555|4557|4571|4e51|4e55|4e57|4e61|' .
+	'4e71|8a50|8a51|8a52|8a53|8a54|8a56|8a57|8a58|8a59|8a5a|8a5b|8a5c|8a5d|8a70|' .
+	'8a71|9840|9841',
 	'code' => '',
 	'process' => 'Intel 10nm',
 	'years' => '2019-21',
@@ -18652,21 +18974,28 @@ sub set_intel_data {
 	'years' => '2023+',
 	},
 	{'arch' => 'Xe2',
-	'ids' => 'e202|e20b|e20c|e20d|e210|e212|e215|e216',
+	'ids' => 'e202|e20b|e20c|e20d|e210|e211|e212|e215|e216',
 	'code' => '',
 	'process' => 'TSMC n4 (4nm)',
 	'years' => '2024+',
 	},
 	{'arch' => 'Xe2',
-	'ids' => '6420|64a0|64b0|b080|b081|b082|b083|b08f|b090|b0a0|b0b0',
+	'ids' => '6420|64a0|64b0',
 	'code' => '',
 	'process' => 'TSMC n3 (3nm)',
 	'years' => '2024+',
 	},
-	{'arch' => 'Xe-LPG',
+	{'arch' => 'Xe2-LPG',
 	'ids' => '7d41|7d51|7d67|7dd1|b640',
 	'code' => '',
-	'process' => 'TSMC 3nm?',
+	'process' => 'TSMC n3 (3nm)',
+	'years' => '2025+',
+	},
+	{'arch' => 'Xe3',
+	'ids' => 'b080|b081|b082|b083|b084|b085|b086|b087|b08f|b090|b0a0|b0b0|fd80|' .
+	'fd81',
+	'code' => '',
+	'process' => 'TSMC 18A',
 	'years' => '2025+',
 	},
 	];
@@ -18900,7 +19229,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 28nm',
 	'release' => '',
-	'series' => '550-570.xx+',
+	'series' => '550-580.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2014-2019',
@@ -18917,7 +19246,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 16nm',
 	'release' => '',
-	'series' => '550-570.xx+',
+	'series' => '550-580.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2016-2021',
@@ -18929,25 +19258,25 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 12nm',
 	'release' => '',
-	'series' => '550-570.xx+',
+	'series' => '550-580.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2017-2020',
 	},
 	{'arch' => 'Turing',
 	'ids' => '1e02|1e04|1e07|1e09|1e30|1e36|1e78|1e81|1e82|1e84|1e87|1e89|1e90|' .
-	'1e91|1e93|1eb0|1eb1|1eb5|1eb6|1ec2|1ec7|1ed0|1ed1|1ed3|1ef5|1f02|1f03|1f06|' .
-	'1f07|1f08|1f0a|1f0b|1f10|1f11|1f12|1f14|1f15|1f36|1f42|1f47|1f50|1f51|1f54|' .
-	'1f55|1f76|1f82|1f83|1f91|1f95|1f96|1f97|1f98|1f99|1f9c|1f9d|1f9f|1fa0|1fb0|' .
-	'1fb1|1fb2|1fb6|1fb7|1fb8|1fb9|1fba|1fbb|1fbc|1fdd|1ff0|1ff2|1ff9|2182|2184|' .
-	'2187|2188|2189|2191|2192|21c4|21d1|25a6|25a7|25a9|25aa|25ad|25ed|28b0|28b8|' .
-	'28f8',
+	'1e91|1e93|1eb0|1eb1|1eb5|1eb6|1eb8|1ec2|1ec7|1ed0|1ed1|1ed3|1ef5|1f02|1f03|' .
+	'1f06|1f07|1f08|1f0a|1f0b|1f10|1f11|1f12|1f14|1f15|1f36|1f42|1f47|1f50|1f51|' .
+	'1f54|1f55|1f76|1f82|1f83|1f91|1f95|1f96|1f97|1f98|1f99|1f9c|1f9d|1f9f|1fa0|' .
+	'1fb0|1fb1|1fb2|1fb6|1fb7|1fb8|1fb9|1fba|1fbb|1fbc|1fdd|1ff0|1ff2|1ff9|2182|' .
+	'2184|2187|2188|2189|2191|2192|21c4|21d1|25a6|25a7|25a9|25aa|25ad|25ed|28b0|' .
+	'28b8|28f8',
 	'code' => 'TUxxx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC 12nm FF',
 	'release' => '',
-	'series' => '550-570.xx+',
+	'series' => '550-580.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2018-2022',
@@ -18959,13 +19288,13 @@ sub set_nv_data {
 	'24b1|24b6|24b7|24b8|24b9|24ba|24bb|24c7|24c9|24dc|24dd|24e0|24fa|2503|2504|' .
 	'2507|2508|2520|2521|2523|2531|2544|2560|2563|2571|2582|2584|25a0|25a2|25a5|' .
 	'25ab|25ac|25b0|25b2|25b6|25b8|25b9|25ba|25bb|25bc|25bd|25e0|25e2|25e5|25ec|' .
-	'25f9|25fa|25fb|2822|2838|28a3',
+	'25f9|25fa|25fb|2822|2838|28a3|28e3',
 	'code' => 'GAxxx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC n7 (7nm)',
 	'release' => '',
-	'series' => '550-570.xx+',
+	'series' => '550-580.xx+',
 	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
 	'xorg' => '',
 	'years' => '2020-2023',
@@ -18977,7 +19306,7 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC n4 (5nm)',
 	'release' => '',
-	'series' => '550-570.xx+',
+	'series' => '550-580.xx+',
 	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2022+',
@@ -18986,25 +19315,27 @@ sub set_nv_data {
 	'ids' => '2684|2685|2689|26b1|26b2|26b3|26b5|26b9|26ba|2702|2704|2705|2709|' .
 	'2717|2730|2757|2770|2782|2783|2786|2788|27a0|27b0|27b1|27b2|27b6|27b8|27ba|' .
 	'27bb|27e0|27fb|2803|2805|2808|2820|2860|2882|28a0|28a1|28b0|28b9|28ba|28bb|' .
-	'28e0|28e1|2b85|2b87|2c02',
+	'28e0|28e1|2b85|2b87|2b8c|2c02|2c05|2c18|2c19|2c58|2c59|2d04|2d05|2d18|2d19|' .
+	'2d58|2d59|2d83|2d98|2dd8|2f04|2f18|2f58',
 	'code' => 'AD1xx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC n4 (5nm)',
 	'release' => '',
-	'series' => '550-570.xx+',
+	'series' => '550-580.xx+',
 	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2022+',
 	},
 	{'arch' => 'Blackwell',
-	'ids' => '2901',
+	'ids' => '2901|2941|2bb1|2bb3|2bb4|2bb5|2c31|2c33|2c34|2c38|2c39|2d30|2d39|' .
+	'2db8|2db9|2f38',
 	'code' => 'GB2xx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC 4np (5nm)',
 	'release' => '',
-	'series' => '550-570.xx+',
+	'series' => '550-580.xx+',
 	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2024+',
@@ -20150,7 +20481,7 @@ sub machine_output {
 	}
 	$bios_date ||= 'N/A';
 	if ($extra > 1 && $data->{'bios_romsize'}){
-		$bios_romsize = $data->{'bios_romsize'};
+		$bios_romsize = main::get_size($data->{'bios_romsize'},'string');
 	}
 	$rows->[$j]{main::key($num++,1,1,'Mobo')} = $mobo_vendor;
 	$rows->[$j]{main::key($num++,1,2,'model')} = $mobo_model;
@@ -20535,7 +20866,12 @@ sub machine_data_dmi {
 					elsif ($value[0] eq 'Version'){
 						$data->{'bios_version'} = main::clean_dmi($value[1]) }
 					elsif ($value[0] eq 'ROM Size'){
-						$data->{'bios_romsize'} = main::clean_dmi($value[1]) }
+						$data->{'bios_romsize'} = main::clean_dmi($value[1]);
+						# Translate to KiB
+						if ($data->{'bios_romsize'} =~ /(\d+\s*[kKMG])i?B?$/){
+							$data->{'bios_romsize'} = main::translate_size($1);
+						}
+					}
 					elsif ($value[0] eq 'BIOS Revision'){
 						$data->{'bios_rev'} = main::clean_dmi($value[1]) }
 				}
@@ -25590,6 +25926,7 @@ sub set_ram_vendors {
 	['^(AX[\d]{4}|Axiom)','Axiom','Axiom',''],
 	['^(BD\d|Black[s-]?Diamond)','Black[s-]?Diamond','Black Diamond',''],
 	['^(-BN$|Brute[s-]?Networks)','Brute[s-]?Networks','Brute Networks',''],
+	['^(CXMT|ChangXin)','ChangXin([s-]?Memory[s-]?Technologies)?','CXMT',''],
 	['^(CM|Corsair)','Corsair','Corsair',''],
 	['^(CT\d|BL|Crucial)','Crucial','Crucial',''],
 	['^(CY|Cypress)','Cypress','Cypress',''],
@@ -30073,7 +30410,7 @@ sub set_dboot_data {
 {
 package DesktopData;
 my ($b_dbg_de,$desktop_session,$gdmsession,$kde_full_session,
-$kde_session_version,$tk_test,$xdg_desktop,@data,%xprop);
+$kde_session_version,$tk_test,$windowmanager,$xdg_desktop,@data,%xprop);
 my $desktop = [];
 
 sub get {
@@ -30287,11 +30624,13 @@ sub de_kde_tde_data {
 		$kded = $program;
 		$kded_name = 'kded';
 	}
-	# note: if TDM is used to start kde, can pass ps tde test
+	# note: if TDM is used to start kde, can pass ps tde test. To avoid this,
+	# in some cases WINDOWMANAGER is set with starttde|startkde|startplasma
 	if ($desktop_session eq 'trinity' || $xdg_desktop eq 'trinity' || 
-	(!$desktop_session && !$xdg_desktop && @{$ps_data{'de-ps-detect'}} && 
-	(grep {/^tde/} @{$ps_data{'de-ps-detect'}}))){
-		# 14.2 moved kdesktop to location not in PATH in some distros, so either of these will fail
+	$windowmanager =~ /starttde/ ||
+	(!$desktop_session && !$xdg_desktop && $windowmanager !~ /start(kde|plasma)/ && 
+	@{$ps_data{'de-ps-detect'}} && (grep {/^tde/} @{$ps_data{'de-ps-detect'}}))){
+		# 14.2 moved kdesktop to location not in PATH in some distros, so eithe# start of these will fail
 		if (($program = main::check_program('kdesktop')) || 
 		($program = main::check_program('twin'))){
 			($desktop->[0],$desktop->[1],$v_data) = ProgramData::full('kdesktop-trinity',$program,0,'raw');
@@ -30308,8 +30647,10 @@ sub de_kde_tde_data {
 	# KDE_SESSION_VERSION is the integer version of the desktop
 	# NOTE: as of plasma 5, the tool: about-distro MAY be available, that will show
 	# actual desktop data, so once that's in debian/ubuntu, if it gets in, add that test
+	# corner case root start, all env variables empty except WINDOWMANAGER
 	elsif ($desktop_session eq 'kde-plasma' || $desktop_session eq 'plasma' || 
-	$xdg_desktop eq 'kde' || $kde_session_version){
+	$xdg_desktop eq 'kde' || $kde_session_version || 
+	($windowmanager && $windowmanager =~ /start(kde|plasma)/)){
 		# KDE <= 4
 		if ($kde_session_version && $kde_session_version <= 4){
 			if ($program = main::check_program($kded_name)){
@@ -30839,6 +31180,7 @@ sub set_env_data {
 	$kde_session_version = ($ENV{'KDE_SESSION_VERSION'}) ? $ENV{'KDE_SESSION_VERSION'} : '';
 	# for fallback to fallback protections re false gnome id
 	$gdmsession = ($ENV{'GDMSESSION'}) ? clean_env($ENV{'GDMSESSION'}) : '';
+	$windowmanager = ($ENV{'WINDOWMANAGER'}) ? clean_env($ENV{'WINDOWMANAGER'}) : '';
 	main::feature_debugger('desktop-scalars',
 	['$desktop_session: ' . $desktop_session,
 	'$xdg_desktop: ' . $xdg_desktop,
@@ -33008,6 +33350,7 @@ sub debian_id {
 		'12' => 'bookworm', 
 		'13' => 'trixie',
 		'14' => 'forky',
+		'15' => 'duke',
 		);
 	}
 	else {
@@ -33020,7 +33363,7 @@ sub debian_id {
 		'5' => 'daedalus', # bookworm
 		'6' => 'excalibur',# trixie
 		'7' => 'freia',    # forky
-		# '' => 'ceres/daedalus',    # sid/unstable
+		# '' => 'ceres',    # sid/unstable
 		);
 	}
 	# debian often numeric, devuan usually not
@@ -33063,10 +33406,12 @@ sub ubuntu_id {
 	my ($id) = ('');
 	# xx.04, xx.10
 	my %codenames = (
-	# '??' => '26.04',
-	# '??' => '25.10',
-	# '??' => '25.04',
-	# '??' => '24.10',
+	# '??' => '27.04',
+	# '??' => '26.10',
+	# '??' => '26.04 LTS',
+	'questing' => '25.10',
+	'plucky' => '25.04',
+	'oracular' => '24.10',
 	'noble' => '24.04 LTS',
 	'mantic' => '23.10',
 	'lunar' => '23.04',
