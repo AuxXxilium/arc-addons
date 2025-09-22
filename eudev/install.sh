@@ -26,9 +26,8 @@ elif [ "${1}" = "modules" ]; then
     exit 1
   }
   echo "Triggering add events to udev"
-  udevadm trigger --type=subsystems --action=add
-  udevadm trigger --type=devices --action=add
-  udevadm trigger --type=devices --action=change
+  udevadm trigger --action=add
+  udevadm trigger --action=change
   udevadm settle --timeout=30 || echo "udevadm settle failed"
   # Give more time
   sleep 10
@@ -102,7 +101,7 @@ elif [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   {
     echo "[Unit]"
-    echo "Description=RR addon udev daemon"
+    echo "Description=udev daemon"
     echo
     echo "[Service]"
     echo "Type=oneshot"
