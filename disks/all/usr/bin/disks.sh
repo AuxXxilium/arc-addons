@@ -31,7 +31,7 @@ __set_conf_kv() {
 # Check if the user has customized the key
 # Args: $1 key
 _check_user_conf() {
-  [ -f "/addons/synoinfo.conf" ] && UCONF="/addons/synoinfo.conf" || UCONF="/usr/rr/addons/synoinfo.conf"
+  [ -f "/addons/synoinfo.conf" ] && UCONF="/addons/synoinfo.conf" || UCONF="/usr/arc/addons/synoinfo.conf"
   grep -Eq "^${1}=" "${UCONF}" 2>/dev/null
 }
 
