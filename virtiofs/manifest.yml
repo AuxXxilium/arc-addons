@@ -1,0 +1,23 @@
+version: 1
+name: virtiofs
+description: "Auto-mount virtio9p and virtiofs file systems (effective after rebooting post initial storage space creation)."
+system: false
+beta: true
+target: system
+all:
+  install-script: "install.sh"
+  copy: ""
+apollolake: true
+broadwell: true
+broadwellnk: true
+broadwellnkv2: true
+broadwellntbap: true
+denverton: true
+geminilake: true
+geminilakenk: true
+purley: true
+v1000: true
+v1000nk: true
+r1000: true
+r1000nk: true
+epyc7002: true

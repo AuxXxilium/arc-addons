@@ -66,24 +66,25 @@ sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"
 
+CARDN=$(ls -d /sys/class/drm/card* 2>/dev/null | head -1)
+if [ -d "${CARDN}" ]; then
+  PCIDN="$(awk -F= '/PCI_SLOT_NAME/ {print $2}' "${CARDN}/device/uevent" 2>/dev/null)"
+  LNAME="$(lspci -s ${PCIDN:-"99:99.9"} 2>/dev/null | sed "s/.*: //")"
+  # LABLE="$(cat "/sys/class/drm/card0/device/label" 2>/dev/null)"
+  CLOCK="$(cat "${CARDN}/gt_max_freq_mhz" 2>/dev/null) MHz"
+  MEMORY="$(awk '{s=(strtonum($2)-strtonum($1)+1)/1048576} (and(strtonum($3),0x200))&&(and(strtonum($3),0x2000))&&(and(strtonum($3),0x40000))&&s>0{print int(s) " MiB"; exit}' "${CARDN}/device/resource" 2>/dev/null)"
+  if [ -n "${LNAME}" ] && [ -n "${CLOCK}" ] && [ -n "${MEMORY}" ]; then
+    echo "GPU Info set to: \"${LNAME}\" \"${CLOCK}\" \"${MEMORY}\""
+    # t.gpu={};t.gpu.clock=\"455 MHz\";t.gpu.memory=\"8192 MiB\";t.gpu.name=\"Tesla P4\";t.gpu.temperature_c=47;t.gpu.tempwarn=false;
+    sed -i "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!t.gpu){t.gpu={};t.gpu.clock=\"${CLOCK}\";t.gpu.memory=\"${MEMORY}\";t.gpu.name=\"${LNAME}\";}let/g" "${FILE_JS}"
+  fi
+fi
+
 if [ "${MEV}" = "physical" ]; then
+  sed -i "s/_D(\"support_nvidia_gpu\")},/_D(\"support_nvidia_gpu\")||true},/g" "${FILE_JS}"
   sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
   sed -i 's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g' "${FILE_JS}"
   sed -i 's/_T("rcpower",n),/(typeof _T==="function"?_T("rcpower", n):"rcpower")?e.fan_list?(typeof _T==="function"?_T("rcpower", n):"rcpower")+e.fan_list.map(fan=>` | ${fan} RPM`).join(""):(typeof _T==="function"?_T("rcpower", n):"rcpower"):e.fan_list?e.fan_list.map(fan=>`${fan} RPM`).join(" | "):(typeof _T==="function"?_T("rcpower", n):"rcpower"),/g' "${FILE_JS}"
-fi
-
-CARDN=$(ls -d /sys/class/drm/card[0-9]* 2>/dev/null | head -1)
-if [ -d "${CARDN}" ]; then
-  PCIDN="$(grep '^DEVNAME=' "${CARDN}/device/uevent" 2>/dev/null | cut -d= -f2)"
-  LNAME="$(lspci -s ${PCIDN:-"99:99.9"} 2>/dev/null | sed "s/.*: //")"
-  CLOCK="$(cat "${CARDN}/gt_max_freq_mhz" 2>/dev/null)"
-  [ -n "${CLOCK}" ] && CLOCK="${CLOCK} MHz"
-  if [ -n "${LNAME}" ]; then
-    echo "GPU Info set to: \"${LNAME}\" \"${CLOCK}\""
-    sed -i "s/_D(\"support_nvidia_gpu\")},/_D(\"support_nvidia_gpu\")||true},/g" "${FILE_JS}"
-    # t.gpu={};t.gpu.clock=\"455 MHz\";t.gpu.memory=\"8192 MiB\";t.gpu.name=\"Tesla P4\";t.gpu.temperature_c=47;t.gpu.tempwarn=false;
-    sed -i "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!t.gpu){t.gpu={};t.gpu.clock=\"${CLOCK}\";t.gpu.name=\"${LNAME}\";}let/g" "${FILE_JS}"
-  fi
 fi
 
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"

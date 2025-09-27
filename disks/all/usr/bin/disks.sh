@@ -178,7 +178,8 @@ dtModel() {
       [ ! -e "${F}" ] && continue
       PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       ATAPORT="$(grep 'ata_port_no' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      if [ -z "${PCIEPATH}" ] || [ -z "${ATAPORT}" ]; then
+      DRIVER="$(cat "${F}/device/syno_block_info" 2>/dev/null | grep 'driver' | cut -d'=' -f2)"
+      if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
         _log "unknown: ${F}"
         continue
       fi
@@ -191,7 +192,7 @@ dtModel() {
       if [ "${HDDSORT}" = "true" ] && [ "${PORTNUM}" -gt 0 ]; then
         CONTPCI=${PCIEPATH}
         for I in $(seq 0 $((${PORTNUM} - 1))); do
-          if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] && [ "${BOOTDISK_ATAPORT}" = "${I}" ]; then
+          if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] && ([ -z "${ATAPORT}" ] || [ "${BOOTDISK_ATAPORT}" = "${I}" ]); then
             _log "bootloader: ${F}"
             continue
           fi
@@ -199,15 +200,15 @@ dtModel() {
           {
             echo "    internal_slot@${COUNT} {"
             echo "        protocol_type = \"sata\";"
-            echo "        ahci {"
+            echo "        ${DRIVER} {"
             echo "            pcie_root = \"${PCIEPATH}\";"
-            echo "            ata_port = <0x$(printf '%02X' ${I})>;"
+            [ -n "${ATAPORT}" ] && echo "            ata_port = <0x$(printf '%02X' ${I})>;"
             echo "        };"
             echo "    };"
           } >>"${DEST}"
         done
       else
-        if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] && [ "${BOOTDISK_ATAPORT}" = "${ATAPORT}" ]; then
+        if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] && ([ -z "${ATAPORT}" ] || [ "${BOOTDISK_ATAPORT}" = "${ATAPORT}" ]); then
           _log "bootloader: ${F}"
           continue
         fi
@@ -215,9 +216,9 @@ dtModel() {
         {
           echo "    internal_slot@${COUNT} {"
           echo "        protocol_type = \"sata\";"
-          echo "        ahci {"
+          echo "        ${DRIVER} {"
           echo "            pcie_root = \"${PCIEPATH}\";"
-          echo "            ata_port = <0x$(printf '%02X' ${ATAPORT})>;"
+          [ -n "${ATAPORT}" ] && echo "            ata_port = <0x$(printf '%02X' ${ATAPORT})>;"
           echo "        };"
           echo "    };"
         } >>"${DEST}"
@@ -399,7 +400,7 @@ nondtModel() {
     printf "cal maxdisks=%d\n" "${MAXDISKS}"
   fi
 
-  if grep -wq "usbinternal" /proc/cmdline 2>/dev/null; then
+  if grep -wq "usbasinternal" /proc/cmdline 2>/dev/null; then
     USBPORTCFG=0
     __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
     printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
