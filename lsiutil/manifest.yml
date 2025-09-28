@@ -3,7 +3,6 @@ name: lsiutil
 description: "Commandline interaction with some LSI RAID controllers"
 system: false
 beta: false
-target: system
 all:
   install-script: "install.sh"
   copy: "all"

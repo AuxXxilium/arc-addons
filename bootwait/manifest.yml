@@ -3,7 +3,6 @@ name: bootwait
 description: "Boot process waits until boot device (`/dev/synoboot`) and PCIe Device are available"
 system: false
 beta: false
-target: system
 all:
   install-script: "install.sh"
   copy: ""

@@ -3,7 +3,6 @@ name: beep
 description: "Beep at startup and shutdown (requires motherboard with buzzer)"
 system: false
 beta: false
-target: system
 all:
   install-script: "install.sh"
   copy: ""

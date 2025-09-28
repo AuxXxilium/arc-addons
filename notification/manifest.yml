@@ -2,8 +2,7 @@ version: 1
 name: notification
 description: "Add notification system to DSM"
 system: false
-beta: true
-target: system
+beta: false
 all:
   install-script: "install.sh"
   copy: "all"

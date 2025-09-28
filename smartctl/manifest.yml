@@ -3,7 +3,6 @@ name: smartctl
 description: "Fix SMART information for HBA devices."
 system: false
 beta: true
-target: system
 all:
   install-script: "install.sh"
   copy: "all"

@@ -3,7 +3,6 @@ name: dbgutils
 description: "Binaries to facilitate debug in the junior mode"
 system: false
 beta: false
-target: system
 all:
   install-script: "install.sh"
   copy: ""

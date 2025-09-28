@@ -3,7 +3,6 @@ name: setrootpw
 description: "Set root password and enable ssh/sftp. Modify PW=\"\" to the desired password in DSM Task Scheduler and run the task"
 system: false
 beta: false
-target: system
 all:
   install-script: "install.sh"
   copy: "all"

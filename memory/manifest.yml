@@ -3,7 +3,6 @@ name: memory
 description: "Remove Memory limitation"
 system: false
 beta: true
-target: system
 all:
   install-script: "install.sh"
   copy: "all"
