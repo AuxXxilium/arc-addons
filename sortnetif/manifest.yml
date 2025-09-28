@@ -3,7 +3,6 @@ name: sortnetif
 description: "Sort network interface names: sorted by busid"
 system: false
 beta: false
-target: system
 all:
   install-script: "install.sh"
   copy: ""

@@ -3,7 +3,6 @@ name: fancontrol
 description: "Control fan PWM from DSM (Depending on sensors addon, only if PWM is supported)."
 system: false
 beta: true
-target: system
 all:
   install-script: "install.sh"
   copy: ""

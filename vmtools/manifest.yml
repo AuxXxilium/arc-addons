@@ -3,7 +3,6 @@ name: vmtools
 description: "qemu-ga & &open-vm-tools (replacement for apps)"
 system: false
 beta: false
-target: system
 all:
   install-script: "install.sh"
   copy: "all"

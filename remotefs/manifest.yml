@@ -3,7 +3,6 @@ name: remotefs
 description: "Allow remote NFS/CIFS shared folder be used in VideoStation, AudioStation and PhotoStation"
 system: false
 beta: false
-target: system
 all:
   install-script: "install.sh"
   copy: "all"

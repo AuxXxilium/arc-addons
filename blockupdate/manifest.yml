@@ -3,7 +3,6 @@ name: blockupdate
 description: "Block all automatic DSM update"
 system: false
 beta: false
-target: system
 all:
   install-script: "install.sh"
   copy: ""

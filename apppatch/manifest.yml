@@ -3,7 +3,6 @@ name: apppatch
 description: "Fix Synology Photos and local_display"
 system: false
 beta: true
-target: system
 all:
   install-script: "install.sh"
   copy: "all"
