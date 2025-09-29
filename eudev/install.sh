@@ -48,6 +48,14 @@ elif [ "${1}" = "modules" ]; then
   /usr/sbin/modprobe 9p || true
   /usr/sbin/modprobe virtiofs || true
 
+
+  for P in tcp sch; do
+    for F in /usr/lib/modules/${P}_*.ko; do
+      [ ! -e "${F}" ] && continue
+      /usr/sbin/modprobe "$(basename "${F}" .ko 2>/dev/null)" || true
+    done
+  done
+
   # Remove kvm module
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_intel && /usr/sbin/modprobe -r kvm_intel || true # kvm-intel.ko
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_amd && /usr/sbin/modprobe -r kvm_amd || true     # kvm-amd.ko
