@@ -8,7 +8,13 @@
 
 set -e
 
-if [ -z "$ARCSU_ACTIVE" ]; then
+# Check if the script is run as root
+if [ "$(id -u)" -ne 0 ]; then
+  # Check if arcsu is available
+  if ! command -v arcsu >/dev/null 2>&1; then
+    echo "Error: This script must be run as root or with 'arcsu'."
+    exit 1
+  fi
   exec env ARCSU_ACTIVE=1 arcsu "$0" "$@"
 fi
 
