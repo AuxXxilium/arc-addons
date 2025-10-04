@@ -33,7 +33,6 @@ elif [ "${1}" = "modules" ]; then
   # Give more time
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
-  /usr/bin/udevadm control --stop-exec-queue || true
   /usr/bin/killall udevd
   # modprobe modules for the beep
   /usr/sbin/modprobe pcspeaker || true
@@ -135,7 +134,6 @@ elif [ "${1}" = "late" ]; then
     echo "RemainAfterExit=yes"
     echo "ExecStart=/usr/bin/udevadm hwdb --update"
     echo "ExecStart=/usr/bin/udevadm control --reload-rules"
-    echo "ExecStart=/usr/bin/udevadm control --start-exec-queue"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
