@@ -11,7 +11,7 @@ set -e
 # Check if the script is run as root
 if [ "$(id -u)" -ne 0 ]; then
   # Check if arcsu is available
-  if ! command -v arcsu >/dev/null 2>&1; then
+  if ! -f /usr/bin/arcsu 2>/dev/null; then
     echo "Error: This script must be run as root or with 'arcsu'."
     exit 1
   fi
