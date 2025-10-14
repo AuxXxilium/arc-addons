@@ -164,7 +164,7 @@ elif [ "${1}" = "late" ]; then
 
   # sdcard
   [ ! -f /tmpRoot/usr/lib/udev/script/sdcard.sh.bak ] && cp -vpf /tmpRoot/usr/lib/udev/script/sdcard.sh /tmpRoot/usr/lib/udev/script/sdcard.sh.bak
-  printf '#!/usr/bin/env sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
+  printf '#!/bin/sh\nexit 0\n' >/tmpRoot/usr/lib/udev/script/sdcard.sh
 
   # beep
   cp -vpf /usr/bin/beep /tmpRoot/usr/bin/beep
