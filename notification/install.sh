@@ -22,7 +22,7 @@ After=synoscgi.service nginx.service
 Type=simple
 Restart=always
 ExecStartPre=/usr/bin/sleep 10
-ExecStart=/usr/bin/notification ${2} ${3}
+ExecStart=/usr/bin/notification "${2:-false}" "${3:-false}"
 
 [Install]
 WantedBy=multi-user.target
