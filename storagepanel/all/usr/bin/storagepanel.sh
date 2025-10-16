@@ -51,6 +51,7 @@ fi
 
 _UNIQUE="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique)"
 _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
+_ARCPANEL="$(/bin/cat /usr/arc/storagepanel.conf 2>/dev/null)"
 
 if [ ${_BUILD:-64570} -gt 64570 ]; then
   FILE_JS="/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js"
@@ -72,42 +73,48 @@ if [ "${1}" = "-r" ]; then
   fi
   SM_KEY="sm_machine_img_config_name"
   synosetkeyvalue "/etc.defaults/synoinfo.conf" "${SM_KEY}" "$(synogetkeyvalue /etc/synoinfo.conf "${SM_KEY}")"
-  exit
+  rm -f /usr/arc/storagepanel.conf 2>/dev/null
+  exit 0
 fi
 
-[ -n "${1}" ] && HDD_BAY="$(echo "${HDD_BAY_LIST[@]}" | grep -iwo "${1}")" || HDD_BAY=""
-if [ -n "${1}" ] && [ -z "${HDD_BAY}" ]; then
-  echo "parameter 1 error"
-fi
-
-SSD_BAY="$(echo "${2^^}" | sed 's/*/X/')"
-if [ -n "${SSD_BAY}" ] && [ -z "$(echo "${SSD_BAY}" | sed -n '/^[0-9]\{1,2\}X[0-9]\{1,2\}$/p')" ]; then
-  echo "parameter 2 error"
-  SSD_BAY=""
-fi
-
-if [ -z "${HDD_BAY}" ]; then
-  if [ -f "/run/model.dtb" ]; then  # if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
-    IDX="$(grep -ao "internal_slot@" "/run/model.dtb" | wc -w)"
-  else
-    IDX="$(synodisk --enum -t internal 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+if [ -n "${1}" ] && [ -n "${2}" ]; then
+  HDD_BAY="$(echo "${HDD_BAY_LIST[@]}" | grep -iwo "${1}")"
+  if [ -z "${HDD_BAY}" ]; then
+    echo "parameter 1 error"
+    exit 1
   fi
-  while [ ${IDX:-0} -le 60 ]; do
-    for i in "${HDD_BAY_LIST[@]}"; do
-      echo "${i}" | grep -q "_${IDX:-0}_" && HDD_BAY="${i}" && break 2
+  SSD_BAY="$(echo "${2^^}" | sed 's/*/X/')"
+  if [ -z "$(echo "${SSD_BAY}" | sed -n '/^[0-9]\{1,2\}X[0-9]\{1,2\}$/p')" ]; then
+    echo "parameter 2 error"
+    exit 1
+  fi
+elif [ -n "${_ARCPANEL}" ]; then
+  HDD_BAY="${_ARCPANEL%%_*}"
+  SSD_BAY="${_ARCPANEL##*_}"
+else
+  if [ -z "${HDD_BAY}" ]; then
+    if [ -f "/run/model.dtb" ]; then
+      IDX="$(grep -ao "internal_slot@" "/run/model.dtb" | wc -w)"
+    else
+      IDX="$(synodisk --enum -t internal 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+    fi
+    while [ ${IDX:-0} -le 60 ]; do
+      for i in "${HDD_BAY_LIST[@]}"; do
+        echo "${i}" | grep -q "_${IDX:-0}_" && HDD_BAY="${i}" && break 2
+      done
+      IDX=$((${IDX:-0} + 1))
     done
-    IDX=$((${IDX:-0} + 1))
-  done
-  HDD_BAY=${HDD_BAY:-RACK_60_Bay}
-fi
-
-if [ -z "${SSD_BAY}" ]; then
-  if [ -f "/run/model.dtb" ]; then  # if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
-    IDX="$(grep -ao "nvme_slot@" "/run/model.dtb" | wc -w)"
-  else
-    IDX="$(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+    HDD_BAY=${HDD_BAY:-RACK_60_Bay}
   fi
-  [ "${IDX:-0}" -le 8 ] && SSD_BAY="1X${IDX:-0}" || SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
+
+  if [ -z "${SSD_BAY}" ]; then
+    if [ -f "/run/model.dtb" ]; then
+      IDX="$(grep -ao "nvme_slot@" "/run/model.dtb" | wc -w)"
+    else
+      IDX="$(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+    fi
+    [ "${IDX:-0}" -le 8 ] && SSD_BAY="1X${IDX:-0}" || SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
+  fi
 fi
 
 [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
@@ -130,5 +137,6 @@ gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
 SM_KEY="sm_machine_img_config_name"
 synosetkeyvalue "/etc.defaults/synoinfo.conf" "${SM_KEY}" "" # "${HDD_BAY}-M2X1"
+[ -n "${_ARCPANEL}" ] && echo "${HDD_BAY}_${SSD_BAY}" > /usr/arc/storagepanel.conf
 
 exit 0
