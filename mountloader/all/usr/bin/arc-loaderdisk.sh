@@ -36,7 +36,7 @@ mountLoaderDisk() {
   if [ ! -f "/usr/arc/.mountloader" ]; then
     while true; do
       for part in $LOADER_DISK $LOADER_PARTS; do
-        [ ! -b "${part}" ] && echo "Loader disk not found: $part" && cleanup && break 2
+        [ ! -b "${part}" ] && cleanup && break 2
       done
 
       # Mount partitions
@@ -50,12 +50,9 @@ mountLoaderDisk() {
           rm -rf "/mnt/p${i}" 2>/dev/null || true
           mkdir -p "/mnt/p${i}"
           mount "/dev/synoboot${i}" "/mnt/p${i}" || {
-            echo "Can't mount /dev/synoboot${i}."
             cleanup
             break 2
           }
-        else
-          echo "/dev/synoboot${i} is already mounted on /mnt/p${i}."
         fi
       done
 
@@ -85,13 +82,11 @@ mountLoaderDisk() {
             *) cleanup && break 2;;
           esac
           if [ ! -f "${RAMDISK_PATH}/opt/arc/arc.sh" ]; then
-            echo "initrd work path not found!"
             rm -rf "${RAMDISK_PATH}"
             cleanup
             break
           fi
         else
-          echo "initrd not found!"
           cleanup
           break
         fi
@@ -109,7 +104,6 @@ mountLoaderDisk() {
       } > "/usr/arc/.mountloader"
 
       if [ ! -f "/usr/arc/.mountloader" ]; then
-        echo "Error: Failed to create /usr/arc/.mountloader"
         cleanup
         exit 1
       fi
@@ -118,10 +112,7 @@ mountLoaderDisk() {
       sync
       break
     done
-    echo "Loader disk mount successful!"
     "/usr/arc/.mountloader"
-  else
-    echo "Loader disk mount is not possible."
   fi
 }
 
@@ -144,9 +135,6 @@ unmountLoaderDisk() {
     sync
 
     cleanup
-    echo "Loader disk unmount successful!"
-  else
-    echo "Loader disk isn't currently mounted."
   fi
 }
 
