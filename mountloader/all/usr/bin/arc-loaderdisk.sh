@@ -100,6 +100,7 @@ mountLoaderDisk() {
         echo "export LOADER_DISK_PART3=\"/dev/synoboot3\""
         if [ -f "${RAMDISK_PATH}/opt/arc/arc.sh" ]; then
           echo "export ARC_PATH=\"${RAMDISK_PATH}/opt/arc\""
+          echo "export ARC_MODE=\"config\""
         fi
       } > "/usr/arc/.mountloader"
 
@@ -126,6 +127,7 @@ unmountLoaderDisk() {
       if [ -f "${RAMDISK_PATH}/opt/arc/arc.sh" ]; then
         rm -rf "${RAMDISK_PATH}" >/dev/null 2>&1 || true
         echo "export ARC_PATH=\"\""
+        echo "export ARC_MODE=\"\""
       fi
     } | tee "/usr/arc/.mountloader"
     chmod a+x "/usr/arc/.mountloader"
