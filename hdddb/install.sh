@@ -15,6 +15,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/sbin/" "/tmpRoot/usr/syno/sbin/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   cp -pf /usr/bin/hdddb.sh /tmpRoot/usr/bin/hdddb.sh
+  cp -pf /usr/syno/sbin/dhm_tool /tmpRoot/usr/syno/sbin/dhm_tool
 
   # Create systemd service file
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/hdddb.service"
