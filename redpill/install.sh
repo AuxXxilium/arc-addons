@@ -16,9 +16,8 @@ if [ "${1}" = "early" ]; then
   echo "Installing addon redpill - ${1}"
 
   insmod /usr/lib/modules/rp.ko
-
 elif [ "${1}" = "jrExit" ]; then
   echo "Installing addon redpill - ${1}"
 
-  #rmmod redpill
+  rmmod redpill
 fi
