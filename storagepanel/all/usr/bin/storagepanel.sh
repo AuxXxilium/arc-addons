@@ -78,15 +78,25 @@ if [ "${1}" = "-r" ]; then
 fi
 
 if [ -n "${1}" ] && [ -n "${2}" ]; then
-  HDD_BAY="$(echo "${HDD_BAY_LIST[@]}" | grep -iwo "${1}")"
+  # Validate HDD_BAY
+  HDD_BAY=""
+  for BAY in "${HDD_BAY_LIST[@]}"; do
+      if [[ "${BAY,,}" == "${1,,}" ]]; then
+          HDD_BAY="${BAY}"
+          break
+      fi
+  done
+  
   if [ -z "${HDD_BAY}" ]; then
-    echo "parameter 1 error"
-    exit 1
+      echo "parameter 1 error: Invalid HDD_BAY. Allowed values are: ${HDD_BAY_LIST[*]}"
+      exit 1
   fi
+  
+  # Validate SSD_BAY
   SSD_BAY="$(echo "${2^^}" | sed 's/*/X/')"
-  if [ -z "$(echo "${SSD_BAY}" | sed -n '/^[0-9]\{1,2\}X[0-9]\{1,2\}$/p')" ]; then
-    echo "parameter 2 error"
-    exit 1
+  if ! [[ "${SSD_BAY}" =~ ^[0-9]{1,2}X[0-9]{1,2}$ ]]; then
+      echo "parameter 2 error: Invalid SSD_BAY. Format must be rowXcolumn (e.g., 1X8, 2X4)."
+      exit 1
   fi
 elif [ -n "${_ARCPANEL}" ]; then
   HDD_BAY="${_ARCPANEL%%_*}"
@@ -104,7 +114,7 @@ else
       done
       IDX=$((${IDX:-0} + 1))
     done
-    HDD_BAY=${HDD_BAY:-RACK_60_Bay}
+    HDD_BAY="${HDD_BAY:-"RACK_60_Bay"}"
   fi
 
   if [ -z "${SSD_BAY}" ]; then
