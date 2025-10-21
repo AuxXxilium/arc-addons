@@ -5,49 +5,9 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-# $1 ?
-#  RACK_0_Bay
-#  RACK_2_Bay
-#  RACK_4_Bay
-#  RACK_8_Bay
-#  RACK_10_Bay
-#  RACK_12_Bay
-#  RACK_12_Bay_2
-#  RACK_16_Bay
-#  RACK_20_Bay
-#  RACK_24_Bay
-#  RACK_60_Bay
-#  TOWER_1_Bay
-#  TOWER_2_Bay
-#  TOWER_4_Bay
-#  TOWER_4_Bay_J
-#  TOWER_4_Bay_S
-#  TOWER_5_Bay
-#  TOWER_6_Bay
-#  TOWER_8_Bay
-#  TOWER_12_Bay
-#  -r                # restore
-# $2 ?
-#  (row)X(column)
 
 HDD_BAY_LIST=(RACK_0_Bay RACK_2_Bay RACK_4_Bay RACK_8_Bay RACK_10_Bay RACK_12_Bay RACK_12_Bay_2 RACK_16_Bay RACK_20_Bay RACK_24_Bay RACK_60_Bay
   TOWER_1_Bay TOWER_2_Bay TOWER_4_Bay TOWER_4_Bay_J TOWER_4_Bay_S TOWER_5_Bay TOWER_6_Bay TOWER_8_Bay TOWER_12_Bay)
-
-if [ "${1}" = "-h" ]; then
-  echo "Use: ${0} [HDD_BAY [SSD_BAY]]"
-  echo "  HDD_BAY: ${HDD_BAY_LIST[*]}"
-  echo "  SSD_BAY: (row)X(column)"
-  echo "  -r: restore"
-  echo "  -h: help"
-  echo "  e.g.:"
-  echo "    ${0}                  - auto"
-  echo "    ${0} RACK_24_Bay      - HDD_BAY set to RACK_24_Bay, SSD_BAY auto"
-  echo "    ${0} RACK_24_Bay 1X8  - HDD_BAY set to RACK_24_Bay, SSD_BAY set to 1X8"
-  echo "    ${0} RACK_60_Bay 2X8  - HDD_BAY set to RACK_60_Bay, SSD_BAY set to 2X8"
-  echo "    ${0} -r               - restore"
-  echo "    ${0} -h               - help"
-  exit
-fi
 
 _UNIQUE="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique)"
 _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
@@ -78,19 +38,29 @@ if [ "${1}" = "-r" ]; then
 fi
 
 if [ -n "${1}" ] && [ -n "${2}" ]; then
-  HDD_BAY="$(echo "${HDD_BAY_LIST[@]}" | grep -iwo "${1}")"
+  # Validate HDD_BAY
+  HDD_BAY=""
+  for BAY in "${HDD_BAY_LIST[@]}"; do
+      if [[ "${BAY,,}" == "${1,,}" ]]; then
+          HDD_BAY="${BAY}"
+          break
+      fi
+  done
+  
   if [ -z "${HDD_BAY}" ]; then
-    echo "parameter 1 error"
-    exit 1
+      echo "parameter 1 error: Invalid HDD_BAY. Allowed values are: ${HDD_BAY_LIST[*]}"
+      exit 1
   fi
+  
+  # Validate SSD_BAY
   SSD_BAY="$(echo "${2^^}" | sed 's/*/X/')"
-  if [ -z "$(echo "${SSD_BAY}" | sed -n '/^[0-9]\{1,2\}X[0-9]\{1,2\}$/p')" ]; then
-    echo "parameter 2 error"
-    exit 1
+  if ! [[ "${SSD_BAY}" =~ ^[0-9]{1,2}X[0-9]{1,2}$ ]]; then
+      echo "parameter 2 error: Invalid SSD_BAY. Format must be rowXcolumn (e.g., 1X8, 2X4)."
+      exit 1
   fi
 elif [ -n "${_ARCPANEL}" ]; then
-  HDD_BAY="${_ARCPANEL%%_*}"
-  SSD_BAY="${_ARCPANEL##*_}"
+  HDD_BAY="${_ARCPANEL%-*}"
+  SSD_BAY="${_ARCPANEL#*-}"
 else
   if [ -z "${HDD_BAY}" ]; then
     if [ -f "/run/model.dtb" ]; then
@@ -104,7 +74,7 @@ else
       done
       IDX=$((${IDX:-0} + 1))
     done
-    HDD_BAY=${HDD_BAY:-RACK_60_Bay}
+    HDD_BAY="${HDD_BAY:-"RACK_60_Bay"}"
   fi
 
   if [ -z "${SSD_BAY}" ]; then
@@ -137,6 +107,6 @@ gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
 SM_KEY="sm_machine_img_config_name"
 synosetkeyvalue "/etc.defaults/synoinfo.conf" "${SM_KEY}" "" # "${HDD_BAY}-M2X1"
-[ -n "${_ARCPANEL}" ] && echo "${HDD_BAY}_${SSD_BAY}" > /usr/arc/storagepanel.conf
+[ -n "${HDD_BAY}" ] && [ -n "${SSD_BAY}" ] && echo "${HDD_BAY}-${SSD_BAY}" > /usr/arc/storagepanel.conf
 
 exit 0
