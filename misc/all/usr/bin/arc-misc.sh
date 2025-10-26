@@ -57,7 +57,7 @@ SSKV=$([ -x "/usr/syno/bin/set_section_key_value" ] && echo "/usr/syno/bin/set_s
 # packages
 [ -f /usr/syno/etc/packages/feeds ] && rm -f /usr/syno/etc/packages/feeds
 mkdir -p /usr/syno/etc/packages
-echo '[{"feed":"https://apps.xpenology.tech","name":"xpenlogy"},{"feed":"https://spk7.imnks.com","name":"imnks"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"}]' >/usr/syno/etc/packages/feeds
+echo '[{"feed":"https://apps.xpenology.tech","name":"xpenlogy"},{"feed":"https://packages.synocommunity.com","name":"synocommunity"},{"feed":"https://spk7.imnks.com","name":"imnks"}]' >/usr/syno/etc/packages/feeds
 
 # network
 if grep -q 'network.' /proc/cmdline; then
