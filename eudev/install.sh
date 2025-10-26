@@ -9,9 +9,9 @@
 if [ "${1}" = "early" ]; then
   echo "Installing addon eudev - ${1}"
   tar -zxf /addons/eudev-7.1.tgz -C /
-  [ ! -L "/usr/sbin/modprobe" ] && ln -vsf /usr/bin/kmod /usr/sbin/modprobe
-  [ ! -L "/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /usr/sbin/modinfo
-  [ ! -L "/usr/sbin/depmod" ] && ln -vsf /usr/bin/kmod /usr/sbin/depmod
+  [ ! -L "/usr/sbin/modprobe" ] && ln -sf /usr/bin/kmod /usr/sbin/modprobe
+  [ ! -L "/usr/sbin/modinfo" ] && ln -sf /usr/bin/kmod /usr/sbin/modinfo
+  [ ! -L "/usr/sbin/depmod" ] && ln -sf /usr/bin/kmod /usr/sbin/depmod
 
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
@@ -52,7 +52,7 @@ elif [ "${1}" = "modules" ]; then
 
   for P in tcp sch; do
     for F in /usr/lib/modules/${P}_*.ko; do
-      [ ! -e "${F}" ] && continue
+      [ ! -f "${F}" ] && continue
       /usr/sbin/modprobe "$(basename "${F}" .ko 2>/dev/null)" || true
     done
   done
@@ -63,11 +63,11 @@ elif [ "${1}" = "modules" ]; then
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon eudev - ${1}"
-  # [ ! -L "/tmpRoot/usr/sbin/modprobe" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modprobe
-  [ ! -L "/tmpRoot/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modinfo
-  [ ! -L "/tmpRoot/usr/sbin/depmod" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/depmod
+  # [ ! -L "/tmpRoot/usr/sbin/modprobe" ] && ln -sf /usr/bin/kmod /tmpRoot/usr/sbin/modprobe
+  [ ! -L "/tmpRoot/usr/sbin/modinfo" ] && ln -sf /usr/bin/kmod /tmpRoot/usr/sbin/modinfo
+  [ ! -L "/tmpRoot/usr/sbin/depmod" ] && ln -sf /usr/bin/kmod /tmpRoot/usr/sbin/depmod
 
-  [ ! -f "/tmpRoot/usr/bin/eject" ] && cp -vpf /usr/bin/eject /tmpRoot/usr/bin/eject
+  [ ! -f "/tmpRoot/usr/bin/eject" ] && cp -pf /usr/bin/eject /tmpRoot/usr/bin/eject
 
   echo "copy modules"
   export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
@@ -89,17 +89,29 @@ elif [ "${1}" = "late" ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
-    for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
-      O=$(echo "${L}" | awk -F'###' '{print $1}')
-      M=$(echo "${L}" | awk -F'###' '{print $2}')
-      [ -z "${M}" ] || [ ! -f "/usr/lib/modules/${M}" ] && continue
-      if [ "$(echo "${O}" | cut -c1 | sed 's/.*/\U&/')" = "F" ]; then
-        /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
-      else
-        /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
-      fi
-      isChange=true
-    done
+    if [ -f /addons/modulelist ]; then
+      exec 3< /addons/modulelist
+      while IFS= read -r L <&3; do
+        case "${L}" in
+          ''|\#*) continue ;;
+        esac
+        set -- ${L}
+        [ "$#" -ne 2 ] && continue
+        O=${1}
+        M=${2}
+        [ -n "${M}" ] || continue
+        [ -f "/usr/lib/modules/${M}" ] || continue
+
+        OVERRIDE=$(printf '%s' "${O}" | cut -c1 | tr '[:lower:]' '[:upper:]')
+        if [ "${OVERRIDE}" = "F" ]; then
+          /tmpRoot/bin/cp -rf "/usr/lib/modules/${M}" "/tmpRoot/usr/lib/modules/"
+        else
+          /tmpRoot/bin/cp -rn "/usr/lib/modules/${M}" "/tmpRoot/usr/lib/modules/"
+        fi
+        isChange=true
+      done
+      exec 3<&-
+    fi
   fi
   echo "isChange: ${isChange}"
   [ "${isChange}" = "true" ] && /usr/sbin/depmod -a -b /tmpRoot
@@ -109,7 +121,7 @@ elif [ "${1}" = "late" ]; then
   /usr/sbin/modprobe kvm_amd 2>/dev/null || true   # kvm-amd.ko
 
   echo "Copy rules"
-  /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
+  /tmpRoot/bin/cp -rf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   {
@@ -126,6 +138,6 @@ elif [ "${1}" = "late" ]; then
     echo "WantedBy=multi-user.target"
   } >"/tmpRoot/usr/lib/systemd/system/udevrules.service"
 
-  mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-  ln -vsf /usr/lib/systemd/system/udevrules.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/udevrules.service
+  mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+  ln -sf /usr/lib/systemd/system/udevrules.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/udevrules.service
 fi
