@@ -400,7 +400,7 @@ nondtModel() {
     printf "cal maxdisks=%d\n" "${MAXDISKS}"
   fi
 
-  if grep -wq "usbasinternal" /proc/cmdline 2>/dev/null; then
+  if grep -wq "usbinternal" /proc/cmdline 2>/dev/null; then
     USBPORTCFG=0
     __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
     printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
