@@ -33,21 +33,21 @@ elif [ "${1}" = "modules" ]; then
   # Give more time
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
-  /usr/bin/killall udevd
+  /usr/bin/killall udevd 2>/dev/null || true
   # modprobe modules for the beep
-  /usr/sbin/modprobe pcspeaker || true
-  /usr/sbin/modprobe pcspkr || true
+  /usr/sbin/modprobe pcspeaker 2>/dev/null || true
+  /usr/sbin/modprobe pcspkr 2>/dev/null || true
   # modprobe modules for the sensors
   for MODULE in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
     if [ -f "/lib/modules/${MODULE}.ko" ]; then
-      /usr/sbin/modprobe "${MODULE}" || true
+      /usr/sbin/modprobe "${MODULE}" 2>/dev/null || true
     else
       echo "Module ${MODULE} not found, skipping."
     fi
   done
   # modprobe modules for the virtiofs
-  /usr/sbin/modprobe 9p || true
-  /usr/sbin/modprobe virtiofs || true
+  /usr/sbin/modprobe 9p 2>/dev/null || true
+  /usr/sbin/modprobe virtiofs 2>/dev/null || true
 
 
   for P in tcp sch; do
@@ -70,7 +70,7 @@ elif [ "${1}" = "late" ]; then
   [ ! -f "/tmpRoot/usr/bin/eject" ] && cp -vpf /usr/bin/eject /tmpRoot/usr/bin/eject
 
   echo "copy modules"
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
   isChange=false
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   if grep -q 'RR@RR' /proc/version 2>/dev/null; then
@@ -105,8 +105,8 @@ elif [ "${1}" = "late" ]; then
   [ "${isChange}" = "true" ] && /usr/sbin/depmod -a -b /tmpRoot
 
   # Restore kvm module
-  /usr/sbin/modprobe kvm_intel || true # kvm-intel.ko
-  /usr/sbin/modprobe kvm_amd || true   # kvm-amd.ko
+  /usr/sbin/modprobe kvm_intel 2>/dev/null || true # kvm-intel.ko
+  /usr/sbin/modprobe kvm_amd 2>/dev/null || true   # kvm-amd.ko
 
   echo "Copy rules"
   /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
