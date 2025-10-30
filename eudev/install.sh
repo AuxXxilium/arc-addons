@@ -26,10 +26,10 @@ elif [ "${1}" = "modules" ]; then
     exit 1
   }
   echo "Triggering add events to udev"
-  /usr/bin/udevadm trigger --type=subsystems --action=add
-  /usr/bin/udevadm trigger --type=devices --action=add
-  /usr/bin/udevadm trigger --type=devices --action=change
-  /usr/bin/udevadm settle --timeout=30 || echo "udevadm settle failed"
+  udevadm trigger --type=subsystems --action=add
+  udevadm trigger --type=devices --action=add
+  udevadm trigger --type=devices --action=change
+  udevadm settle --timeout=30 || echo "udevadm settle failed"
   # Give more time
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
@@ -38,11 +38,11 @@ elif [ "${1}" = "modules" ]; then
   /usr/sbin/modprobe pcspeaker 2>/dev/null || true
   /usr/sbin/modprobe pcspkr 2>/dev/null || true
   # modprobe modules for the sensors
-  for MODULE in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
-    if [ -f "/lib/modules/${MODULE}.ko" ]; then
-      /usr/sbin/modprobe "${MODULE}" 2>/dev/null || true
+  for I in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
+    if [ -f "/lib/modules/${I}.ko" ]; then
+      /usr/sbin/modprobe "${I}" 2>/dev/null || true
     else
-      echo "Module ${MODULE} not found, skipping."
+      echo "Module ${I} not found, skipping."
     fi
   done
   # modprobe modules for the virtiofs
@@ -89,29 +89,17 @@ elif [ "${1}" = "late" ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
-    if [ -f /addons/modulelist ]; then
-      exec 3< /addons/modulelist
-      while IFS= read -r L <&3; do
-        case "${L}" in
-          ''|\#*) continue ;;
-        esac
-        set -- ${L}
-        [ "$#" -ne 2 ] && continue
-        O=${1}
-        M=${2}
-        [ -n "${M}" ] || continue
-        [ -f "/usr/lib/modules/${M}" ] || continue
-
-        OVERRIDE=$(printf '%s' "${O}" | cut -c1 | tr '[:lower:]' '[:upper:]')
-        if [ "${OVERRIDE}" = "F" ]; then
-          /tmpRoot/bin/cp -rf "/usr/lib/modules/${M}" "/tmpRoot/usr/lib/modules/"
-        else
-          /tmpRoot/bin/cp -rn "/usr/lib/modules/${M}" "/tmpRoot/usr/lib/modules/"
-        fi
-        isChange=true
-      done
-      exec 3<&-
-    fi
+    for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
+      O=$(echo "${L}" | awk -F'###' '{print $1}')
+      M=$(echo "${L}" | awk -F'###' '{print $2}')
+      [ -z "${M}" ] || [ ! -f "/usr/lib/modules/${M}" ] && continue
+      if [ "$(echo "${O}" | cut -c1 | sed 's/.*/\U&/')" = "F" ]; then
+        /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+      else
+        /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+      fi
+      isChange=true
+    done
   fi
   echo "isChange: ${isChange}"
   [ "${isChange}" = "true" ] && /usr/sbin/depmod -a -b /tmpRoot
