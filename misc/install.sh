@@ -175,7 +175,6 @@ elif [ "${1}" = "late" ]; then
   # arc
   cp -vpf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
-  cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
   cp -vpf /usr/bin/jq /tmpRoot/usr/bin/jq
 
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
