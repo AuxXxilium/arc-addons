@@ -202,6 +202,10 @@ elif [ "${1}" = "late" ]; then
     fi
   done
 
+  # cleanup
+  rm -f /tmpRoot/usr/sbin/arccontrol.sh 2>/dev/null || true
+  rm -f /tmpRoot/usr/lib/systemd/system/arccontrol.service 2>/dev/null || true
+
   # arc-misc
   cp -vpf /usr/bin/arc-misc.sh /tmpRoot/usr/bin/arc-misc.sh
 
