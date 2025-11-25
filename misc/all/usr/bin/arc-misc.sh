@@ -99,7 +99,7 @@ else
           SF="/etc/iproute2/config/gateway_database"
           BRIDGE=$(/bin/get_key_value "${F}" "BRIDGE")
           [ -n "${BRIDGE}" ] && CF="/etc/sysconfig/network-scripts/ifcfg-${BRIDGE}"
-          sed -i "s|^BOOTPROTO=.*|BOOTPROTO=dhcp|; s|^ONBOOT=.*|ONBOOT=yes|; s|^IPV6INIT=.*|IPV6INIT=no|; s|^IPV6_ACCEPT_RA=.*|IPV6_ACCEPT_RA=0|; /^IPADDR/d; /NETMASK/d; /GATEWAY/d; /DNS1/d; /DNS2/d" "${CF}"
+          sed -i "s|^BOOTPROTO=.*|BOOTPROTO=dhcp|; s|^ONBOOT=.*|ONBOOT=yes|; s|^IPV6INIT=.*|IPV6INIT=auto_dhcp|; /^IPADDR/d; /NETMASK/d; /GATEWAY/d; /DNS1/d; /DNS2/d" "${CF}"
           ${SSKV} "${SF}" "${BRIDGE:-$ETH}" dns ""
           ${SSKV} "${SF}" "${BRIDGE:-$ETH}" gateway ""
           /etc/rc.network restart "${BRIDGE:-$ETH}" >/dev/null 2>&1
