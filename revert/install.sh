@@ -38,15 +38,22 @@ if [ "${1}" = "late" ]; then
       echo "WantedBy=multi-user.target"
     } >"/tmpRoot/usr/lib/systemd/system/revert.service"
 
-    mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
-    ln -vsf /usr/lib/systemd/system/revert.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/revert.service
+    mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
+    ln -sf /usr/lib/systemd/system/revert.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/revert.service
   else
     rm -f "/tmpRoot/usr/lib/systemd/system/revert.service"
     rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/revert.service"
   fi
 
   # Backup loader config
-  rm -rf "/tmpRoot/usr/arc/VERSION" "/tmpRoot/usr/arc/backup" 2>/dev/null
-  [ -f "/usr/arc/VERSION" ] && { mkdir -p "/tmpRoot/usr/arc/"; cp -pf /usr/arc/VERSION "/tmpRoot/usr/arc/VERSION"; }
-  [ -d "/usr/arc/backup" ] && { mkdir -p "/tmpRoot/usr/arc/backup"; cp -raf /usr/arc/backup/* "/tmpRoot/usr/arc/backup/"; }
+  rm -f "/tmpRoot/usr/arc/VERSION" 2>/dev/null
+  rm -rf "/tmpRoot/usr/arc/backup" 2>/dev/null
+  if [ -f "/usr/arc/VERSION" ]; then
+    cp -pf /usr/arc/VERSION "/tmpRoot/usr/arc/VERSION"
+  fi
+  if [ -d "/usr/arc/backup" ]; then
+    mkdir -p "/tmpRoot/usr/arc/backup"
+    cp -raf /usr/arc/backup/* "/tmpRoot/usr/arc/backup/"
+  fi
+  [ -f "/tmpRoot/usr/arc/backup/p1/VERSION" ] && rm -f "/tmpRoot/usr/arc/backup/p1/VERSION"
 fi

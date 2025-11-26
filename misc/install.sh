@@ -175,12 +175,11 @@ elif [ "${1}" = "late" ]; then
   # arc
   cp -vpf /usr/bin/loader-reboot.sh /tmpRoot/usr/bin/loader-reboot.sh
   cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
-  cp -vpf /usr/bin/PatchELFSharp /tmpRoot/usr/bin/PatchELFSharp
   cp -vpf /usr/bin/jq /tmpRoot/usr/bin/jq
 
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
   mkdir -vp /tmpRoot/usr/lib/systemd/system
-  rm -vf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
+  rm -f /tmpRoot/usr/lib/modules-load.d/70-network*.conf
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
@@ -201,6 +200,10 @@ elif [ "${1}" = "late" ]; then
       ln -vsf /usr/lib/systemd/system/getty\@${TTYN}.service /tmpRoot/usr/lib/systemd/system/getty.target.wants/getty\@${TTYN}.service
     fi
   done
+
+  # cleanup
+  [ -f /tmpRoot/usr/sbin/arccontrol.sh ] && rm -f /tmpRoot/usr/sbin/arccontrol.sh 2>/dev/null
+  [ -f /tmpRoot/usr/lib/systemd/system/arccontrol.service ] && rm -f /tmpRoot/usr/lib/systemd/system/arccontrol.service 2>/dev/null
 
   # arc-misc
   cp -vpf /usr/bin/arc-misc.sh /tmpRoot/usr/bin/arc-misc.sh
