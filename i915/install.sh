@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -10,12 +10,12 @@ PLATFORMS="apollolake geminilake"
 PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
 
 if ! echo "${PLATFORMS}" | grep -wq "${PLATFORM}"; then
-  echo "${PLATFORM} is not supported i915le10th addon!"
+  echo "${PLATFORM} is not supported i915 addon!"
   exit 0
 fi
 
 if [ "${1}" = "patches" ]; then
-  echo "Installing addon i915le10th - ${1}"
+  echo "Installing addon i915 - ${1}"
 
   if [ -n "${2}" ]; then
     GPU="$(echo "${2}" | sed 's/://g; s/.*/\L&/')"
@@ -56,7 +56,7 @@ if [ "${1}" = "patches" ]; then
   [ "${isLoad}" = "1" ] && /usr/sbin/modprobe i915
 
 elif [ "${1}" = "late" ]; then
-  echo "Installing addon i915le10th - ${1}"
+  echo "Installing addon i915 - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
@@ -66,7 +66,7 @@ elif [ "${1}" = "late" ]; then
     cp -vpf "/usr/lib/modules/i915.ko" "${KO_FILE}"
   fi
 elif [ "${1}" = "uninstall" ]; then
-  echo "Installing addon i915le10th - ${1}"
+  echo "Installing addon i915 - ${1}"
 
   KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
   [ -f "${KO_FILE}.bak" ] && mv -f "${KO_FILE}.bak" "${KO_FILE}"

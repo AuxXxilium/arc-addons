@@ -26,14 +26,15 @@ elif [ "${1}" = "modules" ]; then
     exit 1
   }
   echo "Triggering add events to udev"
-  /usr/bin/udevadm trigger --type=subsystems --action=add
-  /usr/bin/udevadm trigger --type=devices --action=add
-  /usr/bin/udevadm trigger --type=devices --action=change
-  /usr/bin/udevadm settle --timeout=30 || echo "udevadm settle failed"
+  udevadm trigger --type=subsystems --action=add
+  udevadm trigger --type=devices --action=add
+  udevadm trigger --type=devices --action=change
+  udevadm settle --timeout=30 || echo "udevadm settle failed"
   # Give more time
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
-  /usr/bin/killall udevd
+  # udevadm control --stop || true
+  /usr/bin/killall udevd || true
   # modprobe modules for the beep
   /usr/sbin/modprobe pcspeaker || true
   /usr/sbin/modprobe pcspkr || true
