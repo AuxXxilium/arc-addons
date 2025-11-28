@@ -13,9 +13,10 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p /tmpRoot/usr/vmtools
   tar -zxf /addons/vmtools-7.1.tgz -C /tmpRoot/usr/vmtools
-  ln -vsf /usr/vmtools/etc/open-vm-tools /tmpRoot/etc/open-vm-tools
+  ln -vsf /usr/vmtools/etc/vmware-tools /tmpRoot/etc/open-vm-tools
+  ln -vsf /usr/vmtools/etc/vmware-tools /tmpRoot/etc/vmware-tools
   ln -vsf /usr/vmtools/lib/open-vm-tools /tmpRoot/lib/open-vm-tools
-  ln -vsf /usr/vmtools/share/open-vm-tools /tmpRoot/share/open-vm-tools
+  ln -vsf /usr/vmtools/share/open-vm-tools /tmpRoot/usr/share/open-vm-tools
 
   VMTOOLS_PATH="/usr/vmtools"
   VMTOOLS_PID="/var/run/vmtools.pid"
@@ -120,8 +121,9 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/vmtools.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/vmtools.service"
 
-  rm -rf /tmpRoot/share/open-vm-tools
   rm -rf /tmpRoot/lib/open-vm-tools
   rm -rf /tmpRoot/etc/open-vm-tools
+  rm -rf /tmpRoot/etc/vmware-tools
+  rm -rf /tmpRoot/usr/share/open-vm-tools
   rm -rf /tmpRoot/usr/vmtools
 fi
