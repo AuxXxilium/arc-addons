@@ -37,53 +37,53 @@ if [ "${1}" = "-r" ]; then
   exit 0
 fi
 
-if [ -n "${1}" ] && [ -n "${2}" ]; then
-  # Validate HDD_BAY
-  HDD_BAY=""
-  for BAY in "${HDD_BAY_LIST[@]}"; do
-      if [[ "${BAY,,}" == "${1,,}" ]]; then
-          HDD_BAY="${BAY}"
-          break
-      fi
-  done
-  
-  if [ -z "${HDD_BAY}" ]; then
-      echo "parameter 1 error: Invalid HDD_BAY. Allowed values are: ${HDD_BAY_LIST[*]}"
-      exit 1
-  fi
-  
-  # Validate SSD_BAY
-  SSD_BAY="$(echo "${2^^}" | sed 's/*/X/')"
-  if ! [[ "${SSD_BAY}" =~ ^[0-9]{1,2}X[0-9]{1,2}$ ]]; then
-      echo "parameter 2 error: Invalid SSD_BAY. Format must be rowXcolumn (e.g., 1X8, 2X4)."
-      exit 1
-  fi
-elif [ -n "${_ARCPANEL}" ]; then
-  HDD_BAY="${_ARCPANEL%-*}"
-  SSD_BAY="${_ARCPANEL#*-}"
+if [ -f "/run/model.dtb" ]; then
+  IDX="$(grep -ao "internal_slot@" "/run/model.dtb" | wc -w)"
 else
-  if [ -z "${HDD_BAY}" ]; then
-    if [ -f "/run/model.dtb" ]; then
-      IDX="$(grep -ao "internal_slot@" "/run/model.dtb" | wc -w)"
-    else
-      IDX="$(synodisk --enum -t internal 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
-    fi
-    while [ ${IDX:-0} -le 60 ]; do
-      for i in "${HDD_BAY_LIST[@]}"; do
-        echo "${i}" | grep -q "_${IDX:-0}_" && HDD_BAY="${i}" && break 2
-      done
-      IDX=$((${IDX:-0} + 1))
-    done
-    HDD_BAY="${HDD_BAY:-"RACK_60_Bay"}"
+  IDX="$(synodisk --enum -t internal 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+fi
+while [ ${IDX:-0} -le 60 ]; do
+  for i in "${HDD_BAY_LIST[@]}"; do
+    echo "${i}" | grep -q "_${IDX:-0}_" && HDD_BAY="${i}" && break 2
+  done
+  IDX=$((${IDX:-0} + 1))
+done
+HDD_BAY="${HDD_BAY:-"RACK_60_Bay"}"
+
+if [ -z "${SSD_BAY}" ]; then
+  if [ -f "/run/model.dtb" ]; then
+    IDX="$(grep -ao "nvme_slot@" "/run/model.dtb" | wc -w)"
+  else
+    IDX="$(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+  fi
+  [ "${IDX:-0}" -le 8 ] && SSD_BAY="1X${IDX:-0}" || SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
+fi
+
+if [ -n "${_ARCPANEL}" ]; then
+  ARCPANEL_HDD_BAY="${_ARCPANEL%-*}"
+  ARCPANEL_SSD_BAY="${_ARCPANEL#*-}"
+
+  # Extract numeric values for comparison
+  ARCPANEL_HDD_COUNT=$(echo "${ARCPANEL_HDD_BAY}" | grep -o '[0-9]\+' | tail -n1)
+  HDD_BAY_COUNT=$(echo "${HDD_BAY}" | grep -o '[0-9]\+' | tail -n1)
+
+  ARCPANEL_SSD_ROW=$(echo "${ARCPANEL_SSD_BAY}" | cut -d'X' -f1)
+  ARCPANEL_SSD_COL=$(echo "${ARCPANEL_SSD_BAY}" | cut -d'X' -f2)
+  SSD_BAY_ROW=$(echo "${SSD_BAY}" | cut -d'X' -f1)
+  SSD_BAY_COL=$(echo "${SSD_BAY}" | cut -d'X' -f2)
+
+  # Compare HDD_BAY values
+  if [ "${HDD_BAY_COUNT:-0}" -gt "${ARCPANEL_HDD_COUNT:-0}" ]; then
+    echo "Using HDD_BAY (${HDD_BAY}) instead of preset HDD_BAY (${ARCPANEL_HDD_BAY})"
+  else
+    HDD_BAY="${ARCPANEL_HDD_BAY}"
   fi
 
-  if [ -z "${SSD_BAY}" ]; then
-    if [ -f "/run/model.dtb" ]; then
-      IDX="$(grep -ao "nvme_slot@" "/run/model.dtb" | wc -w)"
-    else
-      IDX="$(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
-    fi
-    [ "${IDX:-0}" -le 8 ] && SSD_BAY="1X${IDX:-0}" || SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
+  # Compare SSD_BAY values
+  if [ "${SSD_BAY_ROW:-0}" -gt "${ARCPANEL_SSD_ROW:-0}" ] || [ "${SSD_BAY_COL:-0}" -gt "${ARCPANEL_SSD_COL:-0}" ]; then
+    echo "Using SSD_BAY (${SSD_BAY}) instead of preset SSD_BAY (${ARCPANEL_SSD_BAY})"
+  else
+    SSD_BAY="${ARCPANEL_SSD_BAY}"
   fi
 fi
 
