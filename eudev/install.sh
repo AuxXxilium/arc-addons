@@ -6,6 +6,20 @@
 # See /LICENSE for more information.
 #
 
+# Generate udev rules to ignore already loaded modules
+generate_udev_rules() {
+  RULES_FILE="/usr/lib/udev/rules.d/99-z-ignore-loaded-modules.rules"
+  echo "# Dynamically generated rules to ignore already loaded modules" > "${RULES_FILE}"
+
+  /usr/sbin/lsmod | awk 'NR>1 {print $1}' | while read -r MODULE; do
+    echo "ACTION==\"add\", SUBSYSTEM==\"module\", KERNEL==\"${MODULE}\", OPTIONS+=\"ignore_device\"" >> "${RULES_FILE}"
+  done
+
+  # Reload udev rules
+  udevadm control --reload-rules
+  echo "Generated udev rules to ignore already loaded modules."
+}
+
 if [ "${1}" = "early" ]; then
   echo "Installing addon eudev - ${1}"
   tar -zxf /addons/eudev-7.1.tgz -C /
@@ -26,14 +40,11 @@ elif [ "${1}" = "modules" ]; then
     exit 1
   }
   echo "Triggering add events to udev"
-  udevadm trigger --type=subsystems --action=add
-  udevadm trigger --type=devices --action=add
-  udevadm trigger --type=devices --action=change
-  udevadm settle --timeout=30 || echo "udevadm settle failed"
-  # Give more time
-  sleep 10
+  udevadm trigger --action=add
+  udevadm trigger --action=change
+  udevadm settle --timeout=60 || echo "udevadm settle failed"
   # Remove from memory to not conflict with RAID mount scripts
-  # udevadm control --stop || true
+  udevadm control --stop || true
   /usr/bin/killall udevd || true
   # modprobe modules for the beep
   /usr/sbin/modprobe pcspeaker || true
@@ -50,7 +61,6 @@ elif [ "${1}" = "modules" ]; then
   /usr/sbin/modprobe 9p || true
   /usr/sbin/modprobe virtiofs || true
 
-
   for P in tcp sch; do
     for F in /usr/lib/modules/${P}_*.ko; do
       [ ! -e "${F}" ] && continue
@@ -61,6 +71,8 @@ elif [ "${1}" = "modules" ]; then
   # Remove kvm module
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_intel && /usr/sbin/modprobe -r kvm_intel || true # kvm-intel.ko
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_amd && /usr/sbin/modprobe -r kvm_amd || true     # kvm-amd.ko
+
+  generate_udev_rules
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon eudev - ${1}"
