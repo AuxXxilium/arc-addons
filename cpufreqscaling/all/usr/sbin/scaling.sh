@@ -9,7 +9,7 @@
 set_governor() {
   echo "CPUFreqScaling: Setting governor to ${GOVERNOR}"
   scaling_files=()
-  for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+  for cpu in /sys/devices/system/cpu/cpu*; do
     [ -d "${cpu}/cpufreq" ] && scaling_files+=("${cpu}/cpufreq/scaling_governor")
   done
   if [ "${#scaling_files[@]}" -gt 0 ]; then
@@ -21,7 +21,7 @@ set_governor() {
 }
 
 all_cpus_set() {
-  for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+  for cpu in /sys/devices/system/cpu/cpu*; do
     [ -d "${cpu}/cpufreq" ] && [ "$(cat "${cpu}/cpufreq/scaling_governor" 2>/dev/null)" != "${GOVERNOR}" ] && return 1
   done
   return 0
@@ -35,10 +35,17 @@ if [ -z "${GOVERNOR}" ]; then
   exit 1
 fi
 
-if [ "${GOVERNOR}" != "schedutil" ] && ! lsmod | grep -qw "cpufreq_${GOVERNOR}"; then
-  depmod -a || true
-  insmod "/usr/lib/modules/cpufreq_governor.ko" 2>/dev/null || true
-  insmod "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" 2>/dev/null || true
+if [ "${GOVERNOR}" != "schedutil" ]; then
+  REQUIRED_MODULES=("cpufreq_stats" "cpufreq_governor" "cpufreq_${GOVERNOR}")
+
+  for MODULE in "${REQUIRED_MODULES[@]}"; do
+    if ! lsmod | grep -qw "${MODULE}"; then
+      MODULE_PATH="/usr/lib/modules/${MODULE}.ko"
+      if [ -f "${MODULE_PATH}" ]; then
+        insmod "${MODULE_PATH}" 2>/dev/null || echo "Failed to load module: ${MODULE}"
+      fi
+    fi
+  done
 fi
 
 for i in {1..3}; do
