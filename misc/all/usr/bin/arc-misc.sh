@@ -47,8 +47,8 @@ set_section_kv() {
   fi
 }
 
-GCKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/bin/get_key_value")
-SCKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
+GCKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/usr/bin/get_key_value")
+SCKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/usr/bin/set_key_value")
 GSKV=$([ -x "/usr/syno/bin/get_section_key_value" ] && echo "/usr/syno/bin/get_section_key_value" || echo "get_section_kv")
 SSKV=$([ -x "/usr/syno/bin/set_section_key_value" ] && echo "/usr/syno/bin/set_section_key_value" || echo "set_section_kv")
 
