@@ -9,9 +9,9 @@
 HDD_BAY_LIST=(RACK_0_Bay RACK_2_Bay RACK_4_Bay RACK_8_Bay RACK_10_Bay RACK_12_Bay RACK_12_Bay_2 RACK_16_Bay RACK_20_Bay RACK_24_Bay RACK_60_Bay
   TOWER_1_Bay TOWER_2_Bay TOWER_4_Bay TOWER_4_Bay_J TOWER_4_Bay_S TOWER_5_Bay TOWER_6_Bay TOWER_8_Bay TOWER_12_Bay)
 
-_UNIQUE="$(/usr/bin/get_key_value /etc.defaults/synoinfo.conf unique)"
-_BUILD="$(/usr/bin/get_key_value /etc.defaults/VERSION buildnumber)"
-_ARCPANEL="$(/usr/bin/cat /usr/arc/storagepanel.conf 2>/dev/null)"
+_UNIQUE="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique)"
+_BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
+_ARCPANEL="$(/bin/cat /usr/arc/storagepanel.conf 2>/dev/null)"
 
 if [ ${_BUILD:-64570} -gt 64570 ]; then
   FILE_JS="/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js"

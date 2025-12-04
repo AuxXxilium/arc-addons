@@ -25,7 +25,7 @@ if [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/storagepanel.sh ${2} ${3}"
+    echo "ExecStart=/usr/bin/storagepanel.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
