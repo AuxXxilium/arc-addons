@@ -9,9 +9,9 @@
 HDD_BAY_LIST=(RACK_0_Bay RACK_2_Bay RACK_4_Bay RACK_8_Bay RACK_10_Bay RACK_12_Bay RACK_12_Bay_2 RACK_16_Bay RACK_20_Bay RACK_24_Bay RACK_60_Bay
   TOWER_1_Bay TOWER_2_Bay TOWER_4_Bay TOWER_4_Bay_J TOWER_4_Bay_S TOWER_5_Bay TOWER_6_Bay TOWER_8_Bay TOWER_12_Bay)
 
-_UNIQUE="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique)"
-_BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
-_ARCPANEL="$(/bin/cat /usr/arc/storagepanel.conf 2>/dev/null)"
+_UNIQUE="$(/usr/bin/get_key_value /etc.defaults/synoinfo.conf unique)"
+_BUILD="$(/usr/bin/get_key_value /etc.defaults/VERSION buildnumber)"
+_ARCPANEL="$(/usr/bin/cat /usr/arc/storagepanel.conf 2>/dev/null)"
 
 if [ ${_BUILD:-64570} -gt 64570 ]; then
   FILE_JS="/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js"
@@ -31,8 +31,6 @@ if [ "${1}" = "-r" ]; then
     mv -f "${FILE_GZ}.bak" "${FILE_GZ}"
     gzip -dc "${FILE_GZ}" >"${FILE_JS}"
   fi
-  SM_KEY="sm_machine_img_config_name"
-  synosetkeyvalue "/etc.defaults/synoinfo.conf" "${SM_KEY}" "$(synogetkeyvalue /etc/synoinfo.conf "${SM_KEY}")"
   rm -f /usr/arc/storagepanel.conf 2>/dev/null
   exit 0
 fi
@@ -50,14 +48,12 @@ while [ ${IDX:-0} -le 60 ]; do
 done
 HDD_BAY="${HDD_BAY:-"RACK_60_Bay"}"
 
-if [ -z "${SSD_BAY}" ]; then
-  if [ -f "/run/model.dtb" ]; then
-    IDX="$(grep -ao "nvme_slot@" "/run/model.dtb" | wc -w)"
-  else
-    IDX="$(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
-  fi
-  [ "${IDX:-0}" -le 8 ] && SSD_BAY="1X${IDX:-0}" || SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
+if [ -f "/run/model.dtb" ]; then
+  IDX="$(grep -ao "nvme_slot@" "/run/model.dtb" | wc -w)"
+else
+  IDX="$(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
 fi
+[ "${IDX:-0}" -le 8 ] && SSD_BAY="1X${IDX:-0}" || SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
 
 if [ -n "${_ARCPANEL}" ]; then
   ARCPANEL_HDD_BAY="${_ARCPANEL%-*}"
@@ -105,8 +101,6 @@ if [ -f "/usr/lib/systemd/system/nvmesystem.service" ] || [ -f "/usr/lib/systemd
 fi
 gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
-SM_KEY="sm_machine_img_config_name"
-synosetkeyvalue "/etc.defaults/synoinfo.conf" "${SM_KEY}" "" # "${HDD_BAY}-M2X1"
-[ -n "${HDD_BAY}" ] && [ -n "${SSD_BAY}" ] && echo "${HDD_BAY}-${SSD_BAY}" > /usr/arc/storagepanel.conf
+[[ -n "${HDD_BAY}" && -n "${SSD_BAY}" ]] && echo "${HDD_BAY}-${SSD_BAY}" > /usr/arc/storagepanel.conf
 
 exit 0
