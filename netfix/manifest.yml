@@ -1,0 +1,22 @@
+version: 1
+name: netfix
+description: "Fix network for DSM 7.3"
+system: true
+beta: false
+all:
+  install-script: "install.sh"
+  copy: ""
+apollolake: true
+broadwell: true
+broadwellnk: true
+broadwellnkv2: true
+broadwellntbap: true
+denverton: true
+geminilake: true
+geminilakenk: true
+purley: true
+v1000: true
+v1000nk: true
+r1000: true
+r1000nk: true
+epyc7002: true
