@@ -16,9 +16,16 @@ if [ "${1}" = "early" ]; then
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
+  if grep -q 'RR@RR' /proc/version 2>/dev/null && lspci -nd ::300 2>/dev/null | grep -q 8086; then
+    mv -vf /usr/lib/modules/update/* /usr/lib/modules/ 2>/dev/null || true
+  else
+    rm -rf /usr/lib/modules/update 2>/dev/null || true
+  fi
+
   # mv -f /usr/lib/udev/rules.d/60-persistent-storage.rules /usr/lib/udev/rules.d/60-persistent-storage.rules.bak
   # mv -f /usr/lib/udev/rules.d/60-persistent-storage-tape.rules /usr/lib/udev/rules.d/60-persistent-storage-tape.rules.bak
-  # mv -f /usr/lib/udev/rules.d/80-net-name-slot.rules /usr/lib/udev/rules.d/80-net-name-slot.rules.bak
+  # mv -f /usr/lib/udev/rules.d/75-persistent-net-generator.rules /usr/lib/udev/rules.d/75-persistent-net-generator.rules.bak
+  ## mv -f /usr/lib/udev/rules.d/80-net-name-slot.rules /usr/lib/udev/rules.d/80-net-name-slot.rules.bak
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
   /usr/sbin/depmod -a
   /usr/sbin/udevd -d || {
@@ -26,21 +33,20 @@ elif [ "${1}" = "modules" ]; then
     exit 1
   }
   echo "Triggering add events to udev"
-  udevadm trigger --action=add
-  udevadm trigger --action=change
-  udevadm settle --timeout=60 || echo "udevadm settle failed"
+  udevadm trigger --type=subsystems --action=add
+  udevadm trigger --type=devices --action=add
+  udevadm trigger --type=devices --action=change
+  udevadm settle --timeout=30 || echo "udevadm settle failed"
+  # Give more time
+  sleep 10
   # Remove from memory to not conflict with RAID mount scripts
-  /usr/bin/killall udevd || true
+  /usr/bin/killall udevd
   # modprobe modules for the beep
   /usr/sbin/modprobe pcspeaker || true
   /usr/sbin/modprobe pcspkr || true
   # modprobe modules for the sensors
-  for MODULE in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
-    if [ -f "/lib/modules/${MODULE}.ko" ]; then
-      /usr/sbin/modprobe "${MODULE}" || true
-    else
-      echo "Module ${MODULE} not found, skipping."
-    fi
+  for I in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
+    /usr/sbin/modprobe "${I}" || true
   done
   # modprobe modules for the virtiofs
   /usr/sbin/modprobe 9p || true
@@ -83,7 +89,7 @@ elif [ "${1}" = "late" ]; then
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
       echo "Custom Kernel Restore - restore modules from backup."
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
-      /tmpRoot/bin/mv -rf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
+      /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
     for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
       O=$(echo "${L}" | awk -F'###' '{print $1}')
@@ -108,6 +114,7 @@ elif [ "${1}" = "late" ]; then
   /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
+  DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
   {
     echo "[Unit]"
     echo "Description=udev daemon"
@@ -120,7 +127,7 @@ elif [ "${1}" = "late" ]; then
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
-  } >"/tmpRoot/usr/lib/systemd/system/udevrules.service"
+  } >"${DEST}"
 
   mkdir -vp /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/udevrules.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/udevrules.service

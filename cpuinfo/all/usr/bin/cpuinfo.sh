@@ -90,7 +90,13 @@ fi
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
 if ! ps aux | grep -v grep | grep -q "/usr/sbin/cpuinfo" >/dev/null; then
-  "/usr/sbin/cpuinfo" &
+  nohup "/usr/sbin/cpuinfo" >/dev/null 2>&1 &
+  PROXY_PID=$!
+  disown ${PROXY_PID}
+  if [ -d "/proc/${PROXY_PID}" ]; then
+    echo -1000 > "/proc/${PROXY_PID}/oom_score_adj" 2>/dev/null || true
+    renice -n -10 ${PROXY_PID} >/dev/null 2>&1 || true
+  fi
   [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
   sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /etc/nginx/nginx.conf
   [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
