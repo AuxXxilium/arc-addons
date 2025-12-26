@@ -91,6 +91,7 @@ elif [ "${1}" = "late" ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
+    # Copy modules from modulelist
     for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
       O=$(echo "${L}" | awk -F'###' '{print $1}')
       M=$(echo "${L}" | awk -F'###' '{print $2}')
@@ -101,6 +102,14 @@ elif [ "${1}" = "late" ]; then
         /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
       fi
       isChange=true
+    done
+    # Copy currently loaded modules
+    for ML in $(lsmod | awk 'NR>1 {print $1}'); do
+      MODULE_PATH=$(find /usr/lib/modules -name "${ML}.ko" 2>/dev/null)
+      if [ -n "${MODULE_PATH}" ]; then
+        /tmpRoot/bin/cp -vrf "${MODULE_PATH}" /tmpRoot/usr/lib/modules/
+        isChange=true
+      fi
     done
   fi
   echo "isChange: ${isChange}"
