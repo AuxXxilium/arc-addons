@@ -7,7 +7,7 @@
 #
 
 VOLUME=$(/usr/syno/bin/servicetool --get-available-volume | head -1)
-if [ -z "${VOLUME}" ]; then
+if [ -z "${VOLUME}" ] || [ ! -d "${VOLUME}" ]; then
   echo "No available volume found."
   exit 0
 fi
@@ -37,12 +37,13 @@ else
       echo "Creating share ${SHARE_NAME} at ${SHARE_PATH}"
       synoshare --add "${SHARE_NAME}" "${SHARE_DESC}" "${SHARE_PATH}" "" "@user" "" 1 0
     fi
-
-    MOUNT_POINT="${SHARE_PATH}/${TAG}"
-    mkdir -p "${MOUNT_POINT}"
-    if ! mount | grep -qw "on ${MOUNT_POINT} "; then
-      echo "Mounting ${TAG} to ${MOUNT_POINT}"
-      mount -t 9p -o trans=virtio,version=9p2000.L "${TAG}" "${MOUNT_POINT}"
+    if [ -d "${SHARE_PATH}" ]; then
+      MOUNT_POINT="${SHARE_PATH}/${TAG}"
+      mkdir -p "${MOUNT_POINT}"
+      if ! mount | grep -qw "on ${MOUNT_POINT} "; then
+        echo "Mounting ${TAG} to ${MOUNT_POINT}"
+        mount -t 9p -o trans=virtio,version=9p2000.L "${TAG}" "${MOUNT_POINT}"
+      fi
     fi
   done
 
@@ -59,12 +60,13 @@ else
       echo "Creating share ${SHARE_NAME} at ${SHARE_PATH}"
       synoshare --add "${SHARE_NAME}" "${SHARE_DESC}" "${SHARE_PATH}" "" "@user" "" 1 0
     fi
-
-    MOUNT_POINT="${SHARE_PATH}/${TAG}"
-    mkdir -p "${MOUNT_POINT}"
-    if ! mount | grep -qw "on ${MOUNT_POINT} "; then
-      echo "Mounting ${TAG} to ${MOUNT_POINT}"
-      mount -t virtiofs -o sync,dirsync "${TAG}" "${MOUNT_POINT}"
+    if [ -d "${SHARE_PATH}" ]; then
+      MOUNT_POINT="${SHARE_PATH}/${TAG}"
+      mkdir -p "${MOUNT_POINT}"
+      if ! mount | grep -qw "on ${MOUNT_POINT} "; then
+        echo "Mounting ${TAG} to ${MOUNT_POINT}"
+        mount -t virtiofs -o sync,dirsync "${TAG}" "${MOUNT_POINT}"
+      fi
     fi
   done
 fi

@@ -29,7 +29,7 @@
 # /var/packages/StorageManager/target/ui/storage_panel.js
 
 
-scriptver="v3.6.111"
+scriptver="v3.6.116"
 script=Synology_HDD_db
 repo="007revad/Synology_HDD_db"
 scriptname=syno_hdd_db
@@ -257,6 +257,11 @@ if [[ $dsm -gt "6" ]]; then
     version="_v$dsm"
 fi
 
+# Get DSM major and minor version
+major=$(/usr/syno/bin/synogetkeyvalue /etc.defaults/VERSION majorversion)
+minor=$(/usr/syno/bin/synogetkeyvalue /etc.defaults/VERSION minorversion)
+dsmversion="$major$minor"
+
 # Get Synology model
 model=$(cat /proc/sys/kernel/syno_hw_version)
 modelname="$model"
@@ -301,7 +306,25 @@ fi
 # Get StorageManager version
 storagemgrver=$(/usr/syno/bin/synopkg version StorageManager)
 # Show StorageManager version
-if [[ $storagemgrver ]]; then echo -e "StorageManager $storagemgrver\n"; fi
+if [[ $storagemgrver ]]; then echo -e "StorageManager $storagemgrver"; fi
+
+# Get SynoOnlinePack version
+if [[ $dsmversion -gt "72" ]]; then
+    # Is DSM 7.3 or later
+    if [[ -f /var/packages/SynoOnlinePack_v3/INFO ]]; then
+        SOPinfo="/var/packages/SynoOnlinePack_v3/INFO"
+        v2="_v3"
+    elif [[ -f /var/packages/SynoOnlinePack_v2/INFO ]]; then
+        SOPinfo="/var/packages/SynoOnlinePack_v2/INFO"
+        v2="_v2"
+    else
+        SOPinfo="/var/packages/SynoOnlinePack/INFO"
+    fi
+    SOPpkgver="$(/usr/syno/bin/synogetkeyvalue $SOPinfo version)"
+    echo -e "SynoOnlinePack$v2 version $SOPpkgver\n"
+else
+    echo ""
+fi
 
 # Show host drive db version
 if [[ -f "/var/lib/disk-compatibility/${model}_host_v7.version" ]]; then
@@ -389,29 +412,6 @@ echo "Running from: ${scriptpath}/$scriptfile"
 
 #echo "tag: $tag"              # debug
 #echo "scriptver: $scriptver"  # debug
-
-
-# Warn if script located on M.2 drive
-get_script_vol() {
-    local script_root vol_num vg_name
-    script_root="${scriptpath#/*}"
-    script_root="${script_root%%/*}"
-    if [[ $script_root =~ ^volume ]]
-    then
-        vol_num="${script_root:6}"
-        vg_name=$(lvs --noheadings --select=lv_name="volume_$vol_num" --options=vg_name)
-        vg_name="${vg_name// }"
-        vol_name=$(pvs --noheadings --select=vg_name="$vg_name" --options=pv_name)
-        vol_name="${vol_name// }"
-    else
-        vol_name=$(df --output=source "/$script_root" |sed 1d)
-    fi
-}
-get_script_vol # sets $vol_name to /dev/whatever
-if grep -qE "^${vol_name#/dev/} .+ nvme" /proc/mdstat
-then
-    echo -e "\n${Yellow}WARNING${Off} Don't store this script on an NVMe volume!"
-fi
 
 
 cleanup_tmp(){ 
@@ -502,6 +502,15 @@ if ! printf "%s\n%s\n" "$tag" "$scriptver" |
                                 syslog_set warn "$script failed to copy $tag to script location"
                             fi
 
+                            # Copy new script companion sh file to script location
+                            if ! cp -p "/tmp/$script-$shorttag/syno_hdd_shutdown.sh" "${scriptpath}/syno_hdd_shutdown.sh";
+                            then
+                                copyerr=1
+                                echo -e "${Error}ERROR${Off} Failed to copy"\
+                                    "$script-$shorttag sh file(s) to:\n $scriptpath/syno_hdd_shutdown.sh"
+                                syslog_set warn "$script failed to copy syno_hdd_shutdown.sh to script location"
+                            fi
+
                             # Copy new syno_hdd_vendor_ids.txt file
                             vidstxt="syno_hdd_vendor_ids.txt"
                             if [[ $scriptpath =~ /volume* ]]; then
@@ -573,6 +582,29 @@ if ! printf "%s\n%s\n" "$tag" "$scriptver" |
             fi
         fi
     fi
+fi
+
+
+# Warn if script located on M.2 drive
+get_script_vol() {
+    local script_root vol_num vg_name
+    script_root="${scriptpath#/*}"
+    script_root="${script_root%%/*}"
+    if [[ $script_root =~ ^volume ]]; then
+        vol_num="${script_root:6}"
+        vg_name=$(lvs --noheadings --select=lv_name="volume_$vol_num" --options=vg_name)
+        vg_name="${vg_name// }"
+        # Only get first partition on volume group
+        vol_name=$(pvs --noheadings --select=vg_name="$vg_name" --options=pv_name | awk '{print $1}' | head -n 1)
+    else
+        vol_name=$(df --output=source "/$script_root" | sed 1d)  # sed 1d = delete first line
+    fi
+}
+get_script_vol # sets $vol_name to /dev/whatever
+if grep -qE "^${vol_name#/dev/} .+ nvme" /proc/mdstat; then
+    ding
+    echo -e "\n${Yellow}WARNING${Off} Don't store this script on an NVMe volume!"
+    exit 3
 fi
 
 
@@ -1326,6 +1358,102 @@ backupdb(){
 }
 
 
+compactdb(){ 
+    # Compact database file if needed
+    local lines
+    lines=$(wc -l "$1" | cut -d" " -f1)
+    if (grep -q ': ' "$1" && grep -q ', ' "$1") || [[ $lines -gt 1 ]]; then
+        # DSM 7.3 and later or pretty-print style
+        cp -p "$1" "$1.tmp" && jq -c . "$1.tmp" > "$1" && chmod 644 "$1" && rm "$1.tmp"
+
+        # Check database is now compact
+        lines=$(wc -l "$1" | cut -d" " -f1)
+        if (grep -q ': ' "$1" && grep -q ', ' "$1") || [[ $lines -gt 1 ]]; then
+            echo -e "${Error}ERROR${Off} Failed to compact ${1##*/}!" >&2
+            return 1
+        else
+            return 0
+        fi
+    fi
+}
+
+
+# Python based function to remove duplicates using EOF method
+check_and_merge_dupes(){ 
+    local file="$1"
+    local count
+    local i
+    local array
+
+    [[ -z "$file" ]] && { echo "ERROR No file specified"; return 1; }
+
+    # Detect duplicate 2nd-level keys (drive models) in json (db) file
+    # jq removes the duplicates so we start with an array of drive models
+    readarray -t array < <(jq . "$file" | grep -e '^    "' | cut -d'"' -f2)
+
+    # Loop through array of drives in db file checking for duplicates
+    for i in "${array[@]}"; do
+        # Check if more than 1 of each drive in db file
+        #count=$(grep -Eo "\"$i\"" "$file" | wc -l)
+        count=$(grep -Foc "$i" "$file")
+        if [[ $count -gt 1 ]]; then
+
+			# Python 3 and 2.7 compatible HERE document
+            python <<EOF
+from __future__ import print_function
+import json
+import shutil
+from collections import OrderedDict
+import io
+import sys
+
+file_path = "$file"
+backup_path = file_path + ".tmp"
+
+# Create a backup first
+shutil.copy(file_path, backup_path)
+
+try:
+    # io.open is compatible with both Python 2 and 3
+    with io.open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    disk_info_items = list(data["disk_compatbility_info"].items())
+    merged = OrderedDict()
+
+    for k, v in disk_info_items:
+        if k not in merged:
+            merged[k] = v
+        else:
+            # merge nested dicts (firmware entries)
+            merged[k].update(v)
+
+    data["disk_compatbility_info"] = merged
+
+    with io.open(file_path, "w", encoding="utf-8") as f:
+        # json.dump(data, f, indent=2, ensure_ascii=False)
+        json.dump(data, f, separators=(',', ':'), ensure_ascii=False)
+
+except Exception as e:
+    print("Error occurred: {}".format(e))
+    # Restore backup on error
+    shutil.copy(backup_path, file_path)
+    raise
+EOF
+
+            if [[ $count -eq 2 ]]; then
+                echo "Removed 1 duplicate drive from ${file##*/}"
+            else
+                echo "Removed $((count -1)) duplicate drives from ${file##*/}"
+            fi
+            
+            chmod 644 "$file"
+            break
+        fi
+    done
+}
+
+
 # Backup host database file if needed
 for i in "${!db1list[@]}"; do
     backupdb "${db1list[i]}" ||{
@@ -1338,6 +1466,17 @@ for i in "${!db2list[@]}"; do
         ding
         exit 5  # maybe don't exit for .db.new file
         }
+done
+
+
+# Compact DSM 7.3.2 database files if needed
+for i in "${!db1list[@]}"; do
+    compactdb "${db1list[i]}" &&\
+    check_and_merge_dupes "${db1list[i]}"
+done
+for i in "${!db2list[@]}"; do
+    compactdb "${db2list[i]}" &&\
+    check_and_merge_dupes "${db2list[i]}"
 done
 
 
@@ -1358,20 +1497,30 @@ editdb7(){
     if [[ $1 == "append" ]]; then  # model not in db file
         #if sed -i "s/}}}/}},\"$hdmodel\":{$fwstrng$default/" "$2"; then  # append
         if sed -i "s/}}}/}},\"${hdmodel//\//\\/}\":{$fwstrng$default/" "$2"; then  # append
-            echo -e "Added ${Yellow}$hdmodel${Off} to ${Cyan}$(basename -- "$2")${Off}"
-            editcount "$2"
+            if jq -e --arg hdmodel "$hdmodel" --arg fwrev "$fwrev" \
+                '.disk_compatbility_info[$hdmodel] | has($fwrev)' "$2" > /dev/null; then
+                echo -e "Added ${Yellow}$hdmodel ($fwrev)${Off} to ${Cyan}$(basename -- "$2")${Off}"
+                editcount "$2"
+            else
+                echo -e "\n${Error}ERROR{Off} Failed to add $hdmodel ($fwrev) to $(basename -- "$2")${Off}"
+            fi
         else
-            echo -e "\n${Error}ERROR 6a${Off} Failed to update $(basename -- "$2")${Off}"
+            echo -e "\n${Error}ERROR 6a${Off} Failed to add $hdmodel ($fwrev) to $(basename -- "$2")${Off}"
             #exit 6
         fi
 
     elif [[ $1 == "insert" ]]; then  # model and default exists
         #if sed -i "s/\"$hdmodel\":{/\"$hdmodel\":{$fwstrng/" "$2"; then  # insert firmware
         if sed -i "s/\"${hdmodel//\//\\/}\":{/\"${hdmodel//\//\\/}\":{$fwstrng/" "$2"; then  # insert firmware
-            echo -e "Updated ${Yellow}$hdmodel${Off} in ${Cyan}$(basename -- "$2")${Off}"
-            #editcount "$2"
+            if jq -e --arg hdmodel "$hdmodel" --arg fwrev "$fwrev" \
+                '.disk_compatbility_info[$hdmodel] | has($fwrev)' "$2" > /dev/null; then
+                echo -e "Updated ${Yellow}$hdmodel ($fwrev)${Off} in ${Cyan}$(basename -- "$2")${Off}"
+                #editcount "$2"
+            else
+                echo -e "\n${Error}ERROR{Off} Failed to update $hdmodel for ($fwrev) in $(basename -- "$2")"
+            fi
         else
-            echo -e "\n${Error}ERROR 6b${Off} Failed to update $(basename -- "$2")${Off}"
+            echo -e "\n${Error}ERROR 6b${Off} Failed to update $hdmodel for ($fwrev) in $(basename -- "$2")"
             #exit 6
         fi
 
@@ -1379,10 +1528,15 @@ editdb7(){
         #if sed -i "s/{}/{\"$hdmodel\":{$fwstrng${default}}/" "$2"; then  # empty
         #if sed -i "s/{}/{\"${hdmodel//\//\\/}\":{$fwstrng${default}}/" "$2"; then  # empty
         if sed -i "s/{}/{\"${hdmodel//\//\\/}\":{$fwstrng${default}/" "$2"; then  # empty
-            echo -e "Added ${Yellow}$hdmodel${Off} to ${Cyan}$(basename -- "$2")${Off}"
-            editcount "$2"
+            if jq -e --arg hdmodel "$hdmodel" --arg fwrev "$fwrev" \
+                '.disk_compatbility_info[$hdmodel] | has($fwrev)' "$2" > /dev/null; then
+                echo -e "Added ${Yellow}$hdmodel ($fwrev)${Off} to ${Cyan}$(basename -- "$2")${Off}"
+                editcount "$2"
+            else
+                echo -e "\n${Error}ERROR{Off} Failed to add $hdmodel ($fwrev) to $(basename -- "$2")"
+            fi
         else
-            echo -e "\n${Error}ERROR 6c${Off} Failed to update $(basename -- "$2")${Off}"
+            echo -e "\n${Error}ERROR 6c${Off} Failed to add $hdmodel ($fwrev) to $(basename -- "$2")"
             #exit 6
         fi
     fi
@@ -1404,11 +1558,13 @@ updatedb(){
 
     if [[ $dbtype -gt "6" ]]; then
         # db type 7 used from DSM 7.1 and later
-        if grep -q "$hdmodel"'":{"'"$fwrev" "$2"; then
-            echo -e "${Yellow}$hdmodel${Off} already exists in ${Cyan}$(basename -- "$2")${Off}" >&2
+        if jq -e --arg hdmodel "$hdmodel" --arg fwrev "$fwrev" \
+            '.disk_compatbility_info[$hdmodel] | has($fwrev)' "$2" > /dev/null; then
+            echo -e "${Yellow}$hdmodel ($fwrev)${Off} already exists in ${Cyan}$(basename -- "$2")${Off}" >&2
         else
-            common_string=\"size_gb\":$size_gb,
-            common_string="$common_string"\"compatibility_interval\":[{
+            #common_string=\"size_gb\":$size_gb,
+            #common_string="$common_string"\"compatibility_interval\":[{
+            common_string=\"compatibility_interval\":[{
             common_string="$common_string"\"compatibility\":\"support\",
             common_string="$common_string"\"not_yet_rolling_status\":\"support\",
             common_string="$common_string"\"fw_dsm_update_status_notify\":false,
@@ -1421,7 +1577,8 @@ updatedb(){
             fwstrng="$fwstrng$common_string"
             fwstrng="$fwstrng"}]},
 
-            default=\"default\":{
+            #default=\"default\":{
+            default=\"default\":{\"size_gb\":$size_gb,
             default="$default$common_string"
             default="$default"}]}}}
 
@@ -1432,7 +1589,7 @@ updatedb(){
                 #echo "Edit empty db file:"  # debug
                 editdb7 "empty" "$2"
 
-            elif grep -q '"'"$hdmodel"'":' "$2"; then
+            elif jq -e --arg hdmodel "$hdmodel" '.disk_compatbility_info[$hdmodel]' "$2" >/dev/null; then
                 # Replace "WD40PURX-64GVNY0":{ with "WD40PURX-64GVNY0":{"80.00A80":{ ... }}},
                 #echo "Insert firmware version:"  # debug
                 editdb7 "insert" "$2"
@@ -1478,7 +1635,7 @@ updatedb(){
             #if sed -i "s/$startstring/$startstring$string/" "$2"; then
             #if sed -i "s/${startstring//\//\\/}/${startstring//\//\\/}$string/" "$2"; then
             if sed -i "s/$startstring/$startstring${string//\//\\/}/" "$2"; then
-                echo -e "Added ${Yellow}$hdmodel${Off} to ${Cyan}$(basename -- "$2")${Off}"
+                echo -e "Added ${Yellow}$hdmodel$ ($fwrev){Off} to ${Cyan}$(basename -- "$2")${Off}"
             else
                 ding
                 echo -e "\n${Error}ERROR 8${Off} Failed to update $(basename -- "$2")${Off}" >&2
@@ -1515,10 +1672,14 @@ while [[ $num -lt "${#hdds[@]}" ]]; do
     # Expansion Units
     for i in "${!eunitdb1list[@]}"; do
         backupdb "${eunitdb1list[i]}" &&\
+            compactdb "${eunitdb1list[i]}" &&\
+            check_and_merge_dupes "${eunitdb1list[i]}" &&\
             updatedb "${hdds[$num]}" "${eunitdb1list[i]}"
     done
     for i in "${!eunitdb2list[@]}"; do
         backupdb "${eunitdb2list[i]}" &&\
+            compactdb "${eunitdb2list[i]}" &&\
+            check_and_merge_dupes "${eunitdb2list[i]}" &&\
             updatedb "${hdds[$num]}" "${eunitdb2list[i]}"
     done
     #------------------------------------------------
@@ -1540,10 +1701,14 @@ while [[ $num -lt "${#nvmes[@]}" ]]; do
     # M.2 adaptor cards
     for i in "${!m2carddb1list[@]}"; do
         backupdb "${m2carddb1list[i]}" &&\
+            compactdb "${m2carddb1list[i]}" &&\
+            check_and_merge_dupes "${m2carddb1list[i]}" &&\
             updatedb "${nvmes[$num]}" "${m2carddb1list[i]}"
     done
     for i in "${!m2carddb2list[@]}"; do
         backupdb "${m2carddb2list[i]}" &&\
+            compactdb "${m2carddb2list[i]}" &&\
+            check_and_merge_dupes "${m2carddb2list[i]}" &&\
             updatedb "${nvmes[$num]}" "${m2carddb2list[i]}"
     done
     #------------------------------------------------
@@ -2145,60 +2310,109 @@ if ls /dev | grep -q "nv[cm]"; then
 fi
 
 
-# Edit synoinfo.conf to prevent drive db updates
-dtu=drive_db_test_url
-url="$(/usr/syno/bin/synogetkeyvalue $synoinfo ${dtu})"
-disabled=""
-if [[ $nodbupdate == "yes" ]]; then
-    if [[ ! $url ]]; then
-        # Add drive_db_test_url="127.0.0.1"
-        #echo 'drive_db_test_url="127.0.0.1"' >> "$synoinfo"
-        /usr/syno/bin/synosetkeyvalue "$synoinfo" "$dtu" "127.0.0.1"
-        # Junior boot
-        #[ -d /tmpRoot ] && /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synoinfo.conf "$dtu" "127.0.0.1"
-        if [ -f /tmpRoot/usr/syno/bin/synosetkeyvalue ] && [ -f /tmpRoot/etc.defaults/synoinfo.conf ]; then
-            /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synoinfo.conf "$dtu" "127.0.0.1"
+# Prevent drive db updates
+if [[ $dsmversion -lt "73" ]]; then
+    # Edit synoinfo.conf to prevent drive db updates
+    dtu=drive_db_test_url
+    url="$(/usr/syno/bin/synogetkeyvalue $synoinfo ${dtu})"
+    disabled=""
+    if [[ $nodbupdate == "yes" ]]; then
+        if [[ ! $url ]]; then
+            # Add drive_db_test_url="127.0.0.1"
+            #echo 'drive_db_test_url="127.0.0.1"' >> "$synoinfo"
+            /usr/syno/bin/synosetkeyvalue "$synoinfo" "$dtu" "127.0.0.1"
+            # Junior boot
+            #[ -d /tmpRoot ] && /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synoinfo.conf "$dtu" "127.0.0.1"
+            if [ -f /tmpRoot/usr/syno/bin/synosetkeyvalue ] && [ -f /tmpRoot/etc.defaults/synoinfo.conf ]; then
+                /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synoinfo.conf "$dtu" "127.0.0.1"
+            fi
+            disabled="yes"
+        elif [[ $url != "127.0.0.1" ]]; then
+            # Edit drive_db_test_url=
+            /usr/syno/bin/synosetkeyvalue "$synoinfo" "$dtu" "127.0.0.1"
+            # Junior boot
+            #[ -d /tmpRoot ] && /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synoinfo.conf "$dtu" "127.0.0.1"
+            if [ -f /tmpRoot/usr/syno/bin/synosetkeyvalue ] && [ -f /tmpRoot/etc.defaults/synoinfo.conf ]; then
+                /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synoinfo.conf "$dtu" "127.0.0.1"
+            fi
+            disabled="yes"
         fi
-        disabled="yes"
-    elif [[ $url != "127.0.0.1" ]]; then
-        # Edit drive_db_test_url=
-        /usr/syno/bin/synosetkeyvalue "$synoinfo" "$dtu" "127.0.0.1"
-        # Junior boot
-        #[ -d /tmpRoot ] && /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synoinfo.conf "$dtu" "127.0.0.1"
-        if [ -f /tmpRoot/usr/syno/bin/synosetkeyvalue ] && [ -f /tmpRoot/etc.defaults/synoinfo.conf ]; then
-            /tmpRoot/usr/syno/bin/synosetkeyvalue /tmpRoot/etc.defaults/synoinfo.conf "$dtu" "127.0.0.1"
-        fi
-        disabled="yes"
-    fi
 
-    # Check if we disabled drive db auto updates
-    url="$(/usr/syno/bin/synogetkeyvalue $synoinfo drive_db_test_url)"
-    if [[ $disabled == "yes" ]]; then
-        if [[ $url == "127.0.0.1" ]]; then
-            echo -e "\nDisabled drive db auto updates."
+        # Check if we disabled drive db auto updates
+        url="$(/usr/syno/bin/synogetkeyvalue $synoinfo drive_db_test_url)"
+        if [[ $disabled == "yes" ]]; then
+            if [[ $url == "127.0.0.1" ]]; then
+                echo -e "\nDisabled drive db auto updates."
+            else
+                echo -e "\n${Error}ERROR${Off} Failed to disable drive db auto updates!"
+            fi
         else
-            echo -e "\n${Error}ERROR${Off} Failed to disable drive db auto updates!"
+            echo -e "\nDrive db auto updates already disabled."
         fi
     else
-        echo -e "\nDrive db auto updates already disabled."
+        # Re-enable drive db updates
+        #if [[ $url == "127.0.0.1" ]]; then
+        if [[ $url ]]; then
+            # Delete "drive_db_test_url=127.0.0.1" line (inc. line break)
+            sed -i "/drive_db_test_url=*/d" "$synoinfo"
+            sed -i "/drive_db_test_url=*/d" /etc/synoinfo.conf
+
+            # Check if we re-enabled drive db auto updates
+            url="$(/usr/syno/bin/synogetkeyvalue $synoinfo drive_db_test_url)"
+            if [[ $url != "127.0.0.1" ]]; then
+                echo -e "\nRe-enabled drive db auto updates."
+            else
+                echo -e "\n${Error}ERROR${Off} Failed to enable drive db auto updates!"
+            fi
+        else
+            echo -e "\nDrive db auto updates already enabled."
+        fi
     fi
 else
-    # Re-enable drive db updates
-    #if [[ $url == "127.0.0.1" ]]; then
-    if [[ $url ]]; then
-        # Delete "drive_db_test_url=127.0.0.1" line (inc. line break)
-        sed -i "/drive_db_test_url=*/d" "$synoinfo"
-        sed -i "/drive_db_test_url=*/d" /etc/synoinfo.conf
+    # Is DSM 7.3 or later
+    if [[ -f /var/packages/SynoOnlinePack_v3/INFO ]]; then
+        SOPinfo="/var/packages/SynoOnlinePack_v3/INFO"
+    elif [[ -f /var/packages/SynoOnlinePack_v2/INFO ]]; then
+        SOPinfo="/var/packages/SynoOnlinePack_v2/INFO"
+    else
+        SOPinfo="/var/packages/SynoOnlinePack/INFO"
+    fi
+    SOPpkgver="$(/usr/syno/bin/synogetkeyvalue $SOPinfo version)"
 
-        # Check if we re-enabled drive db auto updates
-        url="$(/usr/syno/bin/synogetkeyvalue $synoinfo drive_db_test_url)"
-        if [[ $url != "127.0.0.1" ]]; then
-            echo -e "\nRe-enabled drive db auto updates."
+    if [[ $nodbupdate == "yes" ]]; then
+        if [[ ${SOPpkgver:0:4} != "9999" ]]; then
+            # Prepend version with 9999
+            /usr/syno/bin/synosetkeyvalue "$SOPinfo" version "9999$SOPpkgver"
+            disabled="yes"
+        fi
+
+        # Check if we disabled drive db auto updates
+        SOPpkgver2="$(/usr/syno/bin/synogetkeyvalue $SOPinfo version)"
+        if [[ $disabled == "yes" ]]; then
+            if [[ $SOPpkgver2 -gt "$SOPpkgver" ]]; then
+                echo -e "\nDisabled drive db auto updates."
+            else
+                echo -e "\n${Error}ERROR${Off} Failed to disable drive db auto updates!"
+            fi
         else
-            echo -e "\n${Error}ERROR${Off} Failed to enable drive db auto updates!"
+            echo -e "\nDrive db auto updates already disabled."
         fi
     else
-        echo -e "\nDrive db auto updates already enabled."
+        # Re-enable drive db updates
+        if [[ ${SOPpkgver:0:4} == "9999" ]]; then
+            # Remove 9999 from version
+            /usr/syno/bin/synosetkeyvalue "$SOPinfo" version "${SOPpkgver:4}"
+
+            # Check if we re-enabled drive db auto updates
+            SOPpkgver2="$(/usr/syno/bin/synogetkeyvalue $SOPinfo version)"
+            if [[ ${SOPpkgver2:0:4} != "9999" ]]; then
+                echo -e "\nRe-enabled drive db auto updates."
+            else
+                echo -e "\n${Error}ERROR${Off} Failed to enable drive db auto updates!"
+            fi
+        else
+            echo -e "\nDrive db auto updates already enabled."
+        fi
     fi
 fi
 
