@@ -7,8 +7,8 @@
 #
 
 OUTFILE="/etc/pwm.conf"
-STEP=5
-DELAY=3
+STEP=10
+DELAY=2
 MAX=255
 
 # Stop fancontrol before sweep
