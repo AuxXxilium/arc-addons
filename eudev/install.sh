@@ -74,17 +74,28 @@ elif [ "${1}" = "late" ]; then
   echo "copy modules"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   isChange=false
-  /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-  /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/firmware/iwlwifi*.pnvm 2>/dev/null || true  # for <= v25.9.7 to avoid firmware crash
-  if grep -q 'RR@RR' /proc/version 2>/dev/null; then
+  # Copy firmware files
+  for SRC_FILE in /usr/lib/firmware/*; do
+    DEST_FILE="/tmpRoot/usr/lib/firmware/$(basename "${SRC_FILE}")"
+    if [ ! -f "${DEST_FILE}" ] || ! cmp -s "${SRC_FILE}" "${DEST_FILE}"; then
+      /tmpRoot/bin/cp -pf "${SRC_FILE}" "${DEST_FILE}"
+    fi
+  done
+  /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/firmware/iwlwifi*.pnvm 2>/dev/null || true
+  if grep -Eq 'aux@arc|RR@RR' /proc/version 2>/dev/null; then
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     else
       echo "Custom Kernel - backup modules."
-      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
+      /tmpRoot/bin/cp -rpf /usr/lib/modules /tmpRoot/usr/lib/modules.bak
     fi
-    /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules
+    for SRC_FILE in /usr/lib/modules/*; do
+      DEST_FILE="/tmpRoot/usr/lib/modules/$(basename "${SRC_FILE}")"
+      if [ ! -f "${DEST_FILE}" ] || ! cmp -s "${SRC_FILE}" "${DEST_FILE}"; then
+        /tmpRoot/bin/cp -pf "${SRC_FILE}" "${DEST_FILE}"
+      fi
+    done
     isChange=true
   else
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
@@ -112,7 +123,12 @@ elif [ "${1}" = "late" ]; then
   /usr/sbin/modprobe kvm_amd || true   # kvm-amd.ko
 
   echo "Copy rules"
-  /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
+  for SRC_FILE in /usr/lib/udev/*; do
+    DEST_FILE="/tmpRoot/usr/lib/udev/$(basename "${SRC_FILE}")"
+    if [ ! -f "${DEST_FILE}" ] || ! cmp -s "${SRC_FILE}" "${DEST_FILE}"; then
+      /tmpRoot/bin/cp -pf "${SRC_FILE}" "${DEST_FILE}"
+    fi
+  done
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
