@@ -251,7 +251,7 @@ elif [ "${1}" = "late" ]; then
   ln -vsf /usr/lib/systemd/system/arc-once.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arc-once.service
 
   # wol
-  [ ! -f "/tmpRoot/usr/bin/ethtool" ] && cp -pf /usr/bin/ethtool /tmpRoot/usr/bin/ethtool
+  # [ ! -f "/tmpRoot/usr/bin/ethtool" ] && cp -pf /usr/bin/ethtool /tmpRoot/usr/bin/ethtool
   cp -pf /usr/bin/wol.sh /tmpRoot/usr/bin/wol.sh
 
   DEST="/tmpRoot/usr/lib/systemd/system/wol.service"
