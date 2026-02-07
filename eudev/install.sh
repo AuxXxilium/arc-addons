@@ -75,12 +75,7 @@ elif [ "${1}" = "late" ]; then
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   isChange=false
   # Copy firmware files
-  for SRC_FILE in /usr/lib/firmware/*; do
-    DEST_FILE="/tmpRoot/usr/lib/firmware/$(basename "${SRC_FILE}")"
-    if [ ! -f "${DEST_FILE}" ] || [ "$(md5sum "${SRC_FILE}" | awk '{print $1}')" != "$(md5sum "${DEST_FILE}" 2>/dev/null | awk '{print $1}')" ]; then
-      /tmpRoot/bin/cp -pf "${SRC_FILE}" "${DEST_FILE}"
-    fi
-  done
+  /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/firmware/iwlwifi*.pnvm 2>/dev/null || true
   if grep -Eq 'aux@arc|RR@RR' /proc/version 2>/dev/null; then
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
@@ -90,12 +85,7 @@ elif [ "${1}" = "late" ]; then
       echo "Custom Kernel - backup modules."
       /tmpRoot/bin/cp -rpf /usr/lib/modules /tmpRoot/usr/lib/modules.bak
     fi
-    for SRC_FILE in /usr/lib/modules/*; do
-      DEST_FILE="/tmpRoot/usr/lib/modules/$(basename "${SRC_FILE}")"
-      if [ ! -f "${DEST_FILE}" ] || [ "$(md5sum "${SRC_FILE}" | awk '{print $1}')" != "$(md5sum "${DEST_FILE}" 2>/dev/null | awk '{print $1}')" ]; then
-        /tmpRoot/bin/cp -pf "${SRC_FILE}" "${DEST_FILE}"
-      fi
-    done
+    /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules
     isChange=true
   else
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
@@ -123,12 +113,7 @@ elif [ "${1}" = "late" ]; then
   /usr/sbin/modprobe kvm_amd || true   # kvm-amd.ko
 
   echo "Copy rules"
-  for SRC_FILE in /usr/lib/udev/*; do
-    DEST_FILE="/tmpRoot/usr/lib/udev/$(basename "${SRC_FILE}")"
-    if [ ! -f "${DEST_FILE}" ] || [ "$(md5sum "${SRC_FILE}" | awk '{print $1}')" != "$(md5sum "${DEST_FILE}" 2>/dev/null | awk '{print $1}')" ]; then
-      /tmpRoot/bin/cp -pf "${SRC_FILE}" "${DEST_FILE}"
-    fi
-  done
+  /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   DEST="/tmpRoot/usr/lib/systemd/system/udevrules.service"
