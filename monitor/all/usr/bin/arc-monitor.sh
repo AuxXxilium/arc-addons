@@ -19,7 +19,7 @@ on)
       dpmstest -w ${_id}:${_on} 2>/dev/null
     fi
   done
-  for F in /sys/class/graphics/fb*; do
+  for F in $(LC_ALL=C printf '%s\n' /sys/class/graphics/fb* | sort -V); do
     [ ! -e "${F}" ] && continue
     echo 0 >"${F}/blank"
   done
@@ -36,7 +36,7 @@ off)
       dpmstest -w ${_id}:${_off} 2>/dev/null
     fi
   done
-  for F in /sys/class/graphics/fb*; do
+  for F in $(LC_ALL=C printf '%s\n' /sys/class/graphics/fb* | sort -V); do
     [ ! -e "${F}" ] && continue
     echo 1 >"${F}/blank"
   done

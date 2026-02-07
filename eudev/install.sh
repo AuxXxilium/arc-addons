@@ -53,7 +53,7 @@ elif [ "${1}" = "modules" ]; then
   /usr/sbin/modprobe virtiofs || true
 
   for P in tcp sch; do
-    for F in /usr/lib/modules/${P}_*.ko; do
+    for F in $(LC_ALL=C printf '%s\n' /usr/lib/modules/${P}_*.ko | sort -V); do
       [ ! -e "${F}" ] && continue
       /usr/sbin/modprobe "$(basename "${F}" .ko 2>/dev/null)" || true
     done

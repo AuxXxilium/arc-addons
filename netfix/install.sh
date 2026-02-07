@@ -9,7 +9,7 @@
 if [ "${1}" = "patches" ]; then
   echo "Installing addon netfix - ${1}"
   isSetting=false
-  for F in /sys/class/net/eth*; do
+  for F in $(LC_ALL=C printf '%s\n' /sys/class/net/eth* | sort -V); do
     [ ! -e "${F}" ] && continue
     ETH="$(basename "${F}")"
     MAC="$(cat "/sys/class/net/${ETH}/address" 2>/dev/null)"

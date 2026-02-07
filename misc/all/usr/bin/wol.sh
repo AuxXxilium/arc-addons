@@ -8,7 +8,7 @@
 
 SSKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
 
-for F in /sys/class/net/eth*; do
+for F in $(LC_ALL=C printf '%s\n' /sys/class/net/eth* | sort -V); do
   [ ! -e "${F}" ] && continue
   ETH="$(basename "${F}")"
   /usr/bin/ethtool -s "${ETH}" wol g 2>/dev/null

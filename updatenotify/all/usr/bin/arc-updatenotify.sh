@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-Create() {
+function Create() {
   if grep -q '^name=Arc-UpdateNotify' /usr/syno/etc/synoschedule.d/root/*.task; then
     echo "Existence tasks"
   else
@@ -18,8 +18,8 @@ Create() {
   exit 0
 }
 
-Delete() {
-  for F in /usr/syno/etc/synoschedule.d/root/*.task; do
+function Delete() {
+  for F in $(LC_ALL=C printf '%s\n' /usr/syno/etc/synoschedule.d/root/*.task | sort -V); do
     [ ! -e "${F}" ] && continue
     if grep -q '^name=Arc-UpdateNotify' "${F}"; then
       id=$(grep '^id=' "${F}" | cut -d'=' -f2)
@@ -29,7 +29,7 @@ Delete() {
   exit 0
 }
 
-Check() {
+function Check() {
   LOCALTAG=$(grep LOADERVERSION /usr/arc/VERSION 2>/dev/null | cut -d'=' -f2 | sed 's/\"//g')
   if [ -z "${LOCALTAG}" ]; then
     echo "Unknown bootloader version!"
