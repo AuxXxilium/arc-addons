@@ -7,7 +7,7 @@
 #
 
 # M.2 drives in M2 adaptor card do not officially support storage pools
-for F in /run/synostorage/disks/nvme*/m2_pool_support; do
+for F in $(LC_ALL=C printf '%s\n' /run/synostorage/disks/nvme*/m2_pool_support | sort -V); do
   [ ! -e "${F}" ] && continue
   echo -n 1 >"${F}"
 done

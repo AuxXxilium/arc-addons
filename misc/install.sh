@@ -39,7 +39,7 @@ elif [ "${1}" = "patches" ]; then
     for I in $(grep -Eo 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
       MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/')"
       IPRS="$(echo "${I}" | cut -d= -f2)"
-      for F in /sys/class/net/eth*; do
+      for F in $(LC_ALL=C printf '%s\n' /sys/class/net/eth* | sort -V); do
         [ ! -e "${F}" ] && continue
         ETH="$(basename "${F}")"
         MACX=$(cat "/sys/class/net/${ETH}/address" 2>/dev/null | sed 's/://g; s/.*/\L&/')

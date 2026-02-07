@@ -24,7 +24,7 @@ if [ "${1}" = "-r" ]; then
     fi
   done
 else
-  for V in /sys/bus/virtio/drivers/9pnet_virtio/virtio*/mount_tag; do
+  for V in $(LC_ALL=C printf '%s\n' /sys/bus/virtio/drivers/9pnet_virtio/virtio*/mount_tag | sort -V); do
     [ -e "${V}" ] || continue
     read -r TAG <"${V}"
     [ -z "${TAG}" ] && continue
@@ -47,7 +47,7 @@ else
     fi
   done
 
-  for V in /sys/bus/virtio/drivers/virtiofs/virtio*/tag; do
+  for V in $(LC_ALL=C printf '%s\n' /sys/bus/virtio/drivers/virtiofs/virtio*/tag | sort -V); do
     [ -e "${V}" ] || continue
     read -r TAG <"${V}"
     [ -z "${TAG}" ] && continue

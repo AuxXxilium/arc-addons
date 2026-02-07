@@ -10,7 +10,7 @@ if [ "${1}" = "patches" ]; then
   echo "Installing addon sortnetif - ${1}"
 
   ETHLIST=""
-  for F in /sys/class/net/eth*; do
+  for F in $(LC_ALL=C printf '%s\n' /sys/class/net/eth* | sort -V); do
     [ ! -e "${F}" ] && continue
     ETH="$(basename "${F}")"
     MAC="$(cat "/sys/class/net/${ETH}/address" 2>/dev/null | sed 's/://g; s/.*/\L&/')"
@@ -18,7 +18,7 @@ if [ "${1}" = "patches" ]; then
     ETHLIST="${ETHLIST}${BUS} ${MAC} ${ETH}\n"
   done
   ETHLISTTMPM=""
-  ETHLISTTMPB="$(printf "%b" "${ETHLIST}" | sort)"
+  ETHLISTTMPB="$(printf "%b" "${ETHLIST}" | sort -V)"
   if [ -n "${2}" ]; then
     MACS="$(echo "${2}" | sed 's/://g; s/,/ /g; s/.*/\L&/')"
     for MACX in ${MACS}; do

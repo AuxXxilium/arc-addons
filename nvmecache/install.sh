@@ -32,7 +32,7 @@ if [ "${1}" = "patches" ]; then
   echo "BOOTDISK_PHYSDEVPATH=${BOOTDISK_PHYSDEVPATH}"
 
   rm -f /etc/nvmePorts
-  for F in /sys/block/nvme*; do
+  for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
     [ ! -e "${F}" ] && continue
     PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
     if [ -z "${PHYSDEVPATH}" ]; then

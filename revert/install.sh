@@ -14,7 +14,7 @@ if [ "${1}" = "late" ]; then
   echo '#!/usr/bin/env bash' >"/tmpRoot/usr/arc/revert.sh"
   chmod +x "/tmpRoot/usr/arc/revert.sh"
   
-  for F in /tmpRoot/usr/arc/addons/*; do
+  for F in $(LC_ALL=C printf '%s\n' /tmpRoot/usr/arc/addons/* | sort -V); do
     [ ! -e "${F}" ] && continue
     grep -q "/addons/$(basename "${F}")" "/addons/addons.sh" 2>/dev/null && continue
     chmod +x "${F}" || true
