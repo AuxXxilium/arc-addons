@@ -103,6 +103,9 @@ elif [ "${1}" = "late" ]; then
   echo "Killing dufs ..."
   /usr/bin/killall dufs 2>/dev/null || true
 
+  # ethtool
+  [ ! -f "/tmpRoot/usr/bin/ethtool" ] && cp -pf /usr/bin/ethtool /tmpRoot/usr/bin/ethtool
+
   # synoinfo.conf
   cp -vpf "/addons/synoinfo.conf" "/tmpRoot/usr/arc/addons/synoinfo.conf"
   for KEY in $(cat "/addons/synoinfo.conf" 2>/dev/null | cut -d= -f1); do
@@ -251,7 +254,6 @@ elif [ "${1}" = "late" ]; then
   ln -vsf /usr/lib/systemd/system/arc-once.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/arc-once.service
 
   # wol
-  # [ ! -f "/tmpRoot/usr/bin/ethtool" ] && cp -pf /usr/bin/ethtool /tmpRoot/usr/bin/ethtool
   cp -pf /usr/bin/wol.sh /tmpRoot/usr/bin/wol.sh
 
   DEST="/tmpRoot/usr/lib/systemd/system/wol.service"
