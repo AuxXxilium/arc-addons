@@ -9,7 +9,7 @@
 # shellcheck disable=SC2154
 
 # External incoming required ${MLINK} and ${MCHECKSUM}
-if [ -z "${MLINK}" ] || [ -z "${MCHECKSUM}" ]; then
+if [ -z "${MLINK}" ] || [ -z "${MCHECKSUM}" ] || [ "00000000000000000000000000000000" = "${MCHECKSUM}" ]; then
   echo "MLINK or MCHECKSUM is null"
   return
 fi
@@ -27,15 +27,15 @@ if [ "${1}" = "patches" ]; then
   "channel": {
     "title": "RSS for DSM Auto Update",
     "link": "https://update.synology.com/autoupdate/v2/getList",
-    "pubDate": "Sat May 4 20:30:02 CST 2024",
-    "copyright": "Copyright 2024 Synology Inc",
+    "pubDate": "$(TZ=CST-8 date)",
+    "copyright": "Copyright 2026 Synology Inc",
     "item": [
       {
-        "title": "DSM ${productversion}-${buildnumber}",
+        "title": "DSM ${major}.${minor}$([ "0" = "${micro}" ] || echo ".${micro}")-${buildnumber}",
         "MajorVer": ${major},
         "MinorVer": ${minor},
         "NanoVer": ${micro},
-        "BuildPhase": "${buildphase}",
+        "BuildPhase": 0,
         "BuildNum": ${buildnumber},
         "BuildDate": "${builddate}",
         "ReqMajorVer": ${major},
@@ -44,6 +44,7 @@ if [ "${1}" = "patches" ]; then
         "ReqBuildNum": 0,
         "ReqBuildDate": "${builddate}",
         "isSecurityVersion": false,
+        "phase": "Release",
         "model": [
             {
                 "mUnique": "${unique}",
@@ -63,13 +64,13 @@ EOF
   <channel>
       <title>RSS for DSM Auto Update</title>
       <link>http://update.synology.com/autoupdate/genRSS.php</link>
-      <pubDate>Wed May 1 12:02:35 CST 2024</pubDate>
-      <copyright>Copyright 2024 Synology Inc</copyright>
+      <pubDate>$(TZ=CST-8 date)</pubDate>
+      <copyright>Copyright 2026 Synology Inc</copyright>
     <item>
-      <title>DSM ${productversion}-${buildnumber}</title>
+      <title>DSM ${major}.${minor}$([ "0" = "${micro}" ] || echo ".${micro}")-${buildnumber}</title>
       <MajorVer>${major}</MajorVer>
       <MinorVer>${minor}</MinorVer>
-      <BuildPhase>${buildphase}</BuildPhase>
+      <BuildPhase>0</BuildPhase>
       <BuildNum>${buildnumber}</BuildNum>
       <BuildDate>${builddate}</BuildDate>
       <ReqMajorVer>${major}</ReqMajorVer>
