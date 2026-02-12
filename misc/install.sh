@@ -68,8 +68,9 @@ elif [ "${1}" = "rcExit" ]; then
   inetd
 
   # invalid_disks
-  SH_FILE="/usr/syno/share/get_hcl_invalid_disks.sh"
-  [ -f "${SH_FILE}" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak" && printf '#!/bin/sh\nexit 0\n' >"${SH_FILE}"
+  # SH_FILE="/usr/syno/share/get_hcl_invalid_disks.sh"
+  # [ -f "${SH_FILE}" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak" && printf '#!/bin/sh\nexit 0\n' >"${SH_FILE}"
+  while true; do [ ! -f "/tmp/installable_check_pass" ] && touch "/tmp/installable_check_pass"; sleep 1; done &
 
   # error message
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
