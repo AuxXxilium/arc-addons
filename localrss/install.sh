@@ -10,7 +10,7 @@
 
 # External incoming required ${MLINK} and ${MCHECKSUM}
 if [ -z "${MLINK}" ] || [ -z "${MCHECKSUM}" ] || [ "00000000000000000000000000000000" = "${MCHECKSUM}" ]; then
-  echo "MLINK or MCHECKSUM is null"
+  echo "MLINK (${MLINK}) or MCHECKSUM (${MCHECKSUM}) is null"
   return
 fi
 
@@ -27,7 +27,7 @@ if [ "${1}" = "patches" ]; then
   "channel": {
     "title": "RSS for DSM Auto Update",
     "link": "https://update.synology.com/autoupdate/v2/getList",
-    "pubDate": "$(TZ=CST-8 date)",
+    "pubDate": "$(date)",
     "copyright": "Copyright 2026 Synology Inc",
     "item": [
       {
@@ -64,7 +64,7 @@ EOF
   <channel>
       <title>RSS for DSM Auto Update</title>
       <link>http://update.synology.com/autoupdate/genRSS.php</link>
-      <pubDate>$(TZ=CST-8 date)</pubDate>
+      <pubDate>$(date)</pubDate>
       <copyright>Copyright 2026 Synology Inc</copyright>
     <item>
       <title>DSM ${major}.${minor}$([ "0" = "${micro}" ] || echo ".${micro}")-${buildnumber}</title>
