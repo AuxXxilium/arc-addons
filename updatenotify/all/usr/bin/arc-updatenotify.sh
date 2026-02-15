@@ -30,7 +30,7 @@ function Delete() {
 }
 
 function Check() {
-  LOCALTAG=$(grep LOADERVERSION /usr/arc/VERSION 2>/dev/null | cut -d'=' -f2 | sed 's/\"//g')
+  LOCALTAG=$(grep LVERSION /usr/arc/VERSION 2>/dev/null | cut -d'=' -f2 | sed 's/\"//g')
   if [ -z "${LOCALTAG}" ]; then
     echo "Unknown bootloader version!"
     exit 0
