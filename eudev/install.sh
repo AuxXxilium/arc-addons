@@ -16,17 +16,9 @@ if [ "${1}" = "early" ]; then
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
-  if grep -q 'RR@RR' /proc/version 2>/dev/null && lspci -nd ::300 2>/dev/null | grep -q 8086; then
-    mv -vf /usr/lib/modules/update/* /usr/lib/modules/ 2>/dev/null || true
-  else
-    rm -rf /usr/lib/modules/update 2>/dev/null || true
-  fi
-
-  # mv -f /usr/lib/udev/rules.d/60-persistent-storage.rules /usr/lib/udev/rules.d/60-persistent-storage.rules.bak
-  # mv -f /usr/lib/udev/rules.d/60-persistent-storage-tape.rules /usr/lib/udev/rules.d/60-persistent-storage-tape.rules.bak
-  # mv -f /usr/lib/udev/rules.d/75-persistent-net-generator.rules /usr/lib/udev/rules.d/75-persistent-net-generator.rules.bak
-  # mv -f /usr/lib/udev/rules.d/80-net-name-slot.rules /usr/lib/udev/rules.d/80-net-name-slot.rules.bak
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
+  [ -f /lib/modules/modules.builtin ] || : > /lib/modules/modules.builtin
+  [ -d /lib/modules ] && find /lib/modules -type f -name "*.ko" | sort > /lib/modules/modules.order || : > /lib/modules/modules.order
   /usr/sbin/depmod -a
   /usr/sbin/udevd -d || {
     echo "FAIL"
@@ -77,7 +69,7 @@ elif [ "${1}" = "late" ]; then
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/firmware/iwlwifi*.pnvm 2>/dev/null || true
-  if grep -Eq 'aux@arc|RR@RR' /proc/version 2>/dev/null; then
+  if grep -Eq 'FB@FB|RR@RR' /proc/version 2>/dev/null; then
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
@@ -106,11 +98,18 @@ elif [ "${1}" = "late" ]; then
     done
   fi
   echo "isChange: ${isChange}"
-  [ "${isChange}" = "true" ] && /usr/sbin/depmod -a -b /tmpRoot
+  if [ "${isChange}" = "true" ]; then
+    [ -f /tmpRoot/lib/modules/modules.builtin ] || : > /tmpRoot/lib/modules/modules.builtin
+    [ -d /tmpRoot/lib/modules ] && find /tmpRoot/lib/modules -type f -name "*.ko" | sort > /tmpRoot/lib/modules/modules.order || : > /tmpRoot/lib/modules/modules.order
+    /usr/sbin/depmod -a -b /tmpRoot || echo "depmod failed"
+  fi
 
   # Restore kvm module
-  /usr/sbin/modprobe kvm_intel || true # kvm-intel.ko
-  /usr/sbin/modprobe kvm_amd || true   # kvm-amd.ko
+  [ -f /tmpRoot/lib/modules/kvm_intel.ko ] && /usr/sbin/modprobe kvm_intel || true
+  [ -f /tmpRoot/lib/modules/kvm_amd.ko ] && /usr/sbin/modprobe kvm_amd || true
+
+  # DCA
+  [ -f /tmpRoot/lib/modules/dca.ko ] && /usr/sbin/modprobe dca || true
 
   echo "Copy rules"
   /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
