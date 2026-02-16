@@ -16,41 +16,26 @@ if [ "${1}" = "early" ]; then
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
-  if grep -q 'RR@RR' /proc/version 2>/dev/null && lspci -nd ::300 2>/dev/null | grep -q 8086; then
-    mv -vf /usr/lib/modules/update/* /usr/lib/modules/ 2>/dev/null || true
-  else
-    rm -rf /usr/lib/modules/update 2>/dev/null || true
-  fi
-
-  # mv -f /usr/lib/udev/rules.d/60-persistent-storage.rules /usr/lib/udev/rules.d/60-persistent-storage.rules.bak
-  # mv -f /usr/lib/udev/rules.d/60-persistent-storage-tape.rules /usr/lib/udev/rules.d/60-persistent-storage-tape.rules.bak
-  # mv -f /usr/lib/udev/rules.d/75-persistent-net-generator.rules /usr/lib/udev/rules.d/75-persistent-net-generator.rules.bak
-  # mv -f /usr/lib/udev/rules.d/80-net-name-slot.rules /usr/lib/udev/rules.d/80-net-name-slot.rules.bak
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
-  /usr/sbin/depmod -a
+  [ -e /lib/modules/modules.builtin ] || : > /lib/modules/modules.builtin
+  [ -d /lib/modules ] && find /lib/modules -type f -name "*.ko" | sort > /lib/modules/modules.order || : > /lib/modules/modules.order
+  /usr/sbin/depmod -a || echo "boot depmod skipped"
   /usr/sbin/udevd -d || {
     echo "FAIL"
     exit 1
   }
-  echo "Triggering add events to udev"
-  udevadm trigger --type=subsystems --action=add
-  udevadm trigger --type=devices --action=add
-  udevadm trigger --type=devices --action=change
+  echo "Triggering events to udev"
+  udevadm trigger --action=add
+  udevadm trigger --action=change
   udevadm settle --timeout=30 || echo "udevadm settle failed"
   # Give more time
   sleep 10
   # Remove from memory to not conflict with RAID mount scripts
   /usr/bin/killall udevd
-  # modprobe modules for the beep
-  /usr/sbin/modprobe pcspeaker || true
-  /usr/sbin/modprobe pcspkr || true
-  # modprobe modules for the sensors
-  for I in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
-    /usr/sbin/modprobe "${I}" || true
+  # modprobe modules for beep, sensors, and virtiofs
+  for M in pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90 9p virtiofs dca; do
+    /usr/sbin/modprobe "${M}" || true
   done
-  # modprobe modules for the virtiofs
-  /usr/sbin/modprobe 9p || true
-  /usr/sbin/modprobe virtiofs || true
 
   for P in tcp sch; do
     for F in $(LC_ALL=C printf '%s\n' /usr/lib/modules/${P}_*.ko | sort -V); do
@@ -68,7 +53,6 @@ elif [ "${1}" = "late" ]; then
   # [ ! -L "/tmpRoot/usr/sbin/modprobe" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modprobe
   [ ! -L "/tmpRoot/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modinfo
   [ ! -L "/tmpRoot/usr/sbin/depmod" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/depmod
-
   [ ! -f "/tmpRoot/usr/bin/eject" ] && cp -vpf /usr/bin/eject /tmpRoot/usr/bin/eject
 
   echo "copy modules"
@@ -76,8 +60,7 @@ elif [ "${1}" = "late" ]; then
   isChange=false
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-  /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/firmware/iwlwifi*.pnvm 2>/dev/null || true
-  if grep -Eq 'aux@arc|RR@RR' /proc/version 2>/dev/null; then
+  if grep -Eq 'FB@FB|RR@RR' /proc/version 2>/dev/null; then
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
@@ -89,7 +72,7 @@ elif [ "${1}" = "late" ]; then
     isChange=true
   else
     if [ -d /tmpRoot/usr/lib/modules.bak ]; then
-      echo "Custom Kernel Restore - restore modules from backup."
+      echo "Custom Kernel - restore modules from backup."
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
@@ -106,11 +89,15 @@ elif [ "${1}" = "late" ]; then
     done
   fi
   echo "isChange: ${isChange}"
-  [ "${isChange}" = "true" ] && /usr/sbin/depmod -a -b /tmpRoot
+  if [ "${isChange}" = true ]; then
+    [ -e /tmpRoot/lib/modules/modules.builtin ] || : > /tmpRoot/lib/modules/modules.builtin
+    [ -d /tmpRoot/lib/modules ] && find /tmpRoot/lib/modules -type f -name "*.ko" | sort > /tmpRoot/lib/modules/modules.order || : > /tmpRoot/lib/modules/modules.order
+    /usr/sbin/depmod -a -b /tmpRoot || echo "dsm depmod skipped"
+  fi
 
   # Restore kvm module
-  /usr/sbin/modprobe kvm_intel || true # kvm-intel.ko
-  /usr/sbin/modprobe kvm_amd || true   # kvm-amd.ko
+  /usr/sbin/modprobe kvm_intel || true
+  /usr/sbin/modprobe kvm_amd || true
 
   echo "Copy rules"
   /tmpRoot/bin/cp -vrf /usr/lib/udev/* /tmpRoot/usr/lib/udev/
