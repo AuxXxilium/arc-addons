@@ -76,22 +76,25 @@ elif [ "${1}" = "late" ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
-    for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
-      O=$(echo "${L}" | awk -F'###' '{print $1}')
-      M=$(echo "${L}" | awk -F'###' '{print $2}')
+    echo "Checking for loaded modules and updating modulelist..."
+    lsmod | awk 'NR>1 {print "F "$1".ko"}' >> /addons/modulelist
+    sort -u /addons/modulelist -o /addons/modulelist
+    while IFS=' ' read -r O M; do
+      [ -z "${O}" ] && continue
+      [[ "${O}" =~ ^# ]] && continue
       [ -z "${M}" ] || [ ! -f "/usr/lib/modules/${M}" ] && continue
-      if [ "$(echo "${O}" | cut -c1 | sed 's/.*/\U&/')" = "F" ]; then
+      if [ "${O}" = "F" ]; then
         /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
-      else
+      elif [ "${O}" = "N" ]; then
         /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
       fi
       isChange=true
-    done
+    done < /addons/modulelist
   fi
   echo "isChange: ${isChange}"
   if [ "${isChange}" = true ]; then
-    [ -e /tmpRoot/lib/modules/modules.builtin ] || : > /tmpRoot/lib/modules/modules.builtin
-    [ -d /tmpRoot/lib/modules ] && find /tmpRoot/lib/modules -type f -name "*.ko" | sort > /tmpRoot/lib/modules/modules.order || : > /tmpRoot/lib/modules/modules.order
+    [ -f /lib/modules/modules.builtin ] && cp -f /lib/modules/modules.builtin /tmpRoot/lib/modules/modules.builtin
+    [ -f /lib/modules/modules.order ] && cp -f /lib/modules/modules.order /tmpRoot/lib/modules/modules.order
     /usr/sbin/depmod -a -b /tmpRoot || echo "dsm depmod skipped"
   fi
 
