@@ -17,8 +17,8 @@ elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
-  [ -e /lib/modules/modules.builtin ] || : > /lib/modules/modules.builtin
-  [ -d /lib/modules ] && find /lib/modules -type f -name "*.ko" | sort > /lib/modules/modules.order || : > /lib/modules/modules.order
+  [ -e /usr/lib/modules/modules.builtin ] || : > /usr/lib/modules/modules.builtin
+  [ -d /usr/lib/modules ] && find /usr/lib/modules -type f -name "*.ko" | sort > /usr/lib/modules/modules.order || : > /usr/lib/modules/modules.order
   /usr/sbin/depmod -a || echo "boot depmod skipped"
   /usr/sbin/udevd -d || {
     echo "FAIL"
@@ -61,12 +61,9 @@ elif [ "${1}" = "late" ]; then
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   if grep -Eq 'FB@FB|RR@RR' /proc/version 2>/dev/null; then
-    if [ -d /tmpRoot/usr/lib/modules.bak ]; then
-      /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
-      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
-    else
-      echo "Custom Kernel - backup modules."
-      /tmpRoot/bin/cp -rpf /usr/lib/modules /tmpRoot/usr/lib/modules.bak
+    if [ ! -d /tmpRoot/usr/lib/modules.bak ]; then
+      echo "Custom Kernel - backup existing modules."
+      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
     fi
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules
     isChange=true
@@ -93,8 +90,8 @@ elif [ "${1}" = "late" ]; then
   fi
   echo "isChange: ${isChange}"
   if [ "${isChange}" = true ]; then
-    [ -f /lib/modules/modules.builtin ] && cp -f /lib/modules/modules.builtin /tmpRoot/lib/modules/modules.builtin
-    [ -f /lib/modules/modules.order ] && cp -f /lib/modules/modules.order /tmpRoot/lib/modules/modules.order
+    [ -f /usr/lib/modules/modules.builtin ] && cp -f /usr/lib/modules/modules.builtin /tmpRoot/usr/lib/modules/modules.builtin
+    [ -f /usr/lib/modules/modules.order ] && cp -f /usr/lib/modules/modules.order /tmpRoot/usr/lib/modules/modules.order
     /usr/sbin/depmod -a -b /tmpRoot || echo "dsm depmod skipped"
   fi
 
