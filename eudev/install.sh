@@ -61,12 +61,9 @@ elif [ "${1}" = "late" ]; then
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   if grep -Eq 'FB@FB|RR@RR' /proc/version 2>/dev/null; then
-    if [ -d /tmpRoot/usr/lib/modules.bak ]; then
-      /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
-      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
-    else
-      echo "Custom Kernel - backup modules."
-      /tmpRoot/bin/cp -rpf /usr/lib/modules /tmpRoot/usr/lib/modules.bak
+    if [ ! -d /tmpRoot/usr/lib/modules.bak ]; then
+      echo "Custom Kernel - backup existing modules."
+      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
     fi
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules
     isChange=true
