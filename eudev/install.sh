@@ -16,6 +16,12 @@ if [ "${1}" = "early" ]; then
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
+  if grep -q 'RR@RR' /proc/version 2>/dev/null && lspci -nd ::300 2>/dev/null | grep -q 8086; then
+    mv -vf /usr/lib/modules/update/* /usr/lib/modules/ 2>/dev/null || true
+  else
+    rm -rf /usr/lib/modules/update 2>/dev/null || true
+  fi
+
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
   [ -e /usr/lib/modules/modules.builtin ] || : > /usr/lib/modules/modules.builtin
   [ -d /usr/lib/modules ] && find /usr/lib/modules -type f -name "*.ko" | sort > /usr/lib/modules/modules.order || : > /usr/lib/modules/modules.order
@@ -60,7 +66,7 @@ elif [ "${1}" = "late" ]; then
   isChange=false
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-  if grep -Eq 'FB@FB|RR@RR' /proc/version 2>/dev/null; then
+  if grep -q 'RR@RR' /proc/version 2>/dev/null; then
     if [ ! -d /tmpRoot/usr/lib/modules.bak ]; then
       echo "Custom Kernel - backup existing modules."
       /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
