@@ -49,8 +49,8 @@ use POSIX qw(ceil uname strftime ttyname);
 
 ## INXI INFO ##
 my $self_name='inxi';
-my $self_version='3.3.39';
-my $self_date='2025-08-29';
+my $self_version='3.3.40';
+my $self_date='2025-11-25';
 my $self_patch='00';
 ## END INXI INFO ##
 
@@ -5164,14 +5164,22 @@ sub get {
 		my ($opt,$arg) = @_;
 		if ($arg =~ /^(json|screen|xml)$/){
 			$output_type = $arg;
+			if ($arg eq 'screen'){
+				$output_file = 'print';
+			}
 		}
 		else {
 			main::error_handler('bad-arg', $opt, $arg);
 		}},
 	'output-file|export-file:s' => sub {
 		my ($opt,$arg) = @_;
-		if ($arg =~ /^(json|screen|xml)$/){
-			$output_type = $arg;
+		if ($arg){
+			if ($arg eq 'print' || main::check_output_path($arg)){
+				$output_file = $arg;
+			}
+			else {
+				main::error_handler('output-file-bad', $opt, $arg);
+			}
 		}
 		else {
 			main::error_handler('bad-arg', $opt, $arg);
@@ -5253,7 +5261,7 @@ sub check_modifiers {
 		main::error_handler('arg-modifier', '--limit', '-i');
 	}
 	if ($output_type && $output_type ne 'screen' && !$output_file){
-		main::error_handler('arg-modifier', '--output', '--output-file [filename]');
+		main::error_handler('arg-modifier', '--output', '--output-file [file path+name]');
 	}
 	if ($use{'partition-sort'} && !$show{'partition'} && !$show{'partition-full'}){
 		main::error_handler('arg-modifier', '--partition-sort', '-p, -P');
@@ -5666,9 +5674,9 @@ sub show_options {
 	['1', '', '--max-wrap,--wrap-max', "[70-xxx] Set maximum width where 
 	$self_name autowraps line starters. Current: $size{'max-wrap'}"],
 	['1', '', '--output', "[json|screen|xml] Change data output type. Requires 
-	--output-file if not screen."],
+	--output-file. 'screen' restores default output."],
 	['1', '', '--output-file', "[Full filepath|print] Output file to be used for 
-	--output."],
+	--output when types json/xml, or print to stdout."],
 	['1', '', '--separator, --sep', "[key:value separator character]. Change 
 	separator character(s) for key: value pairs."],
 	['1', '-y', '--width', "[empty|-1|1|60-xxx] Output line width max. Overrides 
@@ -12135,7 +12143,7 @@ sub cp_cpu_arch {
 				$process = 'TSMC n4 (4nm)'; # desktop, granite ridge, confirm 2024
 				$year = '2024+';}
 			# seen: 90,A0,C0
-			elsif ($model =~ /^(9|[A-G]).$/){
+			elsif ($model =~ /^([89]|[A-G]).$/){
 				$arch = 'Zen 6';
 				$note = '6';
 				$process = 'TSMC n2/n3 (2,3nm)';
@@ -12735,11 +12743,13 @@ sub cp_cpu_arch {
 			}
 			elsif ($model =~ /^(6)$/){
 				$arch = 'Netburst Presler'; # 6:2,4,5:presler
+				# not positive ID'ed, known stepping 5 45nm, but cpuworld lists as 65nm
 				$process = 'Intel 65nm';
-				$year = '2006';}
+				$year = '2006';
+				$note = $check;}
 			else {
 				$arch = 'Netburst';
-				$process = 'Intel 90-180nm';
+				$process = 'Intel 65-180nm';
 				$year = '2000-06';}
 		}
 		# this is not going to e accurate, WhiskyL or Kaby L can ID as Skylake
@@ -20460,13 +20470,11 @@ sub machine_output {
 		}
 		$j++; # start new row
 	}
-	if ($data->{'firmware'}){
-		$firmware = $data->{'firmware'};
-	}
 	$mobo_vendor = ($data->{'board_vendor'}) ? main::clean($data->{'board_vendor'}) : 'N/A';
 	$mobo_model = ($data->{'board_name'}) ? $data->{'board_name'}: 'N/A';
 	$mobo_version = ($data->{'board_version'})? $data->{'board_version'} : '';
 	$mobo_serial = main::filter($data->{'board_serial'});
+	$firmware = ($data->{'firmware'}) ? $data->{'firmware'} : 'N/A';
 	$bios_vendor = ($data->{'bios_vendor'}) ? main::clean($data->{'bios_vendor'}) : 'N/A';
 	if ($data->{'bios_version'}){
 		$bios_version = $data->{'bios_version'};
@@ -20501,7 +20509,8 @@ sub machine_output {
 	if ($extra > 1 && $data->{'board_mfg_date'}){
 		$rows->[$j]{main::key($num++,0,3,'mfg-date')} = $data->{'board_mfg_date'};
 	}
-	$rows->[$j]{main::key($num++,1,1,$firmware)} = $bios_vendor;
+	$rows->[$j]{main::key($num++,1,1,'Firmware')} = $firmware;
+	$rows->[$j]{main::key($num++,0,2,'vendor')} = $bios_vendor;
 	$rows->[$j]{main::key($num++,0,2,'v')} = $bios_version;
 	if ($bios_rev){
 		$rows->[$j]{main::key($num++,0,2,'rev')} = $bios_rev;
