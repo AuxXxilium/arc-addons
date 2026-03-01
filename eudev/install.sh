@@ -39,7 +39,7 @@ elif [ "${1}" = "modules" ]; then
   # Remove from memory to not conflict with RAID mount scripts
   /usr/bin/killall udevd
   # modprobe modules for beep, sensors, and virtiofs
-  for M in pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90 9p virtiofs dca; do
+  for M in pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90 9p virtiofs; do
     /usr/sbin/modprobe "${M}" 2>/dev/null || true
   done
 
