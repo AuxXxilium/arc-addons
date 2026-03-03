@@ -20,7 +20,7 @@ if [ "${1}" = "patches" ]; then
   if [ -n "${2}" ]; then
     GPU="$(echo "${2}" | sed 's/://g; s/.*/\L&/')"
   else
-    GPU="$(lspci -nd ::300 2>/dev/null | grep 8086 | head -1 | cut -d' ' -f3 | sed 's/://g')"
+    GPU="$(lspci -nd ::300 2>/dev/null | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
     grep -iq "${GPU}" "/addons/i915ids" 2>/dev/null || GPU=""
   fi
   if [ -z "${GPU}" ] || [ "$(printf "%b" "${GPU}" | wc -c)" -ne 8 ]; then
