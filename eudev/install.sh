@@ -52,7 +52,7 @@ elif [ "${1}" = "modules" ]; then
   # Remove from memory to not conflict with RAID mount scripts
   /usr/bin/killall udevd
   # modprobe modules for beep, sensors, and virtiofs
-  for M in pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90 lm95245 9p virtiofs; do
+  for M in pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90 9p virtiofs; do
     /usr/sbin/modprobe "${M}" 2>/dev/null || true
   done
 
@@ -92,20 +92,16 @@ elif [ "${1}" = "late" ]; then
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
       /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
-    echo "Checking for loaded modules and updating modulelist..."
-    lsmod | awk 'NR>1 {print "F "$1".ko"}' >> /addons/modulelist
-    sort -u /addons/modulelist -o /addons/modulelist
-    while IFS=' ' read -r O M; do
-      [ -z "${O}" ] && continue
-      [[ "${O}" =~ ^# ]] && continue
+    for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
+      O=$(echo "${L}" | awk -F'###' '{print $1}')
+      M=$(echo "${L}" | awk -F'###' '{print $2}')
       [ -z "${M}" ] || [ ! -f "/usr/lib/modules/${M}" ] && continue
-      if [ "${O}" = "F" ]; then
-        /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
-      elif [ "${O}" = "N" ]; then
-        /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/
+      if [ "$(echo "${O}" | cut -c1 | sed 's/.*/\U&/')" = "F" ]; then
+        /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/ 2>/dev/null || true
+      else
+        /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/ 2>/dev/null || true
       fi
       isChange=true
-    done < /addons/modulelist
   fi
   echo "isChange: ${isChange}"
   if [ "${isChange}" = true ]; then
