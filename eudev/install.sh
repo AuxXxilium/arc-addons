@@ -102,6 +102,7 @@ elif [ "${1}" = "late" ]; then
         /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/ 2>/dev/null || true
       fi
       isChange=true
+    done
   fi
   echo "isChange: ${isChange}"
   if [ "${isChange}" = true ]; then
