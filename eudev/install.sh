@@ -80,7 +80,7 @@ elif [ "${1}" = "late" ]; then
   isChange=false
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-  if grep -q 'RR@RR' /proc/version 2>/dev/null || grep -q 'runner@' /proc/version 2>/dev/null; then
+  if grep -q 'RR@RR' /proc/version 2>/dev/null; then
     if [ ! -d /tmpRoot/usr/lib/modules.bak ]; then
       echo "Custom Kernel - backup existing modules."
       /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
