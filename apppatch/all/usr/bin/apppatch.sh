@@ -55,8 +55,8 @@ restore_all() {
 
   # Surveillance Station -- local_display
   SS_PATH="/var/packages/SurveillanceStation/target"
-  [ -d "${SS_PATH}/@SSData/AddOns/LocalDisplay" ] &&
-    rm -f "${SS_PATH}/@SSData/AddOns/LocalDisplay/disabled"
+  [ -d "${SS_PATH}/@SSData/AddOns/LocalDisplay" ] \
+    && rm -f "${SS_PATH}/@SSData/AddOns/LocalDisplay/disabled"
 
   # HybridShare
   HS_PATH=/var/packages/HybridShare/target/ui/C2FS.js

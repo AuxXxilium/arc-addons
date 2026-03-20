@@ -22,12 +22,16 @@ if [ "${1}" = "late" ]; then
     echo "${MODEL}=yes" >>"${FILE}"
   done
   rm -f "${FILE}.tmp"
-  cp -pf "${FILE}" "/etc/etc.defaults/adapter_cards.conf"
+  # POSIX-compliant way to replace /etc/ with /etc.defaults/ in the path
+  FILE_DEFAULTS="/tmpRoot/usr/syno/etc.defaults/adapter_cards.conf"
+  cp -pf "${FILE}" "${FILE_DEFAULTS}"
 
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon addincards - ${1}"
 
   FILE="/tmpRoot/usr/syno/etc/adapter_cards.conf"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
-  cp -pf "${FILE}" "/etc/etc.defaults/adapter_cards.conf"
+  # POSIX-compliant way to replace /etc/ with /etc.defaults/ in the path
+  FILE_DEFAULTS="/tmpRoot/usr/syno/etc.defaults/adapter_cards.conf"
+  cp -pf "${FILE}" "${FILE_DEFAULTS}"
 fi

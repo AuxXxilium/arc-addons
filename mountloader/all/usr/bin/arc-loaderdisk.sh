@@ -32,7 +32,7 @@ cleanup() {
   reset_arcsu
 }
 
-mountLoaderDisk() {
+function mountLoaderDisk() {
   if [ ! -f "/usr/arc/.mountloader" ]; then
     while true; do
       for part in $LOADER_DISK $LOADER_PARTS; do
@@ -94,13 +94,13 @@ mountLoaderDisk() {
 
       mkdir -p "/usr/arc"
       {
-        echo "export LOADER_DISK=\"/dev/synoboot\""
-        echo "export LOADER_DISK_PART1=\"/dev/synoboot1\""
-        echo "export LOADER_DISK_PART2=\"/dev/synoboot2\""
-        echo "export LOADER_DISK_PART3=\"/dev/synoboot3\""
+        echo 'export LOADER_DISK="/dev/synoboot"'
+        echo 'export LOADER_DISK_PART1="/dev/synoboot1"'
+        echo 'export LOADER_DISK_PART2="/dev/synoboot2"'
+        echo 'export LOADER_DISK_PART3="/dev/synoboot3"'
         if [ -f "${RAMDISK_PATH}/opt/arc/arc.sh" ]; then
-          echo "export ARC_PATH=\"${RAMDISK_PATH}/opt/arc\""
-          echo "export ARC_MODE=\"config\""
+          echo 'export ARC_PATH="${RAMDISK_PATH}/opt/arc"'
+          echo 'export ARC_MODE="config"'
         fi
       } > "/usr/arc/.mountloader"
 
@@ -117,17 +117,17 @@ mountLoaderDisk() {
   fi
 }
 
-unmountLoaderDisk() {
+functionunmountLoaderDisk() {
   if [ -f "/usr/arc/.mountloader" ]; then
     {
-      echo "export LOADER_DISK=\"\""
-      echo "export LOADER_DISK_PART1=\"\""
-      echo "export LOADER_DISK_PART2=\"\""
-      echo "export LOADER_DISK_PART3=\"\""
+      echo 'export LOADER_DISK=""'
+      echo 'export LOADER_DISK_PART1=""'
+      echo 'export LOADER_DISK_PART2=""'
+      echo 'export LOADER_DISK_PART3=""'
       if [ -f "${RAMDISK_PATH}/opt/arc/arc.sh" ]; then
         rm -rf "${RAMDISK_PATH}" >/dev/null 2>&1 || true
-        echo "export ARC_PATH=\"\""
-        echo "export ARC_MODE=\"\""
+        echo 'export ARC_PATH=""'
+        echo 'export ARC_MODE=""'
       fi
     } | tee "/usr/arc/.mountloader"
     chmod a+x "/usr/arc/.mountloader"

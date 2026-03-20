@@ -20,9 +20,9 @@ if [ "${1}" = "late" ]; then
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
 
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
-  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
-    sed "s/803e00b801000000752.488b/803e00b8010000009090488b/" |
-    xxd -r -p >"${SO_FILE}" 2>/dev/null
+  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null \
+    | sed "s/803e00b801000000752.488b/803e00b8010000009090488b/" \
+    | xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
 elif [ "${1}" = "uninstall" ]; then

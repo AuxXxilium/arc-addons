@@ -64,7 +64,7 @@ if [ "${1}" = "late" ]; then
       echo "Environment=PATH=${VMTOOLS_PATH}/bin:${VMTOOLS_PATH}/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
       echo "Environment=LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:/usr/lib:/lib"
       echo "ExecStart=${VMTOOLS_PATH}/bin/vmtoolsd -c ${VMWARE_CONF} --common-path=${COMMON_PATH} --plugin-path=${PLUGINS_PATH} -b ${VMTOOLS_PID}"
-      echo "ExecReload=/bin/kill -HUP \$MAINPID"
+      echo 'ExecReload=/bin/kill -HUP $MAINPID'
       echo "Restart=always"
       echo "RestartSec=10"
       echo
@@ -86,7 +86,7 @@ if [ "${1}" = "late" ]; then
       echo "Environment=PATH=${VMTOOLS_PATH}/bin:${VMTOOLS_PATH}/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
       echo "Environment=LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:/usr/lib:/lib"
       echo "ExecStart=${VMTOOLS_PATH}/bin/qemu-ga -m virtio-serial -p ${GUEST_AGENT} -t /var/run/ -d -f ${VMTOOLS_PID}"
-      echo "ExecReload=/bin/kill -HUP \$MAINPID"
+      echo 'ExecReload=/bin/kill -HUP $MAINPID'
       echo "Restart=always"
       echo "RestartSec=10"
       echo
