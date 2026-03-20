@@ -13,9 +13,9 @@ if [ "${1}" = "early" ]; then
   SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
-  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
-    sed "s/2d6520302e39/2d6520312e32/" |
-    xxd -r -p >"${SO_FILE}" 2>/dev/null
+  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null \
+    | sed "s/2d6520302e39/2d6520312e32/" \
+    | xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
 elif [ "${1}" = "patches" ]; then
@@ -70,12 +70,25 @@ elif [ "${1}" = "rcExit" ]; then
   # invalid_disks
   # SH_FILE="/usr/syno/share/get_hcl_invalid_disks.sh"
   # [ -f "${SH_FILE}" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak" && printf '#!/bin/sh\nexit 0\n' >"${SH_FILE}"
-  while true; do [ ! -f "/tmp/installable_check_pass" ] && touch "/tmp/installable_check_pass"; sleep 1; done &
+  while true; do
+    [ ! -f "/tmp/installable_check_pass" ] && touch "/tmp/installable_check_pass"
+    sleep 1
+  done & # using a while loop in case DSM is running in a VM
 
   # error message
-  if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
-    sed -i 's/c("welcome","desc_install")/"Error: The bootloader disk is not successfully mounted, the installation will fail."/' /usr/syno/web/main.js 2>/dev/null
-  fi
+  while true; do
+    if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
+      if [ ! -f /usr/syno/web/main.js.bak ]; then
+        cp -f /usr/syno/web/main.js /usr/syno/web/main.js.bak
+        sed -i 's/c("welcome","desc_install")/"Error: Boot disk mounting failed. Please change the USB port of the boot disk and refresh the page."/' /usr/syno/web/main.js 2>/dev/null
+      fi
+    else
+      if [ -f /usr/syno/web/main.js.bak ]; then
+        mv -f /usr/syno/web/main.js.bak /usr/syno/web/main.js
+      fi
+    fi
+    sleep 1
+  done &
 
   # disable DisabledPortDisks
   sed -i 's/^DisabledPortDisks=.*$/DisabledPortDisks=""/' /usr/syno/web/webman/get_state.cgi 2>/dev/null
@@ -183,7 +196,7 @@ elif [ "${1}" = "late" ]; then
 
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
   mkdir -vp /tmpRoot/usr/lib/systemd/system
-  rm -f /tmpRoot/usr/lib/modules-load.d/70-network*.conf
+  rm -vf /tmpRoot/usr/lib/modules-load.d/70-net-kernel.conf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null

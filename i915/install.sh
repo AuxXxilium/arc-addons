@@ -47,9 +47,9 @@ if [ "${1}" = "patches" ]; then
     echo "${GPU} already patched"
   else
     echo "Patching i915.ko"
-    xxd -c "$(xxd -p "${KO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${KO_FILE}.tmp" 2>/dev/null |
-      sed "s/${GPU_DEF}/${GPU_BIN}/; s/308201f706092a86.*70656e6465647e0a//" |
-      xxd -r -p >"${KO_FILE}" 2>/dev/null
+    xxd -c "$(xxd -p "${KO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${KO_FILE}.tmp" 2>/dev/null \
+      | sed "s/${GPU_DEF}/${GPU_BIN}/; s/308201f706092a86.*70656e6465647e0a//" \
+      | xxd -r -p >"${KO_FILE}" 2>/dev/null
     echo "true" >"/etc/i915patched"
   fi
   rm -f "${KO_FILE}.tmp"
