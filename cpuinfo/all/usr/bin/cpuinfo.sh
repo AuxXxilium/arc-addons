@@ -60,10 +60,10 @@ else
   cp -pf "${FILE_JS}.bak" "${FILE_JS}"
 fi
 
-sed -i 's/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g' "${FILE_JS}"
-sed -i 's/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g' "${FILE_JS}"
-sed -i 's/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g' "${FILE_JS}"
-sed -i 's/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g' "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}"
+sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"
 
 CARDN=$(ls -d /sys/class/drm/card* 2>/dev/null | head -1)
 if [ -d "${CARDN}" ]; then
@@ -83,7 +83,7 @@ if [ "${MEV}" = "physical" ]; then
   sed -i 's/_D("support_nvidia_gpu")},/_D("support_nvidia_gpu")||true},/g' "${FILE_JS}"
   sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
   sed -i 's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g' "${FILE_JS}"
-  sed -i 's/_T("rcpower",n),/(typeof _T==="function"?_T("rcpower", n):"rcpower")?e.fan_list?(typeof _T==="function"?_T("rcpower", n):"rcpower")+e.fan_list.map(fan=>` | ${fan} RPM`).join(""):(typeof _T==="function"?_T("rcpower", n):"rcpower"):e.fan_list?e.fan_list.map(fan=>`${fan} RPM`).join(" | "):(typeof _T==="function"?_T("rcpower", n):"rcpower"),/g' "${FILE_JS}"
+  sed -i 's/_T("rcpower",n),/_T("rcpower", n)?e.fan_list?_T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", n):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", n),/g' "${FILE_JS}"
 fi
 
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
