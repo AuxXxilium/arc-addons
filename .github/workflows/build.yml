@@ -37,12 +37,6 @@ jobs:
           keep-count: 10
           keep-old-minor-releases: false
 
-      - name: Changelog
-        uses: Bullrich/generate-release-changelog@master
-        id: Changelog
-        env:
-          REPO: ${{ github.repository }}
-
       - name: Init Env
         run: |
           git config --global user.email "info@auxxxilium.tech"
@@ -81,8 +75,6 @@ jobs:
           makeLatest: ${{ inputs.latest }}
           prerelease: ${{ inputs.prerelease }}
           allowUpdates: true
-          body: |
-            ${{ steps.Changelog.outputs.changelog }}
           artifacts: |
             addons-*.zip
             *.addon
