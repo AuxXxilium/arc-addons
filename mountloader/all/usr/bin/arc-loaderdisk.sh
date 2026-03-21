@@ -117,7 +117,7 @@ function mountLoaderDisk() {
   fi
 }
 
-functionunmountLoaderDisk() {
+function unmountLoaderDisk() {
   if [ -f "/usr/arc/.mountloader" ]; then
     {
       echo 'export LOADER_DISK=""'
@@ -129,13 +129,12 @@ functionunmountLoaderDisk() {
         echo 'export ARC_PATH=""'
         echo 'export ARC_MODE=""'
       fi
-    } | tee "/usr/arc/.mountloader"
+    } > "/usr/arc/.mountloader"
     chmod a+x "/usr/arc/.mountloader"
     "/usr/arc/.mountloader"
     rm -f "/usr/arc/.mountloader"
 
     sync
-
     cleanup
   fi
 }
