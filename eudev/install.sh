@@ -83,6 +83,10 @@ elif [ "${1}" = "late" ]; then
     if [ ! -d /tmpRoot/usr/lib/modules.bak ]; then
       echo "Custom Kernel - backup existing modules."
       /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
+    else
+      echo "Custom Kernel - restore modules from backup."
+      /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
+      /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
     fi
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules
     isChange=true
