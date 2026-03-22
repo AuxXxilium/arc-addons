@@ -55,8 +55,9 @@ cleanup() {
   echo 0 >/proc/sys/kernel/syno_install_flag 2>/dev/null
 }
 
-mount | grep -q "${LOADER_DISK_PART1}" && umount "${LOADER_DISK_PART1}" 2>/dev/null || true
-mount "${LOADER_DISK_PART1}" "${WORK_PATH}" || { echo "Can't mount ${LOADER_DISK_PART1}."; cleanup; reset_arcsu; exit 1; }
+if [ ! -d "${WORK_PATH}" ]; then
+  mount "${LOADER_DISK_PART1}" "${WORK_PATH}" || { echo "Can't mount ${LOADER_DISK_PART1}."; cleanup; reset_arcsu; exit 1; }
+fi
 
 GRUBPATH="$(dirname "$(find "${WORK_PATH}" -name grub.cfg | head -1)")"
 [ -z "${GRUBPATH}" ] && echo "Error: GRUB path not found" && cleanup && reset_arcsu && exit 1
@@ -85,12 +86,6 @@ else
 fi
 
 sync
-
-if ! cleanup; then
-  echo "Cleanup failed (could not unmount or remove work path). Not rebooting."
-  reset_arcsu
-  exit 1
-fi
 
 echo "Cleanup successful, rebooting now."
 reset_arcsu
