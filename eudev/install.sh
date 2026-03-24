@@ -36,8 +36,7 @@ elif [ "${1}" = "modules" ]; then
   fi
 
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
-  [ -e /usr/lib/modules/modules.builtin ] || : > /usr/lib/modules/modules.builtin
-  [ -d /usr/lib/modules ] && find /usr/lib/modules -type f -name "*.ko" | sort > /usr/lib/modules/modules.order || : > /usr/lib/modules/modules.order
+
   /usr/sbin/depmod -a || echo "boot depmod skipped"
   /usr/sbin/udevd -d || {
     echo "FAIL"
@@ -111,8 +110,6 @@ elif [ "${1}" = "late" ]; then
   fi
   echo "isChange: ${isChange}"
   if [ "${isChange}" = true ]; then
-    [ -f /usr/lib/modules/modules.builtin ] && cp -f /usr/lib/modules/modules.builtin /tmpRoot/usr/lib/modules/modules.builtin
-    [ -f /usr/lib/modules/modules.order ] && cp -f /usr/lib/modules/modules.order /tmpRoot/usr/lib/modules/modules.order
     /usr/sbin/depmod -a -b /tmpRoot || echo "dsm depmod skipped"
   fi
 
