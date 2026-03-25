@@ -6,7 +6,7 @@
 # See /LICENSE for more information.
 #
 
-for F in $(LC_ALL=C printf '%s\n' /usr/rr/once.d/* | sort -V); do
+for F in $(LC_ALL=C printf '%s\n' /usr/arc/once.d/* | sort -V); do
   [ ! -e "${F}" ] && continue
   case "${F}" in
   *.sh)
