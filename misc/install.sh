@@ -13,9 +13,7 @@ if [ "${1}" = "early" ]; then
   SO_FILE="/usr/syno/bin/scemd"
   [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
-  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null \
-    | sed "s/2d6520302e39/2d6520312e32/" \
-    | xxd -r -p >"${SO_FILE}" 2>/dev/null
+  xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null | sed "s/2d6520302e39/2d6520312e32/" | xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
 elif [ "${1}" = "patches" ]; then
@@ -196,7 +194,8 @@ elif [ "${1}" = "late" ]; then
 
   # SynoInitEth syno-oob-check-status syno_update_disk_logs
   mkdir -vp /tmpRoot/usr/lib/systemd/system
-  rm -vf /tmpRoot/usr/lib/modules-load.d/70-net-kernel.conf /tmpRoot/usr/lib/modules-load.d/70-network*.conf
+  rm -f /tmpRoot/usr/lib/modules-load.d/70-network*.conf
+  # rm -f /tmpRoot/usr/lib/modules-load.d/70-net-kernel.conf
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
   sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
