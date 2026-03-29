@@ -9,6 +9,22 @@
 HDD_BAY_LIST=(RACK_0_Bay RACK_2_Bay RACK_4_Bay RACK_8_Bay RACK_10_Bay RACK_12_Bay RACK_12_Bay_2 RACK_16_Bay RACK_20_Bay RACK_24_Bay RACK_60_Bay
   TOWER_1_Bay TOWER_2_Bay TOWER_4_Bay TOWER_4_Bay_J TOWER_4_Bay_S TOWER_5_Bay TOWER_6_Bay TOWER_8_Bay TOWER_12_Bay)
 
+if [ "${1}" = "-h" ]; then
+  echo "Use: ${0} [HDD_BAY [SSD_BAY]]"
+  echo "  HDD_BAY: ${HDD_BAY_LIST[*]}"
+  echo "  SSD_BAY: (row)X(column)"
+  echo "  -r: restore"
+  echo "  -h: help"
+  echo "  e.g.:"
+  echo "    ${0}                  - auto"
+  echo "    ${0} RACK_24_Bay      - HDD_BAY set to RACK_24_Bay, SSD_BAY auto"
+  echo "    ${0} RACK_24_Bay 1X8  - HDD_BAY set to RACK_24_Bay, SSD_BAY set to 1X8"
+  echo "    ${0} RACK_60_Bay 2X8  - HDD_BAY set to RACK_60_Bay, SSD_BAY set to 2X8"
+  echo "    ${0} -r               - restore"
+  echo "    ${0} -h               - help"
+  exit
+fi
+
 _UNIQUE="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique)"
 _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
 _ARCPANEL="$(/bin/cat /usr/arc/storagepanel.conf 2>/dev/null)"
@@ -31,61 +47,79 @@ if [ "${1}" = "-r" ]; then
     mv -f "${FILE_GZ}.bak" "${FILE_GZ}"
     gzip -dc "${FILE_GZ}" >"${FILE_JS}"
   fi
+  SM_KEY="sm_machine_img_config_name"
+  synosetkeyvalue "/etc.defaults/synoinfo.conf" "${SM_KEY}" "$(synogetkeyvalue /etc/synoinfo.conf "${SM_KEY}")"
   rm -f /usr/arc/storagepanel.conf 2>/dev/null
-  exit 0
+  exit
 fi
 
-if [ -f "/run/model.dtb" ]; then
-  IDX="$(grep -ao "internal_slot@" "/run/model.dtb" | wc -w)"
-else
-  IDX="$(synodisk --enum -t internal 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+[ -n "${1}" ] && HDD_BAY="$(echo "${HDD_BAY_LIST[@]}" | grep -iwo "${1}")" || HDD_BAY=""
+if [ -n "${1}" ] && [ -z "${HDD_BAY}" ]; then
+  echo "parameter 1 error"
 fi
-while [ ${IDX:-0} -le 60 ]; do
-  for i in "${HDD_BAY_LIST[@]}"; do
-    echo "${i}" | grep -q "_${IDX:-0}_" && HDD_BAY="${i}" && break 2
-  done
-  IDX=$((${IDX:-0} + 1))
-done
-HDD_BAY="${HDD_BAY:-"RACK_60_Bay"}"
 
-if [ -f "/run/model.dtb" ]; then
-  IDX="$(grep -ao "nvme_slot@" "/run/model.dtb" | wc -w)"
-else
-  IDX="$(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+SSD_BAY="$(echo "${2^^}" | sed 's/*/X/')"
+if [ -n "${SSD_BAY}" ] && [ -z "$(echo "${SSD_BAY}" | sed -n '/^[0-9]\{1,2\}X[0-9]\{1,2\}$/p')" ]; then
+  echo "parameter 2 error"
+  SSD_BAY=""
 fi
-[ "${IDX:-0}" -le 8 ] && SSD_BAY="1X${IDX:-0}" || SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
 
-if [ -n "${_ARCPANEL}" ]; then
-  ARCPANEL_HDD_BAY="${_ARCPANEL%-*}"
-  ARCPANEL_SSD_BAY="${_ARCPANEL#*-}"
+#if [ -n "${_ARCPANEL}" ] && [ -z "${HDD_BAY}" ] && [ -z "${SSD_BAY}" ]; then
+#  ARCPANEL_HDD_BAY="${_ARCPANEL%-*}"
+#  ARCPANEL_SSD_BAY="${_ARCPANEL#*-}"
 
   # Extract numeric values for comparison
-  ARCPANEL_HDD_COUNT=$(echo "${ARCPANEL_HDD_BAY}" | grep -o '[0-9]\+' | tail -n1)
-  HDD_BAY_COUNT=$(echo "${HDD_BAY}" | grep -o '[0-9]\+' | tail -n1)
+#  ARCPANEL_HDD_COUNT=$(echo "${ARCPANEL_HDD_BAY}" | grep -o '[0-9]\+' | tail -n1)
+#  HDD_BAY_COUNT=$(echo "${HDD_BAY}" | grep -o '[0-9]\+' | tail -n1)
 
-  ARCPANEL_SSD_ROW=$(echo "${ARCPANEL_SSD_BAY}" | cut -d'X' -f1)
-  ARCPANEL_SSD_COL=$(echo "${ARCPANEL_SSD_BAY}" | cut -d'X' -f2)
-  SSD_BAY_ROW=$(echo "${SSD_BAY}" | cut -d'X' -f1)
-  SSD_BAY_COL=$(echo "${SSD_BAY}" | cut -d'X' -f2)
+#  ARCPANEL_SSD_ROW=$(echo "${ARCPANEL_SSD_BAY}" | cut -d'X' -f1)
+#  ARCPANEL_SSD_COL=$(echo "${ARCPANEL_SSD_BAY}" | cut -d'X' -f2)
+#  SSD_BAY_ROW=$(echo "${SSD_BAY}" | cut -d'X' -f1)
+#  SSD_BAY_COL=$(echo "${SSD_BAY}" | cut -d'X' -f2)
 
   # Compare HDD_BAY values
-  if [ "${HDD_BAY_COUNT:-0}" -gt "${ARCPANEL_HDD_COUNT:-0}" ]; then
-    echo "Using HDD_BAY (${HDD_BAY}) instead of preset HDD_BAY (${ARCPANEL_HDD_BAY})"
-  else
-    HDD_BAY="${ARCPANEL_HDD_BAY}"
-  fi
+#  if [ "${HDD_BAY_COUNT:-0}" -gt "${ARCPANEL_HDD_COUNT:-0}" ]; then
+#    echo "Using HDD_BAY (${HDD_BAY}) instead of preset HDD_BAY (${ARCPANEL_HDD_BAY})"
+#  else
+#    HDD_BAY="${ARCPANEL_HDD_BAY}"
+#  fi
 
   # Compare SSD_BAY values
-  if [ "${SSD_BAY_ROW:-0}" -gt "${ARCPANEL_SSD_ROW:-0}" ] || [ "${SSD_BAY_COL:-0}" -gt "${ARCPANEL_SSD_COL:-0}" ]; then
-    echo "Using SSD_BAY (${SSD_BAY}) instead of preset SSD_BAY (${ARCPANEL_SSD_BAY})"
+#  if [ "${SSD_BAY_ROW:-0}" -gt "${ARCPANEL_SSD_ROW:-0}" ] || [ "${SSD_BAY_COL:-0}" -gt "${ARCPANEL_SSD_COL:-0}" ]; then
+#    echo "Using SSD_BAY (${SSD_BAY}) instead of preset SSD_BAY (${ARCPANEL_SSD_BAY})"
+#  else
+#    SSD_BAY="${ARCPANEL_SSD_BAY}"
+#  fi
+# fi
+
+if [ -z "${HDD_BAY}" ]; then
+  if [ -f "/run/model.dtb" ]; then # if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
+    IDX="$(grep -ao "internal_slot@" "/run/model.dtb" | wc -w)"
   else
-    SSD_BAY="${ARCPANEL_SSD_BAY}"
+    IDX="$(synodisk --enum -t internal 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
   fi
+  while [ ${IDX:-0} -le 60 ]; do
+    for i in "${HDD_BAY_LIST[@]}"; do
+      echo "${i}" | grep -q "_${IDX:-0}_" && HDD_BAY="${i}" && break 2
+    done
+    IDX=$((${IDX:-0} + 1))
+  done
+  HDD_BAY=${HDD_BAY:-RACK_60_Bay}
+fi
+
+if [ -z "${SSD_BAY}" ]; then
+  if [ -f "/run/model.dtb" ]; then # if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
+    IDX="$(grep -ao "nvme_slot@" "/run/model.dtb" | wc -w)"
+  else
+    IDX="$(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+  fi
+  [ "${IDX:-0}" -le 8 ] && SSD_BAY="1X${IDX:-0}" || SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
 fi
 
 [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
 
 gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
+
 echo "storagepanel set to ${HDD_BAY} ${SSD_BAY}"
 OLD="driveShape:\"Mdot2-shape\",major:\"row\",rowDir:\"UD\",colDir:\"LR\",driveSection:\[{top:14,left:18,rowCnt:[0-9]\+,colCnt:[0-9]\+,xGap:6,yGap:6}\]},"
 NEW="driveShape:\"Mdot2-shape\",major:\"row\",rowDir:\"UD\",colDir:\"LR\",driveSection:\[{top:14,left:18,rowCnt:${SSD_BAY%%X*},colCnt:${SSD_BAY##*X},xGap:6,yGap:6}\]},"
@@ -101,6 +135,7 @@ if [ -f "/usr/lib/systemd/system/nvmesystem.service" ] || [ -f "/usr/lib/systemd
 fi
 gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
-[[ -n "${HDD_BAY}" && -n "${SSD_BAY}" ]] && echo "${HDD_BAY}-${SSD_BAY}" > /usr/arc/storagepanel.conf
+SM_KEY="sm_machine_img_config_name"
+synosetkeyvalue "/etc.defaults/synoinfo.conf" "${SM_KEY}" "" # "${HDD_BAY}-M2X1"
 
 exit 0
