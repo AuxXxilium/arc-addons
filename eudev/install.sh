@@ -79,24 +79,32 @@ elif [ "${1}" = "late" ]; then
   echo "copy modules"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   isChange=false
+  # read config
+  PLATFORM=$(awk -F'"' '/^export PLATFORM=/ {print $2}' "${RAMDISK_PATH}/addons/addons.sh")
+  PRODUCTVER=$(awk -F'"' '/^export PRODUCTVER=/ {print $2}' "${RAMDISK_PATH}/addons/addons.sh")
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   if grep -q 'RR@RR' /proc/version 2>/dev/null; then
-    if [ ! -d /tmpRoot/usr/lib/modules.bak ]; then
+    if [ ! -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
       echo "Custom Kernel - backup existing modules."
-      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.bak
-    else
+      rm -rf /tmpRoot/usr/lib/modules.* 2>/dev/null || true
+      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}
+    elif [ -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
       echo "Custom Kernel - restore modules from backup."
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
-      /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
+      /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} /tmpRoot/usr/lib/modules
     fi
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules
     isChange=true
   else
-    if [ -d /tmpRoot/usr/lib/modules.bak ]; then
-      echo "Custom Kernel - restore modules from backup."
+    if [ ! -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
+      echo "Official Kernel - backup existing modules."
+      rm -f /tmpRoot/usr/lib/modules.* 2>/dev/null || true
+      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}
+    elif [ -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
+      echo "Official Kernel - restore modules from backup."
       /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
-      /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.bak /tmpRoot/usr/lib/modules
+      /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} /tmpRoot/usr/lib/modules
     fi
     for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
       O=$(echo "${L}" | awk -F'###' '{print $1}')
