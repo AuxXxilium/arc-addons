@@ -153,6 +153,7 @@ elif [ "${1}" = "late" ]; then
     # crc32c-intel
     if grep flags /proc/cpuinfo 2>/dev/null | grep -wq sse4_2; then
       echo "CPU Supports SSE4.2, crc32c-intel should load"
+      sed -i 's/^# crc32c-intel/crc32c-intel/g' /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf
     else
       echo "CPU does NOT support SSE4.2, crc32c-intel will not load, disabling"
       sed -i 's/^crc32c-intel/# crc32c-intel/g' /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf
@@ -161,6 +162,8 @@ elif [ "${1}" = "late" ]; then
     # aesni-intel
     if grep flags /proc/cpuinfo 2>/dev/null | grep -wq aes; then
       echo "CPU Supports AES, aesni-intel should load"
+      for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do /bin/set_key_value "${F}" "support_aesni_intel" "yes"; done
+      sed -i 's/^# aesni-intel/aesni-intel/g' /tmpRoot/usr/lib/modules-load.d/70-crypto-kernel.conf
     else
       echo "CPU does NOT support AES, aesni-intel will not load, disabling"
       for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do /bin/set_key_value "${F}" "support_aesni_intel" "no"; done
