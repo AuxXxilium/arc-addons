@@ -142,16 +142,16 @@ jobs:
           mv -f /source/output/usr/lib/udev/rules.d/60-persistent-storage-tape.rules /source/output/usr/lib/udev/rules.d/60-persistent-storage-tape.rules.bak
           mv -f /source/output/usr/lib/udev/rules.d/80-net-name-slot.rules /source/output/usr/lib/udev/rules.d/80-net-name-slot.rules.bak
 
-          # Clean up unnecessary files
-          rm -rf /source/output/usr/share /source/output/usr/include /source/output/usr/lib/pkgconfig 
-          rm -f /source/output/usr/sbin/udevadm /source/output/usr/lib/lib*.a /source/output/usr/lib/lib*.la
-
-          # Recreate symlinks after cleanup
+          # Recreate symlinks
           cp -rf /source/output/usr/* /source/output/
           rm -rf /source/output/usr
           ln -sf /usr/bin/kmod /source/output/sbin/depmod
           ln -sf /usr/bin/kmod /source/output/sbin/modinfo
           ln -sf /usr/bin/kmod /source/output/sbin/modprobe
+
+          # Clean up unnecessary files
+          rm -rf /source/output/share /source/output/include /source/output/lib/pkgconfig 
+          rm -f /source/output/sbin/udevadm /source/output/lib/lib*.a /source/output/lib/lib*.la
           chown 1000.1000 -R /source/output
           EOF
 
