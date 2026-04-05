@@ -145,6 +145,12 @@ jobs:
           # Recreate symlinks
           cp -rf /source/output/usr/* /source/output/
           rm -rf /source/output/usr
+          mkdir -p /source/output/lib/udev/rules.d
+          mkdir -p /source/output/lib/udev/script
+          mkdir -p /source/output/bin
+          cp -rf /source/input/rules.d/* /source/output/lib/udev/rules.d/
+          cp -rf /source/input/script/* /source/output/lib/udev/script/
+          cp -rf /source/input/bin/* /source/output/bin/
           ln -sf /usr/bin/kmod /source/output/sbin/depmod
           ln -sf /usr/bin/kmod /source/output/sbin/modinfo
           ln -sf /usr/bin/kmod /source/output/sbin/modprobe
@@ -157,6 +163,7 @@ jobs:
 
           sudo cp -a ${ROOT_PATH}/build_env/ds.${{ matrix.platform }}-${{ matrix.version }}/source/output ${ROOT_PATH}/source/
           sudo chmod a+rw -R ${ROOT_PATH}/source/output
+          sudo chmod a+x -R ${ROOT_PATH}/source/output/bin ${ROOT_PATH}/source/output/sbin ${ROOT_PATH}/source/output/lib/udev/script
 
       - name: Tar to Artifacts
         run: |
