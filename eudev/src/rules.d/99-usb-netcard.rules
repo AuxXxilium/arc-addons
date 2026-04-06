@@ -1,0 +1,8 @@
+#
+# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
+
+ACTION=="add|remove", SUBSYSTEM=="net", KERNEL=="eth*|usb*|wlan*", RUN+="/usr/lib/udev/script/usb-netcard.sh %E{ACTION} %k"

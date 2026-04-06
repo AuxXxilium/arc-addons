@@ -88,13 +88,13 @@ elif [ "${1}" = "late" ]; then
     if [ ! -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
       echo "Custom Kernel - backup existing modules."
       rm -rf /tmpRoot/usr/lib/modules.* 2>/dev/null || true
-      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}
+      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} 2>/dev/null || true
     elif [ -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
       echo "Custom Kernel - restore modules from backup."
-      /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
-      /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} /tmpRoot/usr/lib/modules
+      /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules 2>/dev/null || true
+      /tmpRoot/bin/mv -f /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} /tmpRoot/usr/lib/modules 2>/dev/null || true
     fi
-    /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules
+    /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules 2>/dev/null || true
     isChange=true
   else
     if [ ! -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
@@ -103,8 +103,8 @@ elif [ "${1}" = "late" ]; then
       /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}
     elif [ -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
       echo "Official Kernel - restore modules from backup."
-      /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules
-      /tmpRoot/bin/mv -vf /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} /tmpRoot/usr/lib/modules
+      /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules 2>/dev/null || true
+      /tmpRoot/bin/mv -f /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} /tmpRoot/usr/lib/modules 2>/dev/null || true
     fi
     for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
       O=$(echo "${L}" | awk -F'###' '{print $1}')
