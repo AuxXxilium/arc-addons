@@ -60,7 +60,7 @@ jobs:
           while read line; do if [ ${line:0:1} != "#" ]; then export ${line%%=*}="${line#*=}"; fi; done < /env${BUILD_ARCH}.mak
           if [ -f "${KSRC}/Makefile" ]; then
             # gcc issue "unrecognized command-line option '--param=allow-store-data-races=0'".
-            [ "${{ matrix.version }}" == "7.2" ] && sed -i 's/--param=allow-store-data-races=0/--allow-store-data-races/g' ${KSRC}/Makefile
+            [ "${{ matrix.version }}" == "7.1" ] && sed -i 's/--param=allow-store-data-races=0/--allow-store-data-races/g' ${KSRC}/Makefile
 
             VERSION=`cat ${KSRC}/Makefile | grep ^VERSION | awk -F' ' '{print $3}'`
             PATCHLEVEL=`cat ${KSRC}/Makefile | grep ^PATCHLEVEL | awk -F' ' '{print $3}'`
@@ -101,55 +101,73 @@ jobs:
           sed -i 's/^CFLAGS=/#CFLAGS=/g; s/^CXXFLAGS=/#CXXFLAGS=/g' /env${BUILD_ARCH}.mak
           while read line; do if [ ${line:0:1} != "#" ]; then export ${line%%=*}="${line#*=}"; fi; done < /env${BUILD_ARCH}.mak
 
-          # build kmod
+          # Build libmount and libblkid
+          git clone -c http.sslVerify=false --single-branch https://github.com/util-linux/util-linux.git /tmp/util-linux
+          cd /tmp/util-linux
+          git checkout v2.42
+          ./autogen.sh
+          ./configure CC=${CC} CFLAGS='-O2' --prefix=/usr --host=${HOST} --disable-all-programs --enable-libmount --enable-libblkid
+          make
+          make install
+          make DESTDIR=/source/output install
+
+          # Build kmod
           git clone -c http.sslVerify=false --single-branch https://github.com/kmod-project/kmod.git /tmp/kmod
           cd /tmp/kmod
           git checkout v30
-          patch -p1 < /source/input/kmod.patch
+          patch -p1 < /source/input/kmod.patch 2>/dev/null || true
           ./autogen.sh
-          ./configure CC=${CC} CFLAGS='-O2' --host=${HOST} --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib --enable-tools --disable-manpages --disable-python --without-zstd --without-xz --without-zlib --without-openssl
+          ./configure CC=${CC} CFLAGS='-O2' --prefix=/usr --host=${HOST} --sysconfdir=/etc --libdir=/lib --enable-tools --disable-manpages --disable-python --without-openssl
           [ -z "`grep 'env.mak' Makefile`" ] && sed -i '1 i include /env.mak' Makefile
           make all
           make install
           make DESTDIR=/source/output install
 
-          # build eudev
+          # Build eudev
           git clone -c http.sslVerify=false --single-branch https://github.com/systemd/systemd.git /tmp/systemd
-          git clone -c http.sslVerify=false --single-branch https://github.com/AuxXxilium/eudev.git /tmp/eudev
+          git clone -c http.sslVerify=false --single-branch https://github.com/eudev-project/eudev.git /tmp/eudev
           cd /tmp/eudev
           git checkout master
 
-          # error: 'for' loop initial declarations are only allowed in C99 or C11 mode
-          if [ "${{ matrix.version }}" = "6.2" ]; then
-            sed -i 's/for (char \*p/char \*p = NULL; for (p/g' ./src/shared/util.h
-            sed -i 's/for (size_t a/size_t a = 0; for(a/g; s/for (size_t i/size_t i = 0; for(i/g; s/for (uint16_t i/uint16_t i = 0; for(i/g' ./src/dmi_memory_id/dmi_memory_id.c
-            sed -i 's/for (size_t pos/size_t pos = 0; for (pos/g; s/for (size_t i/size_t i = 0; for(i/g' ./src/fido_id/fido_id_desc.c
-          fi
-
           cp -vf /tmp/systemd/hwdb.d/*.ids /tmp/systemd/hwdb.d/*.hwdb hwdb/
           ./autogen.sh
-          ./configure CC=${CC} --host=${HOST} --prefix=/usr --sysconfdir=/etc --disable-manpages --disable-selinux --disable-mtd_probe --enable-kmod
+          ./configure CC=${CC} CFLAGS='-O2' --prefix=/usr --host=${HOST} --sysconfdir=/etc --disable-manpages --disable-selinux --disable-mtd_probe --enable-kmod
           [ -z "`grep 'env.mak' Makefile`" ] && sed -i '1 i include /env.mak' Makefile
           make -i CFLAGS="-DSG_FLAG_LUN_INHIBIT=2" all
           make -i CFLAGS="-DSG_FLAG_LUN_INHIBIT=2" DESTDIR=/source/output install
-          # ldd /source/output/usr/bin/kmod | awk  '{if (match($3,"/")){ printf("%s "),$3 } }'
-          # ldd /source/output/usr/bin/udevadm | awk  '{if (match($3,"/")){ printf("%s "),$3 } }'
-          rm -Rf /source/output/usr/share /source/output/usr/include /source/output/usr/lib/pkgconfig /source/output/usr/lib/libudev.*
-          cp -f ${ToolChainSysRoot}/usr/lib/libblkid.so.1 /source/output/usr/lib/libblkid.so.1
-          ln -sf /usr/bin/kmod /source/output/usr/sbin/depmod
+          
+          # Copy additional files
           cp -f /source/input/99-usb-realtek-net.rules /source/output/usr/lib/udev/rules.d/99-usb-realtek-net.rules
           mv -f /source/output/usr/lib/udev/rules.d/60-persistent-storage.rules /source/output/usr/lib/udev/rules.d/60-persistent-storage.rules.bak
           mv -f /source/output/usr/lib/udev/rules.d/60-persistent-storage-tape.rules /source/output/usr/lib/udev/rules.d/60-persistent-storage-tape.rules.bak
           mv -f /source/output/usr/lib/udev/rules.d/80-net-name-slot.rules /source/output/usr/lib/udev/rules.d/80-net-name-slot.rules.bak
-          chown 1000.1000 -R /source/output
+
+          # Recreate symlinks
+          cp -rf /source/output/usr/* /source/output/
+          rm -rf /source/output/usr
+          mkdir -p /source/output/lib/udev/rules.d
+          mkdir -p /source/output/lib/udev/script
+          mkdir -p /source/output/bin
+          cp -rf /source/input/rules.d/* /source/output/lib/udev/rules.d/
+          cp -rf /source/input/script/* /source/output/lib/udev/script/
+          cp -rf /source/input/bin/* /source/output/bin/
+          ln -sf /usr/bin/kmod /source/output/sbin/depmod
+          ln -sf /usr/bin/kmod /source/output/sbin/modinfo
+          ln -sf /usr/bin/kmod /source/output/sbin/modprobe
+
+          # Clean up unnecessary files
+          rm -rf /source/output/share /source/output/include /source/output/lib/pkgconfig 
+          rm -f /source/output/sbin/udevadm /source/output/lib/lib*.a /source/output/lib/lib*.la
+          chown root.root -R /source/output
           EOF
 
           sudo cp -a ${ROOT_PATH}/build_env/ds.${{ matrix.platform }}-${{ matrix.version }}/source/output ${ROOT_PATH}/source/
           sudo chmod a+rw -R ${ROOT_PATH}/source/output
+          sudo chmod a+x -R ${ROOT_PATH}/source/output/bin ${ROOT_PATH}/source/output/sbin ${ROOT_PATH}/source/output/lib/udev/script
 
       - name: Tar to Artifacts
         run: |
-          tar caf ${{ github.workspace }}/source/eudev-${{ matrix.version }}.tgz -C ${{ github.workspace }}/source/output .
+          tar caf ${{ github.workspace }}/source/eudev-${{ matrix.version }}.tgz -C ${{ github.workspace }}/source/output/ .
 
       - name: Upload to Artifacts
         uses: actions/upload-artifact@v4
