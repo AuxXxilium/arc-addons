@@ -106,7 +106,7 @@ jobs:
           cd /tmp/util-linux
           git checkout v2.42
           ./autogen.sh
-          ./configure CC=${CC} CFLAGS='-O2' --prefix=/usr --host=${HOST} --disable-all-programs --enable-libmount --enable-libblkid
+          ./configure CC=${CC} CFLAGS='-O2' --prefix=/usr --host=${HOST} --disable-all-programs --enable-libmount --enable-libblkid --enable-blkid
           make
           make install
           make DESTDIR=/source/output install
