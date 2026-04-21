@@ -16,6 +16,16 @@ if [ "${1}" = "early" ]; then
   xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null | sed "s/2d6520302e39/2d6520312e32/" | xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
 
+  # Add movbe emulation for early boot (before kernel modules are loaded)
+  if grep -q "movbe" /proc/cpuinfo 2>/dev/null; then
+    echo "CPU supports MOVBE, no need for early boot emulation"
+  else
+    echo "CPU does NOT support MOVBE, adding early boot emulation"
+    if [ -f /usr/lib/modules/movbe_emulation.ko ]; then
+      insmod /usr/lib/modules/movbe_emulation.ko 2>/dev/null || true
+    fi
+  fi
+
 elif [ "${1}" = "patches" ]; then
   # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
