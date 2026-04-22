@@ -86,9 +86,9 @@ rm -f /source/output/usr/sbin/udevadm /source/output/usr/lib/lib*.a /source/outp
 # Recreate symlinks after cleanup
 cp -rf /source/output/usr/* /source/output/
 rm -rf /source/output/usr
-ln -sf /usr/bin/kmod /source/output/sbin/depmod
-ln -sf /usr/bin/kmod /source/output/sbin/modinfo
-ln -sf /usr/bin/kmod /source/output/sbin/modprobe
+# ln -sf /usr/bin/kmod /source/output/sbin/depmod
+# ln -sf /usr/bin/kmod /source/output/sbin/modinfo
+# ln -sf /usr/bin/kmod /source/output/sbin/modprobe
 chown 1000.1000 -R /source/output
 EOF
 }
