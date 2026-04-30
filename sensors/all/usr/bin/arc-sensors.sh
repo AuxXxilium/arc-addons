@@ -135,8 +135,12 @@ while true; do
       else
         generate_fancontrol_config "${FanBaseMode}"
       fi
-      /usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null && rm -f "/run/fancontrol.pid" 2>/dev/null
-      sleep 1
+      /usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null
+      for _w in 1 2 3 4 5; do
+        /usr/bin/pgrep -f "/usr/sbin/fancontrol" >/dev/null 2>&1 || break
+        sleep 1
+      done
+      rm -f "/run/fancontrol.pid" "/var/run/fancontrol.pid" 2>/dev/null
       /usr/sbin/fancontrol 2>/dev/null &
     fi
   fi
@@ -144,5 +148,5 @@ while true; do
 done
 }
 
-trap '/usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null && rm -f "/run/fancontrol.pid"' EXIT INT TERM HUP
+trap '/usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null; rm -f "/run/fancontrol.pid" "/var/run/fancontrol.pid" 2>/dev/null' EXIT INT TERM HUP
 main &
