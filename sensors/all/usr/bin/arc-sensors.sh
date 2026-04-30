@@ -16,7 +16,7 @@ DEFMODES=("20 50 50 100" "20 60 20 60" "20 70 10 50")
 
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-    for K in "support_fan" "support_fan_adjust_dual_mode" "support_adt7490"; do
+    for K in "support_fan" "support_fan_adjust_dual_mode" "supportadt7490"; do
       /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-"no"}"
     done
   done
@@ -137,7 +137,7 @@ while true; do
       fi
       /usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null && rm -f "/run/fancontrol.pid" 2>/dev/null
       sleep 1
-      /usr/sbin/fancontrol &
+      /usr/sbin/fancontrol 2>/dev/null &
     fi
   fi
   find /etc -maxdepth 1 -type f -name 'synoinfo.conf.??????' -mmin +0.5 -exec rm -f {} \; 2>/dev/null
