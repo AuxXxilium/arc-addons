@@ -696,7 +696,7 @@ case ${1} in
     # symptoms like the update-options wizard reappearing each reboot.
     # extensionPorts / model.dtb are addon-owned outputs and remain
     # safe to copy whole.
-    MANAGED_SYNOINFO_KEYS="maxdisks supportnvme support_m2_pool usbportcfg esataportcfg internalportcfg supportportmappingv2 eunitseq"
+    MANAGED_SYNOINFO_KEYS="maxdisks supportnvme support_m2_pool usbportcfg esataportcfg internalportcfg supportportmappingv2 eunitseq supportsas"
     for SF in /etc/synoinfo.conf /etc.defaults/synoinfo.conf; do
       TF="${TARGET_ROOT}${SF}"
       [ ! -f "${SF}" ] && continue
