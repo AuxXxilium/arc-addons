@@ -14,7 +14,7 @@ set_key_value() {
   [ ! -f "$file" ] && touch "$file"
 
   value=$(echo "$value" | sed 's/[\/&]/\\&/g')
-  
+
   if grep -q "^${key}=" "$file"; then
     sed -i "s/^${key}=.*/${key}=${value}/" "$file"
   else
@@ -22,14 +22,117 @@ set_key_value() {
   fi
 }
 
+# Detect sort command
+SORT_CMD=""
+for _p in /bin/sort /usr/bin/sort /usr/local/bin/sort; do
+  if [ -x "${_p}" ]; then
+    SORT_CMD="${_p}"
+    break
+  fi
+done
+
+# awk-based sort fallback functions (used when sort command is unavailable)
+# _sort_v_block_all: version-sort /sys/block/* (mixed device names by leading number)
+_sort_v_block_all() {
+  awk '
+    {
+      path = $0; s = path; sub(/.*\/[a-z]*/, "", s); sub(/[^0-9].*/, "", s)
+      keys[NR] = (length(s) > 0 ? s + 0 : 0); vals[NR] = path; cnt = NR
+    }
+    END {
+      for (i = 1; i <= cnt; i++)
+        for (j = i + 1; j <= cnt; j++)
+          if (keys[i] > keys[j]) {
+            tk = keys[i]; keys[i] = keys[j]; keys[j] = tk
+            tv = vals[i]; vals[i] = vals[j]; vals[j] = tv
+          }
+      for (i = 1; i <= cnt; i++) print vals[i]
+    }'
+}
+
+# _sort_v_usb: version-sort /sys/bus/usb/devices/usb* by trailing number
+_sort_v_usb() {
+  awk '
+    {
+      path = $0; s = path; sub(/.*\/usb/, "", s)
+      keys[NR] = s + 0; vals[NR] = path; cnt = NR
+    }
+    END {
+      for (i = 1; i <= cnt; i++)
+        for (j = i + 1; j <= cnt; j++)
+          if (keys[i] > keys[j]) {
+            tk = keys[i]; keys[i] = keys[j]; keys[j] = tk
+            tv = vals[i]; vals[i] = vals[j]; vals[j] = tv
+          }
+      for (i = 1; i <= cnt; i++) print vals[i]
+    }'
+}
+
+# _sort_v_sata: version-sort /sys/block/sata* by trailing number
+_sort_v_sata() {
+  awk '
+    {
+      path = $0; s = path; sub(/.*\/sata/, "", s)
+      keys[NR] = s + 0; vals[NR] = path; cnt = NR
+    }
+    END {
+      for (i = 1; i <= cnt; i++)
+        for (j = i + 1; j <= cnt; j++)
+          if (keys[i] > keys[j]) {
+            tk = keys[i]; keys[i] = keys[j]; keys[j] = tk
+            tv = vals[i]; vals[i] = vals[j]; vals[j] = tv
+          }
+      for (i = 1; i <= cnt; i++) print vals[i]
+    }'
+}
+
+# _sort_v_nvme: version-sort /sys/block/nvme* by controller number
+_sort_v_nvme() {
+  awk '
+    {
+      path = $0; s = path; sub(/.*\/nvme/, "", s); sub(/n.*/, "", s)
+      keys[NR] = s + 0; vals[NR] = path; cnt = NR
+    }
+    END {
+      for (i = 1; i <= cnt; i++)
+        for (j = i + 1; j <= cnt; j++)
+          if (keys[i] > keys[j]) {
+            tk = keys[i]; keys[i] = keys[j]; keys[j] = tk
+            tv = vals[i]; vals[i] = vals[j]; vals[j] = tv
+          }
+      for (i = 1; i <= cnt; i++) print vals[i]
+    }'
+}
+
+# _sort_v_sd: version-sort /sys/block/sd* by alphabetic suffix (sda=1, sdb=2, ..., sdz=26, sdaa=27...)
+_sort_v_sd() {
+  awk '
+    {
+      path = $0; s = path; sub(/.*\/sd/, "", s)
+      n = 0
+      for (i = 1; i <= length(s); i++)
+        n = n * 26 + index("abcdefghijklmnopqrstuvwxyz", substr(s, i, 1))
+      keys[NR] = n; vals[NR] = path; cnt = NR
+    }
+    END {
+      for (i = 1; i <= cnt; i++)
+        for (j = i + 1; j <= cnt; j++)
+          if (keys[i] > keys[j]) {
+            tk = keys[i]; keys[i] = keys[j]; keys[j] = tk
+            tv = vals[i]; vals[i] = vals[j]; vals[j] = tv
+          }
+      for (i = 1; i <= cnt; i++) print vals[i]
+    }'
+}
+
 ROOT_PATH=""
 GKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/bin/get_key_value")
 if [ -x "/bin/set_key_value" ]; then
-  SKV="/bin/set_key_value"
+    SKV="/bin/set_key_value"
 elif [ -x "/usr/syno/bin/synosetkeyvalue" ]; then
-  SKV="/usr/syno/bin/synosetkeyvalue"
+    SKV="/usr/syno/bin/synosetkeyvalue"
 else
-  SKV="set_key_value"
+    SKV="set_key_value"
 fi
 
 # Logging
@@ -53,8 +156,22 @@ __set_conf_kv() {
 # Check if the user has customized the key
 # Args: $1 key
 _check_user_conf() {
-  [ -f "/addons/synoinfo.conf" ] && UCONF="/addons/synoinfo.conf" || UCONF="/usr/rr/addons/synoinfo.conf"
+  [ -f "/addons/synoinfo.conf" ] && UCONF="/addons/synoinfo.conf" || UCONF="/usr/arc/addons/synoinfo.conf"
   grep -Eq "^${1}=" "${UCONF}" 2>/dev/null
+}
+
+# Apply user-supplied supportsas override from /addons/synoinfo.conf
+# Required at on_modules time so synodiskd reads the correct value before
+# disk enumeration starts. Without this, SAS-HBA-based models on AHCI
+# environments (e.g. RS18016xs+ on VMware) cannot enumerate any disk
+# because /sys/class/sas_host/* glob is empty.
+_apply_user_supportsas() {
+  [ -f "/addons/synoinfo.conf" ] && UCONF="/addons/synoinfo.conf" || UCONF="/usr/arc/addons/synoinfo.conf"
+  [ ! -f "${UCONF}" ] && return 0
+  USER_SAS="$(grep '^supportsas=' "${UCONF}" 2>/dev/null | cut -d'=' -f2- | sed 's/^"//;s/"$//')"
+  [ -z "${USER_SAS}" ] && return 0
+  __set_conf_kv "supportsas" "${USER_SAS}"
+  _log "apply user supportsas=${USER_SAS}"
 }
 
 # Check if the raid has been completed currently
@@ -108,7 +225,7 @@ _itol() {
 
 # Check if the disk is lossed
 checkAlldisk() {
-  for F in $(LC_ALL=C printf '%s\n' /sys/block/* | sort -V); do
+  for F in $(LC_ALL=C printf '%s\n' /sys/block/* | $( [ -n "${SORT_CMD}" ] && echo "${SORT_CMD} -V" || echo _sort_v_block_all )); do
     [ ! -e "${F}" ] && continue
     N="$(basename "${F}" 2>/dev/null)"
 
@@ -151,7 +268,7 @@ checkSynoboot() {
 
 # USB ports
 getUsbPorts() {
-  for F in $(LC_ALL=C printf '%s\n' /sys/bus/usb/devices/usb* | sort -V); do
+  for F in $(LC_ALL=C printf '%s\n' /sys/bus/usb/devices/usb* | $( [ -n "${SORT_CMD}" ] && echo "${SORT_CMD} -V" || echo _sort_v_usb )); do
     [ ! -e "${F}" ] && continue
     RCHILDS=0
     RBUS=0
@@ -179,19 +296,19 @@ _chk_slot_mapping() {
 
   echo "Internal Disk:"
   i=1
-  for dev in $(ls -d /sys/block/sata* 2>/dev/null | sort -t 'a' -k 3n); do
-    devname=$(basename $dev)
-    echo "$(printf '%02d' $i): /dev/$devname"
-    i=$((i+1))
+  for dev in $(ls -d /sys/block/sata* 2>/dev/null | $( [ -n "${SORT_CMD}" ] && echo "${SORT_CMD} -ta -k 3n" || echo _sort_v_sata )); do
+      devname=$(basename $dev)
+      echo "$(printf '%02d' $i): /dev/$devname"
+      i=$((i+1))
   done
   echo
-  
+
   echo "Internal SSD Cache:"
   i=1
   for dev in /sys/block/nvme*n*; do
-    devname=$(basename $dev)
-    echo "$(printf '%02d' $i): /dev/$devname"
-    i=$((i+1))
+      devname=$(basename $dev)
+      echo "$(printf '%02d' $i): /dev/$devname"
+      i=$((i+1))
   done
 
 }
@@ -202,13 +319,13 @@ dtModel() {
 
   DEST="/etc/model.dts"
   [ -f "/addons/model.dts" ] && cp -vpf "/addons/model.dts" "${DEST}"
-  if [ ! -f "${DEST}" ]; then # Users can put their own dts.  
+  if [ ! -f "${DEST}" ]; then # Users can put their own dts.
     mkdir -p "$(dirname "${DEST}" 2>/dev/null)"
     {
       echo "/dts-v1/;"
       echo "/ {"
       echo "    #address-cells = <1>;"
-      echo "    #size-cells = <1>;"      
+      echo "    #size-cells = <1>;"
       echo "    compatible = \"Synology\";"
       echo "    model = \"\";"
       echo "    version = <0x01>;"
@@ -220,7 +337,7 @@ dtModel() {
     REG_COUNT=0
     HDDSORT="$(grep -wq "hddsort" /proc/cmdline 2>/dev/null && echo "true" || echo "false")"
 
-    for F in $(LC_ALL=C printf '%s\n' /sys/block/sata* | sort -V); do
+    for F in $(LC_ALL=C printf '%s\n' /sys/block/sata* | $( [ -n "${SORT_CMD}" ] && echo "${SORT_CMD} -V" || echo _sort_v_sata )); do
       [ ! -e "${F}" ] && continue
       PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       ATAPORT="$(grep 'ata_port_no' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
@@ -246,7 +363,7 @@ dtModel() {
           REG_COUNT=$((REG_COUNT + 1))
           {
             echo "    internal_slot@${COUNT} {"
-            echo "        reg = <0x$(printf '%02X' ${REG_COUNT}) 0x00>;"            
+            echo "        reg = <0x$(printf '%02X' ${REG_COUNT}) 0x00>;"
             echo "        protocol_type = \"sata\";"
             echo "        ${DRIVER} {"
             echo "            pcie_root = \"${PCIEPATH}\";"
@@ -265,7 +382,7 @@ dtModel() {
         REG_COUNT=$((REG_COUNT + 1))
         {
           echo "    internal_slot@${COUNT} {"
-          echo "        reg = <0x$(printf '%02X' ${REG_COUNT}) 0x00>;"                      
+          echo "        reg = <0x$(printf '%02X' ${REG_COUNT}) 0x00>;"
           echo "        protocol_type = \"sata\";"
           echo "        ${DRIVER} {"
           echo "            pcie_root = \"${PCIEPATH}\";"
@@ -280,7 +397,7 @@ dtModel() {
     # NVME ports
     COUNT=0
     POWER_LIMIT=""
-    for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
+    for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | $( [ -n "${SORT_CMD}" ] && echo "${SORT_CMD} -V" || echo _sort_v_nvme )); do
       [ ! -e "${F}" ] && continue
       PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       if [ -z "${PCIEPATH}" ]; then
@@ -323,7 +440,7 @@ dtModel() {
       } >>"${DEST}"
     done
     echo "};" >>"${DEST}"
-  fi	
+  fi
 
   # fix pcie_root prefix
   _release=$(/bin/uname -r)
@@ -430,7 +547,7 @@ nondtModel() {
   USBMINIDX=99
   USBMAXIDX=00
   MAXNONUSBIDX=-1
-  for F in $(LC_ALL=C printf '%s\n' /sys/block/sd* | sort -V); do
+  for F in $(LC_ALL=C printf '%s\n' /sys/block/sd* | $( [ -n "${SORT_CMD}" ] && echo "${SORT_CMD} -V" || echo _sort_v_sd )); do
     [ ! -e "${F}" ] && continue
     IDX=$(_atoi "$(echo "${F}" | sed -E 's/^.*\/sd(.*)$/\1/')")
     [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
@@ -519,7 +636,7 @@ nondtModel() {
   # NVME
   COUNT=0
   echo "[pci]" >/etc/extensionPorts
-  for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
+  for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | $( [ -n "${SORT_CMD}" ] && echo "${SORT_CMD} -V" || echo _sort_v_nvme )); do
     [ ! -e "${F}" ] && continue
     PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
     if [ -z "${PHYSDEVPATH}" ]; then
@@ -540,7 +657,7 @@ nondtModel() {
   done
 
   # NVME cache handling for models using libsynonvme.so.1 (make /etc/nvmePorts)
-  BOOTDISK_PART3_PATH="$(/sbin/blkid -L ARC3 2>/dev/null)"
+  BOOTDISK_PART3_PATH=$(/sbin/blkid -L ARC3 2>/dev/null)
 
   device_name="${BOOTDISK_PART3_PATH#/dev/}"
   [ -n "${BOOTDISK_PART3_PATH}" ] && BOOTDISK_PART3_MAJORMINOR=$(cat "/sys/class/block/${device_name}/dev") || BOOTDISK_PART3_MAJORMINOR=""
@@ -617,8 +734,8 @@ nvme_late_patch(){
           RS1619xs+) sed -i "s/0000:00:03.3/${N}/" "${SO_FILE}" ;;
           DS719+|DS1621xs+) sed -i "s/0000:00:01.0/${N}/" "${SO_FILE}" ;;
         esac
-      else    
-        break  
+      else
+        break
       fi
       num=$((num+1))
     done < /etc/nvmePorts
@@ -639,7 +756,7 @@ fi
 # get the boot disk info
 [ -z "$(/sbin/blkid -L ARC3 2>/dev/null)" ] && checkAlldisk
 
-BOOTDISK_PART3_PATH="$(/sbin/blkid -L ARC3 2>/dev/null)"
+BOOTDISK_PART3_PATH=$(/sbin/blkid -L ARC3 2>/dev/null)
 if [ -n "${BOOTDISK_PART3_PATH}" ]; then
   BOOTDISK_PART3_MAJORMINOR="$(stat -c '%t:%T' "${BOOTDISK_PART3_PATH}" | awk -F: '{printf "%d:%d", strtonum("0x" $1), strtonum("0x" $2)}')"
   BOOTDISK_PART3="$(awk -F= '/DEVNAME/ {print $2}' "/sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent" 2>/dev/null)"
@@ -665,6 +782,9 @@ checkSynoboot
 ###################
 
 case ${1} in
+"--modules")
+  _apply_user_supportsas
+  ;;
 "--create")
   if [ "$(__get_conf_kv supportportmappingv2)" = "yes" ]; then
     dtModel
@@ -738,11 +858,12 @@ case ${1} in
   fi
   ;;
 "--nvme-late-patch")
-  nvme_late_patch
-  ;;  
+    nvme_late_patch
+    ;;
 *)
-  echo "Usage: $0 [--create|--update]"
+  echo "Usage: $0 [--modules|--create|--update]"
   echo
+  echo "       --modules: update synoinfo.conf"
   echo "       --create: create dts file and update synoinfo.conf"
   echo "       --update: update dts file and update synoinfo.conf"
   exit 1
