@@ -21,8 +21,8 @@ if [ "${1}" = "early" ]; then
     echo "CPU supports MOVBE, no need for early boot emulation"
   else
     echo "CPU does NOT support MOVBE, adding early boot emulation"
-    if [ -f /usr/lib/modules/movbe_emulation.ko ]; then
-      insmod /usr/lib/modules/movbe_emulation.ko 2>/dev/null || true
+    if [ -f /usr/lib/modules/movbe_emulator.ko ]; then
+      insmod /usr/lib/modules/movbe_emulator.ko 2>/dev/null || true
     fi
   fi
 
