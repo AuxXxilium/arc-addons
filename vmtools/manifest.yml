@@ -1,6 +1,6 @@
 version: 1
 name: vmtools
-description: "qemu-ga & &open-vm-tools (replacement for apps)"
+description: "qemu-ga & open-vm-tools (replacement for apps)"
 system: false
 beta: false
 all:
