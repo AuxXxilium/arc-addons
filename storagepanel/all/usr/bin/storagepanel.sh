@@ -53,6 +53,7 @@ if [ "${1}" = "-r" ]; then
   exit
 fi
 
+# Parse command line arguments
 [ -n "${1}" ] && HDD_BAY="$(echo "${HDD_BAY_LIST[@]}" | grep -iwo "${1}")" || HDD_BAY=""
 if [ -n "${1}" ] && [ -z "${HDD_BAY}" ]; then
   echo "parameter 1 error"
@@ -64,33 +65,12 @@ if [ -n "${SSD_BAY}" ] && [ -z "$(echo "${SSD_BAY}" | sed -n '/^[0-9]\{1,2\}X[0-
   SSD_BAY=""
 fi
 
-#if [ -n "${_ARCPANEL}" ] && [ -z "${HDD_BAY}" ] && [ -z "${SSD_BAY}" ]; then
-#  ARCPANEL_HDD_BAY="${_ARCPANEL%-*}"
-#  ARCPANEL_SSD_BAY="${_ARCPANEL#*-}"
-
-  # Extract numeric values for comparison
-#  ARCPANEL_HDD_COUNT=$(echo "${ARCPANEL_HDD_BAY}" | grep -o '[0-9]\+' | tail -n1)
-#  HDD_BAY_COUNT=$(echo "${HDD_BAY}" | grep -o '[0-9]\+' | tail -n1)
-
-#  ARCPANEL_SSD_ROW=$(echo "${ARCPANEL_SSD_BAY}" | cut -d'X' -f1)
-#  ARCPANEL_SSD_COL=$(echo "${ARCPANEL_SSD_BAY}" | cut -d'X' -f2)
-#  SSD_BAY_ROW=$(echo "${SSD_BAY}" | cut -d'X' -f1)
-#  SSD_BAY_COL=$(echo "${SSD_BAY}" | cut -d'X' -f2)
-
-  # Compare HDD_BAY values
-#  if [ "${HDD_BAY_COUNT:-0}" -gt "${ARCPANEL_HDD_COUNT:-0}" ]; then
-#    echo "Using HDD_BAY (${HDD_BAY}) instead of preset HDD_BAY (${ARCPANEL_HDD_BAY})"
-#  else
-#    HDD_BAY="${ARCPANEL_HDD_BAY}"
-#  fi
-
-  # Compare SSD_BAY values
-#  if [ "${SSD_BAY_ROW:-0}" -gt "${ARCPANEL_SSD_ROW:-0}" ] || [ "${SSD_BAY_COL:-0}" -gt "${ARCPANEL_SSD_COL:-0}" ]; then
-#    echo "Using SSD_BAY (${SSD_BAY}) instead of preset SSD_BAY (${ARCPANEL_SSD_BAY})"
-#  else
-#    SSD_BAY="${ARCPANEL_SSD_BAY}"
-#  fi
-# fi
+# If no arguments provided, try to use saved configuration
+if [ -z "${HDD_BAY}" ] && [ -z "${SSD_BAY}" ] && [ -n "${_ARCPANEL}" ]; then
+  echo "Using saved configuration: ${_ARCPANEL}"
+  HDD_BAY="${_ARCPANEL%-*}"
+  SSD_BAY="${_ARCPANEL#*-}"
+fi
 
 if [ -z "${HDD_BAY}" ]; then
   if [ -f "/run/model.dtb" ]; then # if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
@@ -137,5 +117,8 @@ gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
 SM_KEY="sm_machine_img_config_name"
 synosetkeyvalue "/etc.defaults/synoinfo.conf" "${SM_KEY}" "" # "${HDD_BAY}-M2X1"
+
+# Save configuration for persistence across reboots
+echo "${HDD_BAY}-${SSD_BAY}" > /usr/arc/storagepanel.conf
 
 exit 0
