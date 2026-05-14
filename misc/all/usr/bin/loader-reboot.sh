@@ -22,7 +22,7 @@ reset_arcsu() {
   unset ARCSU_ACTIVE
 }
 
-MODES="config recovery junior automated update uefi"
+MODES="config recovery junior automated update uefi dsm"
 
 usage() {
   echo "Use: $0 [ $(echo "${MODES}" | sed 's/ /|/g') ]"
