@@ -36,6 +36,9 @@ function Check() {
     exit 0
   fi
 
+  # Strip beta suffix from local version (e.g., 3.1.1b8 -> 3.1.1)
+  LOCALBASE="${LOCALTAG%%b*}"
+
   URL="https://github.com/AuxXxilium/arc"
   TAG=""
   TAG="$(curl -skL --connect-timeout 10 -w %{url_effective} -o /dev/null "${URL}/releases/latest" | awk -F'/' '{print $NF}')"
@@ -44,8 +47,28 @@ function Check() {
     echo "Error checking new version - Your version is ${LOCALTAG}"
     exit 0
   fi
-  if [ "${TAG}" = "${LOCALTAG}" ]; then
-    echo "Actual version is ${TAG} - Your version is ${LOCALTAG}"
+  
+  # Compare versions (GitHub version vs local base version)
+  if [ "$TAG" = "$LOCALBASE" ]; then
+    # Same base version - notify only if local is beta (stable release available)
+    if [ "$LOCALTAG" != "$LOCALBASE" ]; then
+      # Local has beta suffix, notify about stable release
+      NOTIFICATION="Arc Release ${TAG}"
+      SUBJECT=$(curl -skL --connect-timeout 10 "${URL}/releases/tag/${TAG}" | pup 'div[data-test-selector="body-content"]')
+      SUBJECT="${SUBJECT//\"/\\\\\\\"}"
+      synodsmnotify -e false -b false "@administrators" "arc_notify_subject" "{\"%NOTIFICATION%\": \"${NOTIFICATION}\", \"%SUBJECT%\": \"${SUBJECT}\"}"
+      exit 0
+    else
+      # Local is already stable
+      echo "Actual version is ${TAG} - Your version is ${LOCALTAG}"
+      exit 0
+    fi
+  fi
+  
+  # Only notify if GitHub version is greater than local base version
+  local sorted_first=$(printf '%s\n%s' "$TAG" "$LOCALBASE" | sort -V | head -n1)
+  if [ "$sorted_first" != "$LOCALBASE" ]; then
+    echo "Remote version ${TAG} is not newer than your version ${LOCALTAG}"
     exit 0
   fi
 
