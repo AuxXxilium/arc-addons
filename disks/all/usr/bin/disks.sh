@@ -141,6 +141,57 @@ _log() {
   /bin/logger -p "error" -t "disks" "$@"
 }
 
+# Print how many block disks are attached to each controller.
+_print_controller_disk_counts() {
+  REPORT_LINES=$(for F in /sys/block/*; do
+    [ -e "${F}" ] || continue
+    N="$(basename "${F}" 2>/dev/null)"
+    case "${N}" in
+    loop* | ram* | md* | dm-* | sr* | zram* | mtdblock* | nbd*) continue ;;
+    esac
+    [ -f "${F}/uevent" ] || continue
+    PHYSDEVPATH="$(awk -F= '/^PHYSDEVPATH=/{print $2}' "${F}/uevent" 2>/dev/null)"
+    [ -z "${PHYSDEVPATH}" ] && continue
+    CTRL="$(echo "${PHYSDEVPATH}" | awk -F'/' '
+      {
+        ctrl = ""
+        for (i = 1; i <= NF; i++) {
+          if ($i ~ /^[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]\.[0-9a-fA-F]$/) {
+            ctrl = $i
+            break
+          }
+        }
+        if (ctrl == "") {
+          for (i = 1; i <= NF; i++) {
+            if ($i ~ /^usb[0-9]+$/) {
+              ctrl = $i
+              break
+            }
+          }
+        }
+        if (ctrl == "") ctrl = "unknown"
+        print ctrl
+      }')"
+    printf '%s\t%s\n' "${CTRL}" "${N}"
+  done | awk -F'\t' '
+    {
+      cnt[$1]++
+      devs[$1] = (devs[$1] == "" ? $2 : devs[$1] "," $2)
+    }
+    END {
+      for (c in cnt) {
+        printf "%s\t%d\t%s\n", c, cnt[c], devs[c]
+      }
+    }' | $( [ -n "${SORT_CMD}" ] && echo "${SORT_CMD}" || echo cat ))
+
+  [ -z "${REPORT_LINES}" ] && return 0
+  echo "Controller disk count:"
+  echo "${REPORT_LINES}" | while IFS="$(printf '\t')" read -r C CNT DEVS; do
+    [ -z "${C}" ] && continue
+    echo "  ${C}: ${CNT} disk(s) [${DEVS}]"
+  done
+}
+
 # Get values in synoinfo.conf
 # Args: $1 key
 __get_conf_kv() {
@@ -158,6 +209,75 @@ __set_conf_kv() {
 _check_user_conf() {
   [ -f "/addons/synoinfo.conf" ] && UCONF="/addons/synoinfo.conf" || UCONF="/usr/arc/addons/synoinfo.conf"
   grep -Eq "^${1}=" "${UCONF}" 2>/dev/null
+}
+
+# Count currently visible nonDT data disks (sd*).
+_count_sd_disks() {
+  C=0
+  for F in /sys/block/sd*; do
+    [ -e "${F}" ] || continue
+    C=$((C + 1))
+  done
+  echo "${C}"
+}
+
+# Count currently visible DT data disks (sd* + sata*).
+_count_dt_disks() {
+  C=0
+  for F in /sys/block/sd* /sys/block/sata*; do
+    [ -e "${F}" ] || continue
+    C=$((C + 1))
+  done
+  echo "${C}"
+}
+
+# Wait until HBA disk enumeration becomes stable.
+_wait_hba_disks_stable() {
+  MODE="${1:-nondt}"
+  if [ "${MODE}" = "dt" ]; then
+    COUNT_FN="_count_dt_disks"
+    DISK_LABEL="sd*+sata*"
+  else
+    COUNT_FN="_count_sd_disks"
+    DISK_LABEL="sd*"
+  fi
+
+  START_SD_COUNT="$(${COUNT_FN})"
+  if type udevadm >/dev/null 2>&1; then
+    udevadm settle --timeout=120 2>/dev/null
+  fi
+
+  PREV_SD_COUNT="$(${COUNT_FN})"
+  STABLE_ROUNDS=0
+  I=0
+  while [ ${I} -lt 24 ]; do
+    sleep 5
+    CUR_SD_COUNT="$(${COUNT_FN})"
+    if [ "${CUR_SD_COUNT}" = "${PREV_SD_COUNT}" ]; then
+      STABLE_ROUNDS=$((STABLE_ROUNDS + 1))
+      [ ${STABLE_ROUNDS} -ge 2 ] && break
+    else
+      STABLE_ROUNDS=0
+      PREV_SD_COUNT="${CUR_SD_COUNT}"
+    fi
+    I=$((I + 1))
+  done
+
+  END_SD_COUNT="$(${COUNT_FN})"
+  if [ "${END_SD_COUNT}" -gt "${START_SD_COUNT}" ]; then
+    _log "HBA disks settled: ${DISK_LABEL} ${START_SD_COUNT} -> ${END_SD_COUNT}"
+  fi
+}
+
+# Enable supportsas automatically when SAS hosts exist (unless user set it).
+_auto_enable_supportsas() {
+  if _check_user_conf "supportsas"; then
+    _log "supportsas kept from user config"
+    return 0
+  fi
+  ls -d /sys/class/sas_host/host* >/dev/null 2>&1 || return 0
+  __set_conf_kv "supportsas" "yes"
+  _log "auto supportsas=yes (sas_host detected)"
 }
 
 # Apply user-supplied supportsas override from /addons/synoinfo.conf
@@ -316,6 +436,10 @@ _chk_slot_mapping() {
 # DT model
 dtModel() {
   _log dtModel
+
+  # DT path can also race with late HBA/SATA/NVMe probing.
+  _wait_hba_disks_stable dt
+  _auto_enable_supportsas
 
   DEST="/etc/model.dts"
   [ -f "/addons/model.dts" ] && cp -vpf "/addons/model.dts" "${DEST}"
@@ -485,6 +609,7 @@ dtModel() {
     #cp -vpf /etc/model.dtb /etc.defaults/model.dtb
     cp -vpf /etc/model.dtb /run/model.dtb
     _chk_slot_mapping
+    _print_controller_disk_counts
     # Check if the storagepanel.service is existing
     [ -f "/usr/lib/systemd/system/storagepanel.service" ] && systemctl restart storagepanel.service
     return 0
@@ -499,6 +624,10 @@ dtModel() {
 # DT model update
 dtUpdate() {
   _log dtUpdate "$*"
+
+  # Avoid checking/updating against an incomplete, still-probing disk set.
+  _wait_hba_disks_stable dt
+  _auto_enable_supportsas
 
   F="$(basename "${1:-}" 2>/dev/null)"
   if [ -z "${F}" ]; then
@@ -533,10 +662,9 @@ nondtModel() {
   _log nondtModel
 
   # Wait for asynchronous HBA probes (mpt3sas/megaraid_sas/hpsa) to complete
-  # before enumerating /sys/block/sd* so all HBA disks are counted.
-  if type udevadm >/dev/null 2>&1; then
-    udevadm settle --timeout=30 2>/dev/null
-  fi
+  # and sd* count to stabilize before enumerating disks.
+  _wait_hba_disks_stable
+  _auto_enable_supportsas
 
   MAXDISKS=0
   USBPORTCFG=0
@@ -547,9 +675,11 @@ nondtModel() {
   USBMINIDX=99
   USBMAXIDX=00
   MAXNONUSBIDX=-1
+  NONUSBMASK=0
   for F in $(LC_ALL=C printf '%s\n' /sys/block/sd* | $( [ -n "${SORT_CMD}" ] && echo "${SORT_CMD} -V" || echo _sort_v_sd )); do
     [ ! -e "${F}" ] && continue
     IDX=$(_atoi "$(echo "${F}" | sed -E 's/^.*\/sd(.*)$/\1/')")
+    BIT=$((2 ** ${IDX}))
     [ $((${IDX} + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((${IDX} + 1))
     if grep "PHYSDEVPATH" "${F}/uevent" 2>/dev/null | grep -q "usb"; then
       if [ "${hasUSB}" = "false" ]; then
@@ -560,6 +690,7 @@ nondtModel() {
         [ ${IDX} -gt ${USBMAXIDX} ] && USBMAXIDX=${IDX}
       fi
     else
+      NONUSBMASK=$((NONUSBMASK | BIT))
       [ ${IDX} -gt ${MAXNONUSBIDX} ] && MAXNONUSBIDX=${IDX}
     fi
   done
@@ -604,6 +735,12 @@ nondtModel() {
   else
     # shellcheck disable=SC3019
     USBPORTCFG=$(($((2 ** $((${USBMAXIDX} + 1)) - 1)) ^ $((2 ** ${USBMINIDX} - 1))))
+    # Do not classify any currently detected non-USB disk index as USB.
+    OVERLAPMASK=$((USBPORTCFG & NONUSBMASK))
+    if [ ${OVERLAPMASK} -ne 0 ]; then
+      USBPORTCFG=$((USBPORTCFG ^ OVERLAPMASK))
+      _log "fix usbportcfg overlap: clear mask=0x$(printf '%x' ${OVERLAPMASK})"
+    fi
     __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
     printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
   fi
@@ -676,7 +813,7 @@ nondtModel() {
       echo "bootloader: ${P}"
       continue
     fi
-    PCIEPATH=$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | rev | cut -d'/' -f2 | rev )
+    PCIEPATH=$(awk -F= '/PHYSDEVPATH/ {n=split($2,a,"/"); if (n>1) print a[n-1]}' "${P}/uevent" 2>/dev/null)
     if [ -n "${PCIEPATH}" ]; then
       echo "${PCIEPATH}" >>/etc/nvmePorts
     else
@@ -692,6 +829,8 @@ nondtModel() {
     #__set_conf_kv "support_ssd_cache" "yes"  # block nvmesystem addon
     #__set_conf_kv "support_write_cache" "yes"
   fi
+
+  _print_controller_disk_counts
 }
 
 # non-DT model update
