@@ -45,14 +45,19 @@ elif [ "${1}" = "modules" ]; then
   echo "Triggering events to udev"
   udevadm trigger --type=subsystems --action=add
   udevadm trigger --type=devices --action=add
-  udevadm trigger --type=devices --action=change
-  #udevadm trigger --action=add
-  #udevadm trigger --action=change
-  udevadm settle --timeout=30 || echo "udevadm settle failed"
+  # Delayed second pass: some controllers appear after initial add events.
+  udevadm settle --timeout=60 || echo "udevadm settle failed"
   # Give more time
-  sleep 10
-  # Remove from memory to not conflict with RAID mount scripts
-  /usr/bin/killall udevd
+  sleep 15
+  udevadm trigger --type=devices --action=change
+  udevadm settle --timeout=60 || echo "udevadm settle after change failed"
+  # Stop udevd gracefully after settle to avoid cutting off late disk events.
+  if udevadm control --exit 2>/dev/null; then
+    echo "udevd exit requested"
+  else
+    # Fallback for older userspace where --exit is unavailable.
+    /usr/bin/killall udevd 2>/dev/null || true
+  fi
   # modprobe modules for beep, sensors, and virtiofs
   for M in pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90 9p virtiofs; do
     /usr/sbin/modprobe "${M}" 2>/dev/null || true
