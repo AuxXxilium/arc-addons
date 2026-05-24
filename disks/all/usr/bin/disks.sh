@@ -141,6 +141,57 @@ _log() {
   /bin/logger -p "error" -t "disks" "$@"
 }
 
+# Print how many block disks are attached to each controller.
+_print_controller_disk_counts() {
+  REPORT_LINES=$(for F in /sys/block/*; do
+    [ -e "${F}" ] || continue
+    N="$(basename "${F}" 2>/dev/null)"
+    case "${N}" in
+    loop* | ram* | md* | dm-* | sr* | zram* | mtdblock* | nbd*) continue ;;
+    esac
+    [ -f "${F}/uevent" ] || continue
+    PHYSDEVPATH="$(awk -F= '/^PHYSDEVPATH=/{print $2}' "${F}/uevent" 2>/dev/null)"
+    [ -z "${PHYSDEVPATH}" ] && continue
+    CTRL="$(echo "${PHYSDEVPATH}" | awk -F'/' '
+      {
+        ctrl = ""
+        for (i = 1; i <= NF; i++) {
+          if ($i ~ /^[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]\.[0-9a-fA-F]$/) {
+            ctrl = $i
+            break
+          }
+        }
+        if (ctrl == "") {
+          for (i = 1; i <= NF; i++) {
+            if ($i ~ /^usb[0-9]+$/) {
+              ctrl = $i
+              break
+            }
+          }
+        }
+        if (ctrl == "") ctrl = "unknown"
+        print ctrl
+      }')"
+    printf '%s\t%s\n' "${CTRL}" "${N}"
+  done | awk -F'\t' '
+    {
+      cnt[$1]++
+      devs[$1] = (devs[$1] == "" ? $2 : devs[$1] "," $2)
+    }
+    END {
+      for (c in cnt) {
+        printf "%s\t%d\t%s\n", c, cnt[c], devs[c]
+      }
+    }' | $( [ -n "${SORT_CMD}" ] && echo "${SORT_CMD}" || echo cat ))
+
+  [ -z "${REPORT_LINES}" ] && return 0
+  echo "Controller disk count:"
+  echo "${REPORT_LINES}" | while IFS="$(printf '\t')" read -r C CNT DEVS; do
+    [ -z "${C}" ] && continue
+    echo "  ${C}: ${CNT} disk(s) [${DEVS}]"
+  done
+}
+
 # Get values in synoinfo.conf
 # Args: $1 key
 __get_conf_kv() {
@@ -485,6 +536,7 @@ dtModel() {
     #cp -vpf /etc/model.dtb /etc.defaults/model.dtb
     cp -vpf /etc/model.dtb /run/model.dtb
     _chk_slot_mapping
+    _print_controller_disk_counts
     # Check if the storagepanel.service is existing
     [ -f "/usr/lib/systemd/system/storagepanel.service" ] && systemctl restart storagepanel.service
     return 0
@@ -676,7 +728,7 @@ nondtModel() {
       echo "bootloader: ${P}"
       continue
     fi
-    PCIEPATH=$(cat ${P}/uevent 2>/dev/null | grep 'PHYSDEVPATH' | rev | cut -d'/' -f2 | rev )
+    PCIEPATH=$(awk -F= '/PHYSDEVPATH/ {n=split($2,a,"/"); if (n>1) print a[n-1]}' "${P}/uevent" 2>/dev/null)
     if [ -n "${PCIEPATH}" ]; then
       echo "${PCIEPATH}" >>/etc/nvmePorts
     else
@@ -692,6 +744,8 @@ nondtModel() {
     #__set_conf_kv "support_ssd_cache" "yes"  # block nvmesystem addon
     #__set_conf_kv "support_write_cache" "yes"
   fi
+
+  _print_controller_disk_counts
 }
 
 # non-DT model update
