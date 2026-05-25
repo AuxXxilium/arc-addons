@@ -298,6 +298,18 @@ dtModel() {
       PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       ATAPORT="$(grep 'ata_port_no' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       DRIVER="$(cat "${F}/device/syno_block_info" 2>/dev/null | grep 'driver' | cut -d'=' -f2)"
+
+      # Fallback for some HBA-backed sata* devices where syno_block_info is incomplete.
+      if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
+        PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+        if [ -n "${PHYSDEVPATH}" ] && [ -z "${PCIEPATH}" ]; then
+          PCIEPATH="$(echo "${PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | head -1)"
+        fi
+        if [ -n "${PCIEPATH}" ] && [ -z "${DRIVER}" ] && [ -L "/sys/bus/pci/devices/${PCIEPATH}/driver" ]; then
+          DRIVER="$(basename "$(readlink -f "/sys/bus/pci/devices/${PCIEPATH}/driver")")"
+        fi
+      fi
+
       if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
         _log "unknown: ${F}"
         continue
@@ -461,6 +473,15 @@ dtUpdate() {
   PCIEPATH="$(grep 'pciepath' "/sys/block/${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
   ATAPORT="$(grep 'ata_port_no' "/sys/block/${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
   USBPORT="$(grep 'usb_path' "/sys/block/${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+
+  # Fallback for HBA-backed sata* devices where syno_block_info has no pciepath.
+  if [ -z "${PCIEPATH}" ]; then
+    PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "/sys/block/${F}/uevent" 2>/dev/null)"
+    if [ -n "${PHYSDEVPATH}" ]; then
+      PCIEPATH="$(echo "${PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | head -1)"
+    fi
+  fi
+
   if [ -z "${PCIEPATH}" ] && [ -z "${USBPORT}" ]; then
     _log "unknown: ${F}"
     return 1
