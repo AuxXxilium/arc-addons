@@ -68,20 +68,51 @@ _count_sd_disks() {
 # Count currently visible DT data disks (sd* + sata*).
 _count_dt_disks() {
   C=0
-  for F in /sys/block/sd* /sys/block/sata*; do
+  for F in /sys/block/sata*; do # for F in /sys/block/sd* /sys/block/sata*; do
     [ -e "${F}" ] || continue
     C=$((C + 1))
   done
   echo "${C}"
 }
 
+# Check if any HBA/SCSI/RAID controller is present.
+# Primary: lspci PCI class codes (locale-independent, driver-binding-independent).
+#   0100 = SCSI storage controller
+#   0104 = RAID bus controller
+#   0107 = Serial Attached SCSI (SAS) controller
+# Fallback: /sys/bus/pci/drivers/ when lspci is unavailable.
+_has_hba_driver() {
+  if type lspci >/dev/null 2>&1; then
+    lspci -n 2>/dev/null | grep -qE ' (0100|0104|0107):' && return 0
+    return 1
+  fi
+  for _D in mpt3sas megaraid_sas hpsa aacraid lpfc qla2xxx aic94xx pm8001 isci; do
+    [ -d "/sys/bus/pci/drivers/${_D}" ] && return 0
+  done
+  return 1
+}
+
 # Wait until HBA disk enumeration becomes stable.
 # Args: $1 mode (dt|nondt, default nondt)
 _wait_hba_disks_stable() {
   MODE="${1:-nondt}"
+
+  # Prevent double-call within the same invocation (e.g. dtUpdate -> dtModel).
+  case "${MODE}" in
+    dt)    [ "${_HBA_WAIT_DONE_DT:-0}"    = "1" ] && return 0; _HBA_WAIT_DONE_DT=1 ;;
+    nondt) [ "${_HBA_WAIT_DONE_NONDT:-0}" = "1" ] && return 0; _HBA_WAIT_DONE_NONDT=1 ;;
+  esac
+
+  # Skip the wait entirely when no HBA/SAS driver is loaded — plain SATA/NVMe
+  # systems have stable disk counts before we even run (eudev has settled).
+  if ! _has_hba_driver; then
+    _log "no HBA driver found, skipping disk stabilisation wait"
+    return 0
+  fi
+
   if [ "${MODE}" = "dt" ]; then
     COUNT_FN="_count_dt_disks"
-    DISK_LABEL="sd*+sata*"
+    DISK_LABEL="sata*" # DISK_LABEL="sd*+sata*"
   else
     COUNT_FN="_count_sd_disks"
     DISK_LABEL="sd*"
@@ -94,8 +125,7 @@ _wait_hba_disks_stable() {
   I=0
   # Poll for up to ~3 minutes (60 iterations * 3s = 180s) to handle slow SAS expanders.
   # Fast systems (stable count within 30s) return immediately via 2 stable rounds.
-  # eudev addon has already settled device events before we run.
-  while [ ${I} -lt 60 ]; do
+  while [ ${I} -lt 30 ]; do
     sleep 3
     CUR_COUNT="$(${COUNT_FN})"
 
