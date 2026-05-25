@@ -115,27 +115,6 @@ _wait_hba_disks_stable() {
   fi
 }
 
-# Enable supportsas automatically when SAS hosts exist (unless user set it).
-_auto_enable_supportsas() {
-  if _check_user_conf "supportsas"; then
-    _log "supportsas kept from user config"
-    return 0
-  fi
-  ls -d /sys/class/sas_host/host* >/dev/null 2>&1 || return 0
-  __set_conf_kv "supportsas" "yes"
-  _log "auto supportsas=yes (sas_host detected)"
-}
-
-# Apply user-supplied supportsas override at modules time.
-_apply_user_supportsas() {
-  [ -f "/addons/synoinfo.conf" ] && UCONF="/addons/synoinfo.conf" || UCONF="/usr/arc/addons/synoinfo.conf"
-  [ ! -f "${UCONF}" ] && return 0
-  USER_SAS="$(grep '^supportsas=' "${UCONF}" 2>/dev/null | cut -d'=' -f2- | sed 's/^"//;s/"$//')"
-  [ -z "${USER_SAS}" ] && return 0
-  __set_conf_kv "supportsas" "${USER_SAS}"
-  _log "apply user supportsas=${USER_SAS}"
-}
-
 # Restart scemd after disk-update events with cooldown to avoid restart storms.
 _restart_scemd() {
   [ -x "/usr/syno/bin/scemd" ] || return 0
@@ -295,7 +274,6 @@ dtModel() {
 
   # Wait for late HBA/SATA/SAS probes before enumerating slots.
   _wait_hba_disks_stable dt
-  _auto_enable_supportsas
 
   DEST="/etc/model.dts"
   [ -f "/addons/model.dts" ] && cp -vpf "/addons/model.dts" "${DEST}"
@@ -473,7 +451,6 @@ dtUpdate() {
 
   # Avoid incomplete disk set during hot-plug or late probe.
   _wait_hba_disks_stable dt
-  _auto_enable_supportsas
 
   F="$(basename "${1:-}" 2>/dev/null)"
   if [ -z "${F}" ]; then
@@ -509,7 +486,6 @@ nondtModel() {
 
   # Wait for asynchronous HBA probes (mpt3sas/megaraid_sas/hpsa) to complete.
   _wait_hba_disks_stable nondt
-  _auto_enable_supportsas
 
   # disksort: assign bit indices by physical PCI+SCSI order instead of sd-letter
   # order, giving stable port assignments across reboots on HBA systems.
@@ -712,9 +688,6 @@ checkSynoboot
 ###################
 
 case ${1} in
-  "--modules")
-    _apply_user_supportsas
-    ;;
   "--create")
     if [ "$(__get_conf_kv supportportmappingv2)" = "yes" ]; then
       dtModel
