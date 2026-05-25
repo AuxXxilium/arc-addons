@@ -285,6 +285,8 @@ dtModel() {
       echo '    compatible = "Synology";'
       echo '    model = "";'
       echo "    version = <0x01>;"
+      echo "    #address-cells = <1>;"
+      echo "    #size-cells = <0>;"
       echo '    power_limit = "";'
     } >"${DEST}"
 
@@ -299,27 +301,49 @@ dtModel() {
       ATAPORT="$(grep 'ata_port_no' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       DRIVER="$(cat "${F}/device/syno_block_info" 2>/dev/null | grep 'driver' | cut -d'=' -f2)"
 
-      # Fallback for some HBA-backed sata* devices where syno_block_info is incomplete.
+      # Fallback: derive pciepath/driver/ataport from PHYSDEVPATH when syno_block_info is incomplete.
+      # Needed on platforms like EPYC7002 where DSM only populates syno_block_info for some ports.
+      _SATA_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
       if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
-        PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-        if [ -n "${PHYSDEVPATH}" ] && [ -z "${PCIEPATH}" ]; then
-          PCIEPATH="$(echo "${PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | head -1)"
+        if [ -n "${_SATA_PHYSDEVPATH}" ] && [ -z "${PCIEPATH}" ]; then
+          # Use tail -1 to pick the leaf PCI device, not an intermediate PCIe bridge.
+          PCIEPATH="$(echo "${_SATA_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
         fi
         if [ -n "${PCIEPATH}" ] && [ -z "${DRIVER}" ] && [ -L "/sys/bus/pci/devices/${PCIEPATH}/driver" ]; then
           DRIVER="$(basename "$(readlink -f "/sys/bus/pci/devices/${PCIEPATH}/driver")")"
         fi
-      fi
-
-      if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
-        _log "unknown: ${F}"
-        continue
+        # Derive ataport from sorted ata* host list for this controller.
+        if [ -n "${_SATA_PHYSDEVPATH}" ] && [ -z "${ATAPORT}" ]; then
+          _SATA_FB_ATA="$(echo "${_SATA_PHYSDEVPATH}" | grep -Eo 'ata[0-9]+' | head -1)"
+          _SATA_FB_CTRL="/sys${_SATA_PHYSDEVPATH%%/ata*}"
+          if [ -n "${_SATA_FB_ATA}" ] && [ -d "${_SATA_FB_CTRL}" ]; then
+            _SATA_FB_IDX=0
+            for _SATA_FB_E in $(ls "${_SATA_FB_CTRL}" 2>/dev/null | grep '^ata[0-9]' | sort -V); do
+              if [ "${_SATA_FB_E}" = "${_SATA_FB_ATA}" ]; then
+                ATAPORT=${_SATA_FB_IDX}
+                break
+              fi
+              _SATA_FB_IDX=$((_SATA_FB_IDX + 1))
+            done
+          fi
+        fi
+        if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
+          _log "unknown: ${F}"
+          continue
+        fi
       fi
       if [ "${CONTPCI}" = "${PCIEPATH}" ]; then
         continue
       fi
       CONTPCI=""
-      # shellcheck disable=SC2046
-      PORTNUM=$(ls -ld /sys/devices/pci0000:00/*$(echo "${PCIEPATH}" | sed 's/,/\/*:/g')/ata* 2>/dev/null | wc -l)
+      # Use PHYSDEVPATH to count ata* ports for any PCIe bus (pci0000:00 hardcode was wrong for e.g. EPYC7002 bus 02).
+      _SATA_CTRL_PATH="/sys${_SATA_PHYSDEVPATH%%/ata*}"
+      if [ -n "${_SATA_PHYSDEVPATH}" ] && [ -d "${_SATA_CTRL_PATH}" ]; then
+        PORTNUM=$(ls -d "${_SATA_CTRL_PATH}/ata"* 2>/dev/null | wc -l)
+      else
+        # shellcheck disable=SC2046
+        PORTNUM=$(ls -ld /sys/devices/pci0000:00/*$(echo "${PCIEPATH}" | sed 's/,/\/*:/g')/ata* 2>/dev/null | wc -l)
+      fi
       if [ "${HDDSORT}" = "true" ] && [ "${PORTNUM}" -gt 0 ]; then
         CONTPCI=${PCIEPATH}
         for I in $(seq 0 $((PORTNUM - 1))); do
@@ -330,6 +354,7 @@ dtModel() {
           COUNT=$((COUNT + 1))
           {
             echo "    internal_slot@${COUNT} {"
+            echo "        reg = <${COUNT}>;"
             echo '        protocol_type = "sata";'
             echo "        ${DRIVER} {"
             echo "            pcie_root = \"${PCIEPATH}\";"
@@ -347,6 +372,7 @@ dtModel() {
         COUNT=$((COUNT + 1))
         {
           echo "    internal_slot@${COUNT} {"
+          echo "        reg = <${COUNT}>;"
           echo '        protocol_type = "sata";'
           echo "        ${DRIVER} {"
           echo "            pcie_root = \"${PCIEPATH}\";"
@@ -356,6 +382,63 @@ dtModel() {
           echo "    };"
         } >>"${DEST}"
       fi
+    done
+
+    # SD* fallback for HBA/RAID devices without sata* aliases (e.g. megaraid, some SAS setups)
+    for F in $(LC_ALL=C printf '%s\n' /sys/block/sd* | sort -V); do
+      [ ! -e "${F}" ] && continue
+      N="$(basename "${F}")"
+      [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && continue
+
+      PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      DRIVER="$(cat "${F}/device/syno_block_info" 2>/dev/null | grep 'driver' | cut -d'=' -f2)"
+
+      # Fallback for HBA/RAID disks where syno_block_info lacks pciepath or driver
+      if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
+        PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+        if [ -n "${PHYSDEVPATH}" ] && [ -z "${PCIEPATH}" ]; then
+          # Use tail -1 to pick the leaf PCI device, not an intermediate PCIe bridge.
+          PCIEPATH="$(echo "${PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+        fi
+        if [ -n "${PCIEPATH}" ] && [ -z "${DRIVER}" ] && [ -L "/sys/bus/pci/devices/${PCIEPATH}/driver" ]; then
+          DRIVER="$(basename "$(readlink -f "/sys/bus/pci/devices/${PCIEPATH}/driver")")"
+        fi
+      fi
+
+      if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
+        continue
+      fi
+
+      # Read ata_port from syno_block_info to enable per-port dedup and entry creation.
+      ATAPORT_SD="$(grep 'ata_port_no' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+
+      if [ -n "${ATAPORT_SD}" ]; then
+        # Per-port SATA: skip if this exact pcie_root+ata_port combo already exists.
+        _ATOHEX="$(printf '%02X' "${ATAPORT_SD}")"
+        if grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}"; then
+          # Also skip if there is a controller-level entry (no ata_port) covering all ports.
+          if grep -A2 "pcie_root = \"${PCIEPATH}\";" "${DEST}" | grep -qv "ata_port"; then
+            continue
+          fi
+          grep -A2 "pcie_root = \"${PCIEPATH}\";" "${DEST}" | grep -q "ata_port = <0x${_ATOHEX}>;" && continue
+        fi
+      else
+        # HBA-style: if any entry for this controller already exists, skip.
+        grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue
+      fi
+
+      COUNT=$((COUNT + 1))
+      {
+        echo "    internal_slot@${COUNT} {"
+        echo "        reg = <${COUNT}>;"
+        echo '        protocol_type = "sata";'
+        echo "        ${DRIVER} {"
+        echo "            pcie_root = \"${PCIEPATH}\";"
+        [ -n "${ATAPORT_SD}" ] && echo "            ata_port = <0x$(printf '%02X' "${ATAPORT_SD}")>;"
+        echo "            internal_mode;"
+        echo "        };"
+        echo "    };"
+      } >>"${DEST}"
     done
 
     # NVME ports
@@ -378,6 +461,7 @@ dtModel() {
       COUNT=$((COUNT + 1))
       {
         echo "    nvme_slot@${COUNT} {"
+        echo "        reg = <${COUNT}>;"
         echo "        pcie_root = \"${PCIEPATH}\";"
         echo '        port_type = "ssdcache";'
         echo "    };"
@@ -391,6 +475,7 @@ dtModel() {
       COUNT=$((COUNT + 1))
       {
         echo "    usb_slot@${COUNT} {"
+        echo "      reg = <${COUNT}>;"
         echo "      usb2 {"
         echo "        usb_port = \"${I}\";"
         echo "      };"
@@ -406,9 +491,11 @@ dtModel() {
   # fix pcie_root prefix
   _release=$(/bin/uname -r)
   if [ "$(/bin/echo "${_release%%[-+]*}" | /usr/bin/cut -d'.' -f1)" -lt 5 ]; then
-    sed -i 's/"0000:00:/"00:/g' "${DEST}"
+    # Old kernel expects abbreviated "XX:YY.Z": strip 0000: domain prefix from all pcie_root paths.
+    sed -i 's/"0000:\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\)"/"\1"/g' "${DEST}"
   else
-    sed -i 's/"00:/"0000:00:/g' "${DEST}"
+    # New kernel expects full "0000:XX:YY.Z": add 0000: domain to any abbreviated pcie_root paths.
+    sed -i 's/"\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\)"/"0000:\1"/g' "${DEST}"
   fi
 
   # fix model name
@@ -474,22 +561,27 @@ dtUpdate() {
   ATAPORT="$(grep 'ata_port_no' "/sys/block/${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
   USBPORT="$(grep 'usb_path' "/sys/block/${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
 
-  # Fallback for HBA-backed sata* devices where syno_block_info has no pciepath.
-  if [ -z "${PCIEPATH}" ]; then
-    PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "/sys/block/${F}/uevent" 2>/dev/null)"
-    if [ -n "${PHYSDEVPATH}" ]; then
-      PCIEPATH="$(echo "${PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | head -1)"
-    fi
-  fi
-
   if [ -z "${PCIEPATH}" ] && [ -z "${USBPORT}" ]; then
-    _log "unknown: ${F}"
-    return 1
+    # Fall back to PHYSDEVPATH extraction (same as dtModel sd* fallback).
+    _DTUPDATE_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "/sys/block/${F}/uevent" 2>/dev/null)"
+    if [ -n "${_DTUPDATE_PHYSDEVPATH}" ]; then
+      PCIEPATH="$(echo "${_DTUPDATE_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+    fi
+    if [ -z "${PCIEPATH}" ] && [ -z "${USBPORT}" ]; then
+      _log "unknown: ${F}, triggering full dtModel"
+      dtModel
+      return $?
+    fi
   fi
 
   TEMP_DTS="/tmp/model.dts"
   dtc -I dtb -O dts /etc/model.dtb >"${TEMP_DTS}"
-  sata_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/ata_port = <0x$(printf '%02X' ${ATAPORT})>;/p}" "${TEMP_DTS}" 2>/dev/null)"
+  if [ -z "${ATAPORT}" ]; then
+    # HBA-style: any entry with matching pcie_root covers this disk.
+    sata_slot_find="$(grep "pcie_root = \"${PCIEPATH}\";" "${TEMP_DTS}" 2>/dev/null | head -1)"
+  else
+    sata_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/ata_port = <0x$(printf '%02X' ${ATAPORT})>;/p}" "${TEMP_DTS}" 2>/dev/null)"
+  fi
   nvme_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/port_type = \"ssdcache\";/p}" "${TEMP_DTS}" 2>/dev/null)"
   usb_slot_find="$(sed -n "/usb3 {/{N;/usb_port = \"${USBPORT}\";/p}" "${TEMP_DTS}" 2>/dev/null)"
   rm -f "${TEMP_DTS}"
@@ -551,6 +643,7 @@ nondtModel() {
         [ ${IDX} -gt ${USBMAXIDX} ] && USBMAXIDX=${IDX}
         hasUSB=true
       else
+        [ ${IDX} -lt ${USBMINIDX} ] && USBMINIDX=${IDX}
         [ ${IDX} -gt ${USBMAXIDX} ] && USBMAXIDX=${IDX}
       fi
     else
