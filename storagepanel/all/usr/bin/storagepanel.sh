@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> and Ing <https://github.com/wjz304>
+# Copyright (C) 2026 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -8,6 +8,46 @@
 
 HDD_BAY_LIST=(RACK_0_Bay RACK_2_Bay RACK_4_Bay RACK_8_Bay RACK_10_Bay RACK_12_Bay RACK_12_Bay_2 RACK_16_Bay RACK_20_Bay RACK_24_Bay RACK_60_Bay
   TOWER_1_Bay TOWER_2_Bay TOWER_4_Bay TOWER_4_Bay_J TOWER_4_Bay_S TOWER_5_Bay TOWER_6_Bay TOWER_8_Bay TOWER_12_Bay)
+
+_hdd_bay_to_count() {
+  echo "${1}" | sed -n 's/^[A-Z]\+_\([0-9]\+\)_Bay\(_[0-9]\+\)\?$/\1/p'
+}
+
+_ssd_bay_to_count() {
+  _rows="${1%%X*}"
+  _cols="${1##*X}"
+  [ -n "${_rows}" ] && [ -n "${_cols}" ] && echo $((_rows * _cols)) || echo 0
+}
+
+_auto_hdd_bay() {
+  if [ -f "/run/model.dtb" ]; then
+    IDX="$(grep -ao "internal_slot@" "/run/model.dtb" | wc -w)"
+  else
+    IDX="$(synodisk --enum -t internal 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+  fi
+
+  while [ ${IDX:-0} -le 60 ]; do
+    for i in "${HDD_BAY_LIST[@]}"; do
+      echo "${i}" | grep -q "_${IDX:-0}_" && {
+        echo "${i}"
+        return
+      }
+    done
+    IDX=$((${IDX:-0} + 1))
+  done
+
+  echo "RACK_60_Bay"
+}
+
+_auto_ssd_bay() {
+  if [ -f "/run/model.dtb" ]; then
+    IDX="$(grep -ao "nvme_slot@" "/run/model.dtb" | wc -w)"
+  else
+    IDX="$(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+  fi
+
+  [ "${IDX:-0}" -le 8 ] && echo "1X${IDX:-0}" || echo "$((IDX / 8 + 1))X8"
+}
 
 if [ "${1}" = "-h" ]; then
   echo "Use: ${0} [HDD_BAY [SSD_BAY]]"
@@ -65,35 +105,36 @@ if [ -n "${SSD_BAY}" ] && [ -z "$(echo "${SSD_BAY}" | sed -n '/^[0-9]\{1,2\}X[0-
   SSD_BAY=""
 fi
 
-# If no arguments provided, try to use saved configuration
-if [ -z "${HDD_BAY}" ] && [ -z "${SSD_BAY}" ] && [ -n "${_ARCPANEL}" ]; then
+SAVED_HDD_BAY="${_ARCPANEL%-*}"
+SAVED_SSD_BAY="${_ARCPANEL#*-}"
+if [ -n "${_ARCPANEL}" ] && [ "${SAVED_HDD_BAY}" != "${_ARCPANEL}" ] && [ "${SAVED_SSD_BAY}" != "${_ARCPANEL}" ]; then
   echo "Using saved configuration: ${_ARCPANEL}"
-  HDD_BAY="${_ARCPANEL%-*}"
-  SSD_BAY="${_ARCPANEL#*-}"
+else
+  SAVED_HDD_BAY=""
+  SAVED_SSD_BAY=""
 fi
 
+AUTO_HDD_BAY="$(_auto_hdd_bay)"
+AUTO_SSD_BAY="$(_auto_ssd_bay)"
+
 if [ -z "${HDD_BAY}" ]; then
-  if [ -f "/run/model.dtb" ]; then # if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
-    IDX="$(grep -ao "internal_slot@" "/run/model.dtb" | wc -w)"
+  SAVED_HDD_COUNT="$(_hdd_bay_to_count "${SAVED_HDD_BAY}")"
+  AUTO_HDD_COUNT="$(_hdd_bay_to_count "${AUTO_HDD_BAY}")"
+  if [ -n "${SAVED_HDD_COUNT}" ] && [ "${SAVED_HDD_COUNT}" -ge "${AUTO_HDD_COUNT:-0}" ]; then
+    HDD_BAY="${SAVED_HDD_BAY}"
   else
-    IDX="$(synodisk --enum -t internal 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+    HDD_BAY="${AUTO_HDD_BAY}"
   fi
-  while [ ${IDX:-0} -le 60 ]; do
-    for i in "${HDD_BAY_LIST[@]}"; do
-      echo "${i}" | grep -q "_${IDX:-0}_" && HDD_BAY="${i}" && break 2
-    done
-    IDX=$((${IDX:-0} + 1))
-  done
-  HDD_BAY=${HDD_BAY:-RACK_60_Bay}
 fi
 
 if [ -z "${SSD_BAY}" ]; then
-  if [ -f "/run/model.dtb" ]; then # if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
-    IDX="$(grep -ao "nvme_slot@" "/run/model.dtb" | wc -w)"
+  SAVED_SSD_COUNT="$(_ssd_bay_to_count "${SAVED_SSD_BAY}")"
+  AUTO_SSD_COUNT="$(_ssd_bay_to_count "${AUTO_SSD_BAY}")"
+  if echo "${SAVED_SSD_BAY}" | grep -Eq '^[0-9]{1,2}X[0-9]{1,2}$' && [ "${SAVED_SSD_COUNT}" -ge "${AUTO_SSD_COUNT:-0}" ]; then
+    SSD_BAY="${SAVED_SSD_BAY}"
   else
-    IDX="$(synodisk --enum -t cache 2>/dev/null | grep "Disk id:" | cut -d: -f2 | sort -n | tail -n1 | xargs)"
+    SSD_BAY="${AUTO_SSD_BAY}"
   fi
-  [ "${IDX:-0}" -le 8 ] && SSD_BAY="1X${IDX:-0}" || SSD_BAY="$((${IDX:-0} / 8 + 1))X8"
 fi
 
 [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
