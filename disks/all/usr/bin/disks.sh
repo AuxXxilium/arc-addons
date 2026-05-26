@@ -167,8 +167,11 @@ _restart_scemd() {
     return 0
   fi
 
-  SCEMD_PIDS="$(ps aux 2>/dev/null | awk '$NF=="scemd" || $NF=="/usr/syno/bin/scemd" {print $1}')"
-  [ -n "${SCEMD_PIDS}" ] || return 0
+  SCEMD_PIDS="$(ps aux 2>/dev/null | awk '($NF=="scemd" || $NF=="/usr/syno/bin/scemd") && $2 ~ /^[0-9]+$/ {print $2}')"
+  if [ -z "${SCEMD_PIDS}" ]; then
+    _log "skip scemd restart (not found in ps aux)"
+    return 0
+  fi
 
   kill ${SCEMD_PIDS} 2>/dev/null || true
   sleep 1
@@ -783,8 +786,9 @@ nondtUpdate() {
   _log nondtUpdate "$*"
   F="$(basename "${1:-}" 2>/dev/null)"
   if [ -z "${F}" ]; then
-    _log "No disk found"
-    return 1
+    _log "No disk found, triggering full nondtModel"
+    nondtModel
+    return $?
   fi
 
   # Recompute portcfg/maxdisks when a new disk appears (HBA hot-plug etc.)
