@@ -138,8 +138,8 @@ _wait_hba_disks_stable() {
   _log "HBA disks settled: ${DISK_LABEL} at count ${CUR_COUNT}"
 }
 
-# Restart scemd after disk-update events with cooldown to avoid restart storms.
-_restart_scemd() {
+# Restart scemd in DSM after disk-update events with cooldown to avoid restart storms.
+_restart_scemd_dsm() {
   [ -x "/usr/syno/bin/scemd" ] || return 0
 
   NOW="$(date +%s 2>/dev/null)"
@@ -160,21 +160,30 @@ _restart_scemd() {
     return 0
   fi
 
-  SCEMD_PIDS="$(ps aux 2>/dev/null | awk '($NF=="scemd" || $NF=="/usr/syno/bin/scemd") && $2 ~ /^[0-9]+$/ {print $2}')"
-  if [ -z "${SCEMD_PIDS}" ]; then
-    _log "skip scemd restart (not found in ps aux)"
-    return 0
-  fi
-
-  kill ${SCEMD_PIDS} 2>/dev/null || true
+  systemctl restart scemd 2>/dev/null || true
   sleep 1
-  if type scemd >/dev/null 2>&1; then
-    scemd >/dev/null 2>&1 &
-  else
-    /usr/syno/bin/scemd >/dev/null 2>&1 &
-  fi
-  [ "${NOW}" -gt 0 ] && echo "${NOW}" >"${SCEMD_RESTART_STAMP}"
-  _log "restarted scemd after disk update"
+  systemctl is-active scemd >/dev/null 2>&1 && {
+    [ "${NOW}" -gt 0 ] && echo "${NOW}" >"${SCEMD_RESTART_STAMP}"
+    _log "restarted scemd via systemctl"
+    return 0
+  }
+
+  _log "scemd restart failed"
+  return 1
+}
+
+# Kill scemd during boot-time create runs where the service is not available yet.
+_restart_scemd_boot() {
+  [ -x "/usr/syno/bin/scemd" ] || return 0
+
+  SCEMD_PIDS="$(ps aux 2>/dev/null | awk '($NF=="scemd" || $NF=="/usr/syno/bin/scemd") && $2 ~ /^[0-9]+$/ {print $2}')"
+  [ -n "${SCEMD_PIDS}" ] || return 0
+
+  kill -9 ${SCEMD_PIDS} 2>/dev/null || true
+  sleep 3
+  SCEMD_PIDS="$(ps aux 2>/dev/null | awk '($NF=="scemd" || $NF=="/usr/syno/bin/scemd") && $2 ~ /^[0-9]+$/ {print $2}')"
+  [ -n "${SCEMD_PIDS}" ] && kill -9 ${SCEMD_PIDS} 2>/dev/null || true
+  _log "killed scemd"
 }
 
 # Check if the raid has been completed currently
@@ -835,7 +844,7 @@ case ${1} in
     else
       nondtModel
     fi
-    _restart_scemd
+    _restart_scemd_boot
     ;;
   "--update")
     if [ "$(__get_conf_kv supportportmappingv2)" = "yes" ]; then
@@ -847,7 +856,7 @@ case ${1} in
         nondtUpdate "${2:-}"
       fi
     fi
-    _restart_scemd
+    _restart_scemd_dsm
     ;;
   *)
     echo "Usage: $0 [--modules|--create|--update]"
