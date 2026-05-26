@@ -45,11 +45,11 @@ elif [ "${1}" = "modules" ]; then
   echo "Triggering events to udev"
   udevadm trigger --type=subsystems --action=add
   udevadm trigger --type=devices --action=add
-  sleep 15
+  udevadm settle --timeout=30 || echo "udevadm settle after add failed"
   udevadm trigger --type=devices --action=change
-  sleep 10
   udevadm settle --timeout=30 || echo "udevadm settle after change failed"
-  /usr/bin/killall udevd 2>/dev/null || true
+  sleep 10
+  udevadm control --stop 2>/dev/null && sleep 2 || /usr/bin/killall udevd 2>/dev/null || true
   # modprobe modules for beep, sensors, and virtiofs
   for M in pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90 9p virtiofs; do
     /usr/sbin/modprobe "${M}" 2>/dev/null || true
