@@ -117,32 +117,25 @@ _wait_hba_disks_stable() {
     COUNT_FN="_count_sd_disks"
     DISK_LABEL="sd*"
   fi
-
-  START_COUNT="$(${COUNT_FN})"
-
+  
   PREV_COUNT="$(${COUNT_FN})"
   STABLE_ROUNDS=0
   I=0
-  # Poll for up to ~3 minutes (60 iterations * 3s = 180s) to handle slow SAS expanders.
-  # Fast systems (stable count within 30s) return immediately via 2 stable rounds.
-  while [ ${I} -lt 30 ]; do
+  while [ ${I} -lt 40 ]; do
     sleep 3
     CUR_COUNT="$(${COUNT_FN})"
-
+  
     if [ "${CUR_COUNT}" = "${PREV_COUNT}" ]; then
       STABLE_ROUNDS=$((STABLE_ROUNDS + 1))
-      [ ${STABLE_ROUNDS} -ge 2 ] && break
+      [ ${STABLE_ROUNDS} -ge 5 ] && break
     else
       STABLE_ROUNDS=0
       PREV_COUNT="${CUR_COUNT}"
     fi
     I=$((I + 1))
   done
-
-  END_COUNT="$(${COUNT_FN})"
-  if [ "${END_COUNT}" -gt "${START_COUNT}" ]; then
-    _log "HBA disks settled: ${DISK_LABEL} ${START_COUNT} -> ${END_COUNT}"
-  fi
+  
+  _log "HBA disks settled: ${DISK_LABEL} at count ${CUR_COUNT}"
 }
 
 # Restart scemd after disk-update events with cooldown to avoid restart storms.
