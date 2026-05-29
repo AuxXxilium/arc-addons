@@ -37,6 +37,7 @@ elif [ "${1}" = "modules" ]; then
 
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
 
+  mkdir -p /run/udev
   /usr/sbin/depmod -a || echo "boot depmod skipped"
   /usr/sbin/udevd -d || {
     echo "FAIL"
@@ -49,7 +50,14 @@ elif [ "${1}" = "modules" ]; then
   udevadm trigger --type=devices --action=change
   udevadm settle --timeout=30 || echo "udevadm settle after change failed"
   sleep 10
-  udevadm control --stop 2>/dev/null && sleep 2 || /usr/bin/killall udevd 2>/dev/null || true
+  udevadm control --stop 2>/dev/null || /usr/bin/killall udevd 2>/dev/null || true
+  # Wait for udevd to fully exit before DSM boots its own udev
+  for _i in $(seq 1 5); do
+    ps aux 2>/dev/null | grep -q '[u]devd' || break
+    sleep 1
+  done
+  /usr/bin/killall -9 udevd 2>/dev/null || true
+  rm -rf /run/udev
   # modprobe modules for beep, sensors, and virtiofs
   for M in pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90 9p virtiofs; do
     /usr/sbin/modprobe "${M}" 2>/dev/null || true
