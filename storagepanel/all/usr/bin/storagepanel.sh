@@ -78,8 +78,17 @@ FILE_GZ="${FILE_JS}.gz"
 [ -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
 if [ ! -f "${FILE_GZ}" ]; then
-  echo "${FILE_GZ} file does not exist"
-  exit 0
+  echo "Waiting for ${FILE_GZ}..."
+  WAIT=0
+  while [ ! -f "${FILE_GZ}" ] && [ ${WAIT} -lt 60 ]; do
+    sleep 5
+    WAIT=$((WAIT + 5))
+    [ -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
+  done
+  if [ ! -f "${FILE_GZ}" ]; then
+    echo "${FILE_GZ} file does not exist"
+    exit 1
+  fi
 fi
 
 if [ "${1}" = "-r" ]; then
@@ -87,8 +96,6 @@ if [ "${1}" = "-r" ]; then
     mv -f "${FILE_GZ}.bak" "${FILE_GZ}"
     gzip -dc "${FILE_GZ}" >"${FILE_JS}"
   fi
-  SM_KEY="sm_machine_img_config_name"
-  synosetkeyvalue "/etc.defaults/synoinfo.conf" "${SM_KEY}" "$(synogetkeyvalue /etc/synoinfo.conf "${SM_KEY}")"
   rm -f /usr/arc/storagepanel.conf 2>/dev/null
   exit
 fi
@@ -155,9 +162,6 @@ if [ -f "/usr/lib/systemd/system/nvmesystem.service" ] || [ -f "/usr/lib/systemd
   sed -i 's/return"normal"===this.portType/return"normal"===this.portType||"cache"===this.portType/g' "${FILE_JS}" # [42218,64570)
 fi
 gzip -c "${FILE_JS}" >"${FILE_GZ}"
-
-SM_KEY="sm_machine_img_config_name"
-synosetkeyvalue "/etc.defaults/synoinfo.conf" "${SM_KEY}" "" # "${HDD_BAY}-M2X1"
 
 # Save configuration for persistence across reboots
 echo "${HDD_BAY}-${SSD_BAY}" > /usr/arc/storagepanel.conf
