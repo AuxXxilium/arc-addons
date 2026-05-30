@@ -424,6 +424,10 @@ dtModel() {
       [ ! -e "${F}" ] && continue
       N="$(basename "${F}")"
       [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && continue
+      if [ -n "${BOOTDISK_PHYSDEVPATH}" ]; then
+        _SD_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+        [ -n "${_SD_PP}" ] && [ "${_SD_PP}" = "${BOOTDISK_PHYSDEVPATH}" ] && { _log "bootloader (alias): ${F}"; continue; }
+      fi
 
       PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       DRIVER="$(cat "${F}/device/syno_block_info" 2>/dev/null | grep 'driver' | cut -d'=' -f2)"
@@ -663,7 +667,12 @@ nondtModel() {
     F="/sys/block/${N}"
     [ -e "${F}" ] || continue
     # Skip the bootloader disk so DSM does not try to manage the boot device.
+    # Check both by name (sd*) and by PHYSDEVPATH (handles synoboot alias where BOOTDISK != sd* name).
     [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
+    if [ -n "${BOOTDISK_PHYSDEVPATH}" ]; then
+      _N_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+      [ -n "${_N_PP}" ] && [ "${_N_PP}" = "${BOOTDISK_PHYSDEVPATH}" ] && { _log "bootloader (alias): ${F}"; continue; }
+    fi
     if [ "${DISKSORT}" = "true" ]; then
       IDX=${SEQ_IDX}
       SEQ_IDX=$((SEQ_IDX + 1))
