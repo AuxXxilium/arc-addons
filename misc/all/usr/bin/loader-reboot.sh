@@ -56,7 +56,7 @@ cleanup() {
 }
 
 mount | grep -q "${LOADER_DISK_PART1}" && umount "${LOADER_DISK_PART1}" 2>/dev/null || true
-mount "${LOADER_DISK_PART1}" "${WORK_PATH}" || { echo "Can't mount ${LOADER_DISK_PART1}."; cleanup; reset_arcsu; exit 1; }
+mount -t vfat "${LOADER_DISK_PART1}" "${WORK_PATH}" || { echo "Can't mount ${LOADER_DISK_PART1}."; cleanup; reset_arcsu; exit 1; }
 
 GRUBPATH="$(dirname "$(find "${WORK_PATH}" -name grub.cfg | head -1)")"
 [ -z "${GRUBPATH}" ] && echo "Error: GRUB path not found" && cleanup && reset_arcsu && exit 1

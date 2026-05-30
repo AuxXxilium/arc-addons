@@ -39,7 +39,7 @@ echo 1 >/proc/sys/kernel/syno_install_flag 2>/dev/null
 WORK_PATH="/mnt/p1"
 mkdir -p "${WORK_PATH}"
 mount | grep -q "${LOADER_DISK_PART1}" && umount "${LOADER_DISK_PART1}" 2>/dev/null || true
-mount "${LOADER_DISK_PART1}" "${WORK_PATH}" || {
+mount -t vfat "${LOADER_DISK_PART1}" "${WORK_PATH}" || {
   echo "Can't mount ${LOADER_DISK_PART1}."
   rm -rf "${WORK_PATH}"
   echo 0 >/proc/sys/kernel/syno_install_flag 2>/dev/null
