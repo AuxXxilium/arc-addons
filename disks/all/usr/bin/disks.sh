@@ -865,7 +865,7 @@ case ${1} in
         nondtUpdate "${2:-}"
       fi
     fi
-    _restart_scemd_dsm
+    # _restart_scemd_dsm
     ;;
   *)
     echo "Usage: $0 [--modules|--create|--update]"
