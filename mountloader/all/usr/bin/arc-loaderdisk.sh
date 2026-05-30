@@ -149,9 +149,11 @@ function mountLoaderDisk() {
     mkdir -p "/mnt/p${i}"
     
     local retry=0
+    local fstype
+    fstype="$(blkid -o value -s TYPE "/dev/synoboot${i}" 2>/dev/null || echo "")"
     while [ $retry -lt $MAX_RETRY ]; do
-      if mount "/dev/synoboot${i}" "/mnt/p${i}" 2>/dev/null; then
-        log "Successfully mounted /dev/synoboot${i}"
+      if mount ${fstype:+-t "${fstype}"} "/dev/synoboot${i}" "/mnt/p${i}" 2>/dev/null; then
+        log "Successfully mounted /dev/synoboot${i} (type: ${fstype:-auto})"
         break
       fi
       log "Mount failed, retrying... (attempt $((retry+1))/$MAX_RETRY)"
