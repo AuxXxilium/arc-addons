@@ -87,7 +87,7 @@ if [ ! -f "${FILE_GZ}" ]; then
   done
   if [ ! -f "${FILE_GZ}" ]; then
     echo "${FILE_GZ} file does not exist"
-    exit 1
+    exit 0
   fi
 fi
 
@@ -97,6 +97,8 @@ if [ "${1}" = "-r" ]; then
     gzip -dc "${FILE_GZ}" >"${FILE_JS}"
   fi
   rm -f /usr/arc/storagepanel.conf 2>/dev/null
+  SM_KEY="sm_machine_img_config_name"
+  synosetkeyvalue /etc.defaults/synoinfo.conf "${SM_KEY}" "$(synogetkeyvalue /etc/synoinfo.conf "${SM_KEY}")"
   exit
 fi
 
@@ -165,5 +167,9 @@ gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
 # Save configuration for persistence across reboots
 echo "${HDD_BAY}-${SSD_BAY}" > /usr/arc/storagepanel.conf
+# Backup and clear DSM's cached panel name to force use of patched JS (DSM 7.3)
+SM_KEY="sm_machine_img_config_name"
+[ -z "$(synogetkeyvalue /etc/synoinfo.conf "${SM_KEY}")" ] && synosetkeyvalue /etc/synoinfo.conf "${SM_KEY}" "$(synogetkeyvalue /etc.defaults/synoinfo.conf "${SM_KEY}")"
+synosetkeyvalue /etc.defaults/synoinfo.conf "${SM_KEY}" ""
 
 exit 0
