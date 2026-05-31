@@ -19,7 +19,7 @@ if [ "${1}" = "late" ]; then
     echo "[Unit]"
     echo "Description=Arc apppatch daemon"
     echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
-    echo "After=smpkg-custom-install.service"
+    echo "After=smpkg-custom-install.service pkgctl-StorageManager.service"
     # echo "ConditionPathExists=|/var/packages/SynologyPhotos"
     # echo "ConditionPathExists=|/var/packages/SurveillanceStation"
     echo
@@ -39,7 +39,7 @@ if [ "${1}" = "late" ]; then
     echo "[Unit]"
     echo "Description=Arc apppatch path"
     echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
-    echo "After=smpkg-custom-install.service"
+    echo "After=smpkg-custom-install.service pkgctl-StorageManager.service"
     echo "ConditionPathExists=/var/packages"
     echo
     echo "[Path]"

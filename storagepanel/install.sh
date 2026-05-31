@@ -20,7 +20,7 @@ if [ "${1}" = "late" ]; then
     echo "[Unit]"
     echo "Description=Modify storage panel"
     echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
-    echo "After=smpkg-custom-install.service"
+    echo "After=smpkg-custom-install.service pkgctl-StorageManager.service"
     echo
     echo "[Service]"
     echo "Type=oneshot"
