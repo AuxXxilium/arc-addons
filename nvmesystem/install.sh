@@ -58,7 +58,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Unit]"
     echo "Description=nvmesystem daemon"
     echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
-    echo "After=smpkg-custom-install.service"
+    echo "After=smpkg-custom-install.service pkgctl-StorageManager.service"
     echo "After=storagepanel.service"
     echo
     echo "[Service]"
