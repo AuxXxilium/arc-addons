@@ -89,37 +89,36 @@ elif [ "${1}" = "late" ]; then
   PRODUCTVER=$(awk -F'"' '/^export PRODUCTVER=/ {print $2}' "${RAMDISK_PATH}/addons/addons.sh")
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
+  MODVER="/tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}"
+  MODDIR="/tmpRoot/usr/lib/modules"
   if grep -q 'RR@RR' /proc/version 2>/dev/null; then
-    if [ ! -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
-      echo "Custom Kernel - backup existing modules."
-      rm -rf /tmpRoot/usr/lib/modules.* 2>/dev/null || true
-      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} 2>/dev/null || true
-    elif [ -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
-      echo "Custom Kernel - restore modules from backup."
-      /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules 2>/dev/null || true
-      /tmpRoot/bin/mv -f /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} /tmpRoot/usr/lib/modules 2>/dev/null || true
-    fi
-    /tmpRoot/bin/cp -rpf /usr/lib/modules/* /tmpRoot/usr/lib/modules 2>/dev/null || true
+    KERNEL="Custom"
+  else
+    KERNEL="Official"
+  fi
+
+  if [ ! -d "${MODVER}" ]; then
+    echo "${KERNEL} Kernel - backup existing modules."
+    rm -rf /tmpRoot/usr/lib/modules.* 2>/dev/null || true
+    /tmpRoot/bin/cp -rpf "${MODDIR}" "${MODVER}" 2>/dev/null || true
+  else
+    echo "${KERNEL} Kernel - restore modules from backup."
+    /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
+    /tmpRoot/bin/mv -f "${MODVER}" "${MODDIR}" 2>/dev/null || true
+  fi
+
+  if [ "${KERNEL}" = "Custom" ]; then
+    /tmpRoot/bin/cp -rpf /usr/lib/modules/* "${MODDIR}" 2>/dev/null || true
     isChange=true
   else
-    if [ ! -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
-      echo "Official Kernel - backup existing modules."
-      rm -f /tmpRoot/usr/lib/modules.* 2>/dev/null || true
-      /tmpRoot/bin/cp -rpf /tmpRoot/usr/lib/modules /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}
-    elif [ -d /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} ]; then
-      echo "Official Kernel - restore modules from backup."
-      /tmpRoot/bin/rm -rf /tmpRoot/usr/lib/modules 2>/dev/null || true
-      /tmpRoot/bin/mv -f /tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER} /tmpRoot/usr/lib/modules 2>/dev/null || true
-    fi
-    for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk '{if (NF == 2) print $1"###"$2}'); do
-      O=$(echo "${L}" | awk -F'###' '{print $1}')
-      M=$(echo "${L}" | awk -F'###' '{print $2}')
+    for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk 'NF==2 {print $1"###"$2}'); do
+      O="${L%%###*}"
+      M="${L##*###}"
       [ -z "${M}" ] || [ ! -f "/usr/lib/modules/${M}" ] && continue
-      if [ "$(echo "${O}" | cut -c1 | sed 's/.*/\U&/')" = "F" ]; then
-        /tmpRoot/bin/cp -vrf /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/ 2>/dev/null || true
-      else
-        /tmpRoot/bin/cp -vrn /usr/lib/modules/${M} /tmpRoot/usr/lib/modules/ 2>/dev/null || true
-      fi
+      case "${O}" in
+        [Ff]*) /tmpRoot/bin/cp -vrf "/usr/lib/modules/${M}" "${MODDIR}/" 2>/dev/null || true ;;
+        *)     /tmpRoot/bin/cp -vrn "/usr/lib/modules/${M}" "${MODDIR}/" 2>/dev/null || true ;;
+      esac
       isChange=true
     done
   fi
