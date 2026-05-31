@@ -107,6 +107,13 @@ elif [ "${1}" = "late" ]; then
     /tmpRoot/bin/mv -f "${MODVER}" "${MODDIR}" 2>/dev/null || true
   fi
 
+  # Remove stale module backups that don't match current platform-productver
+  for OLD in /tmpRoot/usr/lib/modules.*; do
+    [ "${OLD}" = "${MODVER}" ] && continue
+    echo "Removing stale module backup: ${OLD}"
+    /tmpRoot/bin/rm -rf "${OLD}" 2>/dev/null || true
+  done
+
   if [ "${KERNEL}" = "Custom" ]; then
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* "${MODDIR}" 2>/dev/null || true
     isChange=true
