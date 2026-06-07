@@ -14,6 +14,61 @@ DEFMODES=("20 50 50 100" "20 60 20 60" "20 70 10 50")
 # 1: MINTEMP  2: MAXTEMP  3: MINPWM  4: MAXPWM
 # MINPWM and MAXPWM are in percent (0–100)
 
+amd_tctl_offset_for_brand() {
+  local brand="$1"
+  case "${brand}" in
+    # Exact offsets from memtest86plus hwquirks.c / Linux k10temp tctl_offset_table
+    *"Ryzen 5 1600X"*|*"Ryzen 7 1700X"*|*"Ryzen 7 1800X"*)  echo -20 ;;  # Summit Ridge
+    *"Ryzen 7 2700X"*)              echo -10 ;;  # Pinnacle Ridge
+    *"Ryzen Threadripper 19"*)      echo -27 ;;  # Whitehaven (1900X/1920X/1950X)
+    *"Ryzen Threadripper 29"*)      echo -27 ;;  # Colfax (2920X/2950X/2970WX/2990WX)
+    *"EPYC 7"*)                     echo -27 ;;  # Naples (all 7xxx, family 17h model 01h)
+    *"EPYC 9"*)                     echo -49 ;;  # Turin (family 1Ah)
+    *)                              echo   0 ;;
+  esac
+}
+
+apply_amd_tctl_offset() {
+  local offset=0 conf="/etc/sensors.d/k10temp-tdie.conf"
+  grep -q 'AuthenticAMD' /proc/cpuinfo 2>/dev/null || return
+
+  local brand
+  brand="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2)"
+
+  # Check the CUR_TEMP SMN register for the TJ_SEL==3 && RANGE_SEL==0 condition.
+  # Uses raw PCI config space via sysfs (always available, no tools required).
+  local hwmon_path pci_config
+  hwmon_path="$(find /sys/class/hwmon -name 'name' -exec grep -lx 'k10temp' {} \; 2>/dev/null | head -1)"
+  pci_config="$(readlink -f "$(dirname "${hwmon_path}")/device" 2>/dev/null)/config"
+  if [ -w "${pci_config}" ] && [ -r "${pci_config}" ]; then
+    # Write SMN address 0x00059800 to register B8h (4 bytes, little-endian)
+    echo -ne "\x00\x98\x05\x00" | dd of="${pci_config}" bs=1 seek=184 count=4 conv=notrunc 2>/dev/null
+    # Read result from register BCh (4 bytes, reassemble little-endian in shell)
+    local b0 b1 b2 b3
+    b0="$(dd if="${pci_config}" bs=1 skip=188 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n')"
+    b1="$(dd if="${pci_config}" bs=1 skip=189 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n')"
+    b2="$(dd if="${pci_config}" bs=1 skip=190 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n')"
+    b3="$(dd if="${pci_config}" bs=1 skip=191 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n')"
+    if [ -n "${b0}" ] && [ -n "${b1}" ] && [ -n "${b2}" ] && [ -n "${b3}" ]; then
+      local bug
+      bug="$(awk "BEGIN { v=strtonum(\"0x${b3}\") * 16777216 + strtonum(\"0x${b2}\") * 65536 + strtonum(\"0x${b1}\") * 256 + strtonum(\"0x${b0}\"); print (int(v/524288)%2==0 && int(v/65536)%4==3) ? 1 : 0 }")"
+      [ "${bug}" = "1" ] && offset=-49
+    fi
+  fi
+
+  # Fall back to brand table if register check did not set an offset
+  if [ "${offset}" -eq 0 ]; then
+    offset="$(amd_tctl_offset_for_brand "${brand}")"
+  fi
+
+  mkdir -p /etc/sensors.d
+  if [ "${offset}" -ne 0 ]; then
+    printf 'chip "k10temp-*"\n    compute temp1 @+(%d), @-(%d)\n' "${offset}" "${offset}" > "${conf}"
+  else
+    rm -f "${conf}"
+  fi
+}
+
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
     for K in "support_fan" "support_fan_adjust_dual_mode" "supportadt7490"; do
@@ -98,6 +153,8 @@ generate_fancontrol_config() {
 }
 
 main() {
+apply_amd_tctl_offset
+
 if [ -z "$(find /sys/ -name "fan*_input")" ]; then
   echo "No fan detected, exiting..."
   set_fan_conf "no"
