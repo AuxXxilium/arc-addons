@@ -176,13 +176,11 @@ _restart_scemd_dsm() {
 _restart_scemd_boot() {
   [ -x "/usr/syno/bin/scemd" ] || return 0
 
-  SCEMD_PIDS="$(ps aux 2>/dev/null | awk '($NF=="scemd" || $NF=="/usr/syno/bin/scemd") && $2 ~ /^[0-9]+$/ {print $2}')"
-  [ -n "${SCEMD_PIDS}" ] || return 0
+  pkill -0 -x scemd 2>/dev/null || return 0
 
-  kill -9 ${SCEMD_PIDS} 2>/dev/null || true
+  pkill -9 -x scemd 2>/dev/null || true
   sleep 3
-  SCEMD_PIDS="$(ps aux 2>/dev/null | awk '($NF=="scemd" || $NF=="/usr/syno/bin/scemd") && $2 ~ /^[0-9]+$/ {print $2}')"
-  [ -n "${SCEMD_PIDS}" ] && kill -9 ${SCEMD_PIDS} 2>/dev/null || true
+  pkill -9 -x scemd 2>/dev/null || true
   _log "killed scemd"
 }
 
