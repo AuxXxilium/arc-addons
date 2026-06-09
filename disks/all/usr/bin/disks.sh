@@ -399,15 +399,19 @@ dtModel() {
     for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
       [ ! -e "${F}" ] && continue
       PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      _NVME_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+      if [ -z "${PCIEPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ]; then
+        PCIEPATH="$(echo "${_NVME_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+      fi
       if [ -z "${PCIEPATH}" ]; then
         _log "unknown: ${F}"
         continue
       fi
-      if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ]; then
+      if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] || [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; then
         _log "bootloader: ${F}"
         continue
       fi
-      grep -q "pcie_root = \"${PCIEPATH}\";" ${DEST} && continue # An nvme controller only recognizes one disk
+      grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue # An nvme controller only recognizes one disk
       [ $((${#POWER_LIMIT} + 2)) -gt 30 ] && break               # POWER_LIMIT string length limit 30 characters
       POWER_LIMIT="${POWER_LIMIT:+${POWER_LIMIT},}0"
       COUNT=$((COUNT + 1))
@@ -680,15 +684,15 @@ nondtModel() {
   for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
     [ ! -e "${F}" ] && continue
     PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-    if [ -z "${PHYSDEVPATH}" ]; then
+    PCIEPATH="$(echo "${PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+    if [ -z "${PCIEPATH}" ]; then
       _log "unknown: ${F}"
       continue
     fi
-    if [ "${BOOTDISK_PHYSDEVPATH}" = "${PHYSDEVPATH}" ]; then
+    if [ "${BOOTDISK_PHYSDEVPATH}" = "${PHYSDEVPATH}" ] || [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ]; then
       _log "bootloader: ${F}"
       continue
     fi
-    PCIEPATH="$(echo "${PHYSDEVPATH}" | awk -F'/' '{if (NF == 4) print $NF; else if (NF > 4) print $(NF-1)}')"
     if grep -q "${PCIEPATH}" /etc/extensionPorts; then
       _log "already: ${F}, An nvme controller only recognizes one disk"
       continue
@@ -748,6 +752,9 @@ fi
 if [ -n "${BOOTDISK}" ]; then
   BOOTDISK_PCIEPATH="$(grep 'pciepath' /sys/block/${BOOTDISK}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
   BOOTDISK_ATAPORT="$(grep 'ata_port_no' /sys/block/${BOOTDISK}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
+  if [ -z "${BOOTDISK_PCIEPATH}" ] && [ -n "${BOOTDISK_PHYSDEVPATH}" ]; then
+    BOOTDISK_PCIEPATH="$(echo "${BOOTDISK_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+  fi
 fi
 
 echo "BOOTDISK=${BOOTDISK}"
