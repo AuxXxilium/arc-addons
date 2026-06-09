@@ -197,14 +197,16 @@ elif [ "${1}" = "late" ]; then
   cp -vpf /usr/bin/grub-editenv /tmpRoot/usr/bin/grub-editenv
   cp -vpf /usr/bin/jq /tmpRoot/usr/bin/jq
 
-  # SynoInitEth syno-oob-check-status syno_update_disk_logs
+  # SynoInitEth syno-oob-check-status syno_update_disk_logs syno-nic-supported-check syno-switch-check
   mkdir -vp /tmpRoot/usr/lib/systemd/system
   rm -f /tmpRoot/usr/lib/modules-load.d/70-network*.conf
   # rm -f /tmpRoot/usr/lib/modules-load.d/70-net-kernel.conf
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno_update_disk_logs.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno_update_disk_logs.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-nic-supported-check.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-switch-check.service 2>/dev/null
 
   # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
