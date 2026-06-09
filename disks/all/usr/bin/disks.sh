@@ -54,87 +54,49 @@ _legacy_sd_disks() {
   done
 }
 
-# Count currently visible nonDT data disks (sd*).
-_count_sd_disks() {
-  C=0
-  for F in /sys/block/sd*; do
-    [ -e "${F}" ] || continue
-    C=$((C + 1))
-  done
-  echo "${C}"
-}
-
-# Count currently visible DT data disks (sd* + sata*).
-_count_dt_disks() {
-  C=0
-  for F in /sys/block/sata*; do # for F in /sys/block/sd* /sys/block/sata*; do
-    [ -e "${F}" ] || continue
-    C=$((C + 1))
-  done
-  echo "${C}"
-}
-
-# Check if any HBA/SCSI/RAID controller is present.
-# Primary: lspci PCI class codes (locale-independent, driver-binding-independent).
+# Check if any HBA/SCSI/RAID controller is present via PCI class codes.
 #   0100 = SCSI storage controller
 #   0104 = RAID bus controller
 #   0107 = Serial Attached SCSI (SAS) controller
-# Fallback: /sys/bus/pci/drivers/ when lspci is unavailable.
 _has_hba_driver() {
-  if type lspci >/dev/null 2>&1; then
-    lspci -n 2>/dev/null | grep -qE ' (0100|0104|0107):' && return 0
-    return 1
-  fi
-  for _D in mpt3sas megaraid_sas hpsa aacraid lpfc qla2xxx aic94xx pm8001 isci; do
-    [ -d "/sys/bus/pci/drivers/${_D}" ] && return 0
-  done
-  return 1
+  lspci -n 2>/dev/null | grep -qE ' (0100|0104|0107):'
+}
+
+# Count block devices matching a glob pattern (e.g. /sys/block/sd* or /sys/block/sata*).
+_count_disks() {
+  C=0
+  for _F in ${1}; do [ -e "${_F}" ] && C=$((C + 1)); done
+  echo "${C}"
 }
 
 # Wait until HBA disk enumeration becomes stable.
-# Args: $1 mode (dt|nondt, default nondt)
+# Args: $1 glob pattern for disks to watch (default /sys/block/sd*)
 _wait_hba_disks_stable() {
-  MODE="${1:-nondt}"
+  [ "${_HBA_WAIT_DONE:-0}" = "1" ] && return 0
+  _HBA_WAIT_DONE=1
 
-  # Prevent double-call within the same invocation (e.g. dtUpdate -> dtModel).
-  case "${MODE}" in
-    dt)    [ "${_HBA_WAIT_DONE_DT:-0}"    = "1" ] && return 0; _HBA_WAIT_DONE_DT=1 ;;
-    nondt) [ "${_HBA_WAIT_DONE_NONDT:-0}" = "1" ] && return 0; _HBA_WAIT_DONE_NONDT=1 ;;
-  esac
-
-  # Skip the wait entirely when no HBA/SAS driver is loaded — plain SATA/NVMe
-  # systems have stable disk counts before we even run (eudev has settled).
   if ! _has_hba_driver; then
     _log "no HBA driver found, skipping disk stabilisation wait"
     return 0
   fi
 
-  if [ "${MODE}" = "dt" ]; then
-    COUNT_FN="_count_dt_disks"
-    DISK_LABEL="sd*+sata*"
-  else
-    COUNT_FN="_count_sd_disks"
-    DISK_LABEL="sd*"
-  fi
-  
-  PREV_COUNT="$(${COUNT_FN})"
+  GLOB="${1:-/sys/block/sd*}"
+  PREV_COUNT="$(_count_disks "${GLOB}")"
   STABLE_ROUNDS=0
   I=0
-  while [ ${I} -lt 40 ]; do
+  while [ "${I}" -lt 40 ]; do
     sleep 3
-    CUR_COUNT="$(${COUNT_FN})"
-  
+    CUR_COUNT="$(_count_disks "${GLOB}")"
     if [ "${CUR_COUNT}" = "${PREV_COUNT}" ]; then
       STABLE_ROUNDS=$((STABLE_ROUNDS + 1))
-      [ ${STABLE_ROUNDS} -ge 5 ] && break
+      [ "${STABLE_ROUNDS}" -ge 5 ] && break
     else
       STABLE_ROUNDS=0
       PREV_COUNT="${CUR_COUNT}"
     fi
     I=$((I + 1))
   done
-  
-  _log "HBA disks settled: ${DISK_LABEL} at count ${CUR_COUNT}"
+  _log "HBA disks settled: ${GLOB} at count ${CUR_COUNT}"
 }
 
 # Check if the raid has been completed currently
@@ -259,7 +221,7 @@ dtModel() {
   _log dtModel
 
   # Wait for late HBA/SATA/SAS probes before enumerating slots.
-  _wait_hba_disks_stable dt
+  _wait_hba_disks_stable "/sys/block/sata*"
 
   DEST="/etc/model.dts"
   [ -f "/addons/model.dts" ] && cp -vpf "/addons/model.dts" "${DEST}"
@@ -539,7 +501,7 @@ dtUpdate() {
   _log dtUpdate "$*"
 
   # Avoid incomplete disk set during hot-plug or late probe.
-  _wait_hba_disks_stable dt
+  _wait_hba_disks_stable "/sys/block/sata*"
 
   F="$(basename "${1:-}" 2>/dev/null)"
   if [ -z "${F}" ]; then
@@ -587,8 +549,8 @@ dtUpdate() {
 nondtModel() {
   _log nondtModel
 
-  # Wait for asynchronous HBA probes (mpt3sas/megaraid_sas/hpsa) to complete.
-  _wait_hba_disks_stable nondt
+  # Wait for asynchronous HBA probes to complete.
+  _wait_hba_disks_stable "/sys/block/sd*"
 
   # disksort: assign bit indices by physical PCI+SCSI order instead of sd-letter
   # order, giving stable port assignments across reboots on HBA systems.
