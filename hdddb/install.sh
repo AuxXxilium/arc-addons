@@ -27,7 +27,8 @@ After=smpkg-custom-install.service pkgctl-StorageManager.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/hdddb.sh -nrwpeSI --autoupdate=3
+SuccessExitStatus=3
+ExecStart=/usr/bin/hdddb.sh -nrwpeI
 
 [Install]
 WantedBy=multi-user.target
