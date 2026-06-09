@@ -85,8 +85,8 @@ elif [ "${1}" = "late" ]; then
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   isChange=false
   # read config
-  PLATFORM=$(awk -F'"' '/^export PLATFORM=/ {print $2}' "${RAMDISK_PATH}/addons/addons.sh")
-  PRODUCTVER=$(awk -F'"' '/^export PRODUCTVER=/ {print $2}' "${RAMDISK_PATH}/addons/addons.sh")
+  PLATFORM=$(awk -F'"' '/^export PLATFORM=/ {print $2}' "/addons/addons.sh")
+  PRODUCTVER=$(awk -F'"' '/^export PRODUCTVER=/ {print $2}' "/addons/addons.sh")
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   MODVER="/tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}"
