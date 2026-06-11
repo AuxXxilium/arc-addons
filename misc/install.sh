@@ -208,6 +208,8 @@ elif [ "${1}" = "late" ]; then
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-nic-supported-check.service 2>/dev/null
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-switch-check.service 2>/dev/null
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
+  sed -i 's|^Restart=.*|Restart=no|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
+  sed -i 's|^Type=.*|Type=oneshot|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
 
   # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
