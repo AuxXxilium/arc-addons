@@ -18,7 +18,7 @@ elif [ "${1}" = "late" ]; then
   for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do
     /bin/set_key_value "${F}" "rss_server" "http://127.0.0.1/autoupdate/genRSS.php"
     /bin/set_key_value "${F}" "rss_server_ssl" "https://127.0.0.1/autoupdate/genRSS.php"
-    /bin/set_key_value "${F}" "rss_server_v2" "https://127.0.0.1/autoupdate/v2/getList"
+    /bin/set_key_value "${F}" "rss_server_v2" "http://127.0.0.1/autoupdate/v2/getList"
   done
 
   rm -rf /tmpRoot/var/update/check_result/*
