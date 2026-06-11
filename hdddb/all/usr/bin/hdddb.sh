@@ -156,20 +156,9 @@ fi
 
 DBPATH=/var/lib/disk-compatibility
 
-# Build the JSON fragment for one firmware entry
-# $1 model  $2 fwrev  $3 size_gb
-_db_entry() {
-  local model="$1" fw="$2" size="$3"
-  local common
-  common='"compatibility_interval":[{'
-  common+="\"compatibility\":\"support\","
-  common+='"not_yet_rolling_status":"support",'
-  common+='"fw_dsm_update_status_notify":false,'
-  common+='"barebone_installable":true,'
-  common+='"barebone_installable_v2":"auto",'
-  common+='"smart_test_ignore":false,'
-  common+='"smart_attr_ignore":false}]}'
-  printf '"%s":{"fw_buildnumber":1,%s' "$fw" "$common"
+# Build the compatibility_interval JSON value (shared by fw entries and default)
+_compat_interval() {
+  printf '"compatibility_interval":[{"compatibility":"support","not_yet_rolling_status":"support","fw_dsm_update_status_notify":false,"barebone_installable":true,"barebone_installable_v2":"auto","smart_test_ignore":false,"smart_attr_ignore":false}]'
 }
 
 # Inject model+fw into one db file (DSM 7 format only)
@@ -196,25 +185,30 @@ _update_db() {
     return
   fi
 
-  local fw_json default_json
-  fw_json="$(_db_entry "$model" "$fw" "$size")"
-  default_json="\"default\":{\"size_gb\":${size},$( \
-    printf '"compatibility_interval":[{"compatibility":"support","not_yet_rolling_status":"support","fw_dsm_update_status_notify":false,"barebone_installable":true,"barebone_installable_v2":"auto","smart_test_ignore":false,"smart_attr_ignore":false}]}')"
+  # fw entry:      "FWREV":{"compatibility_interval":[...]}
+  # default entry: "default":{"size_gb":N,"compatibility_interval":[...]}
+  # model entry:   "MODEL":{"FWREV":{...},"default":{...}}
+  local ci fw_entry default_entry model_entry
+  ci="$(_compat_interval)"
+  fw_entry="\"${fw}\":{${ci}}"
+  default_entry="\"default\":{\"size_gb\":${size},${ci}}"
+  model_entry="\"${model}\":{${fw_entry},${default_entry}}"
 
-  # Escape model for sed
-  local msed="${model//\"/\\\"}"
-  msed="${msed//\//\\/}"
-  local fwsed="${fw_json//\//\\/}"
+  # Escape for sed (/ and & are special)
+  local msed fw_entry_sed model_entry_sed
+  msed="${model//\//\\/}"; msed="${msed//&/\\&}"
+  fw_entry_sed="${fw_entry//\//\\/}"; fw_entry_sed="${fw_entry_sed//&/\\&}"
+  model_entry_sed="${model_entry//\//\\/}"; model_entry_sed="${model_entry_sed//&/\\&}"
 
   if grep -qF '"disk_compatbility_info":{}' "$dbfile"; then
     # Empty db
-    sed -i "s/\"disk_compatbility_info\":{}/\"disk_compatbility_info\":{\"${msed}\":{${fwsed},${default_json}}/" "$dbfile"
+    sed -i "s/\"disk_compatbility_info\":{}/\"disk_compatbility_info\":{${model_entry_sed}}/" "$dbfile"
   elif jq -e --arg m "$model" '.disk_compatbility_info[$m]' "$dbfile" >/dev/null 2>&1; then
-    # Model exists, insert fw
-    sed -i "s/\"${msed}\":{/\"${msed}\":{${fwsed},/" "$dbfile"
+    # Model exists, insert fw entry
+    sed -i "s/\"${msed}\":{/\"${msed}\":{${fw_entry_sed},/" "$dbfile"
   else
-    # Append model
-    sed -i "s/}}}$/},\"${msed}\":{${fwsed},${default_json}}/" "$dbfile"
+    # Append new model entry
+    sed -i "s/}}}\$/},${model_entry_sed}}/" "$dbfile"
   fi
 
   if jq -e --arg m "$model" --arg f "$fw" \
@@ -333,16 +327,11 @@ if [ "$ihm" = "yes" ] && [ "$(uname -m)" = "x86_64" ]; then
   val="$(_get support_ihm)"
   [ "$val" != "yes" ] && _set support_ihm "yes" && _log "support_ihm enabled"
 
-  DHM=/usr/syno/sbin/dhm_tool
-  BUNDLED="$(dirname "$0")/bin/dhm_tool"
-  [ ! -f "$BUNDLED" ] && BUNDLED=/usr/syno/sbin/dhm_tool.bundled
-
-  if [ -f "$BUNDLED" ] && [ "$BUNDLED" != "$DHM" ]; then
+  if [ ! -f /usr/syno/sbin/dhm_tool ]; then
+    _log "dhm_tool not found, IronWolf Health Management unavailable"
+  else
     cur_ver="$(dhm_tool --version 2>/dev/null | grep 'Utility Version' | awk '{print $NF}')"
-    if ! printf '%s\n%s\n' "2.5.1" "$cur_ver" | sort --check=quiet --version-sort 2>/dev/null; then
-      cp -p "$BUNDLED" "$DHM" && chmod 755 "$DHM"
-      _log "dhm_tool updated to $("$DHM" --version 2>/dev/null | grep 'Utility Version' | awk '{print $NF}')"
-    fi
+    _log "dhm_tool version: $cur_ver"
   fi
 fi
 
