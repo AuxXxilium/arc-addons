@@ -699,6 +699,7 @@ nondtModel() {
     fi
     COUNT=$((COUNT + 1))
     echo "pci${COUNT}=\"${PCIEPATH}\"" >>/etc/extensionPorts
+    [ -e "/sys/bus/pci/devices/${PCIEPATH}/power/control" ] && echo "on" >"/sys/bus/pci/devices/${PCIEPATH}/power/control"
   done
 
   if [ "${COUNT}" -gt 0 ]; then
