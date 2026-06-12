@@ -18,6 +18,7 @@ if [ "${1}" = "late" ]; then
 [Unit]
 Description=cpuinfo daemon
 After=synoscgi.service nginx.service
+Requires=synoscgi.service nginx.service
 
 [Service]
 Type=oneshot
@@ -35,6 +36,6 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f /tmpRoot/usr/lib/systemd/system/cpuinfo.service
   [ ! -f /tmpRoot/usr/arc/revert.sh ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/cpuinfo.sh -r" >>/tmpRoot/usr/arc/revert.sh
-  echo "rm -f /usr/bin/cpuinfo.sh" >>/tmpRoot/usr/arc/revert.sh
+  echo "rm -f /usr/bin/cpuinfo.sh /usr/sbin/cpuinfo" >>/tmpRoot/usr/arc/revert.sh
   rm -f /tmpRoot/usr/sbin/cpuinfo
 fi
