@@ -122,4 +122,10 @@ if [ "${_ipv6_disabled}" = "1" ] || ! grep -q "^ipv6 " /proc/modules 2>/dev/null
     sed -i 's|^\([[:space:]]*\)listen \[::\][^;]*;|\1# listen [::] removed: ipv6 unavailable|g' "${F}"
   done
   echo "IPv6 unavailable: removed [::] listeners from nginx config"
+  # Restart nginx if it is currently failed so it picks up the patched config
+  if systemctl is-failed nginx.service >/dev/null 2>&1; then
+    echo "Restarting failed nginx.service after IPv6 patch"
+    systemctl reset-failed nginx.service 2>/dev/null || true
+    systemctl start nginx.service 2>/dev/null || true
+  fi
 fi
