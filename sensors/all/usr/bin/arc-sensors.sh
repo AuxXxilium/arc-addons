@@ -17,6 +17,12 @@ DEFMODES=("20 50 50 100" "20 60 20 60" "20 70 10 50")
 apply_amd_tctl_offset() {
   local offset=0 conf="/etc/sensors.d/k10temp-tdie.conf"
   grep -q 'AuthenticAMD' /proc/cpuinfo 2>/dev/null || return
+  # Skip SMN PCI config space probing when IOMMU is active — direct PCI writes
+  # to the k10temp device can trigger IOMMU faults or return garbage data.
+  if [ -d /sys/class/iommu ] && [ -n "$(ls -A /sys/class/iommu 2>/dev/null)" ]; then
+    rm -f "${conf}"
+    return
+  fi
 
   # Check the CUR_TEMP SMN register for the TJ_SEL==3 && RANGE_SEL==0 condition.
   # Uses raw PCI config space via sysfs (always available, no tools required).
