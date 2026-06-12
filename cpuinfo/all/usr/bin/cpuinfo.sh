@@ -92,6 +92,16 @@ fi
 
 if ! ps aux | grep -v grep | grep -q "/usr/sbin/cpuinfo" >/dev/null; then
   "/usr/sbin/cpuinfo" &
+  # Wait for the proxy socket to appear before redirecting nginx to it.
+  TIMEOUT=10
+  while [ ! -S "/run/arc_synoscgi.sock" ] && [ "${TIMEOUT}" -gt 0 ]; do
+    sleep 1
+    TIMEOUT=$((TIMEOUT - 1))
+  done
+  if [ ! -S "/run/arc_synoscgi.sock" ]; then
+    echo "cpuinfo: socket /run/arc_synoscgi.sock did not appear, skipping nginx patch"
+    exit 1
+  fi
   [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
   sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /etc/nginx/nginx.conf
   [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
