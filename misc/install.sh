@@ -231,6 +231,22 @@ elif [ "${1}" = "late" ]; then
   [ -f /tmpRoot/usr/sbin/arccontrol.sh ] && rm -f /tmpRoot/usr/sbin/arccontrol.sh 2>/dev/null || true
   [ -f /tmpRoot/usr/lib/systemd/system/arccontrol.service ] && rm -f /tmpRoot/usr/lib/systemd/system/arccontrol.service 2>/dev/null || true
 
+  # IPv6: pre-patch nginx mustache before DSM boots so synow3tool never generates [::] listeners
+  # arc-misc.sh handles the runtime case (modprobe + re-patch), but nginx starts before arc-misc
+  # on the first boot, so the mustache must be clean from the start.
+  _ipv6_disabled=0
+  grep -qE '(^| )ipv6\.disable=1( |$)' /proc/cmdline 2>/dev/null && _ipv6_disabled=1
+  if [ "${_ipv6_disabled}" = "0" ] && ! grep -q "^ipv6 " /proc/modules 2>/dev/null; then
+    modprobe ipv6 2>/dev/null || true
+  fi
+  if [ "${_ipv6_disabled}" = "1" ] || ! grep -q "^ipv6 " /proc/modules 2>/dev/null; then
+    echo "IPv6 unavailable: pre-patching nginx mustache in tmpRoot"
+    for F in /tmpRoot/usr/syno/share/nginx/nginx.mustache /tmpRoot/etc/nginx/nginx.conf; do
+      [ -f "${F}" ] || continue
+      sed -i 's|^\([[:space:]]*\)listen \[::\][^;]*;|\1# listen [::] removed: ipv6 unavailable|g' "${F}"
+    done
+  fi
+
   # arc-misc
   cp -vpf /usr/bin/arc-misc.sh /tmpRoot/usr/bin/arc-misc.sh
 
