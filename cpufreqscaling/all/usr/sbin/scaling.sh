@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2026 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -36,16 +36,30 @@ if [ -z "${GOVERNOR}" ]; then
 fi
 
 if [ "${GOVERNOR}" != "schedutil" ]; then
-  REQUIRED_MODULES=("cpufreq_stats" "cpufreq_governor" "cpufreq_${GOVERNOR}")
+  ALL_GOVERNORS=("ondemand" "conservative" "userspace" "powersave" "performance" "interactive")
+  REQUIRED_MODULES=("cpufreq_stats" "cpufreq_governor")
+  for GOV in "${ALL_GOVERNORS[@]}"; do
+    REQUIRED_MODULES+=("cpufreq_${GOV}")
+  done
 
   for MODULE in "${REQUIRED_MODULES[@]}"; do
     if ! lsmod | grep -qw "${MODULE}"; then
       MODULE_PATH="/usr/lib/modules/${MODULE}.ko"
       if [ -f "${MODULE_PATH}" ]; then
-        insmod "${MODULE_PATH}" 2>/dev/null || echo "Failed to load module: ${MODULE}"
+        insmod "${MODULE_PATH}" 2>/dev/null || true
       fi
     fi
   done
+
+  # if requested governor is not available after loading, fall back to ondemand
+  AVAIL_GOV_FILE=""
+  for cpu in /sys/devices/system/cpu/cpu*; do
+    [ -f "${cpu}/cpufreq/scaling_available_governors" ] && AVAIL_GOV_FILE="${cpu}/cpufreq/scaling_available_governors" && break
+  done
+  if [ -n "${AVAIL_GOV_FILE}" ] && ! grep -qw "${GOVERNOR}" "${AVAIL_GOV_FILE}" 2>/dev/null; then
+    echo "CPUFreqScaling: ${GOVERNOR} governor not available, falling back to ondemand"
+    GOVERNOR="ondemand"
+  fi
 fi
 
 for i in {1..3}; do
