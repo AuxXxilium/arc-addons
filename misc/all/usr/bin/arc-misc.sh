@@ -109,23 +109,3 @@ else
     rm -f /etc/sysconfig/network-cmdline.txt
   fi
 fi
-
-# IPv6: try to load the module; if unavailable or disabled patch nginx to remove [::] listeners
-_ipv6_disabled=0
-grep -qE '(^| )ipv6\.disable=1( |$)' /proc/cmdline 2>/dev/null && _ipv6_disabled=1
-if [ "${_ipv6_disabled}" = "0" ] && ! grep -q "^ipv6 " /proc/modules 2>/dev/null; then
-  modprobe ipv6 2>/dev/null || true
-fi
-if [ "${_ipv6_disabled}" = "1" ] || ! grep -q "^ipv6 " /proc/modules 2>/dev/null; then
-  for F in /etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache; do
-    [ -f "${F}" ] || continue
-    sed -i 's|^\([[:space:]]*\)listen \[::\][^;]*;|\1# listen [::] removed: ipv6 unavailable|g' "${F}"
-  done
-  echo "IPv6 unavailable: removed [::] listeners from nginx config"
-  # Restart nginx if it is currently failed so it picks up the patched config
-  if systemctl is-failed nginx.service >/dev/null 2>&1; then
-    echo "Restarting failed nginx.service after IPv6 patch"
-    systemctl reset-failed nginx.service 2>/dev/null || true
-    systemctl start nginx.service 2>/dev/null || true
-  fi
-fi
