@@ -201,13 +201,13 @@ elif [ "${1}" = "late" ]; then
   mkdir -vp /tmpRoot/usr/lib/systemd/system
   rm -f /tmpRoot/usr/lib/modules-load.d/70-network*.conf
   # rm -f /tmpRoot/usr/lib/modules-load.d/70-net-kernel.conf
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno_update_disk_logs.service 2>/dev/null
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno-nic-supported-check.service 2>/dev/null
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/syno-switch-check.service 2>/dev/null
-  sed -i 's|ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno_update_disk_logs.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-nic-supported-check.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-switch-check.service 2>/dev/null
+  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
   sed -i 's|^Restart=.*|Restart=no|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
   sed -i 's|^Type=.*|Type=oneshot|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
 
@@ -228,24 +228,8 @@ elif [ "${1}" = "late" ]; then
   done
 
   # cleanup
-  [ -f /tmpRoot/usr/sbin/arccontrol.sh ] && rm -f /tmpRoot/usr/sbin/arccontrol.sh 2>/dev/null || true
-  [ -f /tmpRoot/usr/lib/systemd/system/arccontrol.service ] && rm -f /tmpRoot/usr/lib/systemd/system/arccontrol.service 2>/dev/null || true
-
-  # IPv6: pre-patch nginx mustache before DSM boots so synow3tool never generates [::] listeners
-  # arc-misc.sh handles the runtime case (modprobe + re-patch), but nginx starts before arc-misc
-  # on the first boot, so the mustache must be clean from the start.
-  _ipv6_disabled=0
-  grep -qE '(^| )ipv6\.disable=1( |$)' /proc/cmdline 2>/dev/null && _ipv6_disabled=1
-  if [ "${_ipv6_disabled}" = "0" ] && ! grep -q "^ipv6 " /proc/modules 2>/dev/null; then
-    modprobe ipv6 2>/dev/null || true
-  fi
-  if [ "${_ipv6_disabled}" = "1" ] || ! grep -q "^ipv6 " /proc/modules 2>/dev/null; then
-    echo "IPv6 unavailable: pre-patching nginx mustache in tmpRoot"
-    for F in /tmpRoot/usr/syno/share/nginx/nginx.mustache /tmpRoot/etc/nginx/nginx.conf; do
-      [ -f "${F}" ] || continue
-      sed -i 's|^\([[:space:]]*\)listen \[::\][^;]*;|\1# listen [::] removed: ipv6 unavailable|g' "${F}"
-    done
-  fi
+  [ -f /tmpRoot/usr/sbin/arccontrol.sh ] && rm -f /tmpRoot/usr/sbin/arccontrol.sh 2>/dev/null
+  [ -f /tmpRoot/usr/lib/systemd/system/arccontrol.service ] && rm -f /tmpRoot/usr/lib/systemd/system/arccontrol.service 2>/dev/null
 
   # arc-misc
   cp -vpf /usr/bin/arc-misc.sh /tmpRoot/usr/bin/arc-misc.sh
@@ -256,7 +240,6 @@ elif [ "${1}" = "late" ]; then
     echo "Description=arc-misc daemon"
     echo "After=multi-user.target"
     echo "After=scemd.service rc-network.service"
-    echo "Before=nginx.service"
     echo
     echo "[Service]"
     echo "Type=oneshot"
