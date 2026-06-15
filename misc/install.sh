@@ -210,6 +210,9 @@ elif [ "${1}" = "late" ]; then
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
   sed -i 's|^Restart=.*|Restart=no|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
   sed -i 's|^Type=.*|Type=oneshot|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
+  grep -q "^RemainAfterExit=" /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null \
+    && sed -i 's|^RemainAfterExit=.*|RemainAfterExit=yes|g' /tmpRoot/usr/lib/systemd/system/numanod.service \
+    || sed -i '/^\[Service\]/a RemainAfterExit=yes' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
 
   # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do

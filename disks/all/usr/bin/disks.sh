@@ -245,13 +245,22 @@ dtModel() {
 
     for F in $(LC_ALL=C printf '%s\n' /sys/block/sata* | sort -V); do
       [ ! -e "${F}" ] && continue
+      N="$(basename "${F}")"
+      # Skip loader disk by name (e.g. sata1 is the Arc loader disk on SATA).
+      [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
+      # Skip loader disk by PHYSDEVPATH (handles cases where BOOTDISK name differs from sata* alias).
+      _SATA_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+      if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_SATA_PHYSDEVPATH}" ] && [ "${_SATA_PHYSDEVPATH}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
+        _log "bootloader (alias): ${F}"
+        continue
+      fi
+
       PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       ATAPORT="$(grep 'ata_port_no' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       DRIVER="$(cat "${F}/device/syno_block_info" 2>/dev/null | grep 'driver' | cut -d'=' -f2)"
 
       # Fallback: derive pciepath/driver/ataport from PHYSDEVPATH when syno_block_info is incomplete.
       # Needed on platforms like EPYC7002 where DSM only populates syno_block_info for some ports.
-      _SATA_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
       if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
         if [ -n "${_SATA_PHYSDEVPATH}" ] && [ -z "${PCIEPATH}" ]; then
           # Use tail -1 to pick the leaf PCI device, not an intermediate PCIe bridge.
@@ -398,6 +407,9 @@ dtModel() {
     POWER_LIMIT=""
     for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
       [ ! -e "${F}" ] && continue
+      N="$(basename "${F}")"
+      # Skip loader disk by name (e.g. nvme0n1 is the Arc loader disk on NVMe).
+      [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
       PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       _NVME_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
       if [ -z "${PCIEPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ]; then
