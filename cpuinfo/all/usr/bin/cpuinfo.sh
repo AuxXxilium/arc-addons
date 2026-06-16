@@ -34,9 +34,7 @@ restoreCpuinfo() {
   elif [ -f "${FILE_JS}.bak" ]; then
     mv -f "${FILE_JS}.bak" "${FILE_JS}"
   fi
-  if ps -aux | grep -v grep | grep -q "/usr/sbin/cpuinfo" >/dev/null; then
-    /usr/bin/pkill -f "/usr/sbin/cpuinfo"
-  fi
+  systemctl stop cpuinfo.service cpuinfo-setup.service 2>/dev/null || /usr/bin/pkill -f "/usr/sbin/cpuinfo" 2>/dev/null
   [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
   [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
@@ -90,23 +88,28 @@ fi
 
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
-if ! ps aux | grep -v grep | grep -q "/usr/sbin/cpuinfo" >/dev/null; then
-  "/usr/sbin/cpuinfo" &
-  # Wait for the proxy socket to appear before redirecting nginx to it.
-  TIMEOUT=10
-  while [ ! -S "/run/arc_synoscgi.sock" ] && [ "${TIMEOUT}" -gt 0 ]; do
-    sleep 1
-    TIMEOUT=$((TIMEOUT - 1))
-  done
-  if [ ! -S "/run/arc_synoscgi.sock" ]; then
-    echo "cpuinfo: socket /run/arc_synoscgi.sock did not appear, skipping nginx patch"
-    exit 1
-  fi
-  [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-  sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /etc/nginx/nginx.conf
-  [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
-  sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /usr/syno/share/nginx/nginx.mustache
-  systemctl reload nginx
+# Patch nginx to route through the cpuinfo proxy socket.
+# The cpuinfo binary is managed as a separate supervised systemd service
+# (cpuinfo.service) so it restarts automatically if it crashes, keeping
+# the socket alive without any nginx reload being needed.
+[ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /etc/nginx/nginx.conf
+[ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
+sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /usr/syno/share/nginx/nginx.mustache
+
+# Wait for the cpuinfo daemon to create the socket before reloading nginx.
+TIMEOUT=30
+while [ ! -S "/run/arc_synoscgi.sock" ] && [ "${TIMEOUT}" -gt 0 ]; do
+  sleep 1
+  TIMEOUT=$((TIMEOUT - 1))
+done
+if [ ! -S "/run/arc_synoscgi.sock" ]; then
+  echo "cpuinfo: socket /run/arc_synoscgi.sock did not appear, reverting nginx patch"
+  [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
+  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
+  exit 1
 fi
+
+systemctl reload nginx
 
 exit 0

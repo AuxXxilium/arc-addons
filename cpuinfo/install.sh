@@ -14,11 +14,12 @@ if [ "${1}" = "late" ]; then
   cp -vpf /usr/sbin/cpuinfo /tmpRoot/usr/sbin/cpuinfo
   cp -vpf /usr/bin/cpuinfo.sh /tmpRoot/usr/bin/cpuinfo.sh
 
-  cat <<EOF >"/tmpRoot/usr/lib/systemd/system/cpuinfo.service"
+  cat <<EOF >"/tmpRoot/usr/lib/systemd/system/cpuinfo-setup.service"
 [Unit]
-Description=cpuinfo daemon
+Description=cpuinfo setup (JS patch + nginx redirect)
 After=synoscgi.service nginx.service
 Requires=synoscgi.service nginx.service
+Before=cpuinfo.service
 
 [Service]
 Type=oneshot
@@ -29,10 +30,29 @@ ExecStart=/usr/bin/cpuinfo.sh
 WantedBy=multi-user.target
 EOF
 
+  cat <<EOF >"/tmpRoot/usr/lib/systemd/system/cpuinfo.service"
+[Unit]
+Description=cpuinfo daemon
+After=cpuinfo-setup.service
+Requires=cpuinfo-setup.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/cpuinfo
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  ln -vsf /usr/lib/systemd/system/cpuinfo-setup.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo-setup.service
   ln -vsf /usr/lib/systemd/system/cpuinfo.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo.service
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon cpuinfo - uninstall"
+  rm -f /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo-setup.service
   rm -f /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/cpuinfo.service
+  rm -f /tmpRoot/usr/lib/systemd/system/cpuinfo-setup.service
   rm -f /tmpRoot/usr/lib/systemd/system/cpuinfo.service
   [ ! -f /tmpRoot/usr/arc/revert.sh ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/cpuinfo.sh -r" >>/tmpRoot/usr/arc/revert.sh

@@ -8,7 +8,7 @@
 
 UGREEN_LEDS_CLI="/usr/sbin/ugreen_leds_cli"
 
-if ps -aux | grep -v grep | grep -q "/usr/sbin/ugreen_led" >/dev/null; then
+if pkill -0 -f "/usr/sbin/ugreen_led" 2>/dev/null; then
     /usr/bin/pkill -f "/usr/sbin/ugreen_led"
 fi
 
@@ -19,7 +19,7 @@ elif [ "${1}" = "off" ]; then
     echo "Disable Ugreen LED"
     ${UGREEN_LEDS_CLI} all -off
 else
-    if ! ps aux | grep -v grep | grep -q "/usr/sbin/ugreen_led" >/dev/null; then
+    if ! pkill -0 -f "/usr/sbin/ugreen_led" 2>/dev/null; then
         "/usr/sbin/ugreen_led" &
     fi
 fi
