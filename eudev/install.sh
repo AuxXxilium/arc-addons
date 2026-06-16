@@ -53,7 +53,7 @@ elif [ "${1}" = "modules" ]; then
   udevadm control --stop 2>/dev/null || /usr/bin/killall udevd 2>/dev/null || true
   # Wait for udevd to fully exit before DSM boots its own udev
   for _i in $(seq 1 5); do
-    ps aux 2>/dev/null | grep -q '[u]devd' || break
+    pkill -0 -x udevd 2>/dev/null || break
     sleep 1
   done
   /usr/bin/killall -9 udevd 2>/dev/null || true

@@ -350,6 +350,17 @@ dtModel() {
         _SD_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
         [ -n "${_SD_PP}" ] && [ "${_SD_PP}" = "${BOOTDISK_PHYSDEVPATH}" ] && { _log "bootloader (alias): ${F}"; continue; }
       fi
+      # On AMD/DT systems (e.g. EPYC7002) BOOTDISK_PHYSDEVPATH may be empty because syno_block_info
+      # is not populated until after the shim runs.  Fall back to PCI path comparison so the SATA
+      # loader disk is never included as a data disk in the DTS.
+      if [ -n "${BOOTDISK_PCIEPATH}" ]; then
+        _SD_PCIE="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+        if [ -z "${_SD_PCIE}" ]; then
+          _SD_PP2="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+          [ -n "${_SD_PP2}" ] && _SD_PCIE="$(echo "${_SD_PP2}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+        fi
+        [ -n "${_SD_PCIE}" ] && [ "${_SD_PCIE}" = "${BOOTDISK_PCIEPATH}" ] && { _log "bootloader (pciepath): ${F}"; continue; }
+      fi
 
       PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       DRIVER="$(cat "${F}/device/syno_block_info" 2>/dev/null | grep 'driver' | cut -d'=' -f2)"
@@ -419,7 +430,7 @@ dtModel() {
         _log "unknown: ${F}"
         continue
       fi
-      if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] || [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; then
+      if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] || { [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
         _log "bootloader: ${F}"
         continue
       fi
@@ -601,6 +612,15 @@ nondtModel() {
     if [ -n "${BOOTDISK_PHYSDEVPATH}" ]; then
       _N_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
       [ -n "${_N_PP}" ] && [ "${_N_PP}" = "${BOOTDISK_PHYSDEVPATH}" ] && { _log "bootloader (alias): ${F}"; continue; }
+    fi
+    # PHYSDEVPATH may be absent when syno_block_info is not yet populated; fall back to PCI path.
+    if [ -n "${BOOTDISK_PCIEPATH}" ]; then
+      _N_PCIE="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      if [ -z "${_N_PCIE}" ]; then
+        _N_PP2="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+        [ -n "${_N_PP2}" ] && _N_PCIE="$(echo "${_N_PP2}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+      fi
+      [ -n "${_N_PCIE}" ] && [ "${_N_PCIE}" = "${BOOTDISK_PCIEPATH}" ] && { _log "bootloader (pciepath): ${F}"; continue; }
     fi
     if [ "${DISKSORT}" = "true" ]; then
       IDX=${SEQ_IDX}

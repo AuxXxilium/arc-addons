@@ -13,7 +13,7 @@ MAX=255
 
 # Stop fancontrol before sweep
 for ((count=0; count<5; count++)); do
-    if ! ps aux | grep "/usr/sbin/fancontrol" | grep -v grep >/dev/null && [ ! -e "/run/fancontrol.pid" ]; then
+    if ! pkill -0 -f "/usr/sbin/fancontrol" 2>/dev/null && [ ! -e "/run/fancontrol.pid" ]; then
         break
     fi
     /usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null

@@ -172,7 +172,7 @@ while true; do
       fi
       /usr/bin/pkill -f "/usr/sbin/fancontrol" 2>/dev/null
       for _w in 1 2 3 4 5; do
-        ps aux 2>/dev/null | grep -v grep | grep -q "/usr/sbin/fancontrol" || break
+        pkill -0 -f "/usr/sbin/fancontrol" 2>/dev/null || break
         sleep 1
       done
       rm -f "/run/fancontrol.pid" "/var/run/fancontrol.pid" 2>/dev/null
