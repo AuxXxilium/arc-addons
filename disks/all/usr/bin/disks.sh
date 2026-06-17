@@ -168,16 +168,6 @@ checkAlldisk() {
     done
   done
 
-  # Create sg* character device nodes for SCSI generic devices (HBA passthrough, enclosures, etc.)
-  for F in $(LC_ALL=C printf '%s\n' /sys/class/scsi_generic/sg* 2>/dev/null | sort -V); do
-    [ ! -e "${F}" ] && continue
-    N="$(basename "${F}" 2>/dev/null)"
-    if [ ! -c "/dev/${N}" ] && [ -f "${F}/dev" ]; then
-      MAJOR="$(cat "${F}/dev" | cut -d':' -f1)"
-      MINOR="$(cat "${F}/dev" | cut -d':' -f2)"
-      mknod "/dev/${N}" c ${MAJOR} ${MINOR} >/dev/null 2>&1
-    fi
-  done
 }
 
 # Check if the disk is a boot disk
@@ -537,9 +527,6 @@ dtModel() {
 # DT model update
 dtUpdate() {
   _log dtUpdate "$*"
-
-  # Avoid incomplete disk set during hot-plug or late probe.
-  _wait_hba_disks_stable "/sys/block/sata*"
 
   F="$(basename "${1:-}" 2>/dev/null)"
   if [ -z "${F}" ]; then
