@@ -327,6 +327,20 @@ if [ "$ihm" = "yes" ] && [ "$(uname -m)" = "x86_64" ]; then
   val="$(_get support_ihm)"
   [ "$val" != "yes" ] && _set support_ihm "yes" && _log "support_ihm enabled"
 
+  # Ensure /dev/sg* nodes exist — DSM udev may not replay add events for devices
+  # already present before udevd started, leaving /dev/sg* absent even though
+  # /sys/class/scsi_generic/ is populated.
+  for _sgpath in /sys/class/scsi_generic/sg*; do
+    [ -e "$_sgpath" ] || continue
+    _sgname="$(basename "$_sgpath")"
+    if [ ! -c "/dev/$_sgname" ] && [ -f "$_sgpath/dev" ]; then
+      _sgmaj="$(cut -d: -f1 < "$_sgpath/dev")"
+      _sgmin="$(cut -d: -f2 < "$_sgpath/dev")"
+      mknod "/dev/$_sgname" c "$_sgmaj" "$_sgmin" >/dev/null 2>&1 && \
+        _log "created /dev/$_sgname ($_sgmaj:$_sgmin)"
+    fi
+  done
+
   if [ ! -f /usr/syno/sbin/dhm_tool ]; then
     _log "dhm_tool not found, IronWolf Health Management unavailable"
   else
