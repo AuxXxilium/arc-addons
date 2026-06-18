@@ -10,4 +10,5 @@
 # DSM has no built-in rule for SUBSYSTEM=="scsi_generic".
 #
 
+ACTION=="add", SUBSYSTEM=="scsi_generic", KERNEL=="sg[0-9]*", RUN+="/sbin/modprobe sg"
 ACTION=="add", SUBSYSTEM=="scsi_generic", KERNEL=="sg[0-9]*", MODE="0660", GROUP="disk"
