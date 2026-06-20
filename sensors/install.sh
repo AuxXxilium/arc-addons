@@ -12,15 +12,18 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
+  mkdir -p /tmpRoot/var
+  mv -f /tmpRoot/usr/var/sensors3.conf /tmpRoot/var/sensors3.conf 2>/dev/null || true
+  rmdir /tmpRoot/usr/var 2>/dev/null || true
 
   # Remove old fancontrol addon remnants
-  rm -f "/tmpRoot/usr/sbin/fancontrol"
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/fancontrol.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/fancontrol.service"
+  rm -f "/tmpRoot/usr/sbin/fancontrol" 2>/dev/null || true
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/fancontrol.service" 2>/dev/null || true
+  rm -f "/tmpRoot/usr/lib/systemd/system/fancontrol.service" 2>/dev/null || true
+  rm -f "/tmpRoot/usr/bin/arc-pwm.sh" 2>/dev/null || true
 
   if grep -wq "fancontrol" /proc/cmdline 2>/dev/null; then
     cp -vpf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
-    cp -vpf /usr/bin/arc-pwm.sh /tmpRoot/usr/bin/arc-pwm.sh
 
     if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
       echo "copy esynoscheduler.db"
@@ -29,21 +32,15 @@ if [ "${1}" = "late" ]; then
     fi
     export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib:/tmpRoot/usr/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-    if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "^Fancontrol|"; then
-      echo "Fancontrol task already exists, will be updated at boot by arc-sensors.sh"
+    if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "^Fancontrol 2.0|"; then
+      echo "Fancontrol 2.0 task already exists, will be updated at boot by arc-sensors.sh"
     else
-      echo "insert Fancontrol task to esynoscheduler.db"
+      echo "insert Fancontrol 2.0 task to esynoscheduler.db"
       /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-DELETE FROM task WHERE task_name LIKE 'Fancontrol';
-INSERT INTO task VALUES('Fancontrol', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
-# Fan modes: MINTEMP MAXTEMP (temperature range, shared across all fans)
-#                       fullfan             coolfan               quietfan
-#                          |                      |                        |
-FANMODES=("20 50 50 100" "20 60 20 60" "20 70 10 50")
-
-# Per-fan PWM% per mode: "hwmonX/pwmY:full_min full_max:cool_min cool_max:quiet_min quiet_max"
-# This section is auto-generated at boot. Edit MINPWM/MAXPWM values as needed.
-# Run arc-pwm.sh to auto-measure the minimum PWM for each fan.
+DELETE FROM task WHERE task_name LIKE 'Fancontrol 2.0';
+INSERT INTO task VALUES('Fancontrol 2.0', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
+# Populated on first boot by arc-sensors.sh
+FANMODES=()
 FAN_CURVES=()
 ', 'script', '{}', '', '', '{}', '{}');
 EOF
@@ -79,7 +76,7 @@ EOF
     if [ -f "${ESYNOSCHEDULER_DB}" ]; then
       echo "delete fancontrol task from esynoscheduler.db"
       /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-DELETE FROM task WHERE task_name LIKE 'Fancontrol';
+DELETE FROM task WHERE task_name LIKE 'Fancontrol 2.0';
 EOF
     fi
   fi
@@ -99,7 +96,7 @@ elif [ "${1}" = "uninstall" ]; then
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete fancontrol task from esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-DELETE FROM task WHERE task_name LIKE 'Fancontrol';
+DELETE FROM task WHERE task_name LIKE 'Fancontrol 2.0';
 EOF
   fi
 fi

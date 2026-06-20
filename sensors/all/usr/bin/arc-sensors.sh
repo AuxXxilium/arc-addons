@@ -6,15 +6,16 @@
 # See /LICENSE for more information.
 #
 
-#            fullfan        coolfan        quietfan
-#               |              |              |
-DEFMODES=("20 50 50 100" "20 60 20 60" "20 70 10 50")
-#           ^  ^  ^  ^
-#           1  2  3  4
-# 1: MINTEMP  2: MAXTEMP  3: MINPWM  4: MAXPWM
+#         fullfan coolfan quietfan
+#            |       |       |
+DEFMODES=("30 70" "30 80" "30 90")
+#           ^  ^
+#           1  2
+# 1: MINTEMP  2: MAXTEMP
 
-# Default per-fan PWM% per mode: "full_min full_max:cool_min cool_max:quiet_min quiet_max"
-DEF_FAN_PWM="50 100:20 60:10 50"
+# Default per-fan 3 points per mode: "t1@p1 t2@p2 t3@p3:t1@p1 t2@p2 t3@p3:t1@p1 t2@p2 t3@p3"
+#                                      fullfan            coolfan            quietfan
+DEF_FAN_PWM="30@50 50@75 70@100:30@20 55@50 80@80:30@10 60@35 90@60"
 
 ESYNOSCHEDULER_DB="/usr/syno/etc/esynoscheduler/esynoscheduler.db"
 FAN2GO_CONF="/etc/fan2go/fan2go.yaml"
@@ -64,6 +65,11 @@ percent_to_pwm() {
   echo $(( P * 255 / 100 ))
 }
 
+# Validate a single mode string of 3 points: "t1@p1 t2@p2 t3@p3"
+valid_mode_points() {
+  [[ "${1}" =~ ^[0-9]+@[0-9]+\ [0-9]+@[0-9]+\ [0-9]+@[0-9]+$ ]]
+}
+
 # Read task operation from esynoscheduler DB and eval into shell variables.
 # Sets: FANMODES array, FAN_CURVES array (may be empty).
 load_task() {
@@ -71,12 +77,12 @@ load_task() {
   FAN_CURVES=()
   [ -f "${ESYNOSCHEDULER_DB}" ] || return
   local OP
-  OP="$(synowebapi -s --exec api=SYNO.Core.EventScheduler method=get task_name=\"Fancontrol\" 2>/dev/null | jq -r '.data.operation' 2>/dev/null)"
+  OP="$(synowebapi -s --exec api=SYNO.Core.EventScheduler method=get task_name=\"Fancontrol 2.0\" 2>/dev/null | jq -r '.data.operation' 2>/dev/null)"
   [ -n "${OP}" ] || return
   eval "${OP}" 2>/dev/null || true
   # Ensure FANMODES has valid entries
   for i in 0 1 2; do
-    [[ "${FANMODES[$i]}" =~ ^[0-9]+\ [0-9]+\ [0-9]+\ [0-9]+$ ]] || FANMODES[$i]="${DEFMODES[$i]}"
+    [[ "${FANMODES[$i]}" =~ ^[0-9]+\ [0-9]+$ ]] || FANMODES[$i]="${DEFMODES[$i]}"
   done
 }
 
@@ -105,7 +111,6 @@ merge_fan_curves() {
   local -a discovered=("$@")
   local -A existing=()
 
-  # Index existing FAN_CURVES by channel key
   for entry in "${FAN_CURVES[@]}"; do
     local key="${entry%%:*}"
     local val="${entry#*:}"
@@ -115,13 +120,13 @@ merge_fan_curves() {
   FAN_CURVES=()
   for chan in "${discovered[@]}"; do
     if [ -n "${existing[${chan}]}" ]; then
-      # Validate: must have 3 colon-separated pairs of 2 numbers each
+      # Validate: 3 colon-separated mode strings, each "t%p t%p t%p"
       local v="${existing[${chan}]}"
       local f1 f2 f3
       f1="$(echo "${v}" | cut -d: -f1)"
       f2="$(echo "${v}" | cut -d: -f2)"
       f3="$(echo "${v}" | cut -d: -f3)"
-      if [[ "${f1}" =~ ^[0-9]+\ [0-9]+$ ]] && [[ "${f2}" =~ ^[0-9]+\ [0-9]+$ ]] && [[ "${f3}" =~ ^[0-9]+\ [0-9]+$ ]]; then
+      if valid_mode_points "${f1}" && valid_mode_points "${f2}" && valid_mode_points "${f3}"; then
         FAN_CURVES+=("${chan}:${v}")
       else
         FAN_CURVES+=("${chan}:${DEF_FAN_PWM}")
@@ -136,18 +141,16 @@ merge_fan_curves() {
 update_task() {
   [ -f "${ESYNOSCHEDULER_DB}" ] || return
 
-  # Build FAN_CURVES bash array literal
   local curves_str="FAN_CURVES=("$'\n'
   for entry in "${FAN_CURVES[@]}"; do
     curves_str+="  \"${entry}\""$'\n'
   done
   curves_str+=")"
 
-  local modes_comment='# Fan modes: MINTEMP MAXTEMP MINPWM MAXPWM (temps shared, PWM overridable per fan below)
-#                       fullfan             coolfan               quietfan
-#                          |                      |                        |'
-  local curves_comment='# Per-fan PWM% per mode: "hwmonX/pwmY:full_min full_max:cool_min cool_max:quiet_min quiet_max"
-# Edit MINPWM/MAXPWM values. Entries are auto-managed (added/removed) on boot.'
+  local modes_comment='# Fan modes: "MINTEMP MAXTEMP" — temperature range per mode, shared across all fans
+#              fullfan   coolfan   quietfan'
+  local curves_comment='# Per-fan 3-point curve per mode: "hwmonX/pwmY:t1@p1 t2@p2 t3@p3:t1@p1 t2@p2 t3@p3:t1@p1 t2@p2 t3@p3"
+# Each point is temp@pwm% (e.g. 30@50 = at 30C run at 50% PWM). Three modes: fullfan:coolfan:quietfan. Auto-managed on boot.'
 
   local operation
   operation="${modes_comment}
@@ -157,25 +160,22 @@ ${curves_comment}
 ${curves_str}"
 
   sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-DELETE FROM task WHERE task_name LIKE 'Fancontrol';
-INSERT INTO task VALUES('Fancontrol', '', 'bootup', '', 0, 0, 0, 0, '', 0, '$(printf '%s' "${operation}" | sed "s/'/''/g")', 'script', '{}', '', '', '{}', '{}');
+DELETE FROM task WHERE task_name LIKE 'Fancontrol 2.0';
+INSERT INTO task VALUES('Fancontrol 2.0', '', 'bootup', '', 0, 0, 0, 0, '', 0, '$(printf '%s' "${operation}" | sed "s/'/''/g")', 'script', '{}', '', '', '{}', '{}');
 EOF
 }
 
 # Find the best CPU temp sensor path (hwmonX/tempY_input).
 find_cpu_temp_sensor() {
-  # Prefer coretemp / k10temp / zenpower
   local P
   P="$(find /sys/class/hwmon -name 'name' 2>/dev/null | xargs grep -lE '^(coretemp|k10temp|zenpower)$' 2>/dev/null | head -1)"
   if [ -n "${P}" ]; then
-    local HW
+    local HW IDX
     HW="$(dirname "${P}")"
-    local IDX
     IDX="$(basename "${HW}" | sed 's/hwmon//')"
     echo "hwmon${IDX}/temp1_input"
     return
   fi
-  # Fallback: first temp sensor found
   for HW in /sys/class/hwmon/hwmon*; do
     [ -r "${HW}/temp1_input" ] || continue
     local IDX
@@ -195,18 +195,13 @@ hwmon_platform() {
 generate_fan2go_config() {
   local MIDX="${1:-1}"
   local FANMODE="${FANMODES[${MIDX}]}"
-  [[ "${FANMODE}" =~ ^([0-9]+)\ ([0-9]+)\ ([0-9]+)\ ([0-9]+)$ ]] || FANMODE="${DEFMODES[${MIDX}]}"
-
-  local MINTEMP MAXTEMP
-  MINTEMP="$(echo "${FANMODE}" | cut -d' ' -f1)"
-  MAXTEMP="$(echo "${FANMODE}" | cut -d' ' -f2)"
+  [[ "${FANMODE}" =~ ^([0-9]+)\ ([0-9]+)$ ]] || FANMODE="${DEFMODES[${MIDX}]}"
 
   local CPU_SENSOR
   CPU_SENSOR="$(find_cpu_temp_sensor)"
-  local CPU_HW_IDX CPU_TEMP_IDX
+  local CPU_HW_IDX CPU_TEMP_IDX CPU_PLATFORM
   CPU_HW_IDX="$(echo "${CPU_SENSOR}" | sed 's/hwmon\([0-9]*\)\/.*/\1/')"
   CPU_TEMP_IDX="$(echo "${CPU_SENSOR}" | sed 's/.*temp\([0-9]*\)_input/\1/')"
-  local CPU_PLATFORM
   CPU_PLATFORM="$(hwmon_platform "${CPU_HW_IDX}")"
 
   mkdir -p /etc/fan2go
@@ -219,24 +214,27 @@ runFanInitializationInParallel: true
 fans:
 YAML
 
-    # Emit one fan entry per FAN_CURVES entry
+    local mode_field=$(( MIDX + 1 ))
+
     for entry in "${FAN_CURVES[@]}"; do
       local chan="${entry%%:*}"
       local pwm_vals="${entry#*:}"
-      local hw_idx fan_idx
+      local hw_idx fan_idx platform
       hw_idx="$(echo "${chan}" | sed 's/hwmon\([0-9]*\)\/.*/\1/')"
       fan_idx="$(echo "${chan}" | sed 's/.*pwm\([0-9]*\)/\1/')"
-      local platform
       platform="$(hwmon_platform "${hw_idx}")"
 
-      # Pick PWM% for active mode (field 1=full, 2=cool, 3=quiet; 1-based)
-      local mode_field=$(( MIDX + 1 ))
-      local pwm_pair
-      pwm_pair="$(echo "${pwm_vals}" | cut -d: -f"${mode_field}")"
-      local MINPWM_P MAXPWM_P
-      MINPWM_P="$(echo "${pwm_pair}" | cut -d' ' -f1)"
-      MAXPWM_P="$(echo "${pwm_pair}" | cut -d' ' -f2)"
-      local MINPWM MAXPWM
+      # Parse the 3-point string for the active mode: "t1%p1 t2%p2 t3%p3"
+      local mode_pts
+      mode_pts="$(echo "${pwm_vals}" | cut -d: -f"${mode_field}")"
+
+      # Extract min and max PWM% from first and last points for fan envelope
+      local pt1 pt3
+      pt1="$(echo "${mode_pts}" | cut -d' ' -f1)"
+      pt3="$(echo "${mode_pts}" | cut -d' ' -f3)"
+      local MINPWM_P MAXPWM_P MINPWM MAXPWM
+      MINPWM_P="$(echo "${pt1}" | cut -d'@' -f2)"
+      MAXPWM_P="$(echo "${pt3}" | cut -d'@' -f2)"
       MINPWM="$(percent_to_pwm "${MINPWM_P}")"
       MAXPWM="$(percent_to_pwm "${MAXPWM_P}")"
       [ "${MAXPWM}" -le "${MINPWM}" ] && MAXPWM=$(( MINPWM + 26 ))
@@ -267,7 +265,6 @@ sensors:
 curves:
 YAML
 
-    # Emit one curve per fan with smooth linear steps across the temp range
     for entry in "${FAN_CURVES[@]}"; do
       local chan="${entry%%:*}"
       local pwm_vals="${entry#*:}"
@@ -275,21 +272,16 @@ YAML
       hw_idx="$(echo "${chan}" | sed 's/hwmon\([0-9]*\)\/.*/\1/')"
       fan_idx="$(echo "${chan}" | sed 's/.*pwm\([0-9]*\)/\1/')"
 
-      local mode_field=$(( MIDX + 1 ))
-      local pwm_pair
-      pwm_pair="$(echo "${pwm_vals}" | cut -d: -f"${mode_field}")"
-      local MINPWM_P MAXPWM_P
-      MINPWM_P="$(echo "${pwm_pair}" | cut -d' ' -f1)"
-      MAXPWM_P="$(echo "${pwm_pair}" | cut -d' ' -f2)"
+      local mode_pts
+      mode_pts="$(echo "${pwm_vals}" | cut -d: -f"${mode_field}")"
 
-      # Build smooth steps: interpolate 5 points between MINTEMP→MAXTEMP / MINPWM→MAXPWM
+      # Emit the 3 stored points directly as fan2go steps
       local steps=""
-      local NSTEPS=5
-      for i in $(seq 0 ${NSTEPS}); do
-        local temp pwm_p
-        temp=$(( MINTEMP + (MAXTEMP - MINTEMP) * i / NSTEPS ))
-        pwm_p=$(( MINPWM_P + (MAXPWM_P - MINPWM_P) * i / NSTEPS ))
-        steps+="        - {temp: ${temp}, pwm: ${pwm_p}}"$'\n'
+      for pt in $(echo "${mode_pts}"); do
+        local t p
+        t="$(echo "${pt}" | cut -d'@' -f1)"
+        p="$(echo "${pt}" | cut -d'@' -f2)"
+        steps+="        - {temp: ${t}, pwm: ${p}}"$'\n'
       done
 
       cat <<YAML
@@ -316,7 +308,7 @@ restart_fan2go() {
     pkill -0 -f "${FAN2GO_BIN}" 2>/dev/null || break
     sleep 1
   done
-  "${FAN2GO_BIN}" --config "${FAN2GO_CONF}" --no-style >/dev/null 2>&1 &
+  LD_LIBRARY_PATH=/usr/lib "${FAN2GO_BIN}" --config "${FAN2GO_CONF}" --no-style >/dev/null 2>&1 &
 }
 
 RELOAD_FLAG="/run/arc-sensors.reload"
@@ -324,7 +316,7 @@ RELOAD_NEEDED=0
 
 get_task_hash() {
   [ -f "${ESYNOSCHEDULER_DB}" ] || echo ""
-  sqlite3 "${ESYNOSCHEDULER_DB}" "SELECT operation FROM task WHERE task_name='Fancontrol';" 2>/dev/null | md5sum | cut -d' ' -f1
+  sqlite3 "${ESYNOSCHEDULER_DB}" "SELECT operation FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null | md5sum | cut -d' ' -f1
 }
 
 reload_config() {
@@ -374,7 +366,6 @@ main() {
   while true; do
     sleep 1
 
-    # Recheck for fans every 30s if none were found initially
     if [ "${FansActive}" -eq 0 ]; then
       NoFanTick=$(( NoFanTick + 1 ))
       if [ "${NoFanTick}" -ge 30 ]; then
@@ -388,7 +379,6 @@ main() {
       continue
     fi
 
-    # Handle reload request (SIGHUP or flag file)
     if [ "${RELOAD_NEEDED}" -eq 1 ] || [ -f "${RELOAD_FLAG}" ]; then
       echo "Reloading fan curves..."
       RELOAD_NEEDED=0
@@ -411,14 +401,13 @@ main() {
       *)                FanCurtMode="1" ;;
     esac
 
-    # Check if task body changed (user edited curves in DSM)
     local CurHash
     CurHash="$(get_task_hash)"
     if [ "${CurHash}" != "${FanTaskHash}" ]; then
       echo "Fan task changed, reloading curves..."
       FanTaskHash="${CurHash}"
       load_task
-      FanBaseMode=""  # force mode re-apply below
+      FanBaseMode=""
     fi
 
     if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
