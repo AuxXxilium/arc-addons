@@ -22,24 +22,24 @@ if [ "${1}" = "late" ]; then
       mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
       cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
     fi
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib:/tmpRoot/usr/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-    if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -E "Fancontrol" -A11 | grep -Eq "^FANMODES=(.*)$"; then
-      echo "Fancontrol task already exists"
+    if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "^Fancontrol|"; then
+      echo "Fancontrol task already exists, will be updated at boot by arc-sensors.sh"
     else
-      echo "insert sensors task to esynoscheduler.db"
+      echo "insert Fancontrol task to esynoscheduler.db"
       /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'Fancontrol';
 INSERT INTO task VALUES('Fancontrol', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
-# You only need to modify the following 12 values. You need to change the FanMode once. You do not need to run the task.
-#
+# Fan modes: MINTEMP MAXTEMP (temperature range, shared across all fans)
 #                       fullfan             coolfan               quietfan
 #                          |                      |                        |
 FANMODES=("20 50 50 100" "20 60 20 60" "20 70 10 50")
-#                    ^  ^   ^   ^
-#                    1  2    3    4
-# 1: MINTEMP  2: MAXTEMP  3: MINPWM  4: MAXPWM
-# MINPWM and MAXPWM are in percent (0-100)
+
+# Per-fan PWM% per mode: "hwmonX/pwmY:full_min full_max:cool_min cool_max:quiet_min quiet_max"
+# This section is auto-generated at boot. Edit MINPWM/MAXPWM values as needed.
+# Run arc-pwm.sh to auto-measure the minimum PWM for each fan.
+FAN_CURVES=()
 ', 'script', '{}', '', '', '{}', '{}');
 EOF
     fi
@@ -47,7 +47,7 @@ EOF
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     {
       echo "[Unit]"
-      echo "Description=sensors daemon"
+      echo "Description=sensors/fancontrol daemon"
       echo "After=multi-user.target"
       echo
       echo "[Service]"
@@ -70,7 +70,7 @@ EOF
     rm -f "/tmpRoot/usr/lib/systemd/system/sensors.service"
     rm -f "/tmpRoot/usr/bin/arc-sensors.sh"
     rm -f "/tmpRoot/usr/bin/arc-pwm.sh"
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib:/tmpRoot/usr/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
     if [ -f "${ESYNOSCHEDULER_DB}" ]; then
       echo "delete fancontrol task from esynoscheduler.db"
@@ -85,7 +85,8 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sensors.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/sensors.service"
 
-  rm -f "/tmpRoot/etc/fancontrol"
+  rm -rf "/tmpRoot/etc/fan2go"
+  rm -f "/tmpRoot/var/lib/fan2go/fan2go.db"
   rm -f "/tmpRoot/usr/bin/arc-sensors.sh"
   rm -f "/tmpRoot/usr/bin/arc-pwm.sh"
 
