@@ -13,7 +13,7 @@ if [ "${1}" = "late" ]; then
 
   tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
 
-  if [ -f "/addons/fancontrol.sh" ]; then
+  if grep -wq "fancontrol" /proc/cmdline 2>/dev/null; then
     cp -vpf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
     cp -vpf /usr/bin/arc-pwm.sh /tmpRoot/usr/bin/arc-pwm.sh
 
