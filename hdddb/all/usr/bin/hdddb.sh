@@ -6,17 +6,16 @@
 # See /LICENSE for more information.
 #
 # Patches DSM disk compatibility databases so that any installed drive is
-# recognised as supported.  Replaces the upstream Synology_HDD_db script with
-# a minimal, ARC-specific implementation that covers only what ARC needs.
+# recognised as supported.
 #
-# Flags (compatible subset of the original script):
+# Flags:
 #   -n | --noupdate      Prevent DSM updating the drive databases
 #   -r | --ram           Disable memory-compatibility checking
 #   -w | --wdda          Disable WD Device Analytics warnings
 #   -I | --ihm           Enable / update IronWolf Health Management
 #   -e | --email         No-op (kept for call-site compatibility)
-#   -S | --ssd           No-op (write_mostly not used in ARC)
-#   -p | --pcie          No-op (storage panel handled by storagepanel addon)
+#   -S | --ssd           Set write_mostly on HDDs when internal SSDs are present
+#   -p | --pcie          No-op
 #
 
 # ── bootstrap ────────────────────────────────────────────────────────────────
@@ -28,8 +27,8 @@ if [ "$(whoami)" != "root" ]; then
   echo "This script must be run as root."; exit 1
 fi
 
-GKV=/usr/syno/bin/synogetkeyvalue
-SKV=/usr/syno/bin/synosetkeyvalue
+GKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/bin/get_key_value")
+SKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
 
 # ── option parsing ────────────────────────────────────────────────────────────
 
@@ -37,6 +36,7 @@ noupdate=no
 ram=no
 wdda=no
 ihm=no
+ssd=no
 
 for arg in "$@"; do
   case "$arg" in
@@ -44,7 +44,8 @@ for arg in "$@"; do
     -r|--ram)   ram=yes ;;
     -w|--wdda)  wdda=yes ;;
     -I|--ihm)   ihm=yes ;;
-    -e|--email|-S|-p|--pcie|--ssd) ;;  # accepted, ignored
+    -S|--ssd)   ssd=yes ;;
+    -e|--email|-p|--pcie) ;;
     *) ;;
   esac
 done
@@ -55,18 +56,27 @@ SYNOINFO=/etc.defaults/synoinfo.conf
 
 _get() { "$GKV" "$SYNOINFO" "$1"; }
 _set() { "$SKV" "$SYNOINFO" "$1" "$2"; "$SKV" /etc/synoinfo.conf "$1" "$2"; }
-
 _log() { echo "hdddb: $*"; }
 
-# ── drive enumeration ─────────────────────────────────────────────────────────
+# ── drive size ────────────────────────────────────────────────────────────────
 
-# Detect ARC boot disk so we never add it to the DB
+disk_size_gb() {
+  SECTORS="$(tr -d '\r\n' <"/sys/block/${1}/size" 2>/dev/null)"
+  case "${SECTORS}" in
+    *[!0-9]* | "") echo 0 ;;
+    *) awk -v sectors="${SECTORS}" 'BEGIN { printf "%d\n", (sectors * 512 / 1000 / 1000 / 1000) + 0.5 }' ;;
+  esac
+}
+
+# ── boot disk detection ───────────────────────────────────────────────────────
+
+BOOTDISK=""
 BOOTDISK_PART3="$(/sbin/blkid -L ARC3 2>/dev/null)"
 if [ -n "$BOOTDISK_PART3" ]; then
   MM="$(stat -c '%t:%T' "$BOOTDISK_PART3" 2>/dev/null | \
     awk -F: '{printf "%d:%d", strtonum("0x"$1), strtonum("0x"$2)}')"
   BOOTDISK="$(awk -F= '/DEVNAME/{print $2}' "/sys/dev/block/$MM/uevent" 2>/dev/null)"
-  BOOTDISK="${BOOTDISK%%[0-9]*}"  # strip partition suffix → base device
+  BOOTDISK="${BOOTDISK%%[0-9]*}"
 fi
 
 _is_usb() {
@@ -76,198 +86,152 @@ _is_usb() {
 
 _trim() { printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'; }
 
-_size_gb() {
-  # $1: block device basename (sata1, sda, nvme0n1 …)
-  local raw
-  raw=$(synodisk --info "/dev/$1" 2>/dev/null | grep 'Total capacity' | awk '{print $4}')
-  [ -z "$raw" ] && { echo 0; return; }
-  # round to nearest 4 GB to avoid 6001/6000 drift
-  awk -v r="$raw" 'BEGIN{gb=r*1.073741824; printf "%d\n", int(gb/4+0.5)*4}'
-}
+# ── drive enumeration ─────────────────────────────────────────────────────────
 
-# Collect drives: hdds[] for SATA/SAS, nvmes[] for NVMe
-# Each entry: "model,firmware,size_gb"
-declare -a hdds nvmes
+collect_disks() {
+  TMP="${1}"
+  : >"${TMP}"
 
-for BLKPATH in /sys/block/*; do
-  DEV="$(basename "$BLKPATH")"
+  # Primary: read from synostorage (already enumerated by DSM)
+  for DISK_DIR in /run/synostorage/disks/*; do
+    [ -d "${DISK_DIR}" ] || continue
+    DEV="$(basename "${DISK_DIR}")"
+    [ "$DEV" = "$BOOTDISK" ] && continue
+    _is_usb "$DEV" && continue
 
-  # Skip non-storage, loop, dm, md, boot disk
-  case "$DEV" in
-    sd[a-z]|sd[a-z][a-z]|sata[0-9]*|sas[0-9]*|hd[a-z]) ;;
-    nvme[0-9]*n[0-9]*) ;;
-    *) continue ;;
-  esac
-
-  [ "$DEV" = "$BOOTDISK" ] && continue
-  _is_usb "$DEV" && continue
-
-  if [[ "$DEV" =~ ^nvme ]]; then
-    model="$(_trim "$(cat "$BLKPATH/device/model" 2>/dev/null)")"
-    fw="$(_trim "$(cat "$BLKPATH/device/firmware_rev" 2>/dev/null)")"
-    [ -z "$model" ] || [ -z "$fw" ] && continue
-    size="$(_size_gb "$DEV")"
-    nvmes+=("${model},${fw},${size}")
-  else
-    model="$(_trim "$(cat "$BLKPATH/device/model" 2>/dev/null)")"
-    [ -z "$model" ] && continue
-
-    # Strip known vendor prefixes that appear in the model field
-    for pfx in "WDC " "HGST " "TOSHIBA " "Hitachi " "SAMSUNG " "FUJITSU " "HCST " "APPLE HDD "; do
-      model="${model#$pfx}"
-    done
-    model="$(_trim "$model")"
-
-    # Firmware: try syno_hdd_util first, fall back to smartctl
-    fw="$(/usr/syno/bin/syno_hdd_util --ssd_detect 2>/dev/null | \
-         grep "/dev/$DEV " | awk '{print $(NF-3)}')"
-    if [ -z "$fw" ]; then
-      fw="$(smartctl -a -d ata -T permissive "/dev/$DEV" 2>/dev/null | \
-            grep -i firmware | awk '{print $NF}')"
-    fi
-    [ -z "$model" ] || [ -z "$fw" ] && continue
-
-    size="$(_size_gb "$DEV")"
-
-    # M.2 SATA SSD goes into nvmes[], regular drives into hdds[]
-    if /usr/syno/bin/synodisk --enum -t cache 2>/dev/null | grep -q "/dev/$DEV"; then
-      nvmes+=("${model},${fw},${size}")
-    else
-      hdds+=("${model},${fw},${size}")
-    fi
-  fi
-done
-
-# Deduplicate
-mapfile -t hdds  < <(printf '%s\n' "${hdds[@]}"  | sort -u)
-mapfile -t nvmes < <(printf '%s\n' "${nvmes[@]}" | sort -u)
-
-_log "SATA/SAS drives found: ${#hdds[@]}"
-for d in "${hdds[@]}";  do _log "  $d GB"; done
-_log "NVMe/M.2 drives found: ${#nvmes[@]}"
-for d in "${nvmes[@]}"; do _log "  $d GB"; done
-
-if [ "${#hdds[@]}" -eq 0 ] && [ "${#nvmes[@]}" -eq 0 ]; then
-  _log "No drives found — exiting."
-  exit 2
-fi
-
-# ── database injection ────────────────────────────────────────────────────────
-
-DBPATH=/var/lib/disk-compatibility
-
-# Build the compatibility_interval JSON value (shared by fw entries and default)
-_compat_interval() {
-  printf '"compatibility_interval":[{"compatibility":"support","not_yet_rolling_status":"support","fw_dsm_update_status_notify":false,"barebone_installable":true,"barebone_installable_v2":"auto","smart_test_ignore":false,"smart_attr_ignore":false}]'
-}
-
-# Inject model+fw into one db file (DSM 7 format only)
-# $1 "model,fw,size"  $2 db file path
-_update_db() {
-  local entry="$1" dbfile="$2"
-  local model fw size
-  model="$(cut -d, -f1 <<< "$entry")"
-  fw="$(cut -d, -f2 <<< "$entry")"
-  size="$(cut -d, -f3 <<< "$entry")"
-
-  # Only handle DSM 7 format
-  grep -qF '{"disk_compatbility_info":' "$dbfile" 2>/dev/null || return
-
-  # Compact if needed (DSM 7.3+ writes pretty-printed JSON)
-  if [ "$(wc -l < "$dbfile")" -gt 1 ]; then
-    jq -c . "$dbfile" > "$dbfile.tmp" && mv "$dbfile.tmp" "$dbfile"
-  fi
-
-  # Already present?
-  if jq -e --arg m "$model" --arg f "$fw" \
-      '.disk_compatbility_info[$m] | has($f)' "$dbfile" >/dev/null 2>&1; then
-    _log "  already in $(basename "$dbfile"): $model ($fw)"
-    return
-  fi
-
-  # fw entry:      "FWREV":{"compatibility_interval":[...]}
-  # default entry: "default":{"size_gb":N,"compatibility_interval":[...]}
-  # model entry:   "MODEL":{"FWREV":{...},"default":{...}}
-  local ci fw_entry default_entry model_entry
-  ci="$(_compat_interval)"
-  fw_entry="\"${fw}\":{${ci}}"
-  default_entry="\"default\":{\"size_gb\":${size},${ci}}"
-  model_entry="\"${model}\":{${fw_entry},${default_entry}}"
-
-  # Escape for sed (/ and & are special)
-  local msed fw_entry_sed model_entry_sed
-  msed="${model//\//\\/}"; msed="${msed//&/\\&}"
-  fw_entry_sed="${fw_entry//\//\\/}"; fw_entry_sed="${fw_entry_sed//&/\\&}"
-  model_entry_sed="${model_entry//\//\\/}"; model_entry_sed="${model_entry_sed//&/\\&}"
-
-  if grep -qF '"disk_compatbility_info":{}' "$dbfile"; then
-    # Empty db
-    sed -i "s/\"disk_compatbility_info\":{}/\"disk_compatbility_info\":{${model_entry_sed}}/" "$dbfile"
-  elif jq -e --arg m "$model" '.disk_compatbility_info[$m]' "$dbfile" >/dev/null 2>&1; then
-    # Model exists, insert fw entry
-    sed -i "s/\"${msed}\":{/\"${msed}\":{${fw_entry_sed},/" "$dbfile"
-  else
-    # Append new model entry
-    sed -i "s/}}}\$/},${model_entry_sed}}/" "$dbfile"
-  fi
-
-  if jq -e --arg m "$model" --arg f "$fw" \
-      '.disk_compatbility_info[$m] | has($f)' "$dbfile" >/dev/null 2>&1; then
-    _log "  added to $(basename "$dbfile"): $model ($fw)"
-  else
-    _log "  FAILED to add to $(basename "$dbfile"): $model ($fw)"
-  fi
-}
-
-# Fix unverified entries
-_fix_unverified() {
-  local f="$1"
-  if grep -q 'unverified' "$f" 2>/dev/null; then
-    sed -i 's/unverified/support/g' "$f"
-    _log "  fixed unverified entries in $(basename "$f")"
-  fi
-}
-
-# Backup a db file once
-_backup() {
-  [ -f "$1.bak" ] || cp -p "$1" "$1.bak"
-}
-
-mapfile -t db1list < <(find "$DBPATH" -maxdepth 1 -name "*_host*.db"     | sort)
-mapfile -t db2list < <(find "$DBPATH" -maxdepth 1 -name "*_host*.db.new" | sort)
-
-if [ "${#db1list[@]}" -eq 0 ]; then
-  _log "No host db files found in $DBPATH — exiting."
-  exit 4
-fi
-
-for f in "${db1list[@]}" "${db2list[@]}"; do
-  _backup "$f"
-  _fix_unverified "$f"
-done
-
-for entry in "${hdds[@]}" "${nvmes[@]}"; do
-  for f in "${db1list[@]}" "${db2list[@]}"; do
-    _update_db "$entry" "$f"
+    MODEL="$([ -f "${DISK_DIR}/model" ] && tr -d '\r\n' <"${DISK_DIR}/model" 2>/dev/null)"
+    [ -n "${MODEL}" ] || MODEL="$([ -f "${DISK_DIR}/real_model" ] && tr -d '\r\n' <"${DISK_DIR}/real_model" 2>/dev/null)"
+    [ -n "${MODEL}" ] || continue
+    MODEL="$(_trim "$MODEL")"
+    FIRM="$([ -f "${DISK_DIR}/firm" ] && tr -d '\r\n' <"${DISK_DIR}/firm" 2>/dev/null)"
+    FIRM="$(_trim "$FIRM")"
+    SIZE="$(disk_size_gb "${DEV}")"
+    printf '%s\t%s\t%s\t%s\n' "${DEV}" "${MODEL}" "${FIRM}" "${SIZE}" >>"${TMP}"
   done
-done
+
+  # Fallback: scan /sys/block for drives not already listed
+  for BLOCK_DIR in /sys/block/*; do
+    [ -d "${BLOCK_DIR}" ] || continue
+    DEV="$(basename "${BLOCK_DIR}")"
+    case "${DEV}" in
+      sata*|sd*|nvme*|sas*) ;;
+      *) continue ;;
+    esac
+    [ "$DEV" = "$BOOTDISK" ] && continue
+    _is_usb "$DEV" && continue
+    grep -q "^${DEV}	" "${TMP}" 2>/dev/null && continue
+
+    MODEL="$([ -f "${BLOCK_DIR}/device/model" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/model" 2>/dev/null)"
+    MODEL="$(_trim "$MODEL")"
+    [ -n "${MODEL}" ] || continue
+
+    # Strip known vendor prefixes
+    for pfx in "WDC " "HGST " "TOSHIBA " "Hitachi " "SAMSUNG " "FUJITSU " "HCST " "APPLE HDD "; do
+      MODEL="${MODEL#$pfx}"
+    done
+    MODEL="$(_trim "$MODEL")"
+
+    FIRM="$([ -f "${BLOCK_DIR}/device/firmware_rev" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/firmware_rev" 2>/dev/null)"
+    [ -n "${FIRM}" ] || FIRM="$([ -f "${BLOCK_DIR}/device/rev" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/rev" 2>/dev/null)"
+    FIRM="$(_trim "$FIRM")"
+    SIZE="$(disk_size_gb "${DEV}")"
+    printf '%s\t%s\t%s\t%s\n' "${DEV}" "${MODEL}" "${FIRM}" "${SIZE}" >>"${TMP}"
+  done
+}
+
+# ── database patching ─────────────────────────────────────────────────────────
+
+patch_database() {
+  DB="${1}"
+  DISKS="${2}"
+  SUPPORT_INTERVAL='{"compatibility":"support","not_yet_rolling_status":"support","fw_dsm_update_status_notify":false,"barebone_installable":true,"barebone_installable_v2":"auto","smart_test_ignore":true,"smart_attr_ignore":true}'
+  jq -e '.disk_compatbility_info | type == "object"' "${DB}" >/dev/null 2>&1 || return 0
+
+  TMP="${DB}.tmp.$$"
+  cp -p "${DB}" "${TMP}" || return 0
+  while IFS="$(printf '\t')" read -r DEV MODEL FIRM SIZE; do
+    [ -n "${MODEL}" ] || continue
+    case "${SIZE}" in *[!0-9]* | "") SIZE=0 ;; esac
+    jq -c \
+      --arg model "${MODEL}" \
+      --arg firm "${FIRM}" \
+      --argjson size "${SIZE}" \
+      --argjson interval "${SUPPORT_INTERVAL}" \
+      '
+      .disk_compatbility_info[$model] //= {}
+      | .disk_compatbility_info[$model].default //= {}
+      | if $size > 0 then .disk_compatbility_info[$model].default.size_gb = $size else . end
+      | .disk_compatbility_info[$model].default.compatibility_interval = [$interval]
+      | if $firm != "" then
+          .disk_compatbility_info[$model][$firm] //= {}
+          | .disk_compatbility_info[$model][$firm].fw_buildnumber //= 1
+          | .disk_compatbility_info[$model][$firm].compatibility_interval = [$interval]
+        else . end
+      ' "${TMP}" >"${TMP}.new" && mv -f "${TMP}.new" "${TMP}" || {
+      rm -f "${TMP}" "${TMP}.new"
+      return 0
+    }
+  done <"${DISKS}"
+
+  chmod 644 "${TMP}" 2>/dev/null || true
+  mv -f "${TMP}" "${DB}"
+}
+
+patch_storage_settings() {
+  DB="/var/lib/storage_setting/general_settings.db"
+  [ -f "${DB}" ] || return 0
+  jq -e . "${DB}" >/dev/null 2>&1 || return 0
+
+  TMP="${DB}.tmp.$$"
+  jq -c '.settings.allow_new_hcl_as_normal = {"dsm_ver":[],"values":[true]}' "${DB}" >"${TMP}" && mv -f "${TMP}" "${DB}"
+}
+
+clear_pool_compatibility() {
+  for FILE in /var/lib/space/pool_compatibility /var/lib/space/pool_compatibility_legacy; do
+    [ -f "${FILE}" ] || continue
+    TMP="${FILE}.tmp.$$"
+    awk -F= '
+      {
+        value = (NF > 1 ? $2 : $0)
+        gsub(/^[ \t]+|[ \t]+$/, "", value)
+        if (value == "at_risk" || value == "at_risk_high" || value == "not_support" || value == "unsupported" || value == "critical") next
+        print
+      }
+    ' "${FILE}" >"${TMP}" && mv -f "${TMP}" "${FILE}"
+  done
+}
+
+refresh_runtime() {
+  DISKS="${1}"
+  SUPPORT_ACTION='{"allow_auto_repair":true,"allow_binding":true,"allow_detected_scan":true,"allow_ma_create":true,"cache_rescue_selectable":"yes","cache_selectable":"yes","cache_status":"healthy","disk_status":"support","hide_alloc_status":false,"hide_fw_version":false,"hide_is4Kn":false,"hide_remain_life":false,"hide_sb_days_left":false,"hide_serial":false,"hide_temperature":false,"hide_unc":false,"legacy_cache_rescue_selectable":"yes","legacy_cache_selectable":"yes","legacy_cache_status":"healthy","notification":false,"notify_health_status":true,"notify_lifetime":true,"notify_unc":true,"pool_rescue_selectable":"yes","pool_selectable":"yes","pool_status":"healthy","send_health_report":true,"show_lifetime_chart":true}'
+  while IFS="$(printf '\t')" read -r DEV MODEL FIRM SIZE; do
+    DISK_DIR="/run/synostorage/disks/${DEV}"
+    [ -d "${DISK_DIR}" ] || continue
+    printf 'support\n' >"${DISK_DIR}/compatibility" 2>/dev/null || true
+    printf 'support\n' >"${DISK_DIR}/force_compatibility" 2>/dev/null || true
+    printf '1\n' >"${DISK_DIR}/smart_attr_ignore" 2>/dev/null || true
+    printf '1\n' >"${DISK_DIR}/smart_test_ignore" 2>/dev/null || true
+    printf '%s' "${SUPPORT_ACTION}" >"${DISK_DIR}/compatibility_action" 2>/dev/null || true
+    rm -f "${DISK_DIR}/compatibility.lock" "${DISK_DIR}/compatibility_action.lock" 2>/dev/null || true
+  done <"${DISKS}"
+}
 
 # ── m2_pool_support ───────────────────────────────────────────────────────────
 
-for d in /run/synostorage/disks/nvme*/m2_pool_support; do
-  [ -f "$d" ] && echo -n 1 > "$d"
-done
+set_m2_pool_support() {
+  for d in /run/synostorage/disks/nvme*/m2_pool_support; do
+    [ -f "$d" ] && printf '1' >"$d"
+  done
+}
 
 # ── synoinfo.conf patches ─────────────────────────────────────────────────────
 
-# Disable drive DB auto-updates
 _disable_dbupdates() {
   local dsmmajor dsmminor
   dsmmajor="$("$GKV" /etc.defaults/VERSION majorversion)"
   dsmminor="$("$GKV" /etc.defaults/VERSION minorversion)"
 
   if [ "${dsmmajor}${dsmminor}" -lt 73 ] 2>/dev/null; then
-    # DSM < 7.3: redirect update URL
     local cur
     cur="$(_get drive_db_test_url)"
     if [ "$cur" != "127.0.0.1" ]; then
@@ -275,7 +239,6 @@ _disable_dbupdates() {
       _log "drive DB auto-updates disabled (drive_db_test_url)"
     fi
   else
-    # DSM 7.3+: bump SynoOnlinePack version so it never auto-updates
     local sopinfo
     for p in SynoOnlinePack_v3 SynoOnlinePack_v2 SynoOnlinePack; do
       [ -f "/var/packages/$p/INFO" ] && sopinfo="/var/packages/$p/INFO" && break
@@ -291,45 +254,12 @@ _disable_dbupdates() {
   fi
 }
 
-[ "$noupdate" = "yes" ] && _disable_dbupdates
-
-# Disable memory compatibility checking
-if [ "$ram" = "yes" ]; then
-  val="$(_get support_memory_compatibility)"
-  if [ -n "$val" ]; then
-    [ "$val" != "no" ] && _set support_memory_compatibility "no" && \
-      _log "support_memory_compatibility disabled"
-  else
-    # Older models use SynoMemCheck.service
-    memcheck=/usr/lib/systemd/system/SynoMemCheck.service
-    if [ -f "$memcheck" ]; then
-      cur="$("$GKV" "$memcheck" ExecStart)"
-      if [ "$cur" != "/bin/true" ]; then
-        "$SKV" "$memcheck" ExecStart /bin/true
-        _log "SynoMemCheck disabled"
-      fi
-    fi
-  fi
-fi
-
-# Disable WDDA
-if [ "$wdda" = "yes" ]; then
-  val="$(_get support_wdda)"
-  if [ "$val" = "yes" ]; then
-    _set support_wdda "no"
-    _log "support_wdda disabled"
-  fi
-fi
-
 # ── IronWolf Health Management ────────────────────────────────────────────────
 
-if [ "$ihm" = "yes" ] && [ "$(uname -m)" = "x86_64" ]; then
+_enable_ihm() {
   val="$(_get support_ihm)"
   [ "$val" != "yes" ] && _set support_ihm "yes" && _log "support_ihm enabled"
 
-  # Ensure /dev/sg* nodes exist — DSM udev may not replay add events for devices
-  # already present before udevd started, leaving /dev/sg* absent even though
-  # /sys/class/scsi_generic/ is populated.
   for _sgpath in /sys/class/scsi_generic/sg*; do
     [ -e "$_sgpath" ] || continue
     _sgname="$(basename "$_sgpath")"
@@ -344,12 +274,122 @@ if [ "$ihm" = "yes" ] && [ "$(uname -m)" = "x86_64" ]; then
   if [ ! -f /usr/syno/sbin/dhm_tool ]; then
     _log "dhm_tool not found, IronWolf Health Management unavailable"
   else
-    cur_ver="$(dhm_tool --version 2>/dev/null | grep 'Utility Version' | awk '{print $NF}')"
+    cur_ver="$(/usr/syno/sbin/dhm_tool --version 2>/dev/null | grep 'Utility Version' | awk '{print $NF}')"
     _log "dhm_tool version: $cur_ver"
+  fi
+}
+
+# ── SSD write_mostly ─────────────────────────────────────────────────────────
+
+# Set md0/md1 state for a drive's system+swap partitions
+# $1: writemostly | in_sync   $2: device basename (sata1, sda, …)
+_set_writemostly() {
+  local state="$1" dev="$2"
+  case "$dev" in
+    sd*)
+      # sdX: partitions are sdX1, sdX2
+      printf '%s' "$state" >"/sys/block/md0/md/dev-${dev}1/state" 2>/dev/null && \
+        _log "  ${dev} DSM partition: $state"
+      printf '%s' "$state" >"/sys/block/md1/md/dev-${dev}2/state" 2>/dev/null && \
+        _log "  ${dev} swap partition: $state"
+      ;;
+    *)
+      # sataX / sasX: partitions are sataXp1, sataXp2
+      printf '%s' "$state" >"/sys/block/md0/md/dev-${dev}p1/state" 2>/dev/null && \
+        _log "  ${dev} DSM partition: $state"
+      printf '%s' "$state" >"/sys/block/md1/md/dev-${dev}p2/state" 2>/dev/null && \
+        _log "  ${dev} swap partition: $state"
+      ;;
+  esac
+}
+
+_apply_ssd_writemostly() {
+  local -a internal_drives internal_hdds
+  local internal_ssd_qty=0
+
+  mapfile -t internal_drives < <(synodisk --enum -t internal 2>/dev/null | grep 'Disk path' | cut -d'/' -f3)
+  [ "${#internal_drives[@]}" -eq 0 ] && { _log "ssd: no internal drives found"; return; }
+
+  for drv in "${internal_drives[@]}"; do
+    # synodisk --isssd: exit 0 = not SSD, exit 1 = is SSD
+    if synodisk --isssd "/dev/${drv}" >/dev/null 2>&1; then
+      internal_hdds+=("$drv")
+    else
+      internal_ssd_qty=$((internal_ssd_qty + 1))
+    fi
+  done
+
+  if [ "$internal_ssd_qty" -gt 0 ] && [ "${#internal_hdds[@]}" -gt 0 ]; then
+    _log "ssd: setting ${#internal_hdds[@]} HDD(s) to write_mostly (${internal_ssd_qty} SSD(s) present)"
+    for drv in "${internal_hdds[@]}"; do
+      _set_writemostly writemostly "$drv"
+    done
+  else
+    _log "ssd: no mixed SSD+HDD setup detected, skipping write_mostly"
+  fi
+}
+
+# ── main ──────────────────────────────────────────────────────────────────────
+
+for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
+  "$SKV" "${F}" "support_disk_compatibility" "yes"
+  "$SKV" "${F}" "forbid_unsupport_extdev" "no"
+done
+
+DISKS="$(mktemp /tmp/diskcompat.XXXXXX)" || exit 0
+collect_disks "${DISKS}"
+[ -s "${DISKS}" ] || {
+  rm -f "${DISKS}"
+  _log "No drives found — exiting."
+  exit 0
+}
+
+for DB in /var/lib/disk-compatibility/*_v*.db; do
+  [ -f "${DB}" ] || continue
+  patch_database "${DB}" "${DISKS}"
+done
+
+patch_storage_settings
+clear_pool_compatibility
+refresh_runtime "${DISKS}"
+set_m2_pool_support
+
+rm -f "${DISKS}"
+
+[ "$noupdate" = "yes" ] && _disable_dbupdates
+
+if [ "$ram" = "yes" ]; then
+  val="$(_get support_memory_compatibility)"
+  if [ -n "$val" ]; then
+    [ "$val" != "no" ] && _set support_memory_compatibility "no" && \
+      _log "support_memory_compatibility disabled"
+  else
+    memcheck=/usr/lib/systemd/system/SynoMemCheck.service
+    if [ -f "$memcheck" ]; then
+      cur="$("$GKV" "$memcheck" ExecStart)"
+      if [ "$cur" != "/bin/true" ]; then
+        "$SKV" "$memcheck" ExecStart /bin/true
+        _log "SynoMemCheck disabled"
+      fi
+    fi
   fi
 fi
 
-# ── trigger DSM compatibility check ──────────────────────────────────────────
+if [ "$wdda" = "yes" ]; then
+  val="$(_get support_wdda)"
+  if [ "$val" = "yes" ]; then
+    _set support_wdda "no"
+    _log "support_wdda disabled"
+  fi
+fi
+
+if [ "$ssd" = "yes" ]; then
+  _apply_ssd_writemostly
+fi
+
+if [ "$ihm" = "yes" ] && [ "$(uname -m)" = "x86_64" ]; then
+  _enable_ihm
+fi
 
 if [ -f /usr/syno/sbin/synostgdisk ]; then
   /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
