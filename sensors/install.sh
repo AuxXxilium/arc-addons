@@ -56,9 +56,8 @@ EOF
       echo "After=multi-user.target"
       echo
       echo "[Service]"
-      echo "Type=forking"
+      echo "Type=simple"
       echo "ExecStart=/usr/bin/arc-sensors.sh"
-      echo "ExecReload=/usr/bin/pkill -f /usr/bin/arc-sensors.sh"
       echo "Restart=always"
       echo "StartLimitBurst=5"
       echo "StartLimitInterval=10"
