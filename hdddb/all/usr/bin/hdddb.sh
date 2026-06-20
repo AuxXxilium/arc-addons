@@ -429,5 +429,11 @@ if [ -f /usr/syno/sbin/synostgdisk ]; then
   _log "synostgdisk compatibility check done (exit $?)"
 fi
 
+# Restart StorageManager to re-read compatibility state
+if systemctl is-active --quiet pkgctl-StorageManager.service 2>/dev/null; then
+  systemctl restart pkgctl-StorageManager.service 2>/dev/null || true
+  _log "StorageManager restarted to reload compatibility"
+fi
+
 _log "done."
 exit 0
