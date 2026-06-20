@@ -349,6 +349,18 @@ for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
 done
 
 DISKS="$(mktemp /tmp/diskcompat.XXXXXX)" || exit 0
+
+# Wait for synostorage to enumerate disks (up to 60s)
+_WAIT=0
+while [ ! -d "/run/synostorage/disks" ] || [ -z "$(ls /run/synostorage/disks/ 2>/dev/null)" ]; do
+  if [ "${_WAIT}" -ge 60 ]; then
+    _log "synostorage not ready after 60s, proceeding with fallback..."
+    break
+  fi
+  sleep 2
+  _WAIT=$(( _WAIT + 2 ))
+done
+
 _log "collecting disks..."
 collect_disks "${DISKS}"
 if [ ! -s "${DISKS}" ]; then

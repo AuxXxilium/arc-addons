@@ -98,7 +98,7 @@ sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /etc/nginx/nginx.conf
 sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /usr/syno/share/nginx/nginx.mustache
 
 # Wait for the cpuinfo daemon to create the socket before reloading nginx.
-TIMEOUT=30
+TIMEOUT=10
 while [ ! -S "/run/arc_synoscgi.sock" ] && [ "${TIMEOUT}" -gt 0 ]; do
   sleep 1
   TIMEOUT=$((TIMEOUT - 1))
