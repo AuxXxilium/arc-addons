@@ -319,39 +319,89 @@ restart_fan2go() {
   "${FAN2GO_BIN}" --config "${FAN2GO_CONF}" --no-style >/dev/null 2>&1 &
 }
 
-main() {
+RELOAD_FLAG="/run/arc-sensors.reload"
+RELOAD_NEEDED=0
+
+get_task_hash() {
+  [ -f "${ESYNOSCHEDULER_DB}" ] || echo ""
+  sqlite3 "${ESYNOSCHEDULER_DB}" "SELECT operation FROM task WHERE task_name='Fancontrol';" 2>/dev/null | md5sum | cut -d' ' -f1
+}
+
+reload_config() {
+  RELOAD_NEEDED=1
+}
+
+init_fans() {
   apply_amd_tctl_offset
 
   if [ -z "$(find /sys/ -name "fan*_input" 2>/dev/null)" ]; then
-    echo "No fan detected, exiting..."
+    echo "No fan detected, skipping fan control..."
     set_fan_conf "no"
-    exit 0
+    return 1
   fi
 
   set_fan_conf "yes"
 
-  # Enable manual PWM control on all channels
   for PWM_ENABLE in /sys/class/hwmon/hwmon*/pwm*_enable; do
     [[ "${PWM_ENABLE}" =~ pwm([0-9]+)_enable$ ]] && [ -w "${PWM_ENABLE}" ] && echo 1 >"${PWM_ENABLE}"
   done
 
-  # Discover fans, load task, merge, write back
   local -a DISCOVERED
   mapfile -t DISCOVERED < <(discover_fans)
 
   if [ "${#DISCOVERED[@]}" -eq 0 ]; then
-    echo "No controllable PWM fans found, exiting..."
+    echo "No controllable PWM fans found, skipping fan control..."
     set_fan_conf "no"
-    exit 0
+    return 1
   fi
 
   load_task
   merge_fan_curves "${DISCOVERED[@]}"
   update_task
+  return 0
+}
 
-  local FanBaseMode=""
+main() {
+  local FanBaseMode="" FanTaskHash="" FansActive=0 NoFanTick=0
+
+  trap 'reload_config' HUP
+
+  if init_fans; then
+    FansActive=1
+    FanTaskHash="$(get_task_hash)"
+  fi
+
   while true; do
     sleep 1
+
+    # Recheck for fans every 30s if none were found initially
+    if [ "${FansActive}" -eq 0 ]; then
+      NoFanTick=$(( NoFanTick + 1 ))
+      if [ "${NoFanTick}" -ge 30 ]; then
+        NoFanTick=0
+        if init_fans; then
+          FansActive=1
+          FanBaseMode=""
+          FanTaskHash=""
+        fi
+      fi
+      continue
+    fi
+
+    # Handle reload request (SIGHUP or flag file)
+    if [ "${RELOAD_NEEDED}" -eq 1 ] || [ -f "${RELOAD_FLAG}" ]; then
+      echo "Reloading fan curves..."
+      RELOAD_NEEDED=0
+      rm -f "${RELOAD_FLAG}"
+      load_task
+      merge_fan_curves $(discover_fans)
+      update_task
+      FanTaskHash="$(get_task_hash)"
+      generate_fan2go_config "${FanBaseMode:-1}"
+      restart_fan2go
+      continue
+    fi
+
     local FanType FanCurtMode
     FanType="$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)"
     case "${FanType}" in
@@ -360,16 +410,27 @@ main() {
       quietfan | low)   FanCurtMode="2" ;;
       *)                FanCurtMode="1" ;;
     esac
+
+    # Check if task body changed (user edited curves in DSM)
+    local CurHash
+    CurHash="$(get_task_hash)"
+    if [ "${CurHash}" != "${FanTaskHash}" ]; then
+      echo "Fan task changed, reloading curves..."
+      FanTaskHash="${CurHash}"
+      load_task
+      FanBaseMode=""  # force mode re-apply below
+    fi
+
     if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
       echo "Fan mode changed to ${FanCurtMode} (${FanType})"
       FanBaseMode="${FanCurtMode}"
-      load_task
       generate_fan2go_config "${FanBaseMode}"
       restart_fan2go
     fi
+
     find /etc -maxdepth 1 -type f -name 'synoinfo.conf.??????' -mmin +0.5 -exec rm -f {} \; 2>/dev/null
   done
 }
 
-trap 'pkill -f "${FAN2GO_BIN}" 2>/dev/null' EXIT INT TERM HUP
-main &
+trap 'pkill -f "${FAN2GO_BIN}" 2>/dev/null' EXIT INT TERM
+main
