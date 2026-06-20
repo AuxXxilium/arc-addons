@@ -88,7 +88,7 @@ generate_fancontrol_config() {
 
   local DEVPATH DEVNAME FCTEMPS FCFANS MINTEMP MAXTEMP MINSTART MINSTOP MINPWM MAXPWM
 
-  CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp' | head -1 | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
+  CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" | grep -E 'coretemp|k10temp|zenpower' | head -1 | sed -n 's|.*/\(hwmon.*\/temp1_input\).*|\1|p')"
   for P in $(find "/sys/devices/platform/" -type f -name "temp1_input"); do
     D="$(echo "${P}" | sed -n 's|.*/\(devices/platform/[^/]*\)/.*|\1|p')"
     I="$(echo "${P}" | sed -n 's|.*hwmon\([0-9]\).*|\1|p')"
