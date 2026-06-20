@@ -13,6 +13,11 @@ if [ "${1}" = "late" ]; then
 
   tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
 
+  # Remove old fancontrol addon remnants
+  rm -f "/tmpRoot/usr/sbin/fancontrol"
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/fancontrol.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/fancontrol.service"
+
   if grep -wq "fancontrol" /proc/cmdline 2>/dev/null; then
     cp -vpf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
     cp -vpf /usr/bin/arc-pwm.sh /tmpRoot/usr/bin/arc-pwm.sh
