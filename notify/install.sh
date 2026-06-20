@@ -21,7 +21,7 @@ if [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/notify.sh"
+    echo "ExecStart=-/usr/bin/notify.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
