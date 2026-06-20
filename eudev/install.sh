@@ -60,7 +60,7 @@ elif [ "${1}" = "modules" ]; then
   /usr/bin/killall -9 udevd 2>/dev/null || true
   rm -rf /run/udev
   # modprobe modules for beep, sensors, and virtiofs
-  for M in sg pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
+  for M in sg drivetemp pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
     /usr/sbin/modprobe "${M}" 2>/dev/null || true
   done
 
