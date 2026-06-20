@@ -106,6 +106,7 @@ collect_disks() {
     FIRM="$([ -f "${DISK_DIR}/firm" ] && tr -d '\r\n' <"${DISK_DIR}/firm" 2>/dev/null)"
     FIRM="$(_trim "$FIRM")"
     SIZE="$(disk_size_gb "${DEV}")"
+    _log "  found (synostorage): ${DEV} model=${MODEL} firm=${FIRM} size=${SIZE}"
     printf '%s\t%s\t%s\t%s\n' "${DEV}" "${MODEL}" "${FIRM}" "${SIZE}" >>"${TMP}"
   done
 
@@ -123,7 +124,7 @@ collect_disks() {
 
     MODEL="$([ -f "${BLOCK_DIR}/device/model" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/model" 2>/dev/null)"
     MODEL="$(_trim "$MODEL")"
-    [ -n "${MODEL}" ] || continue
+    [ -n "${MODEL}" ] || { _log "  skip (no model): ${DEV}"; continue; }
 
     # Strip known vendor prefixes
     for pfx in "WDC " "HGST " "TOSHIBA " "Hitachi " "SAMSUNG " "FUJITSU " "HCST " "APPLE HDD "; do
@@ -135,6 +136,7 @@ collect_disks() {
     [ -n "${FIRM}" ] || FIRM="$([ -f "${BLOCK_DIR}/device/rev" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/rev" 2>/dev/null)"
     FIRM="$(_trim "$FIRM")"
     SIZE="$(disk_size_gb "${DEV}")"
+    _log "  found (sysblock): ${DEV} model=${MODEL} firm=${FIRM} size=${SIZE}"
     printf '%s\t%s\t%s\t%s\n' "${DEV}" "${MODEL}" "${FIRM}" "${SIZE}" >>"${TMP}"
   done
 }
@@ -145,10 +147,14 @@ patch_database() {
   DB="${1}"
   DISKS="${2}"
   SUPPORT_INTERVAL='{"compatibility":"support","not_yet_rolling_status":"support","fw_dsm_update_status_notify":false,"barebone_installable":true,"barebone_installable_v2":"auto","smart_test_ignore":true,"smart_attr_ignore":true}'
-  jq -e '.disk_compatbility_info | type == "object"' "${DB}" >/dev/null 2>&1 || return 0
+  if ! jq -e '.disk_compatbility_info | type == "object"' "${DB}" >/dev/null 2>&1; then
+    return 0
+  fi
 
   TMP="${DB}.tmp.$$"
-  cp -p "${DB}" "${TMP}" || return 0
+  if ! jq -c . "${DB}" >"${TMP}" 2>/dev/null; then
+    cp -p "${DB}" "${TMP}" || return 0
+  fi
   while IFS="$(printf '\t')" read -r DEV MODEL FIRM SIZE; do
     [ -n "${MODEL}" ] || continue
     case "${SIZE}" in *[!0-9]* | "") SIZE=0 ;; esac
@@ -158,13 +164,19 @@ patch_database() {
       --argjson size "${SIZE}" \
       --argjson interval "${SUPPORT_INTERVAL}" \
       '
-      .disk_compatbility_info[$model] //= {}
-      | .disk_compatbility_info[$model].default //= {}
+      if .disk_compatbility_info[$model] == null then
+        .disk_compatbility_info[$model] = {}
+      else . end
+      | if .disk_compatbility_info[$model].default == null then
+          .disk_compatbility_info[$model].default = {}
+        else . end
       | if $size > 0 then .disk_compatbility_info[$model].default.size_gb = $size else . end
       | .disk_compatbility_info[$model].default.compatibility_interval = [$interval]
       | if $firm != "" then
-          .disk_compatbility_info[$model][$firm] //= {}
-          | .disk_compatbility_info[$model][$firm].fw_buildnumber //= 1
+          if .disk_compatbility_info[$model][$firm] == null then
+            .disk_compatbility_info[$model][$firm] = {}
+          else . end
+          | .disk_compatbility_info[$model][$firm].fw_buildnumber = (.disk_compatbility_info[$model][$firm].fw_buildnumber // 1)
           | .disk_compatbility_info[$model][$firm].compatibility_interval = [$interval]
         else . end
       ' "${TMP}" >"${TMP}.new" && mv -f "${TMP}.new" "${TMP}" || {
@@ -337,26 +349,35 @@ for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
 done
 
 DISKS="$(mktemp /tmp/diskcompat.XXXXXX)" || exit 0
+_log "collecting disks..."
 collect_disks "${DISKS}"
-[ -s "${DISKS}" ] || {
+if [ ! -s "${DISKS}" ]; then
   rm -f "${DISKS}"
   _log "No drives found — exiting."
   exit 0
-}
+fi
+_log "drives collected: $(wc -l <"${DISKS}") entries"
 
-for DB in /var/lib/disk-compatibility/*_v*.db; do
+for DB in /var/lib/disk-compatibility/*.db; do
   [ -f "${DB}" ] || continue
   patch_database "${DB}" "${DISKS}"
 done
 
+_log "patching storage settings..."
 patch_storage_settings
+_log "clearing pool compatibility..."
 clear_pool_compatibility
+_log "refreshing runtime compatibility..."
 refresh_runtime "${DISKS}"
+_log "setting M.2 pool support..."
 set_m2_pool_support
 
 rm -f "${DISKS}"
 
-[ "$noupdate" = "yes" ] && _disable_dbupdates
+if [ "$noupdate" = "yes" ]; then
+  _log "disabling drive DB auto-updates..."
+  _disable_dbupdates
+fi
 
 if [ "$ram" = "yes" ]; then
   val="$(_get support_memory_compatibility)"
