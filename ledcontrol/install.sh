@@ -35,7 +35,7 @@ After=multi-user.target
 [Service]
 Type=one-shot
 RemainAfterExit=yes
-ExecStart=/usr/bin/ledcontrol.sh
+ExecStart=-/usr/bin/ledcontrol.sh
 
 [Install]
 WantedBy=multi-user.target

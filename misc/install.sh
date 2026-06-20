@@ -247,7 +247,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/arc-misc.sh"
+    echo "ExecStart=-/usr/bin/arc-misc.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
@@ -270,7 +270,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/arc-once.sh"
+    echo "ExecStart=-/usr/bin/arc-once.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
@@ -291,7 +291,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=/usr/bin/wol.sh"
+    echo "ExecStart=-/usr/bin/wol.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
