@@ -12,9 +12,6 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
-  mkdir -p /tmpRoot/var
-  mv -f /tmpRoot/usr/var/sensors3.conf /tmpRoot/var/sensors3.conf 2>/dev/null || true
-  rmdir /tmpRoot/usr/var 2>/dev/null || true
 
   # Remove old fancontrol addon remnants
   rm -f "/tmpRoot/usr/sbin/fancontrol" 2>/dev/null || true
@@ -23,8 +20,6 @@ if [ "${1}" = "late" ]; then
   rm -f "/tmpRoot/usr/bin/arc-pwm.sh" 2>/dev/null || true
 
   if grep -wq "fancontrol" /proc/cmdline 2>/dev/null; then
-    cp -vpf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
-
     if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
       echo "copy esynoscheduler.db"
       mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
@@ -46,6 +41,9 @@ FAN_CURVES=()
 EOF
     fi
 
+    # libsensors (used by fan2go) requires /etc/sensors3.conf to exist
+    touch "/tmpRoot/etc/sensors3.conf"
+
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
     {
       echo "[Unit]"
@@ -56,8 +54,9 @@ EOF
       echo "Type=simple"
       echo "ExecStart=/usr/bin/arc-sensors.sh"
       echo "Restart=always"
+      echo "RestartSec=5"
       echo "StartLimitBurst=5"
-      echo "StartLimitInterval=10"
+      echo "StartLimitInterval=60"
       echo
       echo "[Install]"
       echo "WantedBy=multi-user.target"
