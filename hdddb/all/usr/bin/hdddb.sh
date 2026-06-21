@@ -103,6 +103,10 @@ collect_disks() {
     _log "  found (sysblock): ${DEV} model=${MODEL} firm=${FIRM} size=${SIZE}"
     printf '%s\t%s\t%s\t%s\n' "${DEV}" "${MODEL}" "${FIRM}" "${SIZE}" >>"${TMP}"
   done
+
+  # Deduplicate by model+firmware: keep first occurrence (synostorage preferred over sysblock)
+  DEDUP="${TMP}.dedup.$$"
+  awk -F'\t' '!seen[$2"\t"$3]++' "${TMP}" >"${DEDUP}" && mv -f "${DEDUP}" "${TMP}"
 }
 
 # ── database patching ─────────────────────────────────────────────────────────
