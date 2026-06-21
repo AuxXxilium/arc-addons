@@ -201,9 +201,10 @@ EOF
     # Task exists — replace only the auto-managed section, leave user edits above it intact
     local cur_op new_op
     cur_op="$(sqlite3 "${ESYNOSCHEDULER_DB}" "SELECT operation FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null)"
-    # Strip everything from the separator line down and append fresh FAN_CURVES
-    new_op="$(printf '%s' "${cur_op}" | sed '/^# --- auto-managed below/,$d')"
-    new_op="${new_op}# --- auto-managed below, do not edit ---
+    # Strip from separator down (handles missing newline before separator via sed on each line)
+    new_op="$(printf '%s\n' "${cur_op}" | sed '/^# --- auto-managed below/,$d' | sed '/^FANMODES=/d')"
+    new_op="${new_op}
+# --- auto-managed below, do not edit ---
 ${fan_curves_str}"
     sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 UPDATE task SET operation='$(printf '%s' "${new_op}" | sed "s/'/''/g")' WHERE task_name='Fancontrol 2.0';
