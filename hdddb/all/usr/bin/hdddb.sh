@@ -219,6 +219,7 @@ clear_pool_compatibility() {
 refresh_runtime() {
   local DISKS="${1}"
   local DEV MODEL FIRM SIZE DISK_DIR
+  local SUPPORT_ACTION='{"allow_auto_repair":true,"allow_binding":true,"allow_detected_scan":true,"allow_ma_create":true,"cache_rescue_selectable":"yes","cache_selectable":"yes","cache_status":"healthy","disk_status":"support","hide_alloc_status":false,"hide_fw_version":false,"hide_is4Kn":false,"hide_remain_life":false,"hide_sb_days_left":false,"hide_serial":false,"hide_temperature":false,"hide_unc":false,"legacy_cache_rescue_selectable":"yes","legacy_cache_selectable":"yes","legacy_cache_status":"healthy","notification":false,"notify_health_status":true,"notify_lifetime":true,"notify_unc":true,"pool_rescue_selectable":"yes","pool_selectable":"yes","pool_status":"healthy","send_health_report":true,"show_lifetime_chart":true}'
   while IFS="$(printf '\t')" read -r DEV MODEL FIRM SIZE; do
     DISK_DIR="/run/synostorage/disks/${DEV}"
     [ -d "${DISK_DIR}" ] || continue
@@ -226,8 +227,7 @@ refresh_runtime() {
     printf 'support\n' >"${DISK_DIR}/force_compatibility" 2>/dev/null || true
     printf '1\n' >"${DISK_DIR}/smart_attr_ignore" 2>/dev/null || true
     printf '1\n' >"${DISK_DIR}/smart_test_ignore" 2>/dev/null || true
-    printf '1' >"${DISK_DIR}/is_syno_drive" 2>/dev/null || true
-    printf '1' >"${DISK_DIR}/is_bundle_ssd" 2>/dev/null || true
+    printf '%s' "${SUPPORT_ACTION}" >"${DISK_DIR}/compatibility_action" 2>/dev/null || true
     rm -f "${DISK_DIR}/compatibility.lock" "${DISK_DIR}/compatibility_action.lock" 2>/dev/null || true
   done <"${DISKS}"
 }
@@ -372,18 +372,24 @@ _apply_ssd_writemostly() {
 # ── main ──────────────────────────────────────────────────────────────────────
 
 for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-  "$SKV" "${F}" "support_disk_compatibility" "no"
+  "$SKV" "${F}" "support_disk_compatibility" "yes"
   "$SKV" "${F}" "forbid_unsupport_extdev" "no"
   "$SKV" "${F}" "support_btrfs_dedupe" "yes"
 done
 
 DISKS="$(mktemp /tmp/diskcompat.XXXXXX)" || exit 0
 
-# synostoraged populates /run/synostorage/disks/ asynchronously — wait up to 30s
+# synostoraged populates /run/synostorage/disks/ asynchronously.
+# Wait up to 60s for at least one disk dir with a model file to appear.
 _WAIT=0
-while [ -z "$(ls /run/synostorage/disks/ 2>/dev/null)" ]; do
-  if [ "${_WAIT}" -ge 30 ]; then
-    _log "synostorage not ready after 30s, using /sys/block fallback..."
+while true; do
+  _READY=0
+  for _D in /run/synostorage/disks/*/model; do
+    [ -f "${_D}" ] && { _READY=1; break; }
+  done
+  [ "${_READY}" -eq 1 ] && break
+  if [ "${_WAIT}" -ge 60 ]; then
+    _log "synostorage not ready after 60s, using /sys/block fallback..."
     break
   fi
   sleep 1
@@ -416,37 +422,14 @@ patch_storagemanager_ui
 _log "clearing pool compatibility..."
 clear_pool_compatibility
 
-# Run synostgdisk + refresh_runtime in a retry loop to handle slow first-boot init.
-# synostgdisk re-reads the patched DBs; refresh_runtime then forces support values last.
-_RETRY=0
-while true; do
-  if [ -f /usr/syno/sbin/synostgdisk ]; then
-    /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
-    _log "synostgdisk compatibility check done (exit $?, attempt $((_RETRY+1)))"
-  fi
-  refresh_runtime "${DISKS}"
-  set_m2_pool_support
+_log "refreshing runtime compatibility..."
+refresh_runtime "${DISKS}"
+set_m2_pool_support
 
-  # Check whether all disks now report support
-  _ALL_OK=1
-  while IFS="$(printf '\t')" read -r _DEV _MODEL _FIRM _SIZE; do
-    _COMPAT_FILE="/run/synostorage/disks/${_DEV}/compatibility"
-    if [ -f "${_COMPAT_FILE}" ]; then
-      _VAL="$(tr -d '\r\n' <"${_COMPAT_FILE}" 2>/dev/null)"
-      [ "${_VAL}" = "support" ] || _ALL_OK=0
-    fi
-  done <"${DISKS}"
-
-  [ "${_ALL_OK}" -eq 1 ] && { _log "all disks verified support (attempt $((_RETRY+1)))"; break; }
-
-  _RETRY=$((_RETRY+1))
-  if [ "${_RETRY}" -ge 10 ]; then
-    _log "giving up after 10 attempts — some disks may still show warnings"
-    break
-  fi
-  _log "not all disks ready yet, retrying in 5s (attempt ${_RETRY}/10)..."
-  sleep 5
-done
+if [ -f /usr/syno/sbin/synostgdisk ]; then
+  /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
+  _log "synostgdisk compatibility check done (exit $?)"
+fi
 
 rm -f "${DISKS}"
 
