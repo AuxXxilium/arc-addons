@@ -34,7 +34,7 @@ restoreCpuinfo() {
   elif [ -f "${FILE_JS}.bak" ]; then
     mv -f "${FILE_JS}.bak" "${FILE_JS}"
   fi
-  systemctl stop cpuinfo.service cpuinfo-setup.service 2>/dev/null || /usr/bin/pkill -f "/usr/sbin/cpuinfo" 2>/dev/null
+  systemctl stop cpuinfo.service cpuinfo-setup.service 2>/dev/null || kill -9 "$(ps aux 2>/dev/null | grep -F "/usr/sbin/cpuinfo" | grep -v grep | awk '{print $2}' | head -1)" 2>/dev/null || true
   [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
   [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx

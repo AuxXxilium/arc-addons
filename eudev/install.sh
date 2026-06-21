@@ -46,6 +46,7 @@ elif [ "${1}" = "modules" ]; then
   }
   echo "Triggering events to udev"
   udevadm trigger --type=subsystems --action=add
+  udevadm settle --timeout=10 || echo "udevadm settle after subsystems add failed"
   udevadm trigger --type=devices --action=add
   udevadm settle --timeout=30 || echo "udevadm settle after add failed"
   udevadm trigger --type=devices --action=change
@@ -54,7 +55,7 @@ elif [ "${1}" = "modules" ]; then
   udevadm control --stop 2>/dev/null || /usr/bin/killall udevd 2>/dev/null || true
   # Wait for udevd to fully exit before DSM boots its own udev
   for _i in $(seq 1 5); do
-    pkill -0 -x udevd 2>/dev/null || break
+    ps aux 2>/dev/null | grep -Fv grep | grep -qw udevd || break
     sleep 1
   done
   /usr/bin/killall -9 udevd 2>/dev/null || true
