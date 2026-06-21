@@ -99,8 +99,7 @@ load_task() {
   FAN_CURVES=()
   [ -f "${ESYNOSCHEDULER_DB}" ] || { derive_curve_vars; return; }
   local OP
-  OP="$(sqlite3 "${ESYNOSCHEDULER_DB}" ".timeout 5000
-SELECT operation FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null)"
+  OP="$(sqlite3 "${ESYNOSCHEDULER_DB}" "SELECT operation FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null)"
   if [ -n "${OP}" ]; then
     eval "${OP}" 2>/dev/null || true
     # Validate loaded curve rows: must be 6 numbers each
@@ -111,7 +110,7 @@ SELECT operation FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null)"
   derive_curve_vars
 }
 
-# Discover all hwmon fans that have RPM > 0 and a matching writable pwm channel.
+# Discover hwmon fans with RPM > 0 and a matching writable pwm channel.
 # Outputs lines: "hwmonX/pwmY"
 discover_fans() {
   for HW in /sys/class/hwmon/hwmon*; do
@@ -121,9 +120,9 @@ discover_fans() {
       [ -r "${FAN}" ] || continue
       local FNUM RPM
       FNUM="$(basename "${FAN}" | sed 's/fan\([0-9]*\)_input/\1/')"
-      RPM="$(cat "${FAN}" 2>/dev/null)"
-      [ "${RPM:-0}" -gt 0 ] || continue
       [ -w "${HW}/pwm${FNUM}" ] || continue
+      RPM="$(cat "${FAN}" 2>/dev/null || echo 0)"
+      [ "${RPM:-0}" -gt 0 ] || continue
       echo "hwmon${IDX}/pwm${FNUM}"
     done
   done
@@ -175,8 +174,7 @@ update_task() {
   fan_curves_str+=")"
 
   local exists
-  exists="$(sqlite3 "${ESYNOSCHEDULER_DB}" ".timeout 5000
-SELECT COUNT(*) FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null)"
+  exists="$(sqlite3 "${ESYNOSCHEDULER_DB}" "SELECT COUNT(*) FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null)"
 
   if [ "${exists:-0}" -eq 0 ]; then
     # First boot — write full template with default curve values
@@ -197,20 +195,17 @@ CURVE_MAX="'"${DEFCURVE_MAX}"'"
 # --- auto-managed below, do not edit ---
 '"${fan_curves_str}"
     sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-.timeout 5000
 INSERT INTO task VALUES('Fancontrol 2.0', '', 'bootup', '', 0, 0, 0, 0, '', 0, '$(printf '%s' "${operation}" | sed "s/'/''/g")', 'script', '{}', '', '', '{}', '{}');
 EOF
   else
     # Task exists — replace only the auto-managed section, leave user edits above it intact
     local cur_op new_op
-    cur_op="$(sqlite3 "${ESYNOSCHEDULER_DB}" ".timeout 5000
-SELECT operation FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null)"
+    cur_op="$(sqlite3 "${ESYNOSCHEDULER_DB}" "SELECT operation FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null)"
     # Strip everything from the separator line down and append fresh FAN_CURVES
     new_op="$(printf '%s' "${cur_op}" | sed '/^# --- auto-managed below/,$d')"
     new_op="${new_op}# --- auto-managed below, do not edit ---
 ${fan_curves_str}"
     sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-.timeout 5000
 UPDATE task SET operation='$(printf '%s' "${new_op}" | sed "s/'/''/g")' WHERE task_name='Fancontrol 2.0';
 EOF
   fi
@@ -267,43 +262,87 @@ generate_fan2go_config() {
 
   local mode_field=$(( MIDX + 1 ))
 
-  mkdir -p /etc/fan2go /var/lib/fan2go
+  # Pre-compute PWM values for each fan entry (needed in both fans: and curves: sections)
+  # Load persisted startPwm:maxPwm values learned by fan2go during training
+  local -A FAN_LEARNED_START=() FAN_LEARNED_MAX=()
+  if [ -f /etc/fan2go/startpwm.conf ]; then
+    while IFS='=' read -r fid val; do
+      [ -n "${fid}" ] || continue
+      FAN_LEARNED_START["${fid}"]="${val%%:*}"
+      FAN_LEARNED_MAX["${fid}"]="${val#*:}"
+    done </etc/fan2go/startpwm.conf
+  fi
+
+  local -A FAN_MINPWM=() FAN_CURVEMINPWM=() FAN_MIDPWM=() FAN_MAXPWM=() FAN_HW_MAXPWM=()
+  for entry in "${FAN_CURVES[@]}"; do
+    local chan="${entry%%:*}"
+    local pwm_triple
+    pwm_triple="$(echo "${entry#*:}" | cut -d: -f"${mode_field}")"
+    local p_min p_mid p_max
+    p_min="$(echo "${pwm_triple}" | cut -d' ' -f1)"
+    p_mid="$(echo "${pwm_triple}" | cut -d' ' -f2)"
+    p_max="$(echo "${pwm_triple}" | cut -d' ' -f3)"
+    local curve_min curve_mid curve_max
+    curve_min="$(percent_to_pwm "${p_min}")"
+    curve_mid="$(percent_to_pwm "${p_mid}")"
+    curve_max="$(percent_to_pwm "${p_max}")"
+    FAN_CURVEMINPWM["${chan}"]="${curve_min}"
+    FAN_MIDPWM["${chan}"]="${curve_mid}"
+
+    local hw_idx fan_idx fan_id
+    hw_idx="$(echo "${chan}" | sed 's/hwmon\([0-9]*\)\/.*/\1/')"
+    fan_idx="$(echo "${chan}" | sed 's/.*pwm\([0-9]*\)/\1/')"
+    fan_id="fan_${hw_idx}_${fan_idx}"
+
+    # Curve steps always use user-configured values
+    FAN_MAXPWM["${chan}"]="${curve_max}"
+
+    # minPwm for fan config: must be <= startPwm so fan2go can spin the fan up.
+    # Use startPwm if known, else 1. This is separate from the curve step floor.
+    local start_pwm="${FAN_LEARNED_START[${fan_id}]:-}"
+    if [ -n "${start_pwm}" ] && [ "${start_pwm}" -gt 0 ] 2>/dev/null; then
+      FAN_MINPWM["${chan}"]="${start_pwm}"
+    else
+      FAN_MINPWM["${chan}"]="1"
+    fi
+
+    # hardware maxPwm for fan config: use learned maxPwm, fall back to 255
+    local learned_max="${FAN_LEARNED_MAX[${fan_id}]:-}"
+    if [ -n "${learned_max}" ] && [ "${learned_max}" -gt 0 ] 2>/dev/null; then
+      FAN_HW_MAXPWM["${chan}"]="${learned_max}"
+    else
+      FAN_HW_MAXPWM["${chan}"]="255"
+    fi
+  done
+
+  mkdir -p /etc/fan2go
 
   {
     cat <<YAML
-dbPath: /var/lib/fan2go/fan2go.db
-runFanInitializationInParallel: true
+dbPath: /etc/fan2go/fan2go.db
+runFanInitializationInParallel: false
 
 fans:
 YAML
 
     for entry in "${FAN_CURVES[@]}"; do
       local chan="${entry%%:*}"
-      local pwm_vals="${entry#*:}"
       local hw_idx fan_idx platform
       hw_idx="$(echo "${chan}" | sed 's/hwmon\([0-9]*\)\/.*/\1/')"
       fan_idx="$(echo "${chan}" | sed 's/.*pwm\([0-9]*\)/\1/')"
       platform="$(hwmon_platform "${hw_idx}")"
 
-      local pwm_triple
-      pwm_triple="$(echo "${pwm_vals}" | cut -d: -f"${mode_field}")"
-      local MINPWM_P MIDPWM_P MAXPWM_P MINPWM MAXPWM
-      MINPWM_P="$(echo "${pwm_triple}" | cut -d' ' -f1)"
-      MIDPWM_P="$(echo "${pwm_triple}" | cut -d' ' -f2)"
-      MAXPWM_P="$(echo "${pwm_triple}" | cut -d' ' -f3)"
-      MINPWM="$(percent_to_pwm "${MINPWM_P}")"
-      MAXPWM="$(percent_to_pwm "${MAXPWM_P}")"
-      [ "${MAXPWM}" -le "${MINPWM}" ] && MAXPWM=$(( MINPWM + 26 ))
+      local fan_id="fan_${hw_idx}_${fan_idx}"
 
       cat <<YAML
-  - id: "fan_${hw_idx}_${fan_idx}"
+  - id: "${fan_id}"
     hwmon:
       platform: "${platform}"
       rpmChannel: ${fan_idx}
       pwmChannel: ${fan_idx}
     neverStop: true
-    minPwm: ${MINPWM}
-    maxPwm: ${MAXPWM}
+    minPwm: ${FAN_MINPWM[${chan}]}
+    maxPwm: ${FAN_HW_MAXPWM[${chan}]}
     curve: "curve_${hw_idx}_${fan_idx}"
 YAML
     done
@@ -321,26 +360,18 @@ YAML
 
     for entry in "${FAN_CURVES[@]}"; do
       local chan="${entry%%:*}"
-      local pwm_vals="${entry#*:}"
       local hw_idx fan_idx
       hw_idx="$(echo "${chan}" | sed 's/hwmon\([0-9]*\)\/.*/\1/')"
       fan_idx="$(echo "${chan}" | sed 's/.*pwm\([0-9]*\)/\1/')"
-
-      local pwm_triple
-      pwm_triple="$(echo "${pwm_vals}" | cut -d: -f"${mode_field}")"
-      local MINPWM_P MIDPWM_P MAXPWM_P
-      MINPWM_P="$(echo "${pwm_triple}" | cut -d' ' -f1)"
-      MIDPWM_P="$(echo "${pwm_triple}" | cut -d' ' -f2)"
-      MAXPWM_P="$(echo "${pwm_triple}" | cut -d' ' -f3)"
 
       cat <<YAML
   - id: "curve_${hw_idx}_${fan_idx}"
     linear:
       sensor: cpu_temp
       steps:
-        ${MINTEMP}: ${MINPWM_P}
-        ${MIDTEMP}: ${MIDPWM_P}
-        ${MAXTEMP}: ${MAXPWM_P}
+        ${MINTEMP}: ${FAN_CURVEMINPWM[${chan}]}
+        ${MIDTEMP}: ${FAN_MIDPWM[${chan}]}
+        ${MAXTEMP}: ${FAN_MAXPWM[${chan}]}
 YAML
     done
 
@@ -353,19 +384,85 @@ YAML
   } >"${FAN2GO_CONF}"
 }
 
-stop_fan2go() {
-  pkill -f "${FAN2GO_BIN}" 2>/dev/null || true
-  for _w in 1 2 3 4 5; do
-    pkill -0 -f "${FAN2GO_BIN}" 2>/dev/null || return
-    sleep 1
+FAN2GO_PID=""
+FAN2GO_WATCHER_PID=""
+FAN2GO_LOG="/tmp/fan2go.log"
+
+# Parse fan2go log for boundary lines and persist startPwm:maxPwm to
+# /etc/fan2go/startpwm.conf as "fan_id=startPwm:maxPwm" lines.
+# Uses two log patterns:
+#   "PWM settings of fan 'ID': Min M, Start S, Max X"  — after DB reuse
+#   "Fan ID: Analysis boundaries detected ... Start S, Max X" — after live sweep
+# Runs in background after fan2go starts; exits once all fans are seen or 120s timeout.
+watch_fan2go_pwm() {
+  local log_offset="${1:-0}" conf="/etc/fan2go/startpwm.conf"
+  local expected="${#FAN_CURVES[@]}" elapsed=0
+
+  while [ "${elapsed}" -lt 120 ]; do
+    sleep 3
+    elapsed=$(( elapsed + 3 ))
+    [ -f "${FAN2GO_LOG}" ] || continue
+
+    local tmp_conf="" seen=0
+    local -A start_map=() max_map=()
+
+    while IFS= read -r line; do
+      local fid spwm mpwm
+      # Pattern 1: "PWM settings of fan 'fan_3_1': Min 30, Start 61, Max 250"
+      if [[ "${line}" =~ PWM\ settings\ of\ fan\ \'([^\']+)\'.*Start\ ([0-9]+),\ Max\ ([0-9]+) ]]; then
+        fid="${BASH_REMATCH[1]}"
+        start_map["${fid}"]="${BASH_REMATCH[2]}"
+        max_map["${fid}"]="${BASH_REMATCH[3]}"
+      # Pattern 2: "Fan fan_3_1: Analysis boundaries detected (before config overrides): Start 61, Max 250"
+      elif [[ "${line}" =~ Fan\ ([^:]+):\ Analysis\ boundaries\ detected.*Start\ ([0-9]+),\ Max\ ([0-9]+) ]]; then
+        fid="${BASH_REMATCH[1]}"
+        start_map["${fid}"]="${BASH_REMATCH[2]}"
+        max_map["${fid}"]="${BASH_REMATCH[3]}"
+      fi
+    done < <(tail -n +"$(( log_offset + 1 ))" "${FAN2GO_LOG}" 2>/dev/null)
+
+    for fc in "${FAN_CURVES[@]}"; do
+      local ch="${fc%%:*}" hi fi fid
+      hi="$(echo "${ch}" | sed 's/hwmon\([0-9]*\)\/.*/\1/')"
+      fi="$(echo "${ch}" | sed 's/.*pwm\([0-9]*\)/\1/')"
+      fid="fan_${hi}_${fi}"
+      local sp="${start_map[${fid}]:-}" mp="${max_map[${fid}]:-}"
+      [ -n "${sp}" ] && [ -n "${mp}" ] || continue
+      tmp_conf+="${fid}=${sp}:${mp}"$'\n'
+      seen=$(( seen + 1 ))
+    done
+
+    if [ "${seen}" -ge "${expected}" ]; then
+      mkdir -p /etc/fan2go
+      printf '%s' "${tmp_conf}" >"${conf}"
+      echo "Saved startPwm/maxPwm for ${seen} fan(s) to ${conf}"
+      break
+    fi
   done
-  pkill -9 -f "${FAN2GO_BIN}" 2>/dev/null || true
+}
+
+stop_fan2go() {
+  if [ -n "${FAN2GO_WATCHER_PID}" ]; then
+    kill "${FAN2GO_WATCHER_PID}" 2>/dev/null || true
+    wait "${FAN2GO_WATCHER_PID}" 2>/dev/null || true
+    FAN2GO_WATCHER_PID=""
+  fi
+  if [ -n "${FAN2GO_PID}" ]; then
+    kill -9 "${FAN2GO_PID}" 2>/dev/null || true
+    wait "${FAN2GO_PID}" 2>/dev/null || true
+    FAN2GO_PID=""
+  fi
 }
 
 restart_fan2go() {
   stop_fan2go
-  mkdir -p /etc/fan2go /var/lib/fan2go
-  "${FAN2GO_BIN}" --config "${FAN2GO_CONF}" --no-style >/dev/null 2>&1 &
+  mkdir -p /etc/fan2go
+  local log_offset=0
+  [ -f "${FAN2GO_LOG}" ] && log_offset="$(wc -l <"${FAN2GO_LOG}" 2>/dev/null || echo 0)"
+  "${FAN2GO_BIN}" --config "${FAN2GO_CONF}" --no-style >>"${FAN2GO_LOG}" 2>&1 &
+  FAN2GO_PID=$!
+  watch_fan2go_pwm "${log_offset}" &
+  FAN2GO_WATCHER_PID=$!
 }
 
 RELOAD_FLAG="/run/arc-sensors.reload"
@@ -422,32 +519,33 @@ start_fan2go() {
   restart_fan2go
 }
 
+fantype_to_mode() {
+  case "$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)" in
+    fullfan | full)  echo "0" ;;
+    quietfan | low)  echo "2" ;;
+    *)               echo "1" ;;
+  esac
+}
+
 main() {
   local FanBaseMode="" FansActive=0 NoFanTick=0
 
   trap 'reload_config' HUP
 
-  # Determine initial fan mode
-  local FanType
-  FanType="$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)"
-  case "${FanType}" in
-    fullfan | full)   FanBaseMode="0" ;;
-    coolfan | high)   FanBaseMode="1" ;;
-    quietfan | low)   FanBaseMode="2" ;;
-    *)                FanBaseMode="1" ;;
-  esac
+  FanBaseMode="$(fantype_to_mode)"
 
   if init_fans; then
     FansActive=1
     start_fan2go "${FanBaseMode}"
   fi
 
+  local SynoInfoMtime=""
   while true; do
-    sleep 1
+    sleep 5
 
     if [ "${FansActive}" -eq 0 ]; then
       NoFanTick=$(( NoFanTick + 1 ))
-      if [ "${NoFanTick}" -ge 30 ]; then
+      if [ "${NoFanTick}" -ge 6 ]; then
         NoFanTick=0
         if init_fans; then
           FansActive=1
@@ -457,37 +555,39 @@ main() {
       continue
     fi
 
-    # Reload triggered by arc-control save&apply or SIGHUP
+    # Reload triggered by arc-control save&apply or SIGHUP — check every tick
     if [ "${RELOAD_NEEDED}" -eq 1 ] || [ -f "${RELOAD_FLAG}" ]; then
       echo "Reloading fan curves..."
       RELOAD_NEEDED=0
       rm -f "${RELOAD_FLAG}"
+      local -a _PREV_CHANS=("${FAN_CURVES[@]%%:*}")
       load_task
-      merge_fan_curves $(discover_fans)
+      merge_fan_curves "${_PREV_CHANS[@]}"
       update_task
       generate_fan2go_config "${FanBaseMode:-1}"
       restart_fan2go
+      SynoInfoMtime="$(stat -c '%Y' /etc/synoinfo.conf 2>/dev/null)"
       continue
     fi
 
-    local FanType FanCurtMode
-    FanType="$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)"
-    case "${FanType}" in
-      fullfan | full)   FanCurtMode="0" ;;
-      coolfan | high)   FanCurtMode="1" ;;
-      quietfan | low)   FanCurtMode="2" ;;
-      *)                FanCurtMode="1" ;;
-    esac
+    # Mode change: only read synoinfo.conf when its mtime changed
+    local mtime
+    mtime="$(stat -c '%Y' /etc/synoinfo.conf 2>/dev/null)"
+    if [ "${mtime}" != "${SynoInfoMtime}" ]; then
+      SynoInfoMtime="${mtime}"
+      local FanCurtMode
+      FanCurtMode="$(fantype_to_mode)"
 
-    if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
-      echo "Fan mode changed to ${FanCurtMode} (${FanType})"
-      FanBaseMode="${FanCurtMode}"
-      load_task
-      generate_fan2go_config "${FanBaseMode}"
-      restart_fan2go
+      if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
+        echo "Fan mode changed to ${FanCurtMode}"
+        FanBaseMode="${FanCurtMode}"
+        local -a _PREV_CHANS=("${FAN_CURVES[@]%%:*}")
+        load_task
+        merge_fan_curves "${_PREV_CHANS[@]}"
+        generate_fan2go_config "${FanBaseMode}"
+        restart_fan2go
+      fi
     fi
-
-    find /etc -maxdepth 1 -type f -name 'synoinfo.conf.??????' -mmin +0.5 -exec rm -f {} \; 2>/dev/null
   done
 }
 
@@ -499,5 +599,5 @@ cleanup() {
   done
 }
 
-trap 'cleanup' EXIT INT TERM
+trap 'cleanup; exit' INT TERM HUP
 main
