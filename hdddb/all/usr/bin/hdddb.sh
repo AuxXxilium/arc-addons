@@ -15,7 +15,7 @@
 #   -I | --ihm           Enable / update IronWolf Health Management
 #   -e | --email         No-op (kept for call-site compatibility)
 #   -S | --ssd           Set write_mostly on HDDs when internal SSDs are present
-#   -p | --pcie          No-op
+#   -p | --pcie          Enable M.2 add-on card pool support (support_m2_pool + UI patch)
 #
 
 # ── bootstrap ────────────────────────────────────────────────────────────────
@@ -37,6 +37,7 @@ ram=no
 wdda=no
 ihm=no
 ssd=no
+pcie=no
 
 for arg in "$@"; do
   case "$arg" in
@@ -45,7 +46,8 @@ for arg in "$@"; do
     -w|--wdda)  wdda=yes ;;
     -I|--ihm)   ihm=yes ;;
     -S|--ssd)   ssd=yes ;;
-    -e|--email|-p|--pcie) ;;
+    -e|--email) ;;
+    -p|--pcie)  pcie=yes ;;
     *) ;;
   esac
 done
@@ -104,17 +106,15 @@ collect_disks() {
     printf '%s\t%s\t%s\t%s\n' "${DEV}" "${MODEL}" "${FIRM}" "${SIZE}" >>"${TMP}"
   done
 
-  # Deduplicate by model+firmware: keep first occurrence (synostorage preferred over sysblock)
-  DEDUP="${TMP}.dedup.$$"
-  awk -F'\t' '!seen[$2"\t"$3]++' "${TMP}" >"${DEDUP}" && mv -f "${DEDUP}" "${TMP}"
 }
 
 # ── database patching ─────────────────────────────────────────────────────────
 
 patch_database() {
-  DB="${1}"
-  DISKS="${2}"
-  SUPPORT_INTERVAL='{"compatibility":"support","not_yet_rolling_status":"support","fw_dsm_update_status_notify":false,"barebone_installable":true,"barebone_installable_v2":"auto","smart_test_ignore":true,"smart_attr_ignore":true}'
+  local DB="${1}"
+  local DISKS="${2}"
+  local SUPPORT_INTERVAL='{"compatibility":"support","not_yet_rolling_status":"support","fw_dsm_update_status_notify":false,"barebone_installable":true,"barebone_installable_v2":"auto","smart_test_ignore":true,"smart_attr_ignore":true}'
+  local DEV MODEL FIRM SIZE TMP
   jq -e '.disk_compatbility_info | type == "object"' "${DB}" >/dev/null 2>&1 || return 0
 
   TMP="${DB}.tmp.$$"
@@ -143,12 +143,16 @@ patch_database() {
     }
   done <"${DISKS}"
 
+  # Replace any remaining not_support/unverified values with support (catches fields jq didn't touch)
+  sed -i 's/"not_support"/"support"/g; s/"unverified"/"support"/g' "${TMP}"
+
   chmod 644 "${TMP}" 2>/dev/null || true
   mv -f "${TMP}" "${DB}"
 }
 
 patch_storage_settings() {
-  DB="/var/lib/storage_setting/general_settings.db"
+  local DB="/var/lib/storage_setting/general_settings.db"
+  local TMP
   [ -f "${DB}" ] || return 0
   jq -e . "${DB}" >/dev/null 2>&1 || return 0
 
@@ -156,7 +160,48 @@ patch_storage_settings() {
   jq -c '.settings.allow_new_hcl_as_normal = {"dsm_ver":[],"values":[true]}' "${DB}" >"${TMP}" && mv -f "${TMP}" "${DB}"
 }
 
+patch_storagemanager_ui() {
+  local strgmgr
+  # DSM 7.2.1+ path, then older path
+  for _p in \
+    "/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js" \
+    "/usr/syno/synoman/webman/modules/StorageManager/storage_panel.js"; do
+    [ -f "${_p}" ] && strgmgr="${_p}" && break
+  done
+  [ -n "${strgmgr}" ] || return 0
+
+  local changed=0
+  # Remove "not a Synology disk" warning conditions from the UI
+  if grep -q 'disk_reason_not_support' "${strgmgr}" 2>/dev/null; then
+    sed -i 's/[^,]*disk_reason_not_support[^,]*,//g' "${strgmgr}" && changed=1
+  fi
+  if grep -q 'warnNonSynologyDisk\|isNotSynologyDisk\|not_syno_disk' "${strgmgr}" 2>/dev/null; then
+    sed -i 's/[^,]*\(warnNonSynologyDisk\|isNotSynologyDisk\|not_syno_disk\)[^,]*,//g' "${strgmgr}" && changed=1
+  fi
+  # Remove M.2 add-on card not-supported warning
+  if grep -q 'notSupportM2Pool_addOnCard' "${strgmgr}" 2>/dev/null; then
+    sed -i 's/notSupportM2Pool_addOnCard:this.T("disk_info","disk_reason_m2_add_on_card"),//g' "${strgmgr}"
+    sed -i 's/},{isConditionInvalid:0<this.pciSlot,invalidReason:"notSupportM2Pool_addOnCard"//g' "${strgmgr}"
+    changed=1
+  fi
+  # Remove dedup-only-on-Synology-SSD warning (notSupportDedup / notSupportBtrfsDedup variants)
+  if grep -qE 'notSupportDedup|notSupportBtrfsDedup' "${strgmgr}" 2>/dev/null; then
+    sed -i 's/[^,]*notSupportDedup[^,]*,//g' "${strgmgr}"
+    sed -i 's/[^,]*notSupportBtrfsDedup[^,]*,//g' "${strgmgr}"
+    changed=1
+  fi
+  # Remove SHA (Synology HDD/SSD Array) restriction warnings
+  if grep -qE 'notSupportM2Pool_SHA|notSupportM2Pool_3rdParty|notSupportM2Pool_blockList' "${strgmgr}" 2>/dev/null; then
+    sed -i 's/[^,]*notSupportM2Pool_SHA[^,]*,//g' "${strgmgr}"
+    sed -i 's/[^,]*notSupportM2Pool_3rdParty[^,]*,//g' "${strgmgr}"
+    sed -i 's/[^,]*notSupportM2Pool_blockList[^,]*,//g' "${strgmgr}"
+    changed=1
+  fi
+  [ "${changed}" -eq 1 ] && _log "StorageManager UI patched to suppress non-Synology disk warnings"
+}
+
 clear_pool_compatibility() {
+  local FILE TMP
   for FILE in /var/lib/space/pool_compatibility /var/lib/space/pool_compatibility_legacy; do
     [ -f "${FILE}" ] || continue
     TMP="${FILE}.tmp.$$"
@@ -172,8 +217,8 @@ clear_pool_compatibility() {
 }
 
 refresh_runtime() {
-  DISKS="${1}"
-  SUPPORT_ACTION='{"allow_auto_repair":true,"allow_binding":true,"allow_detected_scan":true,"allow_ma_create":true,"cache_rescue_selectable":"yes","cache_selectable":"yes","cache_status":"healthy","disk_status":"support","hide_alloc_status":false,"hide_fw_version":false,"hide_is4Kn":false,"hide_remain_life":false,"hide_sb_days_left":false,"hide_serial":false,"hide_temperature":false,"hide_unc":false,"legacy_cache_rescue_selectable":"yes","legacy_cache_selectable":"yes","legacy_cache_status":"healthy","notification":false,"notify_health_status":true,"notify_lifetime":true,"notify_unc":true,"pool_rescue_selectable":"yes","pool_selectable":"yes","pool_status":"healthy","send_health_report":true,"show_lifetime_chart":true}'
+  local DISKS="${1}"
+  local DEV MODEL FIRM SIZE DISK_DIR
   while IFS="$(printf '\t')" read -r DEV MODEL FIRM SIZE; do
     DISK_DIR="/run/synostorage/disks/${DEV}"
     [ -d "${DISK_DIR}" ] || continue
@@ -181,7 +226,8 @@ refresh_runtime() {
     printf 'support\n' >"${DISK_DIR}/force_compatibility" 2>/dev/null || true
     printf '1\n' >"${DISK_DIR}/smart_attr_ignore" 2>/dev/null || true
     printf '1\n' >"${DISK_DIR}/smart_test_ignore" 2>/dev/null || true
-    printf '%s' "${SUPPORT_ACTION}" >"${DISK_DIR}/compatibility_action" 2>/dev/null || true
+    printf '1' >"${DISK_DIR}/is_syno_drive" 2>/dev/null || true
+    printf '1' >"${DISK_DIR}/is_bundle_ssd" 2>/dev/null || true
     rm -f "${DISK_DIR}/compatibility.lock" "${DISK_DIR}/compatibility_action.lock" 2>/dev/null || true
   done <"${DISKS}"
 }
@@ -221,6 +267,30 @@ _disable_dbupdates() {
         _log "drive DB auto-updates disabled (SynoOnlinePack version bumped)"
       fi
     fi
+  fi
+}
+
+# ── PCIe / M.2 adaptor card support ──────────────────────────────────────────
+
+_enable_pcie() {
+  local cur
+  cur="$(_get support_m2_pool)"
+  if [ "${cur}" != "yes" ]; then
+    _set support_m2_pool "yes"
+    _log "pcie: support_m2_pool enabled"
+  fi
+
+  # Remove M.2 add-on card pool restriction from StorageManager UI
+  local strgmgr
+  for _p in \
+    "/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js" \
+    "/usr/syno/synoman/webman/modules/StorageManager/storage_panel.js"; do
+    [ -f "${_p}" ] && strgmgr="${_p}" && break
+  done
+  if [ -n "${strgmgr}" ] && grep -q 'notSupportM2Pool_addOnCard' "${strgmgr}" 2>/dev/null; then
+    sed -i 's/notSupportM2Pool_addOnCard:this.T("disk_info","disk_reason_m2_add_on_card"),//g' "${strgmgr}"
+    sed -i 's/},{isConditionInvalid:0<this.pciSlot,invalidReason:"notSupportM2Pool_addOnCard"//g' "${strgmgr}"
+    _log "pcie: StorageManager UI patched to allow M.2 add-on card pools"
   fi
 }
 
@@ -302,8 +372,9 @@ _apply_ssd_writemostly() {
 # ── main ──────────────────────────────────────────────────────────────────────
 
 for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-  "$SKV" "${F}" "support_disk_compatibility" "yes"
+  "$SKV" "${F}" "support_disk_compatibility" "no"
   "$SKV" "${F}" "forbid_unsupport_extdev" "no"
+  "$SKV" "${F}" "support_btrfs_dedupe" "yes"
 done
 
 DISKS="$(mktemp /tmp/diskcompat.XXXXXX)" || exit 0
@@ -326,21 +397,56 @@ if [ ! -s "${DISKS}" ]; then
   _log "No drives found — exiting."
   exit 0
 fi
-_log "drives collected: $(wc -l <"${DISKS}") entries"
+_log "drives collected: $(wc -l <"${DISKS}" | tr -d ' ') entries"
+
+DISKS_DEDUP="$(mktemp /tmp/diskcompat.XXXXXX)" || exit 0
+awk -F'\t' '!seen[$2"\t"$3]++' "${DISKS}" >"${DISKS_DEDUP}"
+_log "unique model+firmware combinations for DB patch: $(wc -l <"${DISKS_DEDUP}" | tr -d ' ')"
 
 for DB in /var/lib/disk-compatibility/*_v*.db; do
   [ -f "${DB}" ] || continue
-  patch_database "${DB}" "${DISKS}"
+  patch_database "${DB}" "${DISKS_DEDUP}"
 done
+rm -f "${DISKS_DEDUP}"
 
 _log "patching storage settings..."
 patch_storage_settings
+_log "patching StorageManager UI..."
+patch_storagemanager_ui
 _log "clearing pool compatibility..."
 clear_pool_compatibility
-_log "refreshing runtime compatibility..."
-refresh_runtime "${DISKS}"
-_log "setting M.2 pool support..."
-set_m2_pool_support
+
+# Run synostgdisk + refresh_runtime in a retry loop to handle slow first-boot init.
+# synostgdisk re-reads the patched DBs; refresh_runtime then forces support values last.
+_RETRY=0
+while true; do
+  if [ -f /usr/syno/sbin/synostgdisk ]; then
+    /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
+    _log "synostgdisk compatibility check done (exit $?, attempt $((_RETRY+1)))"
+  fi
+  refresh_runtime "${DISKS}"
+  set_m2_pool_support
+
+  # Check whether all disks now report support
+  _ALL_OK=1
+  while IFS="$(printf '\t')" read -r _DEV _MODEL _FIRM _SIZE; do
+    _COMPAT_FILE="/run/synostorage/disks/${_DEV}/compatibility"
+    if [ -f "${_COMPAT_FILE}" ]; then
+      _VAL="$(tr -d '\r\n' <"${_COMPAT_FILE}" 2>/dev/null)"
+      [ "${_VAL}" = "support" ] || _ALL_OK=0
+    fi
+  done <"${DISKS}"
+
+  [ "${_ALL_OK}" -eq 1 ] && { _log "all disks verified support (attempt $((_RETRY+1)))"; break; }
+
+  _RETRY=$((_RETRY+1))
+  if [ "${_RETRY}" -ge 10 ]; then
+    _log "giving up after 10 attempts — some disks may still show warnings"
+    break
+  fi
+  _log "not all disks ready yet, retrying in 5s (attempt ${_RETRY}/10)..."
+  sleep 5
+done
 
 rm -f "${DISKS}"
 
@@ -382,12 +488,11 @@ if [ "$ihm" = "yes" ] && [ "$(uname -m)" = "x86_64" ]; then
   _enable_ihm
 fi
 
-if [ -f /usr/syno/sbin/synostgdisk ]; then
-  /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
-  _log "synostgdisk compatibility check done (exit $?)"
+if [ "$pcie" = "yes" ]; then
+  _log "enabling PCIe/M.2 adaptor card support..."
+  _enable_pcie
 fi
 
-# Restart StorageManager to re-read compatibility state
 if systemctl is-active --quiet pkgctl-StorageManager.service 2>/dev/null; then
   systemctl restart pkgctl-StorageManager.service 2>/dev/null || true
   _log "StorageManager restarted to reload compatibility"
