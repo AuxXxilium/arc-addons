@@ -34,11 +34,7 @@ if [ "${1}" = "late" ]; then
       echo "insert Fancontrol 2.0 task to esynoscheduler.db"
       /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'Fancontrol 2.0';
-INSERT INTO task VALUES('Fancontrol 2.0', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
-# Populated on first boot by arc-sensors.sh
-FANMODES=()
-FAN_CURVES=()
-', 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('Fancontrol 2.0', '', 'bootup', '', 0, 0, 0, 0, '', 0, '# Populated on first boot by arc-sensors.sh', 'script', '{}', '', '', '{}', '{}');
 EOF
     fi
 
