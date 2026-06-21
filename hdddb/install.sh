@@ -21,16 +21,14 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/hdddb.service"
 [Unit]
 Description=HDDs/SSDs drives databases
-Wants=smpkg-custom-install.service pkgctl-StorageManager.service
-After=smpkg-custom-install.service pkgctl-StorageManager.service
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service synostoraged.service
+After=smpkg-custom-install.service pkgctl-StorageManager.service synostoraged.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 SuccessExitStatus=3
-StandardOutput=append:/var/log/hdddb.log
-StandardError=append:/var/log/hdddb.log
-ExecStart=-/usr/bin/hdddb.sh -nrwpeI
+ExecStart=-/bin/sh -c '/usr/bin/hdddb.sh -nrwpeI >>/var/log/hdddb.log 2>&1'
 
 [Install]
 WantedBy=multi-user.target

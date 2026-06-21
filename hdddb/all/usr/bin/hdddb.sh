@@ -68,73 +68,37 @@ disk_size_gb() {
   esac
 }
 
-# ── boot disk detection ───────────────────────────────────────────────────────
-
-BOOTDISK=""
-BOOTDISK_PART3="$(/sbin/blkid -L ARC3 2>/dev/null)"
-if [ -n "$BOOTDISK_PART3" ]; then
-  MM="$(stat -c '%t:%T' "$BOOTDISK_PART3" 2>/dev/null | \
-    awk -F: '{printf "%d:%d", strtonum("0x"$1), strtonum("0x"$2)}')"
-  BOOTDISK="$(awk -F= '/DEVNAME/{print $2}' "/sys/dev/block/$MM/uevent" 2>/dev/null)"
-  BOOTDISK="${BOOTDISK%%[0-9]*}"
-fi
-
-_is_usb() {
-  grep -q "[Uu][Ss][Bb]" "/sys/block/$1/device/uevent" 2>/dev/null ||
-  awk -F= '/PHYSDEVPATH/{print $2}' "/sys/block/$1/uevent" 2>/dev/null | grep -qi usb
-}
-
-_trim() { printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'; }
-
 # ── drive enumeration ─────────────────────────────────────────────────────────
 
 collect_disks() {
   TMP="${1}"
   : >"${TMP}"
 
-  # Primary: read from synostorage (already enumerated by DSM)
   for DISK_DIR in /run/synostorage/disks/*; do
     [ -d "${DISK_DIR}" ] || continue
     DEV="$(basename "${DISK_DIR}")"
-    [ "$DEV" = "$BOOTDISK" ] && continue
-    _is_usb "$DEV" && continue
-
     MODEL="$([ -f "${DISK_DIR}/model" ] && tr -d '\r\n' <"${DISK_DIR}/model" 2>/dev/null)"
     [ -n "${MODEL}" ] || MODEL="$([ -f "${DISK_DIR}/real_model" ] && tr -d '\r\n' <"${DISK_DIR}/real_model" 2>/dev/null)"
     [ -n "${MODEL}" ] || continue
-    MODEL="$(_trim "$MODEL")"
     FIRM="$([ -f "${DISK_DIR}/firm" ] && tr -d '\r\n' <"${DISK_DIR}/firm" 2>/dev/null)"
-    FIRM="$(_trim "$FIRM")"
     SIZE="$(disk_size_gb "${DEV}")"
     _log "  found (synostorage): ${DEV} model=${MODEL} firm=${FIRM} size=${SIZE}"
     printf '%s\t%s\t%s\t%s\n' "${DEV}" "${MODEL}" "${FIRM}" "${SIZE}" >>"${TMP}"
   done
 
-  # Fallback: scan /sys/block for drives not already listed
   for BLOCK_DIR in /sys/block/*; do
     [ -d "${BLOCK_DIR}" ] || continue
     DEV="$(basename "${BLOCK_DIR}")"
     case "${DEV}" in
-      sata*|sd*|nvme*|sas*) ;;
+      sata* | sd* | nvme*) ;;
       *) continue ;;
     esac
-    [ "$DEV" = "$BOOTDISK" ] && continue
-    _is_usb "$DEV" && continue
     grep -q "^${DEV}	" "${TMP}" 2>/dev/null && continue
-
-    MODEL="$([ -f "${BLOCK_DIR}/device/model" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/model" 2>/dev/null)"
-    MODEL="$(_trim "$MODEL")"
-    [ -n "${MODEL}" ] || { _log "  skip (no model): ${DEV}"; continue; }
-
-    # Strip known vendor prefixes
-    for pfx in "WDC " "HGST " "TOSHIBA " "Hitachi " "SAMSUNG " "FUJITSU " "HCST " "APPLE HDD "; do
-      MODEL="${MODEL#$pfx}"
-    done
-    MODEL="$(_trim "$MODEL")"
-
+    MODEL="$([ -f "${BLOCK_DIR}/device/model" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/model" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [ -n "${MODEL}" ] || continue
     FIRM="$([ -f "${BLOCK_DIR}/device/firmware_rev" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/firmware_rev" 2>/dev/null)"
     [ -n "${FIRM}" ] || FIRM="$([ -f "${BLOCK_DIR}/device/rev" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/rev" 2>/dev/null)"
-    FIRM="$(_trim "$FIRM")"
+    FIRM="$(printf '%s' "${FIRM}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     SIZE="$(disk_size_gb "${DEV}")"
     _log "  found (sysblock): ${DEV} model=${MODEL} firm=${FIRM} size=${SIZE}"
     printf '%s\t%s\t%s\t%s\n' "${DEV}" "${MODEL}" "${FIRM}" "${SIZE}" >>"${TMP}"
@@ -147,14 +111,10 @@ patch_database() {
   DB="${1}"
   DISKS="${2}"
   SUPPORT_INTERVAL='{"compatibility":"support","not_yet_rolling_status":"support","fw_dsm_update_status_notify":false,"barebone_installable":true,"barebone_installable_v2":"auto","smart_test_ignore":true,"smart_attr_ignore":true}'
-  if ! jq -e '.disk_compatbility_info | type == "object"' "${DB}" >/dev/null 2>&1; then
-    return 0
-  fi
+  jq -e '.disk_compatbility_info | type == "object"' "${DB}" >/dev/null 2>&1 || return 0
 
   TMP="${DB}.tmp.$$"
-  if ! jq -c . "${DB}" >"${TMP}" 2>/dev/null; then
-    cp -p "${DB}" "${TMP}" || return 0
-  fi
+  cp -p "${DB}" "${TMP}" || return 0
   while IFS="$(printf '\t')" read -r DEV MODEL FIRM SIZE; do
     [ -n "${MODEL}" ] || continue
     case "${SIZE}" in *[!0-9]* | "") SIZE=0 ;; esac
@@ -164,19 +124,13 @@ patch_database() {
       --argjson size "${SIZE}" \
       --argjson interval "${SUPPORT_INTERVAL}" \
       '
-      if .disk_compatbility_info[$model] == null then
-        .disk_compatbility_info[$model] = {}
-      else . end
-      | if .disk_compatbility_info[$model].default == null then
-          .disk_compatbility_info[$model].default = {}
-        else . end
+      .disk_compatbility_info[$model] //= {}
+      | .disk_compatbility_info[$model].default //= {}
       | if $size > 0 then .disk_compatbility_info[$model].default.size_gb = $size else . end
       | .disk_compatbility_info[$model].default.compatibility_interval = [$interval]
       | if $firm != "" then
-          if .disk_compatbility_info[$model][$firm] == null then
-            .disk_compatbility_info[$model][$firm] = {}
-          else . end
-          | .disk_compatbility_info[$model][$firm].fw_buildnumber = (.disk_compatbility_info[$model][$firm].fw_buildnumber // 1)
+          .disk_compatbility_info[$model][$firm] //= {}
+          | .disk_compatbility_info[$model][$firm].fw_buildnumber //= 1
           | .disk_compatbility_info[$model][$firm].compatibility_interval = [$interval]
         else . end
       ' "${TMP}" >"${TMP}.new" && mv -f "${TMP}.new" "${TMP}" || {
@@ -350,6 +304,17 @@ done
 
 DISKS="$(mktemp /tmp/diskcompat.XXXXXX)" || exit 0
 
+# synostoraged populates /run/synostorage/disks/ asynchronously — wait up to 30s
+_WAIT=0
+while [ -z "$(ls /run/synostorage/disks/ 2>/dev/null)" ]; do
+  if [ "${_WAIT}" -ge 30 ]; then
+    _log "synostorage not ready after 30s, using /sys/block fallback..."
+    break
+  fi
+  sleep 1
+  _WAIT=$(( _WAIT + 1 ))
+done
+
 _log "collecting disks..."
 collect_disks "${DISKS}"
 if [ ! -s "${DISKS}" ]; then
@@ -359,7 +324,7 @@ if [ ! -s "${DISKS}" ]; then
 fi
 _log "drives collected: $(wc -l <"${DISKS}") entries"
 
-for DB in /var/lib/disk-compatibility/*.db; do
+for DB in /var/lib/disk-compatibility/*_v*.db; do
   [ -f "${DB}" ] || continue
   patch_database "${DB}" "${DISKS}"
 done
