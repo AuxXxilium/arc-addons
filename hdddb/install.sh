@@ -28,6 +28,8 @@ After=smpkg-custom-install.service pkgctl-StorageManager.service
 Type=oneshot
 RemainAfterExit=yes
 SuccessExitStatus=3
+StandardOutput=append:/var/log/hdddb.log
+StandardError=append:/var/log/hdddb.log
 ExecStart=-/usr/bin/hdddb.sh -nrwpeI
 
 [Install]

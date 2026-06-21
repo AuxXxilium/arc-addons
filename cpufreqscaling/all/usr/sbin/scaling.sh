@@ -72,6 +72,6 @@ if all_cpus_set; then
   echo "CPUFreqScaling: All CPUs set to ${GOVERNOR}, exiting."
 else
   echo "CPUFreqScaling: Failed to set all CPUs after 3 tries, exiting."
-  pkill -f "scaling.sh" || true
+  kill -9 "$(ps aux 2>/dev/null | grep -F "scaling.sh" | grep -v grep | awk '{print $2}' | head -1)" 2>/dev/null || true
   exit 1
 fi

@@ -15,7 +15,7 @@ DEFMODES=("30 70" "30 80" "30 90")
 
 # Default per-fan 3 points per mode: "t1@p1 t2@p2 t3@p3:t1@p1 t2@p2 t3@p3:t1@p1 t2@p2 t3@p3"
 #                                      fullfan            coolfan            quietfan
-DEF_FAN_PWM="30@50 50@75 70@100:30@20 55@50 80@80:30@10 60@35 90@60"
+DEF_FAN_PWM="30@50 50@75 70@100:30@20 55@50 80@80:30@20 60@35 90@60"
 
 ESYNOSCHEDULER_DB="/usr/syno/etc/esynoscheduler/esynoscheduler.db"
 FAN2GO_CONF="/etc/fan2go/fan2go.yaml"
@@ -185,9 +185,24 @@ find_cpu_temp_sensor() {
   done
 }
 
-# Get hwmon platform name for a hwmonX index.
+# Get fan2go platform string for a hwmonX index.
+# fan2go needs e.g. "coretemp-isa-0000" or "nct6798-isa-0290".
+# /sys/devices/platform/NAME.DECIMAL → NAME-isa-HEXADDR (zero-padded to 4 digits)
 hwmon_platform() {
-  cat "/sys/class/hwmon/hwmon${1}/name" 2>/dev/null || echo "hwmon${1}"
+  local idx="${1}"
+  local name dev_path dev_name dec hex
+  name="$(cat "/sys/class/hwmon/hwmon${idx}/name" 2>/dev/null)"
+  [ -z "${name}" ] && echo "hwmon${idx}" && return
+  dev_path="$(readlink -f "/sys/class/hwmon/hwmon${idx}/device" 2>/dev/null)"
+  dev_name="$(basename "${dev_path}")"
+  # Extract decimal suffix after the last dot (e.g. "coretemp.0" → 0, "nct6775.656" → 656)
+  dec="$(echo "${dev_name}" | grep -oE '\.[0-9]+$' | tr -d '.')"
+  if [ -n "${dec}" ]; then
+    hex="$(printf '%04x' "${dec}")"
+    echo "${name}-isa-${hex}"
+  else
+    echo "${name}"
+  fi
 }
 
 # Generate /etc/fan2go/fan2go.yaml from current FANMODES + FAN_CURVES + active mode index.
@@ -208,7 +223,7 @@ generate_fan2go_config() {
 
   {
     cat <<YAML
-dbPath: /var/lib/fan2go/fan2go.db
+dbPath: /etc/fan2go/fan2go.db
 runFanInitializationInParallel: true
 
 fans:
@@ -243,7 +258,6 @@ YAML
   - id: "fan_${hw_idx}_${fan_idx}"
     hwmon:
       platform: "${platform}"
-      index: ${hw_idx}
       rpmChannel: ${fan_idx}
       pwmChannel: ${fan_idx}
     neverStop: true
@@ -259,8 +273,7 @@ sensors:
   - id: cpu_temp
     hwmon:
       platform: "${CPU_PLATFORM}"
-      index: ${CPU_HW_IDX}
-      tempChannel: ${CPU_TEMP_IDX}
+      index: ${CPU_TEMP_IDX}
 
 curves:
 YAML
@@ -275,13 +288,14 @@ YAML
       local mode_pts
       mode_pts="$(echo "${pwm_vals}" | cut -d: -f"${mode_field}")"
 
-      # Emit the 3 stored points directly as fan2go steps
+      # Emit steps in fan2go format: "- TEMP_MILLIDEG: PWM%"
+      # fan2go reads hwmon temps in millidegrees, so multiply °C by 1000
       local steps=""
       for pt in $(echo "${mode_pts}"); do
         local t p
-        t="$(echo "${pt}" | cut -d'@' -f1)"
+        t=$(( $(echo "${pt}" | cut -d'@' -f1) * 1000 ))
         p="$(echo "${pt}" | cut -d'@' -f2)"
-        steps+="        - {temp: ${t}, pwm: ${p}}"$'\n'
+        steps+="        - ${t}: ${p}%"$'\n'
       done
 
       cat <<YAML
@@ -303,21 +317,22 @@ YAML
 }
 
 restart_fan2go() {
-  pkill -f "${FAN2GO_BIN}" 2>/dev/null
-  for _w in 1 2 3 4 5; do
-    pkill -0 -f "${FAN2GO_BIN}" 2>/dev/null || break
-    sleep 1
-  done
+  local pid
+  pid="$(ps aux 2>/dev/null | grep -F "${FAN2GO_BIN}" | grep -v grep | awk '{print $2}' | head -1)"
+  if [ -n "${pid}" ]; then
+    kill "${pid}" 2>/dev/null
+    for _w in 1 2 3 4 5; do
+      kill -0 "${pid}" 2>/dev/null || break
+      sleep 1
+    done
+    kill -9 "${pid}" 2>/dev/null || true
+  fi
+  mkdir -p /etc/fan2go /var/lib/fan2go
   LD_LIBRARY_PATH=/usr/lib "${FAN2GO_BIN}" --config "${FAN2GO_CONF}" --no-style >/dev/null 2>&1 &
 }
 
 RELOAD_FLAG="/run/arc-sensors.reload"
 RELOAD_NEEDED=0
-
-get_task_hash() {
-  [ -f "${ESYNOSCHEDULER_DB}" ] || echo ""
-  sqlite3 "${ESYNOSCHEDULER_DB}" "SELECT operation FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null | md5sum | cut -d' ' -f1
-}
 
 reload_config() {
   RELOAD_NEEDED=1
@@ -325,8 +340,11 @@ reload_config() {
 
 init_fans() {
   apply_amd_tctl_offset
+  # libsensors requires /etc/sensors3.conf — ensure it exists even if tgz was older
+  [ -f /etc/sensors3.conf ] || touch /etc/sensors3.conf
 
-  if [ -z "$(find /sys/ -name "fan*_input" 2>/dev/null)" ]; then
+
+  if [ -z "$(find /sys/class/hwmon/ -name "fan*_input" 2>/dev/null)" ]; then
     echo "No fan detected, skipping fan control..."
     set_fan_conf "no"
     return 1
@@ -353,14 +371,30 @@ init_fans() {
   return 0
 }
 
+start_fan2go() {
+  local FanMode="${1:-1}"
+  generate_fan2go_config "${FanMode}"
+  restart_fan2go
+}
+
 main() {
-  local FanBaseMode="" FanTaskHash="" FansActive=0 NoFanTick=0
+  local FanBaseMode="" FansActive=0 NoFanTick=0
 
   trap 'reload_config' HUP
 
+  # Determine initial fan mode
+  local FanType
+  FanType="$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)"
+  case "${FanType}" in
+    fullfan | full)   FanBaseMode="0" ;;
+    coolfan | high)   FanBaseMode="1" ;;
+    quietfan | low)   FanBaseMode="2" ;;
+    *)                FanBaseMode="1" ;;
+  esac
+
   if init_fans; then
     FansActive=1
-    FanTaskHash="$(get_task_hash)"
+    start_fan2go "${FanBaseMode}"
   fi
 
   while true; do
@@ -372,13 +406,13 @@ main() {
         NoFanTick=0
         if init_fans; then
           FansActive=1
-          FanBaseMode=""
-          FanTaskHash=""
+          start_fan2go "${FanBaseMode}"
         fi
       fi
       continue
     fi
 
+    # Reload triggered by arc-control save&apply or SIGHUP
     if [ "${RELOAD_NEEDED}" -eq 1 ] || [ -f "${RELOAD_FLAG}" ]; then
       echo "Reloading fan curves..."
       RELOAD_NEEDED=0
@@ -386,7 +420,6 @@ main() {
       load_task
       merge_fan_curves $(discover_fans)
       update_task
-      FanTaskHash="$(get_task_hash)"
       generate_fan2go_config "${FanBaseMode:-1}"
       restart_fan2go
       continue
@@ -401,18 +434,10 @@ main() {
       *)                FanCurtMode="1" ;;
     esac
 
-    local CurHash
-    CurHash="$(get_task_hash)"
-    if [ "${CurHash}" != "${FanTaskHash}" ]; then
-      echo "Fan task changed, reloading curves..."
-      FanTaskHash="${CurHash}"
-      load_task
-      FanBaseMode=""
-    fi
-
     if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
       echo "Fan mode changed to ${FanCurtMode} (${FanType})"
       FanBaseMode="${FanCurtMode}"
+      load_task
       generate_fan2go_config "${FanBaseMode}"
       restart_fan2go
     fi
@@ -421,5 +446,5 @@ main() {
   done
 }
 
-trap 'pkill -f "${FAN2GO_BIN}" 2>/dev/null' EXIT INT TERM
+trap 'kill $(ps aux 2>/dev/null | grep -F "${FAN2GO_BIN}" | grep -v grep | awk "{print \$2}" | head -1) 2>/dev/null' EXIT INT TERM
 main
