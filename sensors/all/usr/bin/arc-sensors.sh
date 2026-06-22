@@ -309,8 +309,8 @@ YAML
     cat <<YAML
 
 fanController:
-  adjustmentTickRate: 200ms
-  tempRollingWindowSize: 10
+  adjustmentTickRate: 2000ms
+  tempRollingWindowSize: 5
 YAML
   } >"${FAN2GO_CONF}"
 }

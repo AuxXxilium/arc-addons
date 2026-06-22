@@ -16,6 +16,7 @@
 #   -e | --email         No-op (kept for call-site compatibility)
 #   -S | --ssd           Set write_mostly on HDDs when internal SSDs are present
 #   -p | --pcie          Enable M.2 add-on card pool support (support_m2_pool + UI patch)
+#   -d | --dedup         Enable Btrfs deduplication for non-Synology drives (patches libhwcontrol)
 #
 
 # ── bootstrap ────────────────────────────────────────────────────────────────
@@ -38,6 +39,7 @@ wdda=no
 ihm=no
 ssd=no
 pcie=no
+dedup=no
 
 for arg in "$@"; do
   case "$arg" in
@@ -48,6 +50,7 @@ for arg in "$@"; do
     -S|--ssd)   ssd=yes ;;
     -e|--email) ;;
     -p|--pcie)  pcie=yes ;;
+    -d|--dedup) dedup=yes ;;
     *) ;;
   esac
 done
@@ -294,6 +297,83 @@ _enable_pcie() {
   fi
 }
 
+# ── Deduplication ────────────────────────────────────────────────────────────
+
+_enable_dedup() {
+  local libhw="/usr/lib/libhwcontrol.so.1"
+  local synoinfo2="/etc/synoinfo.conf"
+
+  # Determine tiny dedupe eligibility (needs 16 GB; tiny needs only 4 GB)
+  local ramtotal_mb=0
+  while IFS= read -r line; do
+    case "$line" in
+      *"Size:"*[0-9]*MB*) ramtotal_mb=$((ramtotal_mb + ${line//[^0-9]/})) ;;
+      *"Size:"*[0-9]*GB*) ramtotal_mb=$((ramtotal_mb + ${line//[^0-9]/} * 1024)) ;;
+    esac
+  done < <(dmidecode -t memory 2>/dev/null | grep -i "Size:")
+
+  if [ "$ramtotal_mb" -ge 16384 ]; then
+    _set support_btrfs_dedupe "yes"
+    _set support_tiny_btrfs_dedupe "no"
+    _log "dedup: full Btrfs deduplication enabled (${ramtotal_mb}MB RAM)"
+  elif [ "$ramtotal_mb" -ge 4096 ]; then
+    _set support_btrfs_dedupe "no"
+    _set support_tiny_btrfs_dedupe "yes"
+    _log "dedup: tiny Btrfs deduplication enabled (${ramtotal_mb}MB RAM)"
+  else
+    _log "dedup: insufficient RAM (${ramtotal_mb}MB), skipping"
+    return
+  fi
+
+  # Patch libhwcontrol.so.1 to allow non-Synology drives to use dedupe
+  [ -f "$libhw" ] || { _log "dedup: $libhw not found, skipping binary patch"; return; }
+
+  local hexstring match poshex posrep bytes
+  # Check if already patched (90 90 = NOP NOP)
+  hexstring="80 3E 00 B8 01 00 00 00 90 90 48 8B"
+  match=$(od -v -t x1 "$libhw" | sed 's/[^ ]* *//' | tr '\012' ' ' | grep -b -i -o "$hexstring" | cut -d: -f1 | head -1)
+  if [ -n "$match" ]; then
+    _log "dedup: libhwcontrol already patched"
+    return
+  fi
+
+  # Find the original bytes to patch
+  hexstring="80 3E 00 B8 01 00 00 00 75 2. 48 8B"
+  match=$(od -v -t x1 "$libhw" | sed 's/[^ ]* *//' | tr '\012' ' ' | grep -b -i -o "$hexstring" | cut -d: -f1 | head -1)
+  if [ -z "$match" ]; then
+    _log "dedup: libhwcontrol patch target not found (DSM version mismatch?)"
+    return
+  fi
+
+  local seek
+  seek=$(( match / 3 ))
+  poshex=$(printf "%x" "$seek")
+  posrep=$(printf "%x" $((seek + 8)))
+
+  # Backup before patching
+  if [ ! -f "${libhw}.bak" ]; then
+    cp -p "$libhw" "${libhw}.bak" && _log "dedup: backed up $libhw"
+  fi
+
+  if printf '%s' "${posrep}: 9090" | xxd -r - "$libhw"; then
+    _log "dedup: libhwcontrol patched to allow non-Synology drive deduplication"
+  else
+    _log "dedup: failed to patch libhwcontrol"
+  fi
+
+  # Enable HDD dedupe config button in StorageManager UI
+  local strgmgr
+  for _p in \
+    "/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js" \
+    "/usr/syno/synoman/webman/modules/StorageManager/storage_panel.js"; do
+    [ -f "${_p}" ] && strgmgr="${_p}" && break
+  done
+  if [ -n "$strgmgr" ] && grep -q '&&e.dedup_info.show_config_btn' "$strgmgr" 2>/dev/null; then
+    sed -i 's/&&e.dedup_info.show_config_btn//g' "$strgmgr"
+    _log "dedup: StorageManager UI patched to enable HDD dedupe config button"
+  fi
+}
+
 # ── IronWolf Health Management ────────────────────────────────────────────────
 
 _enable_ihm() {
@@ -463,6 +543,11 @@ fi
 if [ "$pcie" = "yes" ]; then
   _log "enabling PCIe/M.2 adaptor card support..."
   _enable_pcie
+fi
+
+if [ "$dedup" = "yes" ]; then
+  _log "enabling deduplication support..."
+  _enable_dedup
 fi
 
 if systemctl is-active --quiet pkgctl-StorageManager.service 2>/dev/null; then
