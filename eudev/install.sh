@@ -40,6 +40,10 @@ elif [ "${1}" = "modules" ]; then
 
   mkdir -p /run/udev
   /usr/sbin/depmod -a || echo "boot depmod skipped"
+  # modprobe modules before triggering udev so cold-plug events see them
+  for M in sg pcspeaker pcspkr drivetemp coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
+    /usr/sbin/modprobe "${M}" 2>/dev/null || true
+  done
   /usr/sbin/udevd -d || {
     echo "FAIL"
     exit 1
@@ -60,10 +64,6 @@ elif [ "${1}" = "modules" ]; then
   done
   /usr/bin/killall -9 udevd 2>/dev/null || true
   rm -rf /run/udev
-  # modprobe modules for beep, sensors, and virtiofs
-  for M in sg drivetemp pcspeaker pcspkr coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
-    /usr/sbin/modprobe "${M}" 2>/dev/null || true
-  done
 
   for P in tcp sch; do
     for F in $(LC_ALL=C printf '%s\n' /usr/lib/modules/${P}_*.ko | sort -V); do
