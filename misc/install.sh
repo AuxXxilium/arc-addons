@@ -207,12 +207,17 @@ elif [ "${1}" = "late" ]; then
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno_update_disk_logs.service 2>/dev/null
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-nic-supported-check.service 2>/dev/null
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-switch-check.service 2>/dev/null
-  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
-  sed -i 's|^Restart=.*|Restart=no|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
-  sed -i 's|^Type=.*|Type=oneshot|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
-  grep -q "^RemainAfterExit=" /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null \
-    && sed -i 's|^RemainAfterExit=.*|RemainAfterExit=yes|g' /tmpRoot/usr/lib/systemd/system/numanod.service \
-    || sed -i '/^\[Service\]/a RemainAfterExit=yes' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
+  # numanod: only disable on single-node systems; let it run on real multi-socket NUMA.
+  # /proc/buddyinfo has one line per (node, zone) — count distinct node numbers.
+  NUMA_NODES=$(awk '/^Node/ {print $2}' /proc/buddyinfo 2>/dev/null | sort -u | wc -l)
+  if [ "${NUMA_NODES}" -le 1 ]; then
+    sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
+    sed -i 's|^Restart=.*|Restart=no|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
+    sed -i 's|^Type=.*|Type=oneshot|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
+    grep -q "^RemainAfterExit=" /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null \
+      && sed -i 's|^RemainAfterExit=.*|RemainAfterExit=yes|g' /tmpRoot/usr/lib/systemd/system/numanod.service \
+      || sed -i '/^\[Service\]/a RemainAfterExit=yes' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
+  fi
 
   # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
