@@ -35,23 +35,44 @@ _check_user_conf() {
   grep -Eq "^${1}=" "${UCONF}" 2>/dev/null
 }
 
-# Sort sd* devices by PCI path and SCSI address for stable physical port ordering.
-# Outputs sd device basenames (sda, sdb, ...) in controller/port order.
+# Sort sd* devices by PCIe topology for stable physical slot ordering.
+#
+# Sort key (tab-separated, lexicographically comparable):
+#   1. Normalized leaf PCI address: DDDD:BB:DD.F  (zero-padded domain so "0000:" sorts before any domain)
+#      Extracted from syno_block_info pciepath first, then PHYSDEVPATH fallback.
+#      Disks without a PCI parent (pure USB, virtio with no PCI path) sort last ("zzzz:zz:zz.z").
+#   2. SCSI address H:C:T:L — secondary key within the same controller, gives stable per-port ordering.
+#   3. sd device name — final tiebreaker, never needed in practice.
+#
+# This replaces both the old _sorted_sd_disks() (PHYSDEVPATH string sort) and _legacy_sd_disks()
+# (sd-letter order).  The result is deterministic across reboots regardless of sd* letter assignment.
 _sorted_sd_disks() {
   for F in /sys/block/sd*; do
     [ -e "${F}" ] || continue
     N="$(basename "${F}")"
-    PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/{print $2}' "${F}/uevent" 2>/dev/null)"
-    SCSI="$(readlink -f "${F}/device" 2>/dev/null | grep -Eo '[0-9]+:[0-9]+:[0-9]+:[0-9]+' | head -1)"
-    printf '%s\t%s\t%s\n' "${PHYSDEVPATH:-zzz}" "${SCSI:-0:0:0:0}" "${N}"
-  done | sort | awk -F'\t' '{print $3}'
-}
 
-# Legacy sd* lexical ordering.
-_legacy_sd_disks() {
-  LC_ALL=C printf '%s\n' /sys/block/sd* | sort -V | while read -r _F; do
-    [ -e "${_F}" ] && basename "${_F}"
-  done
+    # Prefer pciepath from syno_block_info (already normalized by LKM).
+    PCIE="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+
+    # Fallback: extract leaf PCI address from PHYSDEVPATH.
+    if [ -z "${PCIE}" ]; then
+      PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/{print $2}' "${F}/uevent" 2>/dev/null)"
+      [ -n "${PHYSDEVPATH}" ] && PCIE="$(printf '%s' "${PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+    fi
+
+    # Normalize: ensure DDDD:BB:DD.F format (add 0000: domain if missing).
+    if [ -n "${PCIE}" ]; then
+      case "${PCIE}" in
+        *:*:*.*) : ;; # already has domain
+        *)  PCIE="0000:${PCIE}" ;;
+      esac
+    else
+      PCIE="zzzz:zz:zz.z"
+    fi
+
+    SCSI="$(readlink -f "${F}/device" 2>/dev/null | grep -Eo '[0-9]+:[0-9]+:[0-9]+:[0-9]+' | head -1)"
+    printf '%s\t%s\t%s\n' "${PCIE}" "${SCSI:-0:0:0:0}" "${N}"
+  done | sort | awk -F'\t' '{print $3}'
 }
 
 # Check if any HBA/SCSI/RAID controller is present via PCI class codes.
@@ -69,8 +90,9 @@ _count_disks() {
   echo "${C}"
 }
 
-# Wait until HBA disk enumeration becomes stable.
-# Args: $1 glob pattern for disks to watch (default /sys/block/sd*)
+# Wait until HBA disk enumeration becomes stable across one or more glob patterns.
+# Args: $1 $2 ... glob patterns to watch (counts are summed); defaults to /sys/block/sd*
+# The one-shot guard prevents re-waiting when called multiple times in the same script run.
 _wait_hba_disks_stable() {
   [ "${_HBA_WAIT_DONE:-0}" = "1" ] && return 0
   _HBA_WAIT_DONE=1
@@ -80,13 +102,21 @@ _wait_hba_disks_stable() {
     return 0
   fi
 
-  GLOB="${1:-/sys/block/sd*}"
-  PREV_COUNT="$(_count_disks "${GLOB}")"
+  # Accept multiple glob patterns; sum their counts so adding disks on any pattern restarts the timer.
+  _whba_globs="${*:-/sys/block/sd*}"
+
+  _whba_count() {
+    _C=0
+    for _G in ${_whba_globs}; do _C=$((_C + $(_count_disks "${_G}"))); done
+    echo "${_C}"
+  }
+
+  PREV_COUNT="$(_whba_count)"
   STABLE_ROUNDS=0
   I=0
   while [ "${I}" -lt 40 ]; do
     sleep 3
-    CUR_COUNT="$(_count_disks "${GLOB}")"
+    CUR_COUNT="$(_whba_count)"
     if [ "${CUR_COUNT}" = "${PREV_COUNT}" ]; then
       STABLE_ROUNDS=$((STABLE_ROUNDS + 1))
       [ "${STABLE_ROUNDS}" -ge 5 ] && break
@@ -96,7 +126,7 @@ _wait_hba_disks_stable() {
     fi
     I=$((I + 1))
   done
-  _log "HBA disks settled: ${GLOB} at count ${CUR_COUNT}"
+  _log "HBA disks settled: [${_whba_globs}] at count ${CUR_COUNT}"
 }
 
 # Check if the raid has been completed currently
@@ -109,22 +139,6 @@ _check_rootraidstatus() {
     "clear" | "inactive" | "suspended" | "readonly" | "read-auto") return 1 ;;
   esac
   return 0
-}
-
-# Convert disk name to integer
-# Args: $1 disk name
-_atoi() {
-  DISKNAME=${1}
-  NUM=0
-  IDX=0
-  while [ ${IDX} -lt ${#DISKNAME} ]; do
-    N=$(($(printf '%d' "'$(expr substr "${DISKNAME}" $((IDX + 1)) 1)") - $(printf '%d' "'a") + 1))
-    BIT=$(($(expr length "${DISKNAME}") - 1 - IDX))
-    # shellcheck disable=SC3019
-    NUM=$((NUM + (BIT == 0 ? N : 26 ** BIT * N)))
-    IDX=$((IDX + 1))
-  done
-  echo $((NUM - 1))
 }
 
 # Convert integer to disk name
@@ -222,7 +236,9 @@ dtModel() {
   _log dtModel
 
   # Wait for late HBA/SATA/SAS probes before enumerating slots.
-  _wait_hba_disks_stable "/sys/block/sata*"
+  # Native SATA is always sata*. HBA/PCI-storage disks appear as sas* on DT because
+  # the LKM leaves their syno_port_type as SAS. sd* covers VirtIO and other SCSI hosts.
+  _wait_hba_disks_stable "/sys/block/sata*" "/sys/block/sas*" "/sys/block/sd*"
 
   DEST="/etc/model.dts"
   [ -f "/addons/model.dts" ] && cp -vpf "/addons/model.dts" "${DEST}"
@@ -240,179 +256,175 @@ dtModel() {
     } >"${DEST}"
 
     # SATA ports
+    # Enumerate sata* devices sorted by PCIe topology (pcie_root + ata_port) for stable slot numbering.
+    # Each controller's full port range is always emitted in order (0 .. PORTNUM-1), regardless of
+    # which ports currently have disks attached, giving stable slot@N numbers across disk add/remove.
+    # Sort key: PCIE(DDDD:BB:DD.F) TAB zero-padded-ATAPORT TAB device-name.
+    # pcie_root value format is kernel-version-dependent and normalised by the sed pass below:
+    #   kernel < 5.x expects "BB:DD.F"  (no domain prefix)
+    #   kernel >= 5.x expects "0000:BB:DD.F"
+    # We always store the full DDDD:BB:DD.F form internally so sorting is deterministic; the sed
+    # pass at the end of dtModel() rewrites to whichever format the running kernel needs.
     COUNT=0
+    _DT_SEEN="/tmp/_dt_seen_ctrl"
+    : >"${_DT_SEEN}"
 
-    HDDSORT="$(grep -wq "hddsort" /proc/cmdline 2>/dev/null && echo "true" || echo "false")"
-
-    for F in $(LC_ALL=C printf '%s\n' /sys/block/sata* | sort -V); do
-      [ ! -e "${F}" ] && continue
-      N="$(basename "${F}")"
-      # Skip loader disk by name (e.g. sata1 is the Arc loader disk on SATA).
-      [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
-      # Skip loader disk by PHYSDEVPATH (handles cases where BOOTDISK name differs from sata* alias).
-      _SATA_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-      if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_SATA_PHYSDEVPATH}" ] && [ "${_SATA_PHYSDEVPATH}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
-        _log "bootloader (alias): ${F}"
-        continue
+    # Build sorted sata* entry list into a temp file, then iterate without a subshell pipe
+    # so COUNT and the seen-controller file stay in the parent shell context.
+    _DT_SATA_TMP="/tmp/_dt_sata_list"
+    : >"${_DT_SATA_TMP}"
+    for _F in /sys/block/sata*; do
+      [ -e "${_F}" ] || continue
+      _N="$(basename "${_F}")"
+      _PP="$(awk -F= '/PHYSDEVPATH/{print $2}' "${_F}/uevent" 2>/dev/null)"
+      _PC="$(grep 'pciepath' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      _AT="$(grep 'ata_port_no' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      _DR="$(grep 'driver' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      if [ -z "${_PC}" ] && [ -n "${_PP}" ]; then
+        _PC="$(printf '%s' "${_PP}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
       fi
-
-      PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      ATAPORT="$(grep 'ata_port_no' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      DRIVER="$(cat "${F}/device/syno_block_info" 2>/dev/null | grep 'driver' | cut -d'=' -f2)"
-
-      # Fallback: derive pciepath/driver/ataport from PHYSDEVPATH when syno_block_info is incomplete.
-      # Needed on platforms like EPYC7002 where DSM only populates syno_block_info for some ports.
-      if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
-        if [ -n "${_SATA_PHYSDEVPATH}" ] && [ -z "${PCIEPATH}" ]; then
-          # Use tail -1 to pick the leaf PCI device, not an intermediate PCIe bridge.
-          PCIEPATH="$(echo "${_SATA_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-        fi
-        if [ -n "${PCIEPATH}" ] && [ -z "${DRIVER}" ] && [ -L "/sys/bus/pci/devices/${PCIEPATH}/driver" ]; then
-          DRIVER="$(basename "$(readlink -f "/sys/bus/pci/devices/${PCIEPATH}/driver")")"
-        fi
-        # Derive ataport from sorted ata* host list for this controller.
-        if [ -n "${_SATA_PHYSDEVPATH}" ] && [ -z "${ATAPORT}" ]; then
-          _SATA_FB_ATA="$(echo "${_SATA_PHYSDEVPATH}" | grep -Eo 'ata[0-9]+' | head -1)"
-          _SATA_FB_CTRL="/sys${_SATA_PHYSDEVPATH%%/ata*}"
-          if [ -n "${_SATA_FB_ATA}" ] && [ -d "${_SATA_FB_CTRL}" ]; then
-            _SATA_FB_IDX=0
-            for _SATA_FB_E in $(ls "${_SATA_FB_CTRL}" 2>/dev/null | grep '^ata[0-9]' | sort -V); do
-              if [ "${_SATA_FB_E}" = "${_SATA_FB_ATA}" ]; then
-                ATAPORT=${_SATA_FB_IDX}
-                break
-              fi
-              _SATA_FB_IDX=$((_SATA_FB_IDX + 1))
-            done
-          fi
-        fi
-        if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
-          _log "unknown: ${F}"
-          continue
-        fi
+      if [ -n "${_PC}" ] && [ -z "${_DR}" ] && [ -L "/sys/bus/pci/devices/${_PC}/driver" ]; then
+        _DR="$(basename "$(readlink -f "/sys/bus/pci/devices/${_PC}/driver")")"
       fi
-      if [ "${CONTPCI}" = "${PCIEPATH}" ]; then
-        continue
-      fi
-      CONTPCI=""
-      # Use PHYSDEVPATH to count ata* ports for any PCIe bus (pci0000:00 hardcode was wrong for e.g. EPYC7002 bus 02).
-      _SATA_CTRL_PATH="/sys${_SATA_PHYSDEVPATH%%/ata*}"
-      if [ -n "${_SATA_PHYSDEVPATH}" ] && [ -d "${_SATA_CTRL_PATH}" ]; then
-        PORTNUM=$(ls -d "${_SATA_CTRL_PATH}/ata"* 2>/dev/null | wc -l)
+      if [ -n "${_PC}" ]; then
+        case "${_PC}" in *:*:*.*) : ;; *) _PC="0000:${_PC}" ;; esac
       else
-        # shellcheck disable=SC2046
-        PORTNUM=$(ls -ld /sys/devices/pci0000:00/*$(echo "${PCIEPATH}" | sed 's/,/\/*:/g')/ata* 2>/dev/null | wc -l)
+        _log "unknown: ${_F}"; continue
       fi
-      if [ "${HDDSORT}" = "true" ] && [ "${PORTNUM}" -gt 0 ]; then
-        CONTPCI=${PCIEPATH}
-        for I in $(seq 0 $((PORTNUM - 1))); do
-          if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] && ([ -z "${ATAPORT}" ] || [ "${BOOTDISK_ATAPORT}" = "${I}" ]); then
-            _log "bootloader: ${F}"
-            continue
+      [ -z "${_DR}" ] && { _log "unknown driver: ${_F}"; continue; }
+      # Fallback ataport: index of this ata* within the controller's sorted ata* list.
+      if [ -z "${_AT}" ] && [ -n "${_PP}" ]; then
+        _FB_ATA="$(printf '%s' "${_PP}" | grep -Eo 'ata[0-9]+' | head -1)"
+        _FB_CTRL="/sys${_PP%%/ata*}"
+        if [ -n "${_FB_ATA}" ] && [ -d "${_FB_CTRL}" ]; then
+          _FB_IDX=0
+          for _FB_E in $(ls "${_FB_CTRL}" 2>/dev/null | grep '^ata[0-9]' | sort -V); do
+            [ "${_FB_E}" = "${_FB_ATA}" ] && { _AT=${_FB_IDX}; break; }
+            _FB_IDX=$((_FB_IDX + 1))
+          done
+        fi
+      fi
+      # Sort key: PCIE TAB zero-padded-ATAPORT TAB driver TAB name TAB physdevpath
+      printf '%s\t%04d\t%s\t%s\t%s\n' "${_PC}" "${_AT:-0}" "${_DR}" "${_N}" "${_PP}"
+    done | sort >"${_DT_SATA_TMP}"
+
+    # Emit per-controller port ranges in PCIe-sorted order.
+    # Each controller's ports are always expanded in full (0..PORTNUM-1) for stable slot@N numbering
+    # regardless of which ports currently have a disk attached.
+    # Sort key encodes the kernel-version-independent DDDD:BB:DD.F form; the sed pass at the end of
+    # dtModel() rewrites pcie_root values to the format the running kernel expects.
+    while IFS="$(printf '\t')" read -r _PC _AT _DR _N _PP; do
+      _F="/sys/block/${_N}"
+      [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && { _log "bootloader: ${_F}"; continue; }
+      if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
+        _log "bootloader (alias): ${_F}"; continue
+      fi
+      # Skip if this controller was already processed.
+      grep -qF "${_PC}" "${_DT_SEEN}" 2>/dev/null && continue
+      echo "${_PC}" >>"${_DT_SEEN}"
+
+      # Skip entire controller when the boot disk owns it and we have no per-port ataport info.
+      if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ -z "${BOOTDISK_ATAPORT}" ]; then
+        _log "bootloader (ctrl): ${_F}"; continue
+      fi
+
+      # Count physical ata* ports for this controller.
+      _CTRL_PATH="/sys${_PP%%/ata*}"
+      if [ -n "${_PP}" ] && [ -d "${_CTRL_PATH}" ]; then
+        _PORTNUM=$(ls -d "${_CTRL_PATH}/ata"* 2>/dev/null | wc -l)
+      else
+        _PORTNUM=0
+      fi
+
+      if [ "${_PORTNUM}" -gt 0 ]; then
+        _I=0
+        while [ "${_I}" -lt "${_PORTNUM}" ]; do
+          if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ "${BOOTDISK_ATAPORT}" = "${_I}" ]; then
+            _log "bootloader (port ${_I}): ${_F}"
+            _I=$((_I + 1)); continue
           fi
           COUNT=$((COUNT + 1))
           {
             echo "    internal_slot@${COUNT} {"
             echo "        reg = <${COUNT}>;"
             echo '        protocol_type = "sata";'
-            echo "        ${DRIVER} {"
-            echo "            pcie_root = \"${PCIEPATH}\";"
-            [ -n "${ATAPORT}" ] && echo "            ata_port = <0x$(printf '%02X' ${I})>;"
+            echo "        ${_DR} {"
+            echo "            pcie_root = \"${_PC}\";"
+            printf "            ata_port = <0x%02X>;\n" "${_I}"
             echo "            internal_mode;"
             echo "        };"
             echo "    };"
           } >>"${DEST}"
+          _I=$((_I + 1))
         done
       else
-        if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] && ([ -z "${ATAPORT}" ] || [ "${BOOTDISK_ATAPORT}" = "${ATAPORT}" ]); then
-          _log "bootloader: ${F}"
-          continue
-        fi
+        # No ata* children (unusual) — emit a single controller-level slot.
+        [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && { _log "bootloader (ctrl-single): ${_F}"; continue; }
         COUNT=$((COUNT + 1))
         {
           echo "    internal_slot@${COUNT} {"
           echo "        reg = <${COUNT}>;"
           echo '        protocol_type = "sata";'
-          echo "        ${DRIVER} {"
-          echo "            pcie_root = \"${PCIEPATH}\";"
-          [ -n "${ATAPORT}" ] && echo "            ata_port = <0x$(printf '%02X' ${ATAPORT})>;"
+          echo "        ${_DR} {"
+          echo "            pcie_root = \"${_PC}\";"
           echo "            internal_mode;"
           echo "        };"
           echo "    };"
         } >>"${DEST}"
       fi
-    done
+    done <"${_DT_SATA_TMP}"
+    rm -f "${_DT_SATA_TMP}"
 
-    # SD* fallback for HBA/RAID devices without sata* aliases (e.g. megaraid, some SAS setups)
-    for F in $(LC_ALL=C printf '%s\n' /sys/block/sd* | sort -V); do
-      [ ! -e "${F}" ] && continue
-      N="$(basename "${F}")"
-      [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && continue
-      if [ -n "${BOOTDISK_PHYSDEVPATH}" ]; then
-        _SD_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-        [ -n "${_SD_PP}" ] && [ "${_SD_PP}" = "${BOOTDISK_PHYSDEVPATH}" ] && { _log "bootloader (alias): ${F}"; continue; }
+    # SAS*/SD* fallback: HBA/RAID devices without sata* aliases.
+    # On DT the LKM deliberately leaves HBA PCI-storage disks with syno_port_type=SAS so that
+    # sd.c assigns them the sas* device name (/sys/block/sas0, sas1, ...) rather than sd*.
+    # sd* covers VirtIO and any other SCSI host whose port type was not changed by the LKM.
+    # Sort by PCIe address + SCSI H:C:T:L; one controller-level slot per HBA.
+    _DT_SD_TMP="/tmp/_dt_sd_list"
+    : >"${_DT_SD_TMP}"
+    for _F in /sys/block/sd* /sys/block/sas*; do
+      [ -e "${_F}" ] || continue
+      _N="$(basename "${_F}")"
+      _PC="$(grep 'pciepath' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      _DR="$(grep 'driver' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      _PP="$(awk -F= '/PHYSDEVPATH/{print $2}' "${_F}/uevent" 2>/dev/null)"
+      if [ -z "${_PC}" ] && [ -n "${_PP}" ]; then
+        _PC="$(printf '%s' "${_PP}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
       fi
-      # On AMD/DT systems (e.g. EPYC7002) BOOTDISK_PHYSDEVPATH may be empty because syno_block_info
-      # is not populated until after the shim runs.  Fall back to PCI path comparison so the SATA
-      # loader disk is never included as a data disk in the DTS.
-      if [ -n "${BOOTDISK_PCIEPATH}" ]; then
-        _SD_PCIE="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-        if [ -z "${_SD_PCIE}" ]; then
-          _SD_PP2="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-          [ -n "${_SD_PP2}" ] && _SD_PCIE="$(echo "${_SD_PP2}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-        fi
-        [ -n "${_SD_PCIE}" ] && [ "${_SD_PCIE}" = "${BOOTDISK_PCIEPATH}" ] && { _log "bootloader (pciepath): ${F}"; continue; }
+      if [ -n "${_PC}" ] && [ -z "${_DR}" ] && [ -L "/sys/bus/pci/devices/${_PC}/driver" ]; then
+        _DR="$(basename "$(readlink -f "/sys/bus/pci/devices/${_PC}/driver")")"
       fi
+      { [ -z "${_PC}" ] || [ -z "${_DR}" ]; } && continue
+      case "${_PC}" in *:*:*.*) : ;; *) _PC="0000:${_PC}" ;; esac
+      _SCSI="$(readlink -f "${_F}/device" 2>/dev/null | grep -Eo '[0-9]+:[0-9]+:[0-9]+:[0-9]+' | head -1)"
+      printf '%s\t%s\t%s\t%s\t%s\n' "${_PC}" "${_SCSI:-0:0:0:0}" "${_DR}" "${_N}" "${_PP}"
+    done | sort >"${_DT_SD_TMP}"
 
-      PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      DRIVER="$(cat "${F}/device/syno_block_info" 2>/dev/null | grep 'driver' | cut -d'=' -f2)"
-
-      # Fallback for HBA/RAID disks where syno_block_info lacks pciepath or driver
-      if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
-        PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-        if [ -n "${PHYSDEVPATH}" ] && [ -z "${PCIEPATH}" ]; then
-          # Use tail -1 to pick the leaf PCI device, not an intermediate PCIe bridge.
-          PCIEPATH="$(echo "${PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-        fi
-        if [ -n "${PCIEPATH}" ] && [ -z "${DRIVER}" ] && [ -L "/sys/bus/pci/devices/${PCIEPATH}/driver" ]; then
-          DRIVER="$(basename "$(readlink -f "/sys/bus/pci/devices/${PCIEPATH}/driver")")"
-        fi
+    while IFS="$(printf '\t')" read -r _PC _SCSI _DR _N _PP; do
+      _F="/sys/block/${_N}"
+      [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && continue
+      if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
+        _log "bootloader (alias): ${_F}"; continue
       fi
-
-      if [ -z "${PCIEPATH}" ] || [ -z "${DRIVER}" ]; then
-        continue
+      if [ -n "${BOOTDISK_PCIEPATH}" ] && [ -n "${_PC}" ] && [ "${_PC}" = "${BOOTDISK_PCIEPATH}" ]; then
+        _log "bootloader (pciepath): ${_F}"; continue
       fi
-
-      # Read ata_port from syno_block_info to enable per-port dedup and entry creation.
-      ATAPORT_SD="$(grep 'ata_port_no' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-
-      if [ -n "${ATAPORT_SD}" ]; then
-        # Per-port SATA: skip if this exact pcie_root+ata_port combo already exists.
-        _ATOHEX="$(printf '%02X' "${ATAPORT_SD}")"
-        if grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}"; then
-          # Also skip if there is a controller-level entry (no ata_port) covering all ports.
-          if grep -A2 "pcie_root = \"${PCIEPATH}\";" "${DEST}" | grep -qv "ata_port"; then
-            continue
-          fi
-          grep -A2 "pcie_root = \"${PCIEPATH}\";" "${DEST}" | grep -q "ata_port = <0x${_ATOHEX}>;" && continue
-        fi
-      else
-        # HBA-style: if any entry for this controller already exists, skip.
-        grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue
-      fi
-
+      # Skip if already handled by sata* loop or a prior sd* entry for this controller.
+      grep -qF "${_PC}" "${_DT_SEEN}" 2>/dev/null && continue
+      echo "${_PC}" >>"${_DT_SEEN}"
       COUNT=$((COUNT + 1))
       {
         echo "    internal_slot@${COUNT} {"
         echo "        reg = <${COUNT}>;"
         echo '        protocol_type = "sata";'
-        echo "        ${DRIVER} {"
-        echo "            pcie_root = \"${PCIEPATH}\";"
-        [ -n "${ATAPORT_SD}" ] && echo "            ata_port = <0x$(printf '%02X' "${ATAPORT_SD}")>;"
+        echo "        ${_DR} {"
+        echo "            pcie_root = \"${_PC}\";"
         echo "            internal_mode;"
         echo "        };"
         echo "    };"
       } >>"${DEST}"
-    done
+    done <"${_DT_SD_TMP}"
+    rm -f "${_DT_SD_TMP}" "${_DT_SEEN}"
 
     # NVME ports
     COUNT=0
@@ -577,11 +589,6 @@ nondtModel() {
   # Wait for asynchronous HBA probes to complete.
   _wait_hba_disks_stable "/sys/block/sd*"
 
-  # disksort: assign bit indices by physical PCI+SCSI order instead of sd-letter
-  # order, giving stable port assignments across reboots on HBA systems.
-  DISKSORT="$(grep -wq "disksort" /proc/cmdline 2>/dev/null && echo "true" || echo "false")"
-  _log "disksort=${DISKSORT}"
-
   MAXDISKS=0
   USBPORTCFG=0
   ESATAPORTCFG=0
@@ -594,12 +601,8 @@ nondtModel() {
   NONUSBMASK=0
   SEQ_IDX=0
 
-  if [ "${DISKSORT}" = "true" ]; then
-    DISK_NAMES="$(_sorted_sd_disks)"
-  else
-    # Fallback to the legacy sd-letter order when physical sorting is not requested.
-    DISK_NAMES="$(_legacy_sd_disks)"
-  fi
+  # Always sort by PCIe topology for stable physical slot assignments across reboots.
+  DISK_NAMES="$(_sorted_sd_disks)"
 
   for N in ${DISK_NAMES}; do
     F="/sys/block/${N}"
@@ -620,12 +623,8 @@ nondtModel() {
       fi
       [ -n "${_N_PCIE}" ] && [ "${_N_PCIE}" = "${BOOTDISK_PCIEPATH}" ] && { _log "bootloader (pciepath): ${F}"; continue; }
     fi
-    if [ "${DISKSORT}" = "true" ]; then
-      IDX=${SEQ_IDX}
-      SEQ_IDX=$((SEQ_IDX + 1))
-    else
-      IDX=$(_atoi "$(echo "${N}" | sed -E 's/^sd//')")
-    fi
+    IDX=${SEQ_IDX}
+    SEQ_IDX=$((SEQ_IDX + 1))
     BIT=$((2 ** IDX))
     [ $((IDX + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((IDX + 1))
     if grep "PHYSDEVPATH" "${F}/uevent" 2>/dev/null | grep -q "usb"; then
@@ -664,6 +663,8 @@ nondtModel() {
   fi
 
   if grep -wq "usbinternal" /proc/cmdline 2>/dev/null; then
+    # LKM promotes USB disks to SYNO_PORT_TYPE_SATA when usbinternal is set — DSM sees them
+    # as SATA disks already, so no USB port bitmask is needed.
     USBPORTCFG=0
     __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
     printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
