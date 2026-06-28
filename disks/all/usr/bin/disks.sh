@@ -70,8 +70,14 @@ _sorted_sd_disks() {
       PCIE="zzzz:zz:zz.z"
     fi
 
-    SCSI="$(readlink -f "${F}/device" 2>/dev/null | grep -Eo '[0-9]+:[0-9]+:[0-9]+:[0-9]+' | head -1)"
-    printf '%s\t%s\t%s\n' "${PCIE}" "${SCSI:-0:0:0:0}" "${N}"
+    # Zero-pad each field of H:C:T:L for correct numeric lexicographic sort.
+    SCSI_RAW="$(readlink -f "${F}/device" 2>/dev/null | grep -Eo '[0-9]+:[0-9]+:[0-9]+:[0-9]+' | head -1)"
+    if [ -n "${SCSI_RAW}" ]; then
+      SCSI_PAD="$(echo "${SCSI_RAW}" | awk -F: '{printf "%05d:%05d:%05d:%05d",$1,$2,$3,$4}')"
+    else
+      SCSI_PAD="00000:00000:00000:00000"
+    fi
+    printf '%s\t%s\t%s\n' "${PCIE}" "${SCSI_PAD}" "${N}"
   done | sort | awk -F'\t' '{print $3}'
 }
 
@@ -256,15 +262,11 @@ dtModel() {
     } >"${DEST}"
 
     # SATA ports
-    # Enumerate sata* devices sorted by PCIe topology (pcie_root + ata_port) for stable slot numbering.
-    # Each controller's full port range is always emitted in order (0 .. PORTNUM-1), regardless of
-    # which ports currently have disks attached, giving stable slot@N numbers across disk add/remove.
-    # Sort key: PCIE(DDDD:BB:DD.F) TAB zero-padded-ATAPORT TAB device-name.
-    # pcie_root value format is kernel-version-dependent and normalised by the sed pass below:
-    #   kernel < 5.x expects "BB:DD.F"  (no domain prefix)
-    #   kernel >= 5.x expects "0000:BB:DD.F"
-    # We always store the full DDDD:BB:DD.F form internally so sorting is deterministic; the sed
-    # pass at the end of dtModel() rewrites to whichever format the running kernel needs.
+    # One slot per attached sata* disk, sorted by PCIe topology (pcie_root + ata_port) for stable
+    # slot@N numbers tied to physical port position across reboots.
+    # pcie_root format is kernel-version-dependent; the sed pass at the end of dtModel() normalises:
+    #   kernel < 5.x expects "BB:DD.F", kernel >= 5.x expects "0000:BB:DD.F"
+    # We always store full DDDD:BB:DD.F internally so sorting is deterministic.
     COUNT=0
     _DT_SEEN="/tmp/_dt_seen_ctrl"
     : >"${_DT_SEEN}"
@@ -308,70 +310,35 @@ dtModel() {
       printf '%s\t%04d\t%s\t%s\t%s\n' "${_PC}" "${_AT:-0}" "${_DR}" "${_N}" "${_PP}"
     done | sort >"${_DT_SATA_TMP}"
 
-    # Emit per-controller port ranges in PCIe-sorted order.
-    # Each controller's ports are always expanded in full (0..PORTNUM-1) for stable slot@N numbering
-    # regardless of which ports currently have a disk attached.
-    # Sort key encodes the kernel-version-independent DDDD:BB:DD.F form; the sed pass at the end of
-    # dtModel() rewrites pcie_root values to the format the running kernel expects.
+    # Emit one slot per attached disk in PCIe-sorted order.
+    # Each row in _DT_SATA_TMP is one actual disk; emit its ata_port directly.
+    # The sort order (PCIE TAB ATAPORT) gives stable slot@N numbers tied to physical port position.
     while IFS="$(printf '\t')" read -r _PC _AT _DR _N _PP; do
       _F="/sys/block/${_N}"
       [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && { _log "bootloader: ${_F}"; continue; }
       if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
         _log "bootloader (alias): ${_F}"; continue
       fi
-      # Skip if this controller was already processed.
-      grep -qF "${_PC}" "${_DT_SEEN}" 2>/dev/null && continue
-      echo "${_PC}" >>"${_DT_SEEN}"
-
-      # Skip entire controller when the boot disk owns it and we have no per-port ataport info.
+      if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ "${BOOTDISK_ATAPORT}" = "${_AT}" ]; then
+        _log "bootloader (port ${_AT}): ${_F}"; continue
+      fi
+      # Skip entire controller when boot disk owns it and we have no per-port ataport info.
       if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ -z "${BOOTDISK_ATAPORT}" ]; then
         _log "bootloader (ctrl): ${_F}"; continue
       fi
-
-      # Count physical ata* ports for this controller.
-      _CTRL_PATH="/sys${_PP%%/ata*}"
-      if [ -n "${_PP}" ] && [ -d "${_CTRL_PATH}" ]; then
-        _PORTNUM=$(ls -d "${_CTRL_PATH}/ata"* 2>/dev/null | wc -l)
-      else
-        _PORTNUM=0
-      fi
-
-      if [ "${_PORTNUM}" -gt 0 ]; then
-        _I=0
-        while [ "${_I}" -lt "${_PORTNUM}" ]; do
-          if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ "${BOOTDISK_ATAPORT}" = "${_I}" ]; then
-            _log "bootloader (port ${_I}): ${_F}"
-            _I=$((_I + 1)); continue
-          fi
-          COUNT=$((COUNT + 1))
-          {
-            echo "    internal_slot@${COUNT} {"
-            echo "        reg = <${COUNT}>;"
-            echo '        protocol_type = "sata";'
-            echo "        ${_DR} {"
-            echo "            pcie_root = \"${_PC}\";"
-            printf "            ata_port = <0x%02X>;\n" "${_I}"
-            echo "            internal_mode;"
-            echo "        };"
-            echo "    };"
-          } >>"${DEST}"
-          _I=$((_I + 1))
-        done
-      else
-        # No ata* children (unusual) — emit a single controller-level slot.
-        [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && { _log "bootloader (ctrl-single): ${_F}"; continue; }
-        COUNT=$((COUNT + 1))
-        {
-          echo "    internal_slot@${COUNT} {"
-          echo "        reg = <${COUNT}>;"
-          echo '        protocol_type = "sata";'
-          echo "        ${_DR} {"
-          echo "            pcie_root = \"${_PC}\";"
-          echo "            internal_mode;"
-          echo "        };"
-          echo "    };"
-        } >>"${DEST}"
-      fi
+      echo "${_PC}" >>"${_DT_SEEN}"
+      COUNT=$((COUNT + 1))
+      {
+        echo "    internal_slot@${COUNT} {"
+        echo "        reg = <${COUNT}>;"
+        echo '        protocol_type = "sata";'
+        echo "        ${_DR} {"
+        echo "            pcie_root = \"${_PC}\";"
+        printf "            ata_port = <0x%02X>;\n" "${_AT}"
+        echo "            internal_mode;"
+        echo "        };"
+        echo "    };"
+      } >>"${DEST}"
     done <"${_DT_SATA_TMP}"
     rm -f "${_DT_SATA_TMP}"
 
@@ -599,48 +566,85 @@ nondtModel() {
   USBMAXIDX=0
   MAXNONUSBIDX=-1
   NONUSBMASK=0
-  SEQ_IDX=0
 
-  # Always sort by PCIe topology for stable physical slot assignments across reboots.
-  DISK_NAMES="$(_sorted_sd_disks)"
+  # DSM nonDT maps internalportcfg bit N directly to sd-index N (sda=0, sdb=1, sdc=2, ...).
+  # We must use the actual kernel sd-letter index in the bitmask so DSM can find each disk.
+  # Gaps caused by empty SCSI ports are fine — DSM walks existing /dev/sd* nodes, not the gaps.
+  #
+  # diskidxmap=<dev>:<idx>[,...] on the kernel cmdline overrides specific disks to a chosen bit
+  # position. E.g. diskidxmap=sdc:0,sdi:1 maps sdc→slot1, sdi→slot2 in DSM.
+  _sd_name_to_idx() {
+    _sn="${1#sd}"
+    case "${#_sn}" in
+      1) printf '%d' "$(($(printf '%d' "'${_sn}") - 97))" ;;
+      2) _hi="$(($(printf '%d' "'$(printf '%s' "${_sn}" | cut -c1)") - 96))"
+         _lo="$(($(printf '%d' "'$(printf '%s' "${_sn}" | cut -c2)") - 97))"
+         printf '%d' "$((_hi * 26 + _lo))" ;;
+      *) printf '0' ;;
+    esac
+  }
 
-  for N in ${DISK_NAMES}; do
-    F="/sys/block/${N}"
+  # Parse diskidxmap=dev:idx[,dev:idx,...] from cmdline; emit "dev idx" lines.
+  _parse_diskidxmap() {
+    _map="$(grep -o 'diskidxmap=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
+    [ -z "${_map}" ] && return
+    _IFS_SAVE="${IFS}"; IFS=","
+    for _entry in ${_map}; do
+      IFS="${_IFS_SAVE}"
+      _dev="${_entry%%:*}"; _idx="${_entry##*:}"
+      [ -n "${_dev}" ] && [ -n "${_idx}" ] && printf '%s %s\n' "${_dev}" "${_idx}"
+      IFS=","
+    done
+    IFS="${_IFS_SAVE}"
+  }
+  _DISKIDXMAP="$(_parse_diskidxmap)"
+
+  # Returns the slot index for a given sd device name.
+  # Priority: explicit diskidxmap entry > actual sd-letter index (default).
+  _sd_name_to_idx_mapped() {
+    if [ -n "${_DISKIDXMAP}" ]; then
+      _mapped="$(printf '%s\n' "${_DISKIDXMAP}" | awk -v d="${1}" '$1==d{print $2; exit}')"
+      [ -n "${_mapped}" ] && { printf '%s' "${_mapped}"; return; }
+    fi
+    _sd_name_to_idx "${1}"
+  }
+
+  _NONDT_TMP="/tmp/_nondt_disks"
+  _sorted_sd_disks >"${_NONDT_TMP}"
+
+  while read -r _ND_N; do
+    F="/sys/block/${_ND_N}"
     [ -e "${F}" ] || continue
-    # Skip the bootloader disk so DSM does not try to manage the boot device.
-    # Check both by name (sd*) and by PHYSDEVPATH (handles synoboot alias where BOOTDISK != sd* name).
-    [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
+    if [ -n "${BOOTDISK}" ] && [ "${_ND_N}" = "${BOOTDISK}" ]; then
+      _log "bootloader: ${F}"; continue
+    fi
     if [ -n "${BOOTDISK_PHYSDEVPATH}" ]; then
       _N_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-      [ -n "${_N_PP}" ] && [ "${_N_PP}" = "${BOOTDISK_PHYSDEVPATH}" ] && { _log "bootloader (alias): ${F}"; continue; }
+      if [ -n "${_N_PP}" ] && [ "${_N_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
+        _log "bootloader (alias): ${F}"; continue
+      fi
     fi
-    # PHYSDEVPATH may be absent when syno_block_info is not yet populated; fall back to PCI path.
-    if [ -n "${BOOTDISK_PCIEPATH}" ]; then
+    if [ -n "${BOOTDISK_PCIEPATH}" ] && [ -n "${BOOTDISK_ATAPORT}" ]; then
       _N_PCIE="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      if [ -z "${_N_PCIE}" ]; then
-        _N_PP2="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-        [ -n "${_N_PP2}" ] && _N_PCIE="$(echo "${_N_PP2}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+      _N_ATAPORT="$(grep 'ata_port_no' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      if [ -n "${_N_PCIE}" ] && [ -n "${_N_ATAPORT}" ] && \
+         [ "${_N_PCIE}" = "${BOOTDISK_PCIEPATH}" ] && [ "${_N_ATAPORT}" = "${BOOTDISK_ATAPORT}" ]; then
+        _log "bootloader (pciepath+ataport): ${F}"; continue
       fi
-      [ -n "${_N_PCIE}" ] && [ "${_N_PCIE}" = "${BOOTDISK_PCIEPATH}" ] && { _log "bootloader (pciepath): ${F}"; continue; }
     fi
-    IDX=${SEQ_IDX}
-    SEQ_IDX=$((SEQ_IDX + 1))
+    IDX="$(_sd_name_to_idx_mapped "${_ND_N}")"
     BIT=$((2 ** IDX))
-    [ $((IDX + 1)) -ge ${MAXDISKS} ] && MAXDISKS=$((IDX + 1))
+    [ $((IDX + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((IDX + 1))
     if grep "PHYSDEVPATH" "${F}/uevent" 2>/dev/null | grep -q "usb"; then
-      if [ "${hasUSB}" = "false" ]; then
-        [ ${IDX} -lt ${USBMINIDX} ] && USBMINIDX=${IDX}
-        [ ${IDX} -gt ${USBMAXIDX} ] && USBMAXIDX=${IDX}
-        hasUSB=true
-      else
-        [ ${IDX} -lt ${USBMINIDX} ] && USBMINIDX=${IDX}
-        [ ${IDX} -gt ${USBMAXIDX} ] && USBMAXIDX=${IDX}
-      fi
+      [ ${IDX} -lt ${USBMINIDX} ] && USBMINIDX=${IDX}
+      [ ${IDX} -gt ${USBMAXIDX} ] && USBMAXIDX=${IDX}
+      hasUSB=true
     else
       NONUSBMASK=$((NONUSBMASK | BIT))
       [ ${IDX} -gt ${MAXNONUSBIDX} ] && MAXNONUSBIDX=${IDX}
     fi
-  done
+  done <"${_NONDT_TMP}"
+  rm -f "${_NONDT_TMP}"
   # Reserve 6 USB slots minimum, but never across indices occupied by non-USB disks.
   if [ "${hasUSB}" = "false" ]; then
     USBMINIDX=$((MAXNONUSBIDX + 1))
