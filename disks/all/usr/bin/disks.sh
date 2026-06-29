@@ -556,8 +556,9 @@ nondtModel() {
   # Wait for asynchronous HBA probes to complete.
   _wait_hba_disks_stable "/sys/block/sd*"
 
-  # Remove empty SCSI slots so they don't consume sd-letter indices in the bitmask.
-  # Retry a few times: some HBAs re-register ports briefly after the initial settle.
+  # Remove empty SCSI slots (size==0) so they don't consume sd-letter indices.
+  # The eudev rule handles this during loader boot; this loop covers DSM's own eudev
+  # where the rule may not be present.
   _DEL_ROUNDS=0
   while [ "${_DEL_ROUNDS}" -lt 3 ]; do
     _DEL_COUNT=0
@@ -572,23 +573,6 @@ nondtModel() {
   done
   _log "empty slots removed after ${_DEL_ROUNDS} round(s)"
 
-  # Trigger LKM compact remapping: renumbers surviving disks sda, sdb, ...
-  # The LKM enumerates live non-empty non-boot disks in PCI+SCSI sort order,
-  # assigns them indices 0,1,2,... via an IDA override, and force-replugs them.
-  if [ -w "/proc/diskidxmap" ]; then
-    _PRE_REMAP_COUNT="$(_count_disks "/sys/block/sd*")"
-    echo "auto" >"/proc/diskidxmap"
-    # Wait for the replug to settle: disk count must stabilise back to the same value.
-    _REMAP_WAIT=0
-    while [ "${_REMAP_WAIT}" -lt 15 ]; do
-      sleep 1
-      _POST_COUNT="$(_count_disks "/sys/block/sd*")"
-      [ "${_POST_COUNT}" = "${_PRE_REMAP_COUNT}" ] && break
-      _REMAP_WAIT=$((_REMAP_WAIT + 1))
-    done
-    _log "diskidxmap auto-remap done (waited ${_REMAP_WAIT}s, count=${_POST_COUNT})"
-  fi
-
   MAXDISKS=0
   USBPORTCFG=0
   ESATAPORTCFG=0
@@ -599,52 +583,6 @@ nondtModel() {
   USBMAXIDX=0
   MAXNONUSBIDX=-1
   NONUSBMASK=0
-
-  # DSM nonDT maps internalportcfg bit N directly to sd-index N (sda=0, sdb=1, sdc=2, ...).
-  # We must use the actual kernel sd-letter index in the bitmask so DSM can find each disk.
-  # Gaps caused by empty SCSI ports are fine — DSM walks existing /dev/sd* nodes, not the gaps.
-  #
-  # diskidxmap=<dev>:<idx>[,...] on the kernel cmdline overrides specific disks to a chosen bit
-  # position. E.g. diskidxmap=sdc:0,sdi:1 maps sdc→slot1, sdi→slot2 in DSM.
-  _sd_name_to_idx() {
-    _sn="${1#sd}"
-    case "${#_sn}" in
-      1) printf '%d' "$(($(printf '%d' "'${_sn}") - 97))" ;;
-      2) _hi="$(($(printf '%d' "'$(printf '%s' "${_sn}" | cut -c1)") - 96))"
-         _lo="$(($(printf '%d' "'$(printf '%s' "${_sn}" | cut -c2)") - 97))"
-         printf '%d' "$((_hi * 26 + _lo))" ;;
-      *) printf '0' ;;
-    esac
-  }
-
-  # Parse diskidxmap=dev:idx[,dev:idx,...] from cmdline; emit "dev idx" lines.
-  _parse_diskidxmap() {
-    _map="$(grep -o 'diskidxmap=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
-    [ -z "${_map}" ] && return
-    _IFS_SAVE="${IFS}"; IFS=","
-    for _entry in ${_map}; do
-      IFS="${_IFS_SAVE}"
-      _dev="${_entry%%:*}"; _idx="${_entry##*:}"
-      [ -n "${_dev}" ] && [ -n "${_idx}" ] && printf '%s %s\n' "${_dev}" "${_idx}"
-      IFS=","
-    done
-    IFS="${_IFS_SAVE}"
-  }
-  _DISKIDXMAP="$(_parse_diskidxmap)"
-
-  _SEQ_CTR=0
-
-  # Returns the slot index for a given sd device name.
-  # Priority: explicit diskidxmap entry > sequential counter (incremented by caller).
-  _sd_name_to_idx_mapped() {
-    if [ -n "${_DISKIDXMAP}" ]; then
-      _mapped="$(printf '%s\n' "${_DISKIDXMAP}" | awk -v d="${1}" '$1==d{print $2; exit}')"
-      [ -n "${_mapped}" ] && { printf '%s' "${_mapped}"; return 0; }
-    fi
-    printf '%s' "${_SEQ_CTR}"
-    return 1
-  }
-
   _NONDT_TMP="/tmp/_nondt_disks"
   _sorted_sd_disks >"${_NONDT_TMP}"
 
@@ -668,7 +606,12 @@ nondtModel() {
         _log "bootloader (pciepath+ataport): ${F}"; continue
       fi
     fi
-    IDX="$(_sd_name_to_idx_mapped "${_ND_N}")" || { IDX="$(_sd_name_to_idx "${_ND_N}")"; _SEQ_CTR=$((_SEQ_CTR + 1)); }
+    _sn="${_ND_N#sd}"
+    case "${#_sn}" in
+      1) IDX="$(($(printf '%d' "'${_sn}") - 97))" ;;
+      2) IDX="$((( $(printf '%d' "'$(printf '%s' "${_sn}" | cut -c1)") - 96) * 26 + $(printf '%d' "'$(printf '%s' "${_sn}" | cut -c2)") - 97))" ;;
+      *) IDX=0 ;;
+    esac
     BIT=$((2 ** IDX))
     [ $((IDX + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((IDX + 1))
     if grep "PHYSDEVPATH" "${F}/uevent" 2>/dev/null | grep -q "usb"; then
@@ -681,6 +624,7 @@ nondtModel() {
     fi
   done <"${_NONDT_TMP}"
   rm -f "${_NONDT_TMP}"
+
   # Only reserve USB slots when USB disks are actually present.
   if [ "${hasUSB}" = "true" ]; then
     if [ ${MAXNONUSBIDX} -lt ${USBMINIDX} ]; then
