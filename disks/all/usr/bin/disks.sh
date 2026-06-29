@@ -556,6 +556,39 @@ nondtModel() {
   # Wait for asynchronous HBA probes to complete.
   _wait_hba_disks_stable "/sys/block/sd*"
 
+  # Remove empty SCSI slots so they don't consume sd-letter indices in the bitmask.
+  # Retry a few times: some HBAs re-register ports briefly after the initial settle.
+  _DEL_ROUNDS=0
+  while [ "${_DEL_ROUNDS}" -lt 3 ]; do
+    _DEL_COUNT=0
+    for _F in /sys/block/sd*; do
+      [ -e "${_F}" ] || continue
+      [ "$(cat "${_F}/size" 2>/dev/null)" = "0" ] || continue
+      echo 1 >"${_F}/device/delete" 2>/dev/null && _DEL_COUNT=$((_DEL_COUNT + 1))
+    done
+    [ "${_DEL_COUNT}" -eq 0 ] && break
+    sleep 2
+    _DEL_ROUNDS=$((_DEL_ROUNDS + 1))
+  done
+  _log "empty slots removed after ${_DEL_ROUNDS} round(s)"
+
+  # Trigger LKM compact remapping: renumbers surviving disks sda, sdb, ...
+  # The LKM enumerates live non-empty non-boot disks in PCI+SCSI sort order,
+  # assigns them indices 0,1,2,... via an IDA override, and force-replugs them.
+  if [ -w "/proc/diskidxmap" ]; then
+    _PRE_REMAP_COUNT="$(_count_disks "/sys/block/sd*")"
+    echo "auto" >"/proc/diskidxmap"
+    # Wait for the replug to settle: disk count must stabilise back to the same value.
+    _REMAP_WAIT=0
+    while [ "${_REMAP_WAIT}" -lt 15 ]; do
+      sleep 1
+      _POST_COUNT="$(_count_disks "/sys/block/sd*")"
+      [ "${_POST_COUNT}" = "${_PRE_REMAP_COUNT}" ] && break
+      _REMAP_WAIT=$((_REMAP_WAIT + 1))
+    done
+    _log "diskidxmap auto-remap done (waited ${_REMAP_WAIT}s, count=${_POST_COUNT})"
+  fi
+
   MAXDISKS=0
   USBPORTCFG=0
   ESATAPORTCFG=0
@@ -599,14 +632,17 @@ nondtModel() {
   }
   _DISKIDXMAP="$(_parse_diskidxmap)"
 
+  _SEQ_CTR=0
+
   # Returns the slot index for a given sd device name.
-  # Priority: explicit diskidxmap entry > actual sd-letter index (default).
+  # Priority: explicit diskidxmap entry > sequential counter (incremented by caller).
   _sd_name_to_idx_mapped() {
     if [ -n "${_DISKIDXMAP}" ]; then
       _mapped="$(printf '%s\n' "${_DISKIDXMAP}" | awk -v d="${1}" '$1==d{print $2; exit}')"
-      [ -n "${_mapped}" ] && { printf '%s' "${_mapped}"; return; }
+      [ -n "${_mapped}" ] && { printf '%s' "${_mapped}"; return 0; }
     fi
-    _sd_name_to_idx "${1}"
+    printf '%s' "${_SEQ_CTR}"
+    return 1
   }
 
   _NONDT_TMP="/tmp/_nondt_disks"
@@ -632,7 +668,7 @@ nondtModel() {
         _log "bootloader (pciepath+ataport): ${F}"; continue
       fi
     fi
-    IDX="$(_sd_name_to_idx_mapped "${_ND_N}")"
+    IDX="$(_sd_name_to_idx_mapped "${_ND_N}")" || { IDX="$(_sd_name_to_idx "${_ND_N}")"; _SEQ_CTR=$((_SEQ_CTR + 1)); }
     BIT=$((2 ** IDX))
     [ $((IDX + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((IDX + 1))
     if grep "PHYSDEVPATH" "${F}/uevent" 2>/dev/null | grep -q "usb"; then
@@ -645,17 +681,13 @@ nondtModel() {
     fi
   done <"${_NONDT_TMP}"
   rm -f "${_NONDT_TMP}"
-  # Reserve 6 USB slots minimum, but never across indices occupied by non-USB disks.
-  if [ "${hasUSB}" = "false" ]; then
-    USBMINIDX=$((MAXNONUSBIDX + 1))
-    [ ${USBMINIDX} -lt ${MAXDISKS} ] && USBMINIDX=${MAXDISKS}
-    USBMAXIDX=$((USBMINIDX + 6 - 1))
-  elif [ ${MAXNONUSBIDX} -lt ${USBMINIDX} ]; then
-    # No non-USB disk above USB range -> safe to extend to 6 slots
-    [ $((USBMAXIDX - USBMINIDX)) -lt $((6 - 1)) ] && USBMAXIDX=$((USBMINIDX + 6 - 1))
+  # Only reserve USB slots when USB disks are actually present.
+  if [ "${hasUSB}" = "true" ]; then
+    if [ ${MAXNONUSBIDX} -lt ${USBMINIDX} ]; then
+      [ $((USBMAXIDX - USBMINIDX)) -lt $((6 - 1)) ] && USBMAXIDX=$((USBMINIDX + 6 - 1))
+    fi
+    [ $((USBMAXIDX + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((USBMAXIDX + 1))
   fi
-  # else: USB interleaved with non-USB -> keep measured bits only
-  [ $((USBMAXIDX + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((USBMAXIDX + 1))
 
   if _check_user_conf "maxdisks"; then
     MAXDISKS=$(($(__get_conf_kv maxdisks)))
@@ -675,7 +707,7 @@ nondtModel() {
   elif _check_user_conf "usbportcfg"; then
     USBPORTCFG=$(($(__get_conf_kv usbportcfg)))
     printf 'get usbportcfg=0x%.2x\n' "${USBPORTCFG}"
-  else
+  elif [ "${hasUSB}" = "true" ]; then
     # shellcheck disable=SC3019
     USBPORTCFG=$(($((2 ** $((USBMAXIDX + 1)) - 1)) ^ $((2 ** USBMINIDX - 1))))
     # Do not classify any currently detected non-USB disk index as USB.
@@ -684,6 +716,10 @@ nondtModel() {
       USBPORTCFG=$((USBPORTCFG ^ OVERLAPMASK))
       _log "fix usbportcfg overlap: clear mask=0x$(printf '%x' ${OVERLAPMASK})"
     fi
+    __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
+    printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
+  else
+    USBPORTCFG=0
     __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
     printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
   fi
