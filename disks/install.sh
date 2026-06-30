@@ -88,48 +88,41 @@ elif [ "${1}" = "late" ]; then
 
   cp -vpf /usr/bin/disks.sh /tmpRoot/usr/bin/disks.sh
 
-  # Runtime script: patch storage_panel.js and write m2_pool_support flags
-  cat >"/tmpRoot/usr/bin/disks-nvme-ui.sh" <<'SCRIPT'
+  # Runtime script: mark NVMe disks as M.2-pool-eligible so StorageManager allows
+  # them as storage volumes (this.m2_pool_support is read per-disk from this flag).
+  # Newer builds gate purely on that runtime flag; older builds (<=64570) additionally
+  # hard-code a pciSlot/addOnCard check directly in storage_panel.js, so patch both.
+  cat >"/tmpRoot/usr/bin/disks-m2pool.sh" <<'SCRIPT'
 #!/usr/bin/env sh
-for F in $(LC_ALL=C printf '%s\n' /run/synostorage/disks/nvme*/m2_pool_support | sort -V); do
-  [ ! -e "${F}" ] && continue
+for F in /run/synostorage/disks/nvme*/m2_pool_support; do
+  [ -e "${F}" ] || continue
   echo -n 1 >"${F}"
 done
 
-if [ -f /usr/lib/systemd/system/storagepanel.service ]; then
-  exit 0
-fi
-
 _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
-if [ ${_BUILD:-64570} -gt 64570 ]; then
-  FILE_JS="/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js"
-else
+if [ "${_BUILD:-64570}" -le 64570 ]; then
   FILE_JS="/usr/syno/synoman/webman/modules/StorageManager/storage_panel.js"
+  FILE_GZ="${FILE_JS}.gz"
+  if [ -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ]; then
+    gzip -c "${FILE_JS}" >"${FILE_GZ}"
+  fi
+  if [ -f "${FILE_GZ}" ]; then
+    [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
+    gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
+    sed -i 's/notSupportM2Pool_addOnCard:this\.T("disk_info","disk_reason_m2_add_on_card"),//g' "${FILE_JS}"
+    sed -i 's/},{isConditionInvalid:0<this\.pciSlot,invalidReason:"notSupportM2Pool_addOnCard"//g' "${FILE_JS}"
+    gzip -c "${FILE_JS}" >"${FILE_GZ}"
+  fi
 fi
-FILE_GZ="${FILE_JS}.gz"
-if [ -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ]; then
-  gzip -c "${FILE_JS}" >"${FILE_GZ}"
-fi
-[ ! -f "${FILE_GZ}" ] && exit 0
-
-[ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
-gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
-sed -i "s/e.portType||e.isCacheTray()/e.portType||false/g" "${FILE_JS}"
-sed -i 's/("normal"!==this.portType)/("normal"!==this.portType\&\&"cache"!==this.portType)/g' "${FILE_JS}"
-sed -i "s/\!u.isCacheTray()/(\!u.isCacheTray()||true)/g" "${FILE_JS}"
-sed -i 's/t="normal"!==this.portType/t="normal"!==this.portType\&\&"cache"!==this.portType/g' "${FILE_JS}"
-sed -i 's/return"normal"===this.portType/return"normal"===this.portType||"cache"===this.portType/g' "${FILE_JS}"
-gzip -c "${FILE_JS}" >"${FILE_GZ}"
-exit 0
 SCRIPT
-  chmod +x "/tmpRoot/usr/bin/disks-nvme-ui.sh"
+  chmod +x "/tmpRoot/usr/bin/disks-m2pool.sh"
 
   [ ! -f "/tmpRoot/usr/bin/gzip" ] && cp -vpf /usr/bin/gzip /tmpRoot/usr/bin/gzip
 
   mkdir -p "/tmpRoot/usr/lib/systemd/system"
   {
     echo "[Unit]"
-    echo "Description=disks NVMe UI patch"
+    echo "Description=disks M.2 pool support flag"
     echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
     echo "After=smpkg-custom-install.service pkgctl-StorageManager.service"
     echo "After=storagepanel.service"
@@ -137,13 +130,13 @@ SCRIPT
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/disks-nvme-ui.sh"
+    echo "ExecStart=-/usr/bin/disks-m2pool.sh"
     echo ""
     echo "[Install]"
     echo "WantedBy=multi-user.target"
-  } >"/tmpRoot/usr/lib/systemd/system/disks-nvme-ui.service"
+  } >"/tmpRoot/usr/lib/systemd/system/disks-m2pool.service"
   mkdir -vp "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
-  ln -vsf /usr/lib/systemd/system/disks-nvme-ui.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/disks-nvme-ui.service
+  ln -vsf /usr/lib/systemd/system/disks-m2pool.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/disks-m2pool.service
 
   {
     echo '# Author: "SynoCommunity"'
@@ -186,7 +179,7 @@ elif [ "${1}" = "uninstall" ]; then
   SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
   [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
 
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/disks-nvme-ui.service"
-  rm -f "/tmpRoot/usr/lib/systemd/system/disks-nvme-ui.service"
-  rm -f "/tmpRoot/usr/bin/disks-nvme-ui.sh"
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/disks-m2pool.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/disks-m2pool.service"
+  rm -f "/tmpRoot/usr/bin/disks-m2pool.sh"
 fi
