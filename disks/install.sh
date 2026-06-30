@@ -16,6 +16,21 @@ elif [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
+  # Patch libhwcontrol to allow NVMe as storage volume on nonDT models.
+  # Skip if nvmesystem is present — it supersedes this with a full UI+lib patch.
+  if ! grep -wq "/addons/nvmesystem.sh" "/addons/addons.sh"; then
+    SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
+    if [ -f "${SO_FILE}" ]; then
+      [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
+      cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
+      xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null \
+        | sed "s/803e00b801000000752.488b/803e00b8010000009090488b/" \
+        | xxd -r -p >"${SO_FILE}" 2>/dev/null
+      rm -f "${SO_FILE}.tmp"
+      echo "disks addon: libhwcontrol patched for NVMe volume support"
+    fi
+  fi
+
   cp -vpf /usr/bin/disks.sh /tmpRoot/usr/bin/disks.sh
   {
     echo '# Author: "SynoCommunity"'
