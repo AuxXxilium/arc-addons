@@ -6,10 +6,37 @@
 # See /LICENSE for more information.
 #
 
+NVMECACHE_MODELS="DS918+ RS1619xs+ DS419+ DS1019+ DS719+ DS1621xs+"
+MODEL="$(grep -o 'syno_hw_version=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
+
 if [ "${1}" = "patches" ]; then
   echo "Installing addon disks - ${1}"
 
   /usr/bin/disks.sh --create
+
+  # NVMe cache PCI path discovery (for models that need libsynonvme patching).
+  if echo "${NVMECACHE_MODELS}" | grep -wq "${MODEL}"; then
+    BOOTDISK_PART3_PATH="$(/sbin/blkid -L ARC3 2>/dev/null)"
+    if [ -n "${BOOTDISK_PART3_PATH}" ]; then
+      BOOTDISK_PART3_MAJORMINOR="$(stat -c '%t:%T' "${BOOTDISK_PART3_PATH}" | awk -F: '{printf "%d:%d", strtonum("0x" $1), strtonum("0x" $2)}')"
+      BOOTDISK_PART3="$(awk -F= '/DEVNAME/ {print $2}' "/sys/dev/block/${BOOTDISK_PART3_MAJORMINOR}/uevent" 2>/dev/null)"
+    fi
+    if [ -n "${BOOTDISK_PART3}" ]; then
+      BOOTDISK="$(basename "$(dirname /sys/block/*/${BOOTDISK_PART3} 2>/dev/null)" 2>/dev/null)"
+      BOOTDISK_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "/sys/block/${BOOTDISK}/uevent" 2>/dev/null)"
+    fi
+    rm -f /etc/nvmePorts
+    for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
+      [ ! -e "${F}" ] && continue
+      PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+      [ -z "${PHYSDEVPATH}" ] && continue
+      [ "${BOOTDISK_PHYSDEVPATH}" = "${PHYSDEVPATH}" ] && continue
+      PCIEPATH="$(echo "${PHYSDEVPATH}" | awk -F'/' '{if (NF == 4) print $NF; else if (NF > 4) print $(NF-1)}')"
+      grep -q "${PCIEPATH}" /etc/nvmePorts 2>/dev/null && continue
+      echo "${PCIEPATH}" >>/etc/nvmePorts
+    done
+    [ -f /etc/nvmePorts ] && echo "disks addon: nvmePorts=$(cat /etc/nvmePorts | tr '\n' ' ')"
+  fi
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon disks - ${1}"
@@ -28,6 +55,34 @@ elif [ "${1}" = "late" ]; then
         | xxd -r -p >"${SO_FILE}" 2>/dev/null
       rm -f "${SO_FILE}.tmp"
       echo "disks addon: libhwcontrol patched for NVMe volume support"
+    fi
+  fi
+
+  # Patch libsynonvme to redirect hardcoded NVMe cache PCI paths to actual hardware.
+  if echo "${NVMECACHE_MODELS}" | grep -wq "${MODEL}"; then
+    if [ -f /etc/nvmePorts ]; then
+      SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
+      if [ -f "${SO_FILE}" ]; then
+        [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
+        cp -pf "${SO_FILE}.bak" "${SO_FILE}"
+        sed -i "s/0000:00:13.1/0000:99:99.0/; s/0000:00:03.2/0000:99:99.0/; s/0000:00:14.1/0000:99:99.0/; s/0000:00:01.1/0000:99:99.0/" "${SO_FILE}"
+        sed -i "s/0000:00:13.2/0000:99:99.1/; s/0000:00:03.3/0000:99:99.1/; s/0000:00:99.9/0000:99:99.1/; s/0000:00:01.0/0000:99:99.1/" "${SO_FILE}"
+        idx=0
+        while IFS= read -r N; do
+          [ -z "${N}" ] && continue
+          if [ ${idx} -eq 0 ]; then
+            sed -i "s/0000:99:99.0/${N}/g" "${SO_FILE}"
+          elif [ ${idx} -eq 1 ]; then
+            sed -i "s/0000:99:99.1/${N}/g" "${SO_FILE}"
+          else
+            break
+          fi
+          echo "disks addon: nvmecache slot${idx}=${N}"
+          idx=$((idx + 1))
+        done </etc/nvmePorts
+      fi
+    else
+      echo "disks addon: nvmePorts not found, skipping libsynonvme patch"
     fi
   fi
 
@@ -66,4 +121,10 @@ elif [ "${1}" = "uninstall" ]; then
   rm -rf "/tmpRoot/usr/bin/disks.sh"
   rm -rf "/tmpRoot/usr/lib/udev/rules.d/04-system-disk-dtb.rules"
   rm -rf "/tmpRoot/usr/bin/dtc"
+
+  SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
+  [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
+
+  SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
+  [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
 fi
