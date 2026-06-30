@@ -109,3 +109,15 @@ else
     rm -f /etc/sysconfig/network-cmdline.txt
   fi
 fi
+
+# fix size units: replace SI prefixes with correct binary (IEC) prefixes in DSM UI strings
+for F in /usr/syno/synoman/webman/texts/*/strings; do
+  [ -f "${F}" ] || continue
+  sed -i 's/"KB"/"KiB"/g; s/"MB"/"MiB"/g; s/"GB"/"GiB"/g; s/"TB"/"TiB"/g' "${F}"
+  # German and Czech use lowercase kB for kilobyte
+  case "${F}" in */ger/strings|*/csy/strings) sed -i 's/"kB"/"KiB"/g' "${F}" ;; esac
+  # French uses Ko/Mo/Go/To
+  case "${F}" in */fre/strings) sed -i 's/"Ko"/"Kio"/g; s/"Mo"/"Mio"/g; s/"Go"/"Gio"/g; s/"To"/"Tio"/g' "${F}" ;; esac
+  # Russian uses Cyrillic
+  case "${F}" in */rus/strings) sed -i 's/"КБ"/"КиБ"/g; s/"МБ"/"МиБ"/g; s/"ГБ"/"ГиБ"/g; s/"ТБ"/"ТиБ"/g' "${F}" ;; esac
+done
