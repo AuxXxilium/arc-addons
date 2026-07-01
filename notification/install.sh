@@ -33,7 +33,5 @@ elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon notification - uninstall"
   rm -f /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/notification.service
   rm -f /tmpRoot/usr/lib/systemd/system/notification.service
-  [ ! -f /tmpRoot/usr/arc/revert.sh ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
-  echo "/usr/bin/notification.sh -r" >>/tmpRoot/usr/arc/revert.sh
-  echo "rm -f /usr/bin/notification.sh" >>/tmpRoot/usr/arc/revert.sh
+  rm -f /tmpRoot/usr/bin/notification
 fi

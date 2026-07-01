@@ -45,20 +45,10 @@ EOF
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon ledcontrol - ${1}"
 
-  # Remove systemd files
-  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service" \
-        "/tmpRoot/usr/lib/systemd/system/ledcontrol.service" \
-        "/tmpRoot/usr/arc/addons/ledcontrol.sh" \
-        "/tmpRoot/usr/bin/ugreen_leds_cli" \
-        "/tmpRoot/usr/bin/ugreen_led"
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/ledcontrol.service"
+  rm -f "/tmpRoot/usr/lib/systemd/system/ledcontrol.service"
+  rm -f "/tmpRoot/usr/bin/ledcontrol.sh"
+  rm -f "/tmpRoot/usr/sbin/ugreen_leds_cli"
+  rm -f "/tmpRoot/usr/sbin/ugreen_led"
 
-  # Create revert script if not present
-  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && {
-    echo '#!/usr/bin/env bash' > /tmpRoot/usr/arc/revert.sh
-    chmod +x /tmpRoot/usr/arc/revert.sh
-  }
-
-  # Add revert commands
-  echo "/usr/bin/ledcontrol.sh" >> /tmpRoot/usr/arc/revert.sh
-  echo "rm -f /usr/bin/ledcontrol.sh" >> /tmpRoot/usr/arc/revert.sh
 fi
