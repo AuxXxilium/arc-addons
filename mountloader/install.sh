@@ -38,6 +38,7 @@ if [ "${1}" = "late" ]; then
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon mountloader - ${1}"
 
+  rm -rf "/tmpRoot/usr/mountloader"
   rm -f "/tmpRoot/usr/bin/arc-loaderdisk.sh"
   rm -f "/tmpRoot/usr/bin/arcsu"
 fi

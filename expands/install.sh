@@ -36,7 +36,7 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/expands.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/expands.service"
 
-[ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
+  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/expands.sh -r" >>/tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/expands.sh" >>/tmpRoot/usr/arc/revert.sh
 fi

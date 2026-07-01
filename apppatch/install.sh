@@ -60,6 +60,7 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/apppatch.path"
   rm -f "/tmpRoot/usr/lib/systemd/system/apppatch.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/apppatch.path"
+  rm -f "/tmpRoot/usr/bin/PatchELFSharp"
 
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
   echo "/usr/bin/apppatch.sh -r" >>/tmpRoot/usr/arc/revert.sh
