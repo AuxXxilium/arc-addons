@@ -25,6 +25,8 @@ Type=simple
 ExecStart=/usr/sbin/cpuinfo
 Restart=always
 RestartSec=5
+OOMScoreAdjust=-1000
+Nice=-10
 
 [Install]
 WantedBy=multi-user.target

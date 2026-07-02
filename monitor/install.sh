@@ -27,9 +27,9 @@ if [ "${1}" = "late" ]; then
     echo "insert PowerOnMonitor/PowerOffMonitor task to esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'PowerOnMonitor';
-INSERT INTO task VALUES('PowerOnMonitor', '', 'bootup', '', 0, 0, 0, 0, '', 0, "/usr/bin/arc-monitor.sh on", 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('PowerOnMonitor', '', 'bootup', '', 0, 0, 0, 0, '', 0, '/usr/bin/arc-monitor.sh on', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'PowerOffMonitor';
-INSERT INTO task VALUES('PowerOffMonitor', '', 'bootup', '', 1, 0, 0, 0, '', 0, "/usr/bin/arc-monitor.sh off", 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('PowerOffMonitor', '', 'bootup', '', 1, 0, 0, 0, '', 0, '/usr/bin/arc-monitor.sh off', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
 elif [ "${1}" = "uninstall" ]; then
@@ -44,7 +44,7 @@ elif [ "${1}" = "uninstall" ]; then
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
-    echo "delete setrootpw task from esynoscheduler.db"
+    echo "delete PowerOnMonitor/PowerOffMonitor task from esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'PowerOnMonitor';
 DELETE FROM task WHERE task_name LIKE 'PowerOffMonitor';

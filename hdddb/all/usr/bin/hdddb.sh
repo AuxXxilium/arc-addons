@@ -24,7 +24,7 @@
 if [ "$(basename "$BASH")" != "bash" ]; then
   echo "This script requires bash."; exit 1
 fi
-if [ "$(whoami)" != "root" ]; then
+if [ ! "${USER}" = "root" ]; then
   echo "This script must be run as root."; exit 1
 fi
 
@@ -205,7 +205,7 @@ patch_storagemanager_ui() {
 
 clear_pool_compatibility() {
   local FILE TMP
-  for FILE in /var/lib/space/pool_compatibility /var/lib/space/pool_compatibility_legacy; do
+  for FILE in /run/space/pool_compatibility /run/space/pool_compatibility_legacy /var/lib/space/pool_compatibility /var/lib/space/pool_compatibility_legacy; do
     [ -f "${FILE}" ] || continue
     TMP="${FILE}.tmp.$$"
     awk -F= '
