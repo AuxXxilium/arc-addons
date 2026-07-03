@@ -21,13 +21,6 @@
 
 # ── bootstrap ────────────────────────────────────────────────────────────────
 
-if [ "$(basename "$BASH")" != "bash" ]; then
-  echo "This script requires bash."; exit 1
-fi
-if [ ! "${USER}" = "root" ]; then
-  echo "This script must be run as root."; exit 1
-fi
-
 GKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/bin/get_key_value")
 SKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
 
@@ -83,7 +76,12 @@ collect_disks() {
     [ -d "${DISK_DIR}" ] || continue
     DEV="$(basename "${DISK_DIR}")"
     MODEL="$([ -f "${DISK_DIR}/model" ] && tr -d '\r\n' <"${DISK_DIR}/model" 2>/dev/null)"
-    [ -n "${MODEL}" ] || MODEL="$([ -f "${DISK_DIR}/real_model" ] && tr -d '\r\n' <"${DISK_DIR}/real_model" 2>/dev/null)"
+    # Some virtualized/passthrough disks report a size string (e.g. "512GB")
+    # instead of a real model in synostorage's model file; that key never
+    # matches DSM's own compatibility lookup, so prefer real_model then.
+    case "${MODEL}" in
+      "" | [0-9]*[Gg][Bb] | [0-9]*[Tt][Bb]) MODEL="$([ -f "${DISK_DIR}/real_model" ] && tr -d '\r\n' <"${DISK_DIR}/real_model" 2>/dev/null)" ;;
+    esac
     [ -n "${MODEL}" ] || continue
     FIRM="$([ -f "${DISK_DIR}/firm" ] && tr -d '\r\n' <"${DISK_DIR}/firm" 2>/dev/null)"
     SIZE="$(disk_size_gb "${DEV}")"
@@ -138,6 +136,7 @@ patch_database() {
       | if $firm != "" then
           .disk_compatbility_info[$model][$firm] //= {}
           | .disk_compatbility_info[$model][$firm].fw_buildnumber //= 1
+          | .disk_compatbility_info[$model][$firm].firm_bin //= ($firm + ".bin")
           | .disk_compatbility_info[$model][$firm].compatibility_interval = [$interval]
         else . end
       ' "${TMP}" >"${TMP}.new" && mv -f "${TMP}.new" "${TMP}" || {
