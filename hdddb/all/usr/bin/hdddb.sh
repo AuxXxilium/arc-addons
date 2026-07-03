@@ -21,13 +21,6 @@
 
 # ── bootstrap ────────────────────────────────────────────────────────────────
 
-if [ "$(basename "$BASH")" != "bash" ]; then
-  echo "This script requires bash."; exit 1
-fi
-if [ ! "${USER}" = "root" ]; then
-  echo "This script must be run as root."; exit 1
-fi
-
 GKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/bin/get_key_value")
 SKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
 
@@ -138,6 +131,7 @@ patch_database() {
       | if $firm != "" then
           .disk_compatbility_info[$model][$firm] //= {}
           | .disk_compatbility_info[$model][$firm].fw_buildnumber //= 1
+          | .disk_compatbility_info[$model][$firm].firm_bin //= ($firm + ".bin")
           | .disk_compatbility_info[$model][$firm].compatibility_interval = [$interval]
         else . end
       ' "${TMP}" >"${TMP}.new" && mv -f "${TMP}.new" "${TMP}" || {
@@ -494,11 +488,6 @@ clear_pool_compatibility
 _log "refreshing runtime compatibility..."
 refresh_runtime "${DISKS}"
 set_m2_pool_support
-
-if [ -f /usr/syno/sbin/synostgdisk ]; then
-  /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
-  _log "synostgdisk compatibility check done (exit $?)"
-fi
 
 rm -f "${DISKS}"
 
