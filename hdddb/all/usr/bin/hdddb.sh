@@ -19,6 +19,14 @@
 
 # ── bootstrap ────────────────────────────────────────────────────────────────
 
+if [ "$(id -u)" -ne 0 ]; then
+  if [ ! -x /usr/bin/arcsu ]; then
+    echo "Error: This script must be run as root or with 'arcsu'."
+    exit 1
+  fi
+  exec env ARCSU_ACTIVE=1 arcsu "$0" "$@"
+fi
+
 GKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/bin/get_key_value")
 SKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
 
