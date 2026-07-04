@@ -19,26 +19,15 @@ if [ "${1}" = "late" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/fancontrol.service" 2>/dev/null || true
   rm -f "/tmpRoot/usr/bin/arc-pwm.sh" 2>/dev/null || true
 
-  CORETEMP="$(find "/sys/devices/platform/" -name "temp1_input" 2>/dev/null | grep -E 'coretemp|k10temp|zenpower' | head -1)"
-  PWM_NODE="$(find "/sys/class/hwmon/" -name "pwm*" 2>/dev/null | grep -v '_enable\|_auto\|_mode' | head -1)"
-  if grep -wq "fancontrol" /proc/cmdline 2>/dev/null && [ -n "${CORETEMP}" ] && [ -n "${PWM_NODE}" ]; then
+  if grep -wq "fancontrol" /proc/cmdline 2>/dev/null; then
     cp -pf /usr/bin/arc-sensors.sh /tmpRoot/usr/bin/arc-sensors.sh
     if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
       echo "copy esynoscheduler.db"
       mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
       cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
     fi
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib:/tmpRoot/usr/lib
-    ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-    if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "^Fancontrol 2.0|"; then
-      echo "Fancontrol 2.0 task already exists, will be updated at boot"
-    else
-      echo "insert Fancontrol 2.0 task to esynoscheduler.db"
-      /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-DELETE FROM task WHERE task_name LIKE 'Fancontrol 2.0';
-INSERT INTO task VALUES('Fancontrol 2.0', '', 'bootup', '', 0, 0, 0, 0, '', 0, '# Populated on first boot', 'script', '{}', '', '', '{}', '{}');
-EOF
-    fi
+    # Real curve values are seeded once by arc-sensors.sh's update_task on first boot;
+    # inserting a placeholder row here would make that check think it's already configured.
 
     # libsensors (used by fan2go) requires /etc/sensors3.conf to exist
     touch "/tmpRoot/etc/sensors3.conf"
