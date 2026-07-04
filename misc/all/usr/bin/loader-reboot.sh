@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2026 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -9,7 +9,7 @@
 set -e
 
 # Check if the script is run as root
-if [ "$(id -u)" -ne 0 ]; then
+if [ ! "${USER}" = "root" ]; then
   # Check if arcsu is available
   if ! -f /usr/bin/arcsu 2>/dev/null; then
     echo "Error: This script must be run as root or with 'arcsu'."

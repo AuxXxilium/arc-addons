@@ -17,7 +17,7 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
-  [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
+  [ ! -f "${SO_FILE}.bak-nvme" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak-nvme"
 
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null \
@@ -57,7 +57,7 @@ elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon nvmevolume - ${1}"
 
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
-  [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
+  [ -f "${SO_FILE}.bak-nvme" ] && mv -f "${SO_FILE}.bak-nvme" "${SO_FILE}"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmevolume.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/nvmevolume.service"
