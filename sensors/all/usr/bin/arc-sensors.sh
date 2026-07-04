@@ -450,6 +450,7 @@ start_fan2go() {
 fantype_to_mode() {
   case "$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)" in
     fullfan | full)  echo "0" ;;
+    coolfan | high)  echo "1" ;;
     quietfan | low)  echo "2" ;;
     *)               echo "1" ;;
   esac
@@ -467,7 +468,6 @@ main() {
     start_fan2go "${FanBaseMode}"
   fi
 
-  local SynoInfoMtime=""
   while true; do
     sleep 5
 
@@ -492,25 +492,21 @@ main() {
       load_fan_channels
       generate_fan2go_config "${FanBaseMode:-1}"
       restart_fan2go
-      SynoInfoMtime="$(stat -c '%Y' /etc/synoinfo.conf 2>/dev/null)"
       continue
     fi
 
-    # Mode change: only read synoinfo.conf when its mtime changed
-    local mtime
-    mtime="$(stat -c '%Y' /etc/synoinfo.conf 2>/dev/null)"
-    if [ "${mtime}" != "${SynoInfoMtime}" ]; then
-      SynoInfoMtime="${mtime}"
-      local FanCurtMode
-      FanCurtMode="$(fantype_to_mode)"
+    # Mode change: read synoinfo.conf every tick (no mtime gate - DSM may
+    # write it via a temp-file-then-rename dance, and gating on mtime risks
+    # permanently missing an update if the gate's mtime snapshot races it).
+    local FanCurtMode
+    FanCurtMode="$(fantype_to_mode)"
 
-      if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
-        echo "Fan mode changed to ${FanCurtMode}"
-        FanBaseMode="${FanCurtMode}"
-        load_task
-        generate_fan2go_config "${FanBaseMode}"
-        restart_fan2go
-      fi
+    if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
+      echo "Fan mode changed to ${FanCurtMode}"
+      FanBaseMode="${FanCurtMode}"
+      load_task
+      generate_fan2go_config "${FanBaseMode}"
+      restart_fan2go
     fi
   done
 }
