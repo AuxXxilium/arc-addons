@@ -11,10 +11,8 @@ FAMILY=""                                                                       
 SERIES="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed -E 's/@ [0-9.]+[[:space:]]*GHz//g' | sed -E 's/ CPU//g' | xargs)"       # str
 CORES="$(cat /sys/devices/system/cpu/cpu[0-9]*/topology/{core_cpus_list,thread_siblings_list} | sort -u | wc -l 2>/dev/null)"                                # str
 MEV="$(cat "/proc/cmdline" 2>/dev/null | grep -oE 'mev=[^ ]+' | cut -d= -f2 | xargs)" # str
-if [ -n "${MEV}" ] && [ "${MEV}" != "physical" ]; then
+if [ -n "${MEV}" ]; then
   SERIES="${SERIES} @ ${MEV}"
-elif [ -n "${GOVERNOR}" ]; then
-  SERIES="${SERIES}"
 fi
 
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
@@ -84,14 +82,40 @@ if [ -d "${CARDN}" ]; then
   fi
 fi
 if [ "${MEV}" = "physical" ]; then
+  LEGACY_SYS_TEMP_PATCHED=0
   if grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
     sed -i 's/_D("support_nvidia_gpu")},/_D("support_nvidia_gpu")||true},/g' "${FILE_JS}"
-    sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
     sed -i 's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g' "${FILE_JS}"
+    if grep -q ',t,i,s)}' "${FILE_JS}"; then
+      sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
+      LEGACY_SYS_TEMP_PATCHED=1
+    else
+      echo "cpuinfo: ,t,i,s)} anchor not found, skipping legacy sys_temp renderer patch"
+    fi
     sed -i 's/_T("rcpower",n),/_T("rcpower", n)?e.fan_list?_T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", n):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", n),/g' "${FILE_JS}"
   else
-    sed -i 's/,t,i,n)}/,t,i,e.sys_temp?n+" \| "+this.renderTempFromC(e.sys_temp):n)}/g' "${FILE_JS}"
+    if grep -q ',t,i,n)}' "${FILE_JS}"; then
+      sed -i 's/,t,i,n)}/,t,i,e.sys_temp?n+" \| "+this.renderTempFromC(e.sys_temp):n)}/g' "${FILE_JS}"
+      LEGACY_SYS_TEMP_PATCHED=1
+    else
+      echo "cpuinfo: ,t,i,n)} anchor not found, skipping legacy sys_temp renderer patch"
+    fi
     sed -i 's/_T("rcpower",s),/_T("rcpower", s)?e.fan_list?_T("rcpower", s) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", s):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", s),/g' "${FILE_JS}"
+  fi
+
+  # formatExternalDeviceInfo (arg0 = record, arg1 = FanSpeed data) has no native
+  # system-temperature row on some DSM builds - insert one alongside the
+  # fan-mode row it already builds, reusing the renderTempFromC helper already
+  # present in this bundle. Only run when the legacy ,t,i,n)}/,t,i,s)} patch
+  # above didn't find its anchor (e.g. DSM 7.4-90075, where that pattern only
+  # matches an unrelated Shares grid column) - running both unconditionally
+  # double-patches builds where the legacy patch already works (e.g. 7.3).
+  if [ "${LEGACY_SYS_TEMP_PATCHED}" -eq 0 ]; then
+    if grep -q 'i.unshift(\[_T("rcpower","rcfancontrol_desc")' "${FILE_JS}"; then
+      sed -i 's/i\.unshift(\[_T("rcpower","rcfancontrol_desc"),/e.sys_temp\&\&i.unshift(["System Temperature",this.renderTempFromC(e.sys_temp),n]),i.unshift([_T("rcpower","rcfancontrol_desc"),/g' "${FILE_JS}"
+    else
+      echo "cpuinfo: rcfancontrol_desc anchor not found, skipping sys_temp row patch (unsupported DSM build)"
+    fi
   fi
 fi
 
