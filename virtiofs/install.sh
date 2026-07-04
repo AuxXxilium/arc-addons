@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium> && Ing <https://github.com/wjz304>
+# Copyright (C) 2026 AuxXxilium <https://github.com/AuxXxilium> && Ing <https://github.com/wjz304>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.

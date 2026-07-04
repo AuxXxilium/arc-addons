@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 #
-# Copyright (C) 2025 AuxXxilium <https://github.com/AuxXxilium>
+# Copyright (C) 2026 AuxXxilium <https://github.com/AuxXxilium>
 #
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
@@ -27,8 +27,7 @@ After=smpkg-custom-install.service pkgctl-StorageManager.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-SuccessExitStatus=3
-ExecStart=/usr/bin/hdddb.sh -nrwpeId
+ExecStart=-/usr/bin/hdddb.sh -nrwId
 
 [Install]
 WantedBy=multi-user.target
@@ -50,6 +49,6 @@ elif [ "${1}" = "uninstall" ]; then
 
   # Add revert commands
   echo "/usr/bin/hdddb.sh --restore" >> /tmpRoot/usr/arc/revert.sh
-  echo "[ -f /usr/lib/libhwcontrol.so.1.bak ] && cp -p /usr/lib/libhwcontrol.so.1.bak /usr/lib/libhwcontrol.so.1 && rm -f /usr/lib/libhwcontrol.so.1.bak" >> /tmpRoot/usr/arc/revert.sh
+  echo "[ -f /usr/lib/libhwcontrol.so.1.bak-dedup ] && cp -p /usr/lib/libhwcontrol.so.1.bak-dedup /usr/lib/libhwcontrol.so.1 && rm -f /usr/lib/libhwcontrol.so.1.bak-dedup" >> /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/hdddb.sh" >> /tmpRoot/usr/arc/revert.sh
 fi

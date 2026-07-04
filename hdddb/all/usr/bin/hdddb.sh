@@ -13,20 +13,11 @@
 #   -r | --ram           Disable memory-compatibility checking
 #   -w | --wdda          Disable WD Device Analytics warnings
 #   -I | --ihm           Enable / update IronWolf Health Management
-#   -e | --email         No-op (kept for call-site compatibility)
 #   -S | --ssd           Set write_mostly on HDDs when internal SSDs are present
-#   -p | --pcie          Enable M.2 add-on card pool support (support_m2_pool + UI patch)
 #   -d | --dedup         Enable Btrfs deduplication for non-Synology drives (patches libhwcontrol)
 #
 
 # ── bootstrap ────────────────────────────────────────────────────────────────
-
-if [ "$(basename "$BASH")" != "bash" ]; then
-  echo "This script requires bash."; exit 1
-fi
-if [ "$(whoami)" != "root" ]; then
-  echo "This script must be run as root."; exit 1
-fi
 
 GKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/bin/get_key_value")
 SKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
@@ -38,7 +29,6 @@ ram=no
 wdda=no
 ihm=no
 ssd=no
-pcie=no
 dedup=no
 
 for arg in "$@"; do
@@ -48,8 +38,6 @@ for arg in "$@"; do
     -w|--wdda)  wdda=yes ;;
     -I|--ihm)   ihm=yes ;;
     -S|--ssd)   ssd=yes ;;
-    -e|--email) ;;
-    -p|--pcie)  pcie=yes ;;
     -d|--dedup) dedup=yes ;;
     *) ;;
   esac
@@ -138,6 +126,7 @@ patch_database() {
       | if $firm != "" then
           .disk_compatbility_info[$model][$firm] //= {}
           | .disk_compatbility_info[$model][$firm].fw_buildnumber //= 1
+          | .disk_compatbility_info[$model][$firm].firm_bin //= ($firm + ".bin")
           | .disk_compatbility_info[$model][$firm].compatibility_interval = [$interval]
         else . end
       ' "${TMP}" >"${TMP}.new" && mv -f "${TMP}.new" "${TMP}" || {
@@ -205,7 +194,7 @@ patch_storagemanager_ui() {
 
 clear_pool_compatibility() {
   local FILE TMP
-  for FILE in /var/lib/space/pool_compatibility /var/lib/space/pool_compatibility_legacy; do
+  for FILE in /run/space/pool_compatibility /run/space/pool_compatibility_legacy /var/lib/space/pool_compatibility /var/lib/space/pool_compatibility_legacy; do
     [ -f "${FILE}" ] || continue
     TMP="${FILE}.tmp.$$"
     awk -F= '
@@ -235,14 +224,6 @@ refresh_runtime() {
   done <"${DISKS}"
 }
 
-# ── m2_pool_support ───────────────────────────────────────────────────────────
-
-set_m2_pool_support() {
-  for d in /run/synostorage/disks/nvme*/m2_pool_support; do
-    [ -f "$d" ] && printf '1' >"$d"
-  done
-}
-
 # ── synoinfo.conf patches ─────────────────────────────────────────────────────
 
 _disable_dbupdates() {
@@ -270,30 +251,6 @@ _disable_dbupdates() {
         _log "drive DB auto-updates disabled (SynoOnlinePack version bumped)"
       fi
     fi
-  fi
-}
-
-# ── PCIe / M.2 adaptor card support ──────────────────────────────────────────
-
-_enable_pcie() {
-  local cur
-  cur="$(_get support_m2_pool)"
-  if [ "${cur}" != "yes" ]; then
-    _set support_m2_pool "yes"
-    _log "pcie: support_m2_pool enabled"
-  fi
-
-  # Remove M.2 add-on card pool restriction from StorageManager UI
-  local strgmgr
-  for _p in \
-    "/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js" \
-    "/usr/syno/synoman/webman/modules/StorageManager/storage_panel.js"; do
-    [ -f "${_p}" ] && strgmgr="${_p}" && break
-  done
-  if [ -n "${strgmgr}" ] && grep -q 'notSupportM2Pool_addOnCard' "${strgmgr}" 2>/dev/null; then
-    sed -i 's/notSupportM2Pool_addOnCard:this.T("disk_info","disk_reason_m2_add_on_card"),//g' "${strgmgr}"
-    sed -i 's/},{isConditionInvalid:0<this.pciSlot,invalidReason:"notSupportM2Pool_addOnCard"//g' "${strgmgr}"
-    _log "pcie: StorageManager UI patched to allow M.2 add-on card pools"
   fi
 }
 
@@ -328,6 +285,11 @@ _enable_dedup() {
   # Patch libhwcontrol.so.1 to allow non-Synology drives to use dedupe
   [ -f "$libhw" ] || { _log "dedup: $libhw not found, skipping binary patch"; return; }
 
+  if grep -wq "/addons/nvmevolume.sh\|/addons/nvmesystem.sh" "/addons/addons.sh" 2>/dev/null; then
+    _log "dedup: libhwcontrol already patched by nvmevolume/nvmesystem, skipping"
+    return
+  fi
+
   local hexstring match poshex posrep bytes
   # Check if already patched (90 90 = NOP NOP)
   hexstring="80 3E 00 B8 01 00 00 00 90 90 48 8B"
@@ -351,8 +313,8 @@ _enable_dedup() {
   posrep=$(printf "%x" $((seek + 8)))
 
   # Backup before patching
-  if [ ! -f "${libhw}.bak" ]; then
-    cp -p "$libhw" "${libhw}.bak" && _log "dedup: backed up $libhw"
+  if [ ! -f "${libhw}.bak-dedup" ]; then
+    cp -p "$libhw" "${libhw}.bak-dedup" && _log "dedup: backed up $libhw"
   fi
 
   if printf '%s' "${posrep}: 9090" | xxd -r - "$libhw"; then
@@ -493,12 +455,6 @@ clear_pool_compatibility
 
 _log "refreshing runtime compatibility..."
 refresh_runtime "${DISKS}"
-set_m2_pool_support
-
-if [ -f /usr/syno/sbin/synostgdisk ]; then
-  /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
-  _log "synostgdisk compatibility check done (exit $?)"
-fi
 
 rm -f "${DISKS}"
 
@@ -538,11 +494,6 @@ fi
 
 if [ "$ihm" = "yes" ] && [ "$(uname -m)" = "x86_64" ]; then
   _enable_ihm
-fi
-
-if [ "$pcie" = "yes" ]; then
-  _log "enabling PCIe/M.2 adaptor card support..."
-  _enable_pcie
 fi
 
 if [ "$dedup" = "yes" ]; then
