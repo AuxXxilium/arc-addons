@@ -17,12 +17,17 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/bin/hdddb.sh /tmpRoot/usr/bin/hdddb.sh
   cp -pf /usr/syno/sbin/dhm_tool /tmpRoot/usr/syno/sbin/dhm_tool
 
-  # Create systemd service file
+  # Create systemd service file. Only After=smpkg-custom-install.service (not
+  # pkgctl-StorageManager.service, despite it being in Wants=) so this runs as
+  # early as multi-user.target ordering allows — matching upstream reference
+  # scripts. Waiting on pkgctl-StorageManager.service pushes this later in
+  # boot, giving synostoraged more time to start and cache a compatibility
+  # verdict from the still-unpatched DBs before we ever get to patch them.
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/hdddb.service"
 [Unit]
 Description=HDDs/SSDs drives databases
 Wants=smpkg-custom-install.service pkgctl-StorageManager.service
-After=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 
 [Service]
 Type=oneshot
