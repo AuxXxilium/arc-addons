@@ -143,9 +143,6 @@ patch_database() {
     }
   done <"${DISKS}"
 
-  # Replace any remaining not_support/unverified values with support (catches fields jq didn't touch)
-  sed -i 's/"not_support"/"support"/g; s/"unverified"/"support"/g' "${TMP}"
-
   chmod 644 "${TMP}" 2>/dev/null || true
   mv -f "${TMP}" "${DB}"
 }
@@ -209,7 +206,7 @@ clear_pool_compatibility() {
       {
         value = (NF > 1 ? $2 : $0)
         gsub(/^[ \t]+|[ \t]+$/, "", value)
-        if (value == "at_risk" || value == "at_risk_high" || value == "not_support" || value == "unsupported" || value == "critical") next
+        if (value == "at_risk" || value == "at_risk_high" || value == "not_support" || value == "not_in_support" || value == "unsupported" || value == "critical") next
         print
       }
     ' "${FILE}" >"${TMP}" && mv -f "${TMP}" "${FILE}"
@@ -507,11 +504,6 @@ fi
 if [ "$dedup" = "yes" ]; then
   _log "enabling deduplication support..."
   _enable_dedup
-fi
-
-if systemctl is-active --quiet pkgctl-StorageManager.service 2>/dev/null; then
-  systemctl restart pkgctl-StorageManager.service 2>/dev/null || true
-  _log "StorageManager restarted to reload compatibility"
 fi
 
 _log "done."
