@@ -143,6 +143,9 @@ patch_database() {
     }
   done <"${DISKS}"
 
+  # Replace any remaining not_in_support/unverified values with support (catches fields jq didn't touch)
+  sed -i 's/"not_in_support"/"support"/g; s/"unverified"/"support"/g' "${TMP}"
+
   chmod 644 "${TMP}" 2>/dev/null || true
   mv -f "${TMP}" "${DB}"
 }
@@ -168,33 +171,13 @@ patch_storagemanager_ui() {
   [ -n "${strgmgr}" ] || return 0
 
   local changed=0
-  # Remove "not a Synology disk" warning conditions from the UI
-  if grep -q 'disk_reason_not_support' "${strgmgr}" 2>/dev/null; then
-    sed -i 's/[^,]*disk_reason_not_support[^,]*,//g' "${strgmgr}" && changed=1
-  fi
-  if grep -q 'warnNonSynologyDisk\|isNotSynologyDisk\|not_syno_disk' "${strgmgr}" 2>/dev/null; then
-    sed -i 's/[^,]*\(warnNonSynologyDisk\|isNotSynologyDisk\|not_syno_disk\)[^,]*,//g' "${strgmgr}" && changed=1
-  fi
   # Remove M.2 add-on card not-supported warning
   if grep -q 'notSupportM2Pool_addOnCard' "${strgmgr}" 2>/dev/null; then
     sed -i 's/notSupportM2Pool_addOnCard:this.T("disk_info","disk_reason_m2_add_on_card"),//g' "${strgmgr}"
     sed -i 's/},{isConditionInvalid:0<this.pciSlot,invalidReason:"notSupportM2Pool_addOnCard"//g' "${strgmgr}"
     changed=1
   fi
-  # Remove dedup-only-on-Synology-SSD warning (notSupportDedup / notSupportBtrfsDedup variants)
-  if grep -qE 'notSupportDedup|notSupportBtrfsDedup' "${strgmgr}" 2>/dev/null; then
-    sed -i 's/[^,]*notSupportDedup[^,]*,//g' "${strgmgr}"
-    sed -i 's/[^,]*notSupportBtrfsDedup[^,]*,//g' "${strgmgr}"
-    changed=1
-  fi
-  # Remove SHA (Synology HDD/SSD Array) restriction warnings
-  if grep -qE 'notSupportM2Pool_SHA|notSupportM2Pool_3rdParty|notSupportM2Pool_blockList' "${strgmgr}" 2>/dev/null; then
-    sed -i 's/[^,]*notSupportM2Pool_SHA[^,]*,//g' "${strgmgr}"
-    sed -i 's/[^,]*notSupportM2Pool_3rdParty[^,]*,//g' "${strgmgr}"
-    sed -i 's/[^,]*notSupportM2Pool_blockList[^,]*,//g' "${strgmgr}"
-    changed=1
-  fi
-  [ "${changed}" -eq 1 ] && _log "StorageManager UI patched to suppress non-Synology disk warnings"
+  [ "${changed}" -eq 1 ] && _log "StorageManager UI patched to enable pool creation on M.2 add-on cards"
 }
 
 clear_pool_compatibility() {
@@ -206,7 +189,7 @@ clear_pool_compatibility() {
       {
         value = (NF > 1 ? $2 : $0)
         gsub(/^[ \t]+|[ \t]+$/, "", value)
-        if (value == "at_risk" || value == "at_risk_high" || value == "not_support" || value == "not_in_support" || value == "unsupported" || value == "critical") next
+        if (value == "at_risk" || value == "at_risk_high" || value == "not_in_support" || value == "unsupported" || value == "critical") next
         print
       }
     ' "${FILE}" >"${TMP}" && mv -f "${TMP}" "${FILE}"
@@ -504,6 +487,11 @@ fi
 if [ "$dedup" = "yes" ]; then
   _log "enabling deduplication support..."
   _enable_dedup
+fi
+
+if systemctl is-active --quiet pkgctl-StorageManager.service 2>/dev/null; then
+  systemctl restart pkgctl-StorageManager.service 2>/dev/null || true
+  _log "StorageManager restarted to reload compatibility"
 fi
 
 _log "done."
