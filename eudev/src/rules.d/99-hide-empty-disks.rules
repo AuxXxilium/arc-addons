@@ -5,4 +5,4 @@
 # See /LICENSE for more information.
 #
 
-ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd*|sata*", ATTR{size}=="0", RUN+="/bin/sh -c 'echo 1 > /sys/block/%k/device/delete'"
+ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd*|sata*|usb*", ATTR{size}=="0", RUN+="/bin/sh -c 'echo 1 > /sys/block/%k/device/delete'"
