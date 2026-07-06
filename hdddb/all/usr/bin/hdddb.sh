@@ -6,7 +6,9 @@
 # See /LICENSE for more information.
 #
 # Patches DSM disk compatibility databases so that any installed drive is
-# recognised as supported.
+# recognised as supported. A reboot is required for changes to take effect.
+#
+# Based on https://github.com/007revad/Synology_HDD_db
 #
 # Flags:
 #   -n | --noupdate      Prevent DSM updating the drive databases
@@ -15,6 +17,7 @@
 #   -I | --ihm           Enable / update IronWolf Health Management
 #   -S | --ssd           Set write_mostly on HDDs when internal SSDs are present
 #   -d | --dedup         Enable Btrfs deduplication for non-Synology drives (patches libhwcontrol)
+#   -f | --force         Disable support_disk_compatibility entirely instead of patching per-drive
 #
 
 # ── bootstrap ────────────────────────────────────────────────────────────────
@@ -38,6 +41,7 @@ wdda=no
 ihm=no
 ssd=no
 dedup=no
+force=no
 
 for arg in "$@"; do
   case "$arg" in
@@ -47,6 +51,7 @@ for arg in "$@"; do
     -I|--ihm)   ihm=yes ;;
     -S|--ssd)   ssd=yes ;;
     -d|--dedup) dedup=yes ;;
+    -f|--force) force=yes ;;
     *) ;;
   esac
 done
@@ -69,23 +74,29 @@ disk_size_gb() {
   esac
 }
 
+# ── drive model normalisation ─────────────────────────────────────────────────
+
+# Strip vendor prefixes that /sys/block/*/device/model reports but that the
+# disk-compatibility DB keys drives without (e.g. "WDC WD40EFZX-..." -> "WD40EFZX-...").
+fix_drive_model() {
+  local m="$1"
+  case "${m}" in
+    "WDC "*) m="${m#WDC }" ;;
+    "HGST "*) m="${m#HGST }" ;;
+    "TOSHIBA "*) m="${m#TOSHIBA }" ;;
+    "HCST "*) m="${m#HCST }" ;;
+    "Hitachi "*) m="${m#Hitachi }" ;;
+    "SAMSUNG "*) m="${m#SAMSUNG }" ;;
+    "FUJITSU "*) m="${m#FUJITSU }" ;;
+  esac
+  printf '%s' "${m}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
 # ── drive enumeration ─────────────────────────────────────────────────────────
 
 collect_disks() {
   TMP="${1}"
   : >"${TMP}"
-
-  for DISK_DIR in /run/synostorage/disks/*; do
-    [ -d "${DISK_DIR}" ] || continue
-    DEV="$(basename "${DISK_DIR}")"
-    MODEL="$([ -f "${DISK_DIR}/model" ] && tr -d '\r\n' <"${DISK_DIR}/model" 2>/dev/null)"
-    [ -n "${MODEL}" ] || MODEL="$([ -f "${DISK_DIR}/real_model" ] && tr -d '\r\n' <"${DISK_DIR}/real_model" 2>/dev/null)"
-    [ -n "${MODEL}" ] || continue
-    FIRM="$([ -f "${DISK_DIR}/firm" ] && tr -d '\r\n' <"${DISK_DIR}/firm" 2>/dev/null)"
-    SIZE="$(disk_size_gb "${DEV}")"
-    _log "  found (synostorage): ${DEV} model=${MODEL} firm=${FIRM} size=${SIZE}"
-    printf '%s\t%s\t%s\t%s\n' "${DEV}" "${MODEL}" "${FIRM}" "${SIZE}" >>"${TMP}"
-  done
 
   for BLOCK_DIR in /sys/block/*; do
     [ -d "${BLOCK_DIR}" ] || continue
@@ -94,17 +105,16 @@ collect_disks() {
       sata* | sd* | nvme*) ;;
       *) continue ;;
     esac
-    grep -q "^${DEV}	" "${TMP}" 2>/dev/null && continue
     MODEL="$([ -f "${BLOCK_DIR}/device/model" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/model" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     [ -n "${MODEL}" ] || continue
+    MODEL="$(fix_drive_model "${MODEL}")"
     FIRM="$([ -f "${BLOCK_DIR}/device/firmware_rev" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/firmware_rev" 2>/dev/null)"
     [ -n "${FIRM}" ] || FIRM="$([ -f "${BLOCK_DIR}/device/rev" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/rev" 2>/dev/null)"
     FIRM="$(printf '%s' "${FIRM}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     SIZE="$(disk_size_gb "${DEV}")"
-    _log "  found (sysblock): ${DEV} model=${MODEL} firm=${FIRM} size=${SIZE}"
+    _log "  found: ${DEV} model=${MODEL} firm=${FIRM} size=${SIZE}"
     printf '%s\t%s\t%s\t%s\n' "${DEV}" "${MODEL}" "${FIRM}" "${SIZE}" >>"${TMP}"
   done
-
 }
 
 # ── database patching ─────────────────────────────────────────────────────────
@@ -158,58 +168,6 @@ patch_storage_settings() {
 
   TMP="${DB}.tmp.$$"
   jq -c '.settings.allow_new_hcl_as_normal = {"dsm_ver":[],"values":[true]}' "${DB}" >"${TMP}" && mv -f "${TMP}" "${DB}"
-}
-
-patch_storagemanager_ui() {
-  local strgmgr
-  # DSM 7.2.1+ path, then older path
-  for _p in \
-    "/usr/local/packages/@appstore/StorageManager/ui/storage_panel.js" \
-    "/usr/syno/synoman/webman/modules/StorageManager/storage_panel.js"; do
-    [ -f "${_p}" ] && strgmgr="${_p}" && break
-  done
-  [ -n "${strgmgr}" ] || return 0
-
-  local changed=0
-  # Remove M.2 add-on card not-supported warning
-  if grep -q 'notSupportM2Pool_addOnCard' "${strgmgr}" 2>/dev/null; then
-    sed -i 's/notSupportM2Pool_addOnCard:this.T("disk_info","disk_reason_m2_add_on_card"),//g' "${strgmgr}"
-    sed -i 's/},{isConditionInvalid:0<this.pciSlot,invalidReason:"notSupportM2Pool_addOnCard"//g' "${strgmgr}"
-    changed=1
-  fi
-  [ "${changed}" -eq 1 ] && _log "StorageManager UI patched to enable pool creation on M.2 add-on cards"
-}
-
-clear_pool_compatibility() {
-  local FILE TMP
-  for FILE in /run/space/pool_compatibility /run/space/pool_compatibility_legacy /var/lib/space/pool_compatibility /var/lib/space/pool_compatibility_legacy; do
-    [ -f "${FILE}" ] || continue
-    TMP="${FILE}.tmp.$$"
-    awk -F= '
-      {
-        value = (NF > 1 ? $2 : $0)
-        gsub(/^[ \t]+|[ \t]+$/, "", value)
-        if (value == "at_risk" || value == "at_risk_high" || value == "not_in_support" || value == "unsupported" || value == "critical") next
-        print
-      }
-    ' "${FILE}" >"${TMP}" && mv -f "${TMP}" "${FILE}"
-  done
-}
-
-refresh_runtime() {
-  local DISKS="${1}"
-  local DEV MODEL FIRM SIZE DISK_DIR
-  local SUPPORT_ACTION='{"allow_auto_repair":true,"allow_binding":true,"allow_detected_scan":true,"allow_ma_create":true,"cache_rescue_selectable":"yes","cache_selectable":"yes","cache_status":"healthy","disk_status":"support","hide_alloc_status":false,"hide_fw_version":false,"hide_is4Kn":false,"hide_remain_life":false,"hide_sb_days_left":false,"hide_serial":false,"hide_temperature":false,"hide_unc":false,"legacy_cache_rescue_selectable":"yes","legacy_cache_selectable":"yes","legacy_cache_status":"healthy","notification":false,"notify_health_status":true,"notify_lifetime":true,"notify_unc":true,"pool_rescue_selectable":"yes","pool_selectable":"yes","pool_status":"healthy","send_health_report":true,"show_lifetime_chart":true}'
-  while IFS="$(printf '\t')" read -r DEV MODEL FIRM SIZE; do
-    DISK_DIR="/run/synostorage/disks/${DEV}"
-    [ -d "${DISK_DIR}" ] || continue
-    printf 'support\n' >"${DISK_DIR}/compatibility" 2>/dev/null || true
-    printf 'support\n' >"${DISK_DIR}/force_compatibility" 2>/dev/null || true
-    printf '1\n' >"${DISK_DIR}/smart_attr_ignore" 2>/dev/null || true
-    printf '1\n' >"${DISK_DIR}/smart_test_ignore" 2>/dev/null || true
-    printf '%s' "${SUPPORT_ACTION}" >"${DISK_DIR}/compatibility_action" 2>/dev/null || true
-    rm -f "${DISK_DIR}/compatibility.lock" "${DISK_DIR}/compatibility_action.lock" 2>/dev/null || true
-  done <"${DISKS}"
 }
 
 # ── synoinfo.conf patches ─────────────────────────────────────────────────────
@@ -391,29 +349,16 @@ _apply_ssd_writemostly() {
 # ── main ──────────────────────────────────────────────────────────────────────
 
 for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-  "$SKV" "${F}" "support_disk_compatibility" "yes"
+  if [ "$force" = "yes" ]; then
+    "$SKV" "${F}" "support_disk_compatibility" "no"
+  else
+    "$SKV" "${F}" "support_disk_compatibility" "yes"
+  fi
   "$SKV" "${F}" "forbid_unsupport_extdev" "no"
   "$SKV" "${F}" "support_btrfs_dedupe" "yes"
 done
 
 DISKS="$(mktemp /tmp/diskcompat.XXXXXX)" || exit 0
-
-# synostoraged populates /run/synostorage/disks/ asynchronously.
-# Wait up to 60s for at least one disk dir with a model file to appear.
-_WAIT=0
-while true; do
-  _READY=0
-  for _D in /run/synostorage/disks/*/model; do
-    [ -f "${_D}" ] && { _READY=1; break; }
-  done
-  [ "${_READY}" -eq 1 ] && break
-  if [ "${_WAIT}" -ge 60 ]; then
-    _log "synostorage not ready after 60s, using /sys/block fallback..."
-    break
-  fi
-  sleep 1
-  _WAIT=$(( _WAIT + 1 ))
-done
 
 _log "collecting disks..."
 collect_disks "${DISKS}"
@@ -424,6 +369,14 @@ if [ ! -s "${DISKS}" ]; then
 fi
 _log "drives collected: $(wc -l <"${DISKS}" | tr -d ' ') entries"
 
+if grep -q "^nvme" "${DISKS}"; then
+  for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
+    "$SKV" "${F}" "supportnvme" "yes"
+    "$SKV" "${F}" "support_m2_pool" "yes"
+  done
+  _log "NVMe drives present: supportnvme/support_m2_pool enabled"
+fi
+
 DISKS_DEDUP="$(mktemp /tmp/diskcompat.XXXXXX)" || exit 0
 awk -F'\t' '!seen[$2"\t"$3]++' "${DISKS}" >"${DISKS_DEDUP}"
 _log "unique model+firmware combinations for DB patch: $(wc -l <"${DISKS_DEDUP}" | tr -d ' ')"
@@ -432,19 +385,10 @@ for DB in /var/lib/disk-compatibility/*_v*.db; do
   [ -f "${DB}" ] || continue
   patch_database "${DB}" "${DISKS_DEDUP}"
 done
-rm -f "${DISKS_DEDUP}"
+rm -f "${DISKS_DEDUP}" "${DISKS}"
 
 _log "patching storage settings..."
 patch_storage_settings
-_log "patching StorageManager UI..."
-patch_storagemanager_ui
-_log "clearing pool compatibility..."
-clear_pool_compatibility
-
-_log "refreshing runtime compatibility..."
-refresh_runtime "${DISKS}"
-
-rm -f "${DISKS}"
 
 if [ "$noupdate" = "yes" ]; then
   _log "disabling drive DB auto-updates..."
@@ -489,10 +433,5 @@ if [ "$dedup" = "yes" ]; then
   _enable_dedup
 fi
 
-if systemctl is-active --quiet pkgctl-StorageManager.service 2>/dev/null; then
-  systemctl restart pkgctl-StorageManager.service 2>/dev/null || true
-  _log "StorageManager restarted to reload compatibility"
-fi
-
-_log "done."
+_log "done. Reboot required for changes to take effect."
 exit 0
