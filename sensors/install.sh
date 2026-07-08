@@ -11,7 +11,7 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  tar -zxf /addons/sensors-7.1.tgz -C /tmpRoot/usr/
+  tar -zxf /addons/sensors.tgz -C /tmpRoot/usr/
 
   # Remove old fancontrol addon remnants
   rm -f "/tmpRoot/usr/sbin/fancontrol" 2>/dev/null || true
@@ -26,10 +26,7 @@ if [ "${1}" = "late" ]; then
       mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
       cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
     fi
-    # Real curve values are seeded once by arc-sensors.sh's update_task on first boot;
-    # inserting a placeholder row here would make that check think it's already configured.
 
-    # libsensors (used by fan2go) requires /etc/sensors3.conf to exist
     touch "/tmpRoot/etc/sensors3.conf"
 
     mkdir -p "/tmpRoot/usr/lib/systemd/system"
