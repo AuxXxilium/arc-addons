@@ -53,8 +53,12 @@ jobs:
           ROOT_PATH=${{ github.workspace }}
           OUTPUT_PATH="${ROOT_PATH}/output-${{ matrix.version }}-${{ matrix.kver }}"
           mkdir -p "${OUTPUT_PATH}"
+          # Container runs as uid 1000 (syno-compiler's Dockerfile) and writes
+          # directly into the bind-mounted /output.
+          chmod 777 "${OUTPUT_PATH}"
 
           docker run --rm \
+            -e EXPECTED_KVER="${{ matrix.kver }}" \
             -v "${ROOT_PATH}/eudev/src:/input" \
             -v "${OUTPUT_PATH}:/output" \
             auxxxilium/syno-compiler:${{ matrix.version }} \
