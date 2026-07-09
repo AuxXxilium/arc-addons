@@ -115,8 +115,19 @@ disk_size_gb() {
 
 # Strip vendor prefixes that /sys/block/*/device/model reports but that the
 # disk-compatibility DB keys drives without (e.g. "WDC WD40EFZX-..." -> "WD40EFZX-...").
+# ATA/SCSI INQUIRY vendor/product fields are fixed-width and space-padded, so the
+# raw string can have runs of multiple spaces between vendor and product (e.g.
+# "VMware   Virtual disk") — collapse those to single spaces first.
+#
+# $2 (device basename) selects whether the "VMware " prefix is stripped: DSM's
+# own disk-compatibility DBs key VMware's emulated SATA/SCSI virtual disks
+# without the vendor prefix ("Virtual disk", "Virtual SATA Hard Drive") but keep
+# it for its NVMe disks ("VMware Virtual NVMe Disk") — matching the live model
+# string to the wrong convention leaves the disk permanently "unverified" even
+# though a correct entry already exists in the DB.
 fix_drive_model() {
-  local m="$1"
+  local m="$1" dev="${2:-}"
+  m="$(printf '%s' "${m}" | sed 's/[[:space:]]\{1,\}/ /g')"
   case "${m}" in
     "WDC "*) m="${m#WDC }" ;;
     "HGST "*) m="${m#HGST }" ;;
@@ -125,6 +136,12 @@ fix_drive_model() {
     "Hitachi "*) m="${m#Hitachi }" ;;
     "SAMSUNG "*) m="${m#SAMSUNG }" ;;
     "FUJITSU "*) m="${m#FUJITSU }" ;;
+    "VMware "*)
+      case "${dev}" in
+        nvme*) : ;; # DB keeps the "VMware " prefix for NVMe models
+        *) m="${m#VMware }" ;;
+      esac
+      ;;
   esac
   printf '%s' "${m}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
@@ -142,11 +159,15 @@ collect_disks() {
       sata* | sd* | nvme*) ;;
       *) continue ;;
     esac
-    MODEL="$([ -f "${BLOCK_DIR}/device/model" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/model" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    MODEL="$([ -f "${BLOCK_DIR}/device/model" ] && tr -cd '[:print:]' <"${BLOCK_DIR}/device/model" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     [ -n "${MODEL}" ] || continue
-    MODEL="$(fix_drive_model "${MODEL}")"
-    FIRM="$([ -f "${BLOCK_DIR}/device/firmware_rev" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/firmware_rev" 2>/dev/null)"
-    [ -n "${FIRM}" ] || FIRM="$([ -f "${BLOCK_DIR}/device/rev" ] && tr -d '\r\n' <"${BLOCK_DIR}/device/rev" 2>/dev/null)"
+    MODEL="$(fix_drive_model "${MODEL}" "${DEV}")"
+    # ATA/SCSI INQUIRY-style fields are fixed-width and space/NUL-padded; on some
+    # (especially virtualized/emulated) devices the padding leaks embedded NULs or
+    # non-ASCII bytes past the real string, which previously survived into FIRM and
+    # showed up in the UI as e.g. "2.0 ????". Strip to printable ASCII only.
+    FIRM="$([ -f "${BLOCK_DIR}/device/firmware_rev" ] && tr -cd '[:print:]' <"${BLOCK_DIR}/device/firmware_rev" 2>/dev/null)"
+    [ -n "${FIRM}" ] || FIRM="$([ -f "${BLOCK_DIR}/device/rev" ] && tr -cd '[:print:]' <"${BLOCK_DIR}/device/rev" 2>/dev/null)"
     FIRM="$(printf '%s' "${FIRM}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     SIZE="$(disk_size_gb "${DEV}")"
     _log "  found: ${DEV} model=${MODEL} firm=${FIRM} size=${SIZE}"
