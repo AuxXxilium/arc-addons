@@ -75,7 +75,7 @@ jobs:
       - name: Upload to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: addons
+          name: addons-${{ matrix.version }}-${{ matrix.kver }}
           path: |
             ${{ github.workspace }}/source/*.tgz
 
@@ -96,8 +96,9 @@ jobs:
       - name: download to artifacts
         uses: actions/download-artifact@v4
         with:
-          name: addons
+          pattern: addons-*
           path: ./artifacts
+          merge-multiple: true
 
       - name: Check and Push
         run: |
