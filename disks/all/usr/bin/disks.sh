@@ -323,12 +323,15 @@ dtModel() {
       if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
         _log "bootloader (alias): ${_F}"; continue
       fi
-      if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ "${BOOTDISK_ATAPORT}" = "${_AT}" ]; then
+      if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ -n "${BOOTDISK_ATAPORT}" ] && [ "${BOOTDISK_ATAPORT}" = "${_AT}" ]; then
         _log "bootloader (port ${_AT}): ${_F}"; continue
       fi
-      # Skip entire controller when boot disk owns it and we have no per-port ataport info.
-      if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ -z "${BOOTDISK_ATAPORT}" ]; then
-        _log "bootloader (ctrl): ${_F}"; continue
+      # Skip only this disk (never the whole controller) when boot disk shares this pcie_root
+      # but ataport could not be resolved. pciepath can collapse to a shared upstream bridge
+      # address on HBAs/RAID controllers with multiple disks (e.g. HP P840), so blanket-skipping
+      # every disk on that address would hide the entire controller instead of just the boot disk.
+      if [ -z "${BOOTDISK_ATAPORT}" ] && [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_PP}" ]; then
+        _log "bootloader (physdevpath): ${_F}"; continue
       fi
       echo "${_PC}" >>"${_DT_SEEN}"
       COUNT=$((COUNT + 1))
@@ -350,9 +353,13 @@ dtModel() {
     # On DT the LKM deliberately leaves HBA PCI-storage disks with syno_port_type=SAS so that
     # sd.c assigns them the sas* device name (/sys/block/sas0, sas1, ...) rather than sd*.
     # sd* covers VirtIO and any other SCSI host whose port type was not changed by the LKM.
-    # Sort by PCIe address + SCSI H:C:T:L; one controller-level slot per HBA.
+    # Sort by PCIe address + SCSI H:C:T:L; one slot per disk, multiple disks may share a pcie_root
+    # (e.g. a multi-drive SAS/RAID HBA like the HP P840, where all drives report the same
+    # upstream bridge address).
     _DT_SD_TMP="/tmp/_dt_sd_list"
     : >"${_DT_SD_TMP}"
+    _DT_SD_SEEN="/tmp/_dt_sd_seen"
+    : >"${_DT_SD_SEEN}"
     for _F in /sys/block/sd* /sys/block/sas*; do
       [ -e "${_F}" ] || continue
       _N="$(basename "${_F}")"
@@ -377,12 +384,23 @@ dtModel() {
       if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
         _log "bootloader (alias): ${_F}"; continue
       fi
-      if [ -n "${BOOTDISK_PCIEPATH}" ] && [ -n "${_PC}" ] && [ "${_PC}" = "${BOOTDISK_PCIEPATH}" ]; then
+      # Only treat as the boot disk's controller when we can't tell devices on this pcie_root
+      # apart (no SCSI address) - otherwise pciepath alone is unreliable: it can collapse to a
+      # shared upstream bridge address on multi-disk HBAs/RAID controllers (e.g. HP P840), which
+      # would wrongly match every data disk behind that HBA as "the boot controller".
+      if [ -n "${BOOTDISK_PCIEPATH}" ] && [ -n "${_PC}" ] && [ "${_PC}" = "${BOOTDISK_PCIEPATH}" ] && [ "${_SCSI}" = "0:0:0:0" ]; then
         _log "bootloader (pciepath): ${_F}"; continue
       fi
-      # Skip if already handled by sata* loop or a prior sd* entry for this controller.
-      grep -qF "${_PC}" "${_DT_SEEN}" 2>/dev/null && continue
-      echo "${_PC}" >>"${_DT_SEEN}"
+      # Skip if this pcie_root is already claimed by a sata* entry above (proper sata* disks
+      # take priority; the sas*/sd* fallback only covers disks without a sata* alias).
+      grep -qxF "${_PC}" "${_DT_SEEN}" 2>/dev/null && continue
+      # Skip only the exact same disk (by pcie_root+SCSI address) already handled by a prior
+      # entry in this loop, not merely any disk sharing this controller's pcie_root - multiple
+      # physical drives behind one HBA/RAID controller share the same pcie_root and must each
+      # get their own slot.
+      _DT_SD_SEEN_KEY="${_PC} ${_SCSI}"
+      grep -qxF "${_DT_SD_SEEN_KEY}" "${_DT_SD_SEEN}" 2>/dev/null && continue
+      echo "${_DT_SD_SEEN_KEY}" >>"${_DT_SD_SEEN}"
       COUNT=$((COUNT + 1))
       {
         echo "    internal_slot@${COUNT} {"
@@ -395,7 +413,7 @@ dtModel() {
         echo "    };"
       } >>"${DEST}"
     done <"${_DT_SD_TMP}"
-    rm -f "${_DT_SD_TMP}" "${_DT_SEEN}"
+    rm -f "${_DT_SD_TMP}" "${_DT_SD_SEEN}" "${_DT_SEEN}"
 
     # NVME ports
     COUNT=0
