@@ -120,7 +120,7 @@ _wait_hba_disks_stable() {
   PREV_COUNT="$(_whba_count)"
   STABLE_ROUNDS=0
   I=0
-  while [ "${I}" -lt 40 ]; do
+  while [ "${I}" -lt 100 ]; do
     sleep 3
     CUR_COUNT="$(_whba_count)"
     if [ "${CUR_COUNT}" = "${PREV_COUNT}" ]; then
@@ -132,7 +132,11 @@ _wait_hba_disks_stable() {
     fi
     I=$((I + 1))
   done
-  _log "HBA disks settled: [${_whba_globs}] at count ${CUR_COUNT}"
+  if [ "${I}" -ge 100 ]; then
+    _log "HBA disk stabilisation wait timed out: [${_whba_globs}] at count ${CUR_COUNT}"
+  else
+    _log "HBA disks settled: [${_whba_globs}] at count ${CUR_COUNT}"
+  fi
 }
 
 # Check if the raid has been completed currently
