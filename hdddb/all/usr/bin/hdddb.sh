@@ -64,6 +64,43 @@ _get() { "$GKV" "$SYNOINFO" "$1"; }
 _set() { "$SKV" "$SYNOINFO" "$1" "$2"; "$SKV" /etc/synoinfo.conf "$1" "$2"; }
 _log() { echo "hdddb: $*"; }
 
+_has_hba_driver() {
+  lspci -n 2>/dev/null | grep -qE ' (0100|0104|0107):'
+}
+
+_count_disks() {
+  local c=0 f
+  for f in ${1}; do [ -e "${f}" ] && c=$((c + 1)); done
+  echo "${c}"
+}
+
+_wait_hba_disks_stable() {
+  _has_hba_driver || return 0
+
+  local globs="/sys/block/sata* /sys/block/sas* /sys/block/sd*"
+  _count() {
+    local total=0 g
+    for g in ${globs}; do total=$((total + $(_count_disks "${g}"))); done
+    echo "${total}"
+  }
+
+  local prev cur stable_rounds=0 i=0
+  prev="$(_count)"
+  while [ "${i}" -lt 100 ]; do
+    sleep 3
+    cur="$(_count)"
+    if [ "${cur}" = "${prev}" ]; then
+      stable_rounds=$((stable_rounds + 1))
+      [ "${stable_rounds}" -ge 5 ] && break
+    else
+      stable_rounds=0
+      prev="${cur}"
+    fi
+    i=$((i + 1))
+  done
+  _log "HBA disks settled at count ${cur}"
+}
+
 # ── drive size ────────────────────────────────────────────────────────────────
 
 disk_size_gb() {
@@ -357,6 +394,8 @@ for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
   "$SKV" "${F}" "forbid_unsupport_extdev" "no"
   "$SKV" "${F}" "support_btrfs_dedupe" "yes"
 done
+
+_wait_hba_disks_stable
 
 DISKS="$(mktemp /tmp/diskcompat.XXXXXX)" || exit 0
 

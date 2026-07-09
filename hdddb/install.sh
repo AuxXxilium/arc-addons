@@ -34,12 +34,16 @@ WantedBy=multi-user.target
 EOF
 
   ln -vsf /usr/lib/systemd/system/hdddb.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/hdddb.service
+
+  echo 'ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ENV{DEVNAME}=="/dev/nvme*|/dev/sas*|/dev/sd*|/dev/sata*", RUN+="/usr/bin/systemctl restart hdddb.service"' \
+    >"/tmpRoot/usr/lib/udev/rules.d/05-hdddb-update.rules"
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon hdddb - ${1}"
 
   # Remove systemd files
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/hdddb.service" \
-        "/tmpRoot/usr/lib/systemd/system/hdddb.service"
+        "/tmpRoot/usr/lib/systemd/system/hdddb.service" \
+        "/tmpRoot/usr/lib/udev/rules.d/05-hdddb-update.rules"
 
   # Create revert script if not present
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && {
