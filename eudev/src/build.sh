@@ -71,7 +71,7 @@ SYSROOT_MOUNT_H="${SYSROOT}/usr/include/linux/mount.h"
 # void* under strict C rules. Cast to unsigned char* at both use sites.
 sed -i 's/io_hdr\.sbp\[/((unsigned char *)io_hdr.sbp)[/g' sys-utils/eject.c
 
-./configure CC="${CC}" CFLAGS='-O2' --prefix=/usr --host="${HOST}" --disable-all-programs --enable-libmount --enable-libblkid --enable-eject --disable-libmount-mountfd-support
+./configure CC="${CC}" CFLAGS='-O2' --prefix=/usr --host="${HOST}" --disable-all-programs --enable-libmount --enable-libblkid --enable-blkid --enable-eject --disable-libmount-mountfd-support
 make
 make DESTDIR="${OUT}" install
 # eudev's ./configure below runs PKG_CHECK_MODULES([BLKID], ...) against the
@@ -90,6 +90,17 @@ make DESTDIR="${OUT}" install
 # Same as libblkid above: eudev's PKG_CHECK_EXISTS([libkmod]) needs to find
 # this in the cross toolchain's sysroot, not just in ${OUT}.
 sudo env PATH="${PATH}" make DESTDIR="${SYSROOT}" install
+
+# kmod's own Makefile.am only declares insmod/rmmod/lsmod/modprobe/modinfo/depmod
+# as noinst_SCRIPTS (build-tree symlinks to the kmod binary, used by its test
+# suite) — `make install` intentionally does not install them, only bin/kmod
+# itself. depmod in particular is required by disks.sh elsewhere in this
+# ramdisk, so recreate the multicall symlinks ourselves, in sbin/ to match
+# where these admin tools have always lived in this addon.
+mkdir -p "${OUT}/usr/sbin"
+for TOOL in depmod insmod rmmod lsmod modprobe modinfo; do
+  ln -sf ../bin/kmod "${OUT}/usr/sbin/${TOOL}"
+done
 
 # Build eudev
 git clone -c http.sslVerify=false --single-branch https://github.com/systemd/systemd.git /tmp/systemd
@@ -133,6 +144,10 @@ mv -f "${OUT}/usr/lib/udev/rules.d/80-net-name-slot.rules" "${OUT}/usr/lib/udev/
 # Clean up unnecessary files
 rm -rf "${OUT}/usr/share" "${OUT}/usr/include" "${OUT}/usr/lib/pkgconfig"
 rm -f "${OUT}/usr/sbin/udevadm" "${OUT}/usr/lib"/lib*.a "${OUT}/usr/lib"/lib*.la
+# kmod was configured with --libdir=/lib (not /usr/lib), so its .la/.pc files
+# land here instead of the usr/lib paths cleaned up above.
+rm -rf "${OUT}/lib/pkgconfig"
+rm -f "${OUT}/lib"/lib*.la
 
 # Recreate symlinks after cleanup
 cp -rf "${OUT}/usr/"* "${OUT}/"
