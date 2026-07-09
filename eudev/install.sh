@@ -8,25 +8,14 @@
 
 if [ "${1}" = "early" ]; then
   echo "Installing addon eudev - ${1}"
-  PRODUCTVER=$(awk -F'"' '/^export PRODUCTVER=/ {print $2}' "/addons/addons.sh")
-  case "${PRODUCTVER}" in
-    7.2*) EUDEVVER="7.2" ;;
-    7.3*) EUDEVVER="7.3" ;;
-    7.4*) EUDEVVER="7.4" ;;
-    *) EUDEVVER="7.4" ;;
-  esac
 
-  # Kernel branch differs per platform within a DSM version.
-  # Matches the kver syno-compiler builds against for DSM 7.2/7.3/7.4.
-  KMAJOR=$(/bin/uname -r | cut -d'.' -f1)
-  case "${KMAJOR}" in
-    [5-9]|[1-9][0-9]*) KVER="5.10.55" ;;
-    *) KVER="4.4.302" ;;
-  esac
-
-  EUDEVPKG="/addons/eudev-${EUDEVVER}-${KVER}.tgz"
-  [ -f "${EUDEVPKG}" ] || EUDEVPKG="/addons/eudev-${EUDEVVER}-4.4.302.tgz"
-  [ -f "${EUDEVPKG}" ] || EUDEVPKG="/addons/eudev-7.4-4.4.302.tgz"
+  # Only the eudev-<dsmver>-<kver>.tgz matching this build is copied to
+  # /addons/ (see installAddon() in addons.sh), so just pick whichever is there.
+  EUDEVPKG="$(ls /addons/eudev-*-*.tgz 2>/dev/null | head -n1)"
+  if [ -z "${EUDEVPKG}" ]; then
+    echo "ERROR: no eudev-*.tgz found in /addons/"
+    exit 1
+  fi
   tar -zxf "${EUDEVPKG}" -C /
   [ -L "/usr/sbin/modprobe" ] || ln -vsf /usr/bin/kmod /usr/sbin/modprobe
   [ -L "/usr/sbin/modinfo" ] || ln -vsf /usr/bin/kmod /usr/sbin/modinfo
