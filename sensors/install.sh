@@ -11,7 +11,14 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  tar -zxf /addons/sensors.tgz -C /tmpRoot/usr/
+  # Only the sensors-<dsmver>-<kver>.tgz matching this build is copied to
+  # /addons/ (see installAddon() in addons.sh), so just pick whichever is there.
+  SENSORSPKG="$(ls /addons/sensors-*-*.tgz 2>/dev/null | head -n1)"
+  if [ -z "${SENSORSPKG}" ]; then
+    echo "ERROR: no sensors-*.tgz found in /addons/"
+    exit 1
+  fi
+  tar -zxf "${SENSORSPKG}" -C /tmpRoot/usr/
 
   # Remove old fancontrol addon remnants
   rm -f "/tmpRoot/usr/sbin/fancontrol" 2>/dev/null || true
