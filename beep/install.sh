@@ -31,9 +31,9 @@ if [ "${1}" = "late" ]; then
     fi
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'BeepOnBoot';
-INSERT INTO task VALUES('BeepOnBoot', '', 'bootup', '', 1, 0, 0, 0, '', 0, "${BB}", 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('BeepOnBootup', '', 'bootup', '', 1, 0, 0, 0, '', 0, '${BB}', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'BeepOnShutdown';
-INSERT INTO task VALUES('BeepOnShutdown', '', 'shutdown', '', 1, 0, 0, 0, '', 0, "${BS}", 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('BeepOnShutdown', '', 'shutdown', '', 1, 0, 0, 0, '', 0, '${BS}', 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
 elif [ "${1}" = "uninstall" ]; then
