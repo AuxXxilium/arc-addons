@@ -23,9 +23,9 @@ if [ "${1}" = "late" ]; then
   echo "insert synoconfbkp task to esynoscheduler.db"
   /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'SynoconfbkpBootup';
-INSERT INTO task VALUES('SynoconfbkpBootup', '', 'bootup', '', 1, 0, 0, 0, '', 0, "/usr/bin/dsmconfigbackup.sh ${2:-7} ${3:-bkp}_bootup", 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('SynoconfbkpBootup', '', 'bootup', '', 1, 0, 0, 0, '', 0, '/usr/bin/dsmconfigbackup.sh ${2:-7} ${3:-bkp}_bootup', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'SynoconfbkpShutdown';
-INSERT INTO task VALUES('SynoconfbkpShutdown', '', 'shutdown', '', 1, 0, 0, 0, '', 0, "/usr/bin/dsmconfigbackup.sh ${2:-7} ${3:-bkp}_shutdown", 'script', '{}', '', '', '{}', '{}');
+INSERT INTO task VALUES('SynoconfbkpShutdown', '', 'shutdown', '', 1, 0, 0, 0, '', 0, '/usr/bin/dsmconfigbackup.sh ${2:-7} ${3:-bkp}_shutdown', 'script', '{}', '', '', '{}', '{}');
 EOF
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon synoconfbkp - ${1}"

@@ -23,7 +23,7 @@ if [ ! -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ]; then
   exit 0
 fi
 
-restoreCpuinfo() {
+if [ "${1}" = "-r" ]; then
   if [ -f "${FILE_GZ}.bak" ]; then
     rm -f "${FILE_JS}" "${FILE_GZ}"
     mv -f "${FILE_GZ}.bak" "${FILE_GZ}"
@@ -35,10 +35,6 @@ restoreCpuinfo() {
   [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
   [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
-}
-
-if [ "$1" == "-r" ]; then
-  restoreCpuinfo
   exit 0
 fi
 
@@ -60,6 +56,16 @@ sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}"
 sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"
 
+applyPatch() {
+  # $1=description $2=grep-anchor(BRE) $3=sed-script
+  if grep -q "$2" "${FILE_JS}"; then
+    sed -i "$3" "${FILE_JS}"
+    return 0
+  fi
+  echo "cpuinfo: $1 anchor not found, skipping"
+  return 1
+}
+
 CARDN=$(ls -d /sys/class/drm/card* 2>/dev/null | head -1)
 if [ -d "${CARDN}" ]; then
   PCIDN="$(awk -F= '/PCI_SLOT_NAME/ {print $2}' "${CARDN}/device/uevent" 2>/dev/null)"
@@ -73,58 +79,46 @@ if [ -d "${CARDN}" ]; then
     echo "GPU Info set to: \"${LNAME}\" \"${CLOCK}\" \"${MEMORY}\""
     if grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
       # t.gpu={};t.gpu.clock=\"455 MHz\";t.gpu.memory=\"8192 MiB\";t.gpu.name=\"Tesla P4\";t.gpu.temperature_c=47;t.gpu.tempwarn=false;
-      sed -i "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!t.gpu){t.gpu={};t.gpu.clock=\"${CLOCK}\";t.gpu.memory=\"${MEMORY}\";t.gpu.name=\"${LNAME}\";}let/g" "${FILE_JS}"
+      applyPatch "nvidia GPU info injection (getActiveApi)" 't=this\.getActiveApi(t);let' \
+        "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!t.gpu){t.gpu={};t.gpu.clock=\"${CLOCK}\";t.gpu.memory=\"${MEMORY}\";t.gpu.name=\"${LNAME}\";}let/g"
     else
       # b.gpu_info=[{name:\"Tesla P4\",status:\"compatible\",clock:\"455 MHz\",memory:\"8192 MiB\",pci_slot_num:\"0000:00:1c.0\",built_in_gpu_slot_num:\"\",temperature_c:47,tempwarn:false}];
       PCISLOT="${PCIDN:-}"
-      sed -i "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!b.support_gpu){b.support_gpu=true;b.gpu_info=[{name:\"${LNAME}\",status:\"compatible\",clock:\"${CLOCK}\",memory:\"${MEMORY}\",pci_slot_num:\"${PCISLOT}\",built_in_gpu_slot_num:\"\",temperature_c:0,tempwarn:false}];}let/g" "${FILE_JS}"
+      applyPatch "legacy GPU info injection (getActiveApi)" 't=this\.getActiveApi(t);let' \
+        "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!b.support_gpu){b.support_gpu=true;b.gpu_info=[{name:\"${LNAME}\",status:\"compatible\",clock:\"${CLOCK}\",memory:\"${MEMORY}\",pci_slot_num:\"${PCISLOT}\",built_in_gpu_slot_num:\"\",temperature_c:0,tempwarn:false}];}let/g"
     fi
   fi
 fi
 if [ "${MEV}" = "physical" ]; then
   LEGACY_SYS_TEMP_PATCHED=0
   if grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
-    sed -i 's/_D("support_nvidia_gpu")},/_D("support_nvidia_gpu")||true},/g' "${FILE_JS}"
-    sed -i 's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g' "${FILE_JS}"
-    if grep -q ',t,i,s)}' "${FILE_JS}"; then
-      sed -i 's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' "${FILE_JS}"
-      LEGACY_SYS_TEMP_PATCHED=1
-    else
-      echo "cpuinfo: ,t,i,s)} anchor not found, skipping legacy sys_temp renderer patch"
-    fi
-    sed -i 's/_T("rcpower",n),/_T("rcpower", n)?e.fan_list?_T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", n):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", n),/g' "${FILE_JS}"
+    applyPatch "nvidia GPU support flag (_D(\"support_nvidia_gpu\")})" '_D("support_nvidia_gpu")},' \
+      's/_D("support_nvidia_gpu")},/_D("support_nvidia_gpu")||true},/g'
+    applyPatch "GPU temp renderer (,C,D);)" ',C,D);' \
+      's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g'
+    applyPatch "legacy sys_temp renderer (,t,i,s)})" ',t,i,s)}' \
+      's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' \
+      && LEGACY_SYS_TEMP_PATCHED=1
+    applyPatch "fan RPM renderer (rcpower,n)" '_T("rcpower",n),' \
+      's/_T("rcpower",n),/_T("rcpower", n)?e.fan_list?_T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", n):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", n),/g'
   else
-    if grep -q ',t,i,n)}' "${FILE_JS}"; then
-      sed -i 's/,t,i,n)}/,t,i,e.sys_temp?n+" \| "+this.renderTempFromC(e.sys_temp):n)}/g' "${FILE_JS}"
-      LEGACY_SYS_TEMP_PATCHED=1
-    else
-      echo "cpuinfo: ,t,i,n)} anchor not found, skipping legacy sys_temp renderer patch"
-    fi
-    sed -i 's/_T("rcpower",s),/_T("rcpower", s)?e.fan_list?_T("rcpower", s) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", s):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", s),/g' "${FILE_JS}"
+    applyPatch "legacy sys_temp renderer (,t,i,n)})" ',t,i,n)}' \
+      's/,t,i,n)}/,t,i,e.sys_temp?n+" \| "+this.renderTempFromC(e.sys_temp):n)}/g' \
+      && LEGACY_SYS_TEMP_PATCHED=1
+    applyPatch "legacy GPU temp renderer (font_normal)" 'font_normal"),"</div>","</div>"\].join("")' \
+      's#font_normal"),"</div>","</div>"].join("")#font_normal")," | "+this.renderTempFromC(h),"</div>","</div>"].join("")#g'
+    applyPatch "fan RPM renderer (rcpower,s)" '_T("rcpower",s),' \
+      's/_T("rcpower",s),/_T("rcpower", s)?e.fan_list?_T("rcpower", s) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", s):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", s),/g'
   fi
 
-  # formatExternalDeviceInfo (arg0 = record, arg1 = FanSpeed data) has no native
-  # system-temperature row on some DSM builds - insert one alongside the
-  # fan-mode row it already builds, reusing the renderTempFromC helper already
-  # present in this bundle. Only run when the legacy ,t,i,n)}/,t,i,s)} patch
-  # above didn't find its anchor (e.g. DSM 7.4-90075, where that pattern only
-  # matches an unrelated Shares grid column) - running both unconditionally
-  # double-patches builds where the legacy patch already works (e.g. 7.3).
   if [ "${LEGACY_SYS_TEMP_PATCHED}" -eq 0 ]; then
-    if grep -q 'i.unshift(\[_T("rcpower","rcfancontrol_desc")' "${FILE_JS}"; then
-      sed -i 's/i\.unshift(\[_T("rcpower","rcfancontrol_desc"),/e.sys_temp\&\&i.unshift(["System Temperature",this.renderTempFromC(e.sys_temp),n]),i.unshift([_T("rcpower","rcfancontrol_desc"),/g' "${FILE_JS}"
-    else
-      echo "cpuinfo: rcfancontrol_desc anchor not found, skipping sys_temp row patch (unsupported DSM build)"
-    fi
+    applyPatch "sys_temp row (rcfancontrol_desc)" 'i.unshift(\[_T("rcpower","rcfancontrol_desc")' \
+      's/i\.unshift(\[_T("rcpower","rcfancontrol_desc"),/e.sys_temp\&\&i.unshift(["System Temperature",this.renderTempFromC(e.sys_temp),n]),i.unshift([_T("rcpower","rcfancontrol_desc"),/g'
   fi
 fi
 
 [ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
 
-# Patch nginx to route through the cpuinfo proxy socket.
-# The cpuinfo binary is managed as a separate supervised systemd service
-# (cpuinfo.service) so it restarts automatically if it crashes, keeping
-# the socket alive without any nginx reload being needed.
 [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
 sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /etc/nginx/nginx.conf
 [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak

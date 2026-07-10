@@ -35,52 +35,6 @@ _check_user_conf() {
   grep -Eq "^${1}=" "${UCONF}" 2>/dev/null
 }
 
-# Sort sd* devices by PCIe topology for stable physical slot ordering.
-#
-# Sort key (tab-separated, lexicographically comparable):
-#   1. Normalized leaf PCI address: DDDD:BB:DD.F  (zero-padded domain so "0000:" sorts before any domain)
-#      Extracted from syno_block_info pciepath first, then PHYSDEVPATH fallback.
-#      Disks without a PCI parent (pure USB, virtio with no PCI path) sort last ("zzzz:zz:zz.z").
-#   2. SCSI address H:C:T:L — secondary key within the same controller, gives stable per-port ordering.
-#   3. sd device name — final tiebreaker, never needed in practice.
-#
-# This replaces both the old _sorted_sd_disks() (PHYSDEVPATH string sort) and _legacy_sd_disks()
-# (sd-letter order).  The result is deterministic across reboots regardless of sd* letter assignment.
-_sorted_sd_disks() {
-  for F in /sys/block/sd*; do
-    [ -e "${F}" ] || continue
-    N="$(basename "${F}")"
-
-    # Prefer pciepath from syno_block_info (already normalized by LKM).
-    PCIE="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-
-    # Fallback: extract leaf PCI address from PHYSDEVPATH.
-    if [ -z "${PCIE}" ]; then
-      PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/{print $2}' "${F}/uevent" 2>/dev/null)"
-      [ -n "${PHYSDEVPATH}" ] && PCIE="$(printf '%s' "${PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-    fi
-
-    # Normalize: ensure DDDD:BB:DD.F format (add 0000: domain if missing).
-    if [ -n "${PCIE}" ]; then
-      case "${PCIE}" in
-        *:*:*.*) : ;; # already has domain
-        *)  PCIE="0000:${PCIE}" ;;
-      esac
-    else
-      PCIE="zzzz:zz:zz.z"
-    fi
-
-    # Zero-pad each field of H:C:T:L for correct numeric lexicographic sort.
-    SCSI_RAW="$(readlink -f "${F}/device" 2>/dev/null | grep -Eo '[0-9]+:[0-9]+:[0-9]+:[0-9]+' | head -1)"
-    if [ -n "${SCSI_RAW}" ]; then
-      SCSI_PAD="$(echo "${SCSI_RAW}" | awk -F: '{printf "%05d:%05d:%05d:%05d",$1,$2,$3,$4}')"
-    else
-      SCSI_PAD="00000:00000:00000:00000"
-    fi
-    printf '%s\t%s\t%s\n' "${PCIE}" "${SCSI_PAD}" "${N}"
-  done | sort | awk -F'\t' '{print $3}'
-}
-
 # Check if any HBA/SCSI/RAID controller is present via PCI class codes.
 #   0100 = SCSI storage controller
 #   0104 = RAID bus controller
@@ -137,6 +91,22 @@ _wait_hba_disks_stable() {
   else
     _log "HBA disks settled: [${_whba_globs}] at count ${CUR_COUNT}"
   fi
+}
+
+# Convert disk name to integer
+# Args: $1 disk name
+_atoi() {
+  DISKNAME=${1}
+  NUM=0
+  IDX=0
+  while [ ${IDX} -lt ${#DISKNAME} ]; do
+    N=$(($(printf '%d' "'$(expr substr "${DISKNAME}" $((IDX + 1)) 1)") - $(printf '%d' "'a") + 1))
+    BIT=$(($(expr length "${DISKNAME}") - 1 - IDX))
+    # shellcheck disable=SC3019
+    NUM=$((NUM + (BIT == 0 ? N : 26 ** BIT * N)))
+    IDX=$((IDX + 1))
+  done
+  echo $((NUM - 1))
 }
 
 # Check if the raid has been completed currently
@@ -245,6 +215,8 @@ getUsbPorts() {
 dtModel() {
   _log dtModel
 
+  UNIQUE=$(__get_conf_kv unique)
+
   # Wait for late HBA/SATA/SAS probes before enumerating slots.
   # Native SATA is always sata*. HBA/PCI-storage disks appear as sas* on DT because
   # the LKM leaves their syno_port_type as SAS. sd* covers VirtIO and other SCSI hosts.
@@ -266,22 +238,18 @@ dtModel() {
     } >"${DEST}"
 
     # SATA ports
-    # One slot per attached sata* disk, sorted by PCIe topology (pcie_root + ata_port) for stable
-    # slot@N numbers tied to physical port position across reboots.
+    # One slot per attached sata* disk, in natural device-name order (sata0, sata1, ...).
     # pcie_root format is kernel-version-dependent; the sed pass at the end of dtModel() normalises:
     #   kernel < 5.x expects "BB:DD.F", kernel >= 5.x expects "0000:BB:DD.F"
-    # We always store full DDDD:BB:DD.F internally so sorting is deterministic.
+    # We always store full DDDD:BB:DD.F internally so normalisation is deterministic.
     COUNT=0
     _DT_SEEN="/tmp/_dt_seen_ctrl"
     : >"${_DT_SEEN}"
 
-    # Build sorted sata* entry list into a temp file, then iterate without a subshell pipe
-    # so COUNT and the seen-controller file stay in the parent shell context.
-    _DT_SATA_TMP="/tmp/_dt_sata_list"
-    : >"${_DT_SATA_TMP}"
-    for _F in /sys/block/sata*; do
+    for _F in $(LC_ALL=C printf '%s\n' /sys/block/sata* | sort -V); do
       [ -e "${_F}" ] || continue
       _N="$(basename "${_F}")"
+      [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && { _log "bootloader: ${_F}"; continue; }
       _PP="$(awk -F= '/PHYSDEVPATH/{print $2}' "${_F}/uevent" 2>/dev/null)"
       _PC="$(grep 'pciepath' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       _AT="$(grep 'ata_port_no' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
@@ -310,16 +278,6 @@ dtModel() {
           done
         fi
       fi
-      # Sort key: PCIE TAB zero-padded-ATAPORT TAB driver TAB name TAB physdevpath
-      printf '%s\t%04d\t%s\t%s\t%s\n' "${_PC}" "${_AT:-0}" "${_DR}" "${_N}" "${_PP}"
-    done | sort >"${_DT_SATA_TMP}"
-
-    # Emit one slot per attached disk in PCIe-sorted order.
-    # Each row in _DT_SATA_TMP is one actual disk; emit its ata_port directly.
-    # The sort order (PCIE TAB ATAPORT) gives stable slot@N numbers tied to physical port position.
-    while IFS="$(printf '\t')" read -r _PC _AT _DR _N _PP; do
-      _F="/sys/block/${_N}"
-      [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && { _log "bootloader: ${_F}"; continue; }
       if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
         _log "bootloader (alias): ${_F}"; continue
       fi
@@ -337,7 +295,6 @@ dtModel() {
       COUNT=$((COUNT + 1))
       {
         echo "    internal_slot@${COUNT} {"
-        echo "        reg = <${COUNT}>;"
         echo '        protocol_type = "sata";'
         echo "        ${_DR} {"
         echo "            pcie_root = \"${_PC}\";"
@@ -346,23 +303,21 @@ dtModel() {
         echo "        };"
         echo "    };"
       } >>"${DEST}"
-    done <"${_DT_SATA_TMP}"
-    rm -f "${_DT_SATA_TMP}"
+    done
 
     # SAS*/SD* fallback: HBA/RAID devices without sata* aliases.
     # On DT the LKM deliberately leaves HBA PCI-storage disks with syno_port_type=SAS so that
     # sd.c assigns them the sas* device name (/sys/block/sas0, sas1, ...) rather than sd*.
     # sd* covers VirtIO and any other SCSI host whose port type was not changed by the LKM.
-    # Sort by PCIe address + SCSI H:C:T:L; one slot per disk, multiple disks may share a pcie_root
-    # (e.g. a multi-drive SAS/RAID HBA like the HP P840, where all drives report the same
-    # upstream bridge address).
-    _DT_SD_TMP="/tmp/_dt_sd_list"
-    : >"${_DT_SD_TMP}"
+    # Multiple disks may share a pcie_root (e.g. a multi-drive SAS/RAID HBA like the HP P840,
+    # where all drives report the same upstream bridge address), so dedup by pcie_root+SCSI
+    # address rather than skipping the whole controller after the first disk.
     _DT_SD_SEEN="/tmp/_dt_sd_seen"
     : >"${_DT_SD_SEEN}"
-    for _F in /sys/block/sd* /sys/block/sas*; do
+    for _F in $(LC_ALL=C printf '%s\n' /sys/block/sd* /sys/block/sas* | sort -V); do
       [ -e "${_F}" ] || continue
       _N="$(basename "${_F}")"
+      [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && continue
       _PC="$(grep 'pciepath' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       _DR="$(grep 'driver' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
       _PP="$(awk -F= '/PHYSDEVPATH/{print $2}' "${_F}/uevent" 2>/dev/null)"
@@ -375,12 +330,7 @@ dtModel() {
       { [ -z "${_PC}" ] || [ -z "${_DR}" ]; } && continue
       case "${_PC}" in *:*:*.*) : ;; *) _PC="0000:${_PC}" ;; esac
       _SCSI="$(readlink -f "${_F}/device" 2>/dev/null | grep -Eo '[0-9]+:[0-9]+:[0-9]+:[0-9]+' | head -1)"
-      printf '%s\t%s\t%s\t%s\t%s\n' "${_PC}" "${_SCSI:-0:0:0:0}" "${_DR}" "${_N}" "${_PP}"
-    done | sort >"${_DT_SD_TMP}"
-
-    while IFS="$(printf '\t')" read -r _PC _SCSI _DR _N _PP; do
-      _F="/sys/block/${_N}"
-      [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && continue
+      _SCSI="${_SCSI:-0:0:0:0}"
       if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
         _log "bootloader (alias): ${_F}"; continue
       fi
@@ -404,7 +354,6 @@ dtModel() {
       COUNT=$((COUNT + 1))
       {
         echo "    internal_slot@${COUNT} {"
-        echo "        reg = <${COUNT}>;"
         echo '        protocol_type = "sata";'
         echo "        ${_DR} {"
         echo "            pcie_root = \"${_PC}\";"
@@ -412,43 +361,74 @@ dtModel() {
         echo "        };"
         echo "    };"
       } >>"${DEST}"
-    done <"${_DT_SD_TMP}"
-    rm -f "${_DT_SD_TMP}" "${_DT_SD_SEEN}" "${_DT_SEEN}"
+    done
+    rm -f "${_DT_SD_SEEN}" "${_DT_SEEN}"
 
     # NVME ports
-    COUNT=0
-    POWER_LIMIT=""
-    for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
-      [ ! -e "${F}" ] && continue
-      N="$(basename "${F}")"
-      # Skip loader disk by name (e.g. nvme0n1 is the Arc loader disk on NVMe).
-      [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
-      PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      _NVME_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-      if [ -z "${PCIEPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ]; then
-        PCIEPATH="$(echo "${_NVME_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-      fi
-      if [ -z "${PCIEPATH}" ]; then
-        _log "unknown: ${F}"
-        continue
-      fi
-      if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] || { [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
-        _log "bootloader: ${F}"
-        continue
-      fi
-      grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue # An nvme controller only recognizes one disk
-      [ $((${#POWER_LIMIT} + 2)) -gt 30 ] && break               # POWER_LIMIT string length limit 30 characters
-      POWER_LIMIT="${POWER_LIMIT:+${POWER_LIMIT},}0"
-      COUNT=$((COUNT + 1))
-      {
-        echo "    nvme_slot@${COUNT} {"
-        echo "        reg = <${COUNT}>;"
-        echo "        pcie_root = \"${PCIEPATH}\";"
-        echo '        port_type = "ssdcache";'
-        echo "    };"
-      } >>"${DEST}"
-    done
-    [ -n "${POWER_LIMIT}" ] && sed -i "s/power_limit = .*/power_limit = \"${POWER_LIMIT}\";/" "${DEST}" || sed -i '/power_limit/d' "${DEST}"
+    if echo "${UNIQUE}" | grep -q 'epyc7003ntb'; then
+      COUNT=0
+      for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
+        [ ! -e "${F}" ] && continue
+        N="$(basename "${F}")"
+        [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
+        PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+        _NVME_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+        if [ -z "${PCIEPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ]; then
+          PCIEPATH="$(echo "${_NVME_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+        fi
+        if [ -z "${PCIEPATH}" ]; then
+          _log "unknown: ${F}"
+          continue
+        fi
+        if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] || { [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
+          _log "bootloader: ${F}"
+          continue
+        fi
+        grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue # An nvme controller only recognizes one disk
+        COUNT=$((COUNT + 1))
+        {
+          echo "    internal_slot@${COUNT} {"
+          echo "        nvme {"
+          echo "            pcie_root = \"${PCIEPATH}\";"
+          echo "        };"
+          echo "    };"
+        } >>"${DEST}"
+      done
+    else
+      COUNT=0
+      POWER_LIMIT=""
+      for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
+        [ ! -e "${F}" ] && continue
+        N="$(basename "${F}")"
+        # Skip loader disk by name (e.g. nvme0n1 is the Arc loader disk on NVMe).
+        [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
+        PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+        _NVME_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+        if [ -z "${PCIEPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ]; then
+          PCIEPATH="$(echo "${_NVME_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+        fi
+        if [ -z "${PCIEPATH}" ]; then
+          _log "unknown: ${F}"
+          continue
+        fi
+        if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] || { [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
+          _log "bootloader: ${F}"
+          continue
+        fi
+        grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue # An nvme controller only recognizes one disk
+        [ $((${#POWER_LIMIT} + 2)) -gt 30 ] && break               # POWER_LIMIT string length limit 30 characters
+        POWER_LIMIT="${POWER_LIMIT:+${POWER_LIMIT},}0"
+        COUNT=$((COUNT + 1))
+        {
+          echo "    nvme_slot@${COUNT} {"
+          echo "        reg = <${COUNT}>;"
+          echo "        pcie_root = \"${PCIEPATH}\";"
+          echo '        port_type = "ssdcache";'
+          echo "    };"
+        } >>"${DEST}"
+      done
+      [ -n "${POWER_LIMIT}" ] && sed -i "s/power_limit = .*/power_limit = \"${POWER_LIMIT}\";/" "${DEST}" || sed -i '/power_limit/d' "${DEST}"
+    fi
 
     # USB ports
     COUNT=0
@@ -480,7 +460,6 @@ dtModel() {
   fi
 
   # fix model name
-  UNIQUE=$(__get_conf_kv unique)
   sed -i "0,/version = .*;/s/model = \".*\";/model = \"${UNIQUE}\";/" "${DEST}"
 
   MAXDISKS=$(grep -c "internal_slot@" "${DEST}" 2>/dev/null)
@@ -588,10 +567,8 @@ nondtModel() {
   USBMAXIDX=0
   MAXNONUSBIDX=-1
   NONUSBMASK=0
-  _NONDT_TMP="/tmp/_nondt_disks"
-  _sorted_sd_disks >"${_NONDT_TMP}"
-
-  while read -r _ND_N; do
+  for _ND_N in $(LC_ALL=C printf '%s\n' /sys/block/sd* | sort -V); do
+    _ND_N="$(basename "${_ND_N}")"
     F="/sys/block/${_ND_N}"
     [ -e "${F}" ] || continue
     if [ -n "${BOOTDISK}" ] && [ "${_ND_N}" = "${BOOTDISK}" ]; then
@@ -611,12 +588,7 @@ nondtModel() {
         _log "bootloader (pciepath+ataport): ${F}"; continue
       fi
     fi
-    _sn="${_ND_N#sd}"
-    case "${#_sn}" in
-      1) IDX="$(($(printf '%d' "'${_sn}") - 97))" ;;
-      2) IDX="$((( $(printf '%d' "'$(printf '%s' "${_sn}" | cut -c1)") - 96) * 26 + $(printf '%d' "'$(printf '%s' "${_sn}" | cut -c2)") - 97))" ;;
-      *) IDX=0 ;;
-    esac
+    IDX="$(_atoi "${_ND_N#sd}")"
     BIT=$((2 ** IDX))
     [ $((IDX + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((IDX + 1))
     if grep "PHYSDEVPATH" "${F}/uevent" 2>/dev/null | grep -q "usb"; then
@@ -627,8 +599,7 @@ nondtModel() {
       NONUSBMASK=$((NONUSBMASK | BIT))
       [ ${IDX} -gt ${MAXNONUSBIDX} ] && MAXNONUSBIDX=${IDX}
     fi
-  done <"${_NONDT_TMP}"
-  rm -f "${_NONDT_TMP}"
+  done
 
   # Only reserve USB slots when USB disks are actually present.
   if [ "${hasUSB}" = "true" ]; then
