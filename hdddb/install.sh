@@ -22,12 +22,12 @@ if [ "${1}" = "late" ]; then
 [Unit]
 Description=HDDs/SSDs drives databases
 Wants=smpkg-custom-install.service pkgctl-StorageManager.service
-After=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=-/usr/bin/hdddb.sh -nrwd
+ExecStart=-/usr/bin/hdddb.sh -nrwpe
 
 [Install]
 WantedBy=multi-user.target
@@ -53,6 +53,5 @@ elif [ "${1}" = "uninstall" ]; then
 
   # Add revert commands
   echo "/usr/bin/hdddb.sh --restore" >> /tmpRoot/usr/arc/revert.sh
-  echo "[ -f /usr/lib/libhwcontrol.so.1.bak-dedup ] && cp -p /usr/lib/libhwcontrol.so.1.bak-dedup /usr/lib/libhwcontrol.so.1 && rm -f /usr/lib/libhwcontrol.so.1.bak-dedup" >> /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/hdddb.sh" >> /tmpRoot/usr/arc/revert.sh
 fi
