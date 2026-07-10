@@ -6,6 +6,8 @@
 # See /LICENSE for more information.
 #
 
+PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
+
 if [ "${1}" = "early" ]; then
   echo "Installing addon misc - ${1}"
 
@@ -17,6 +19,12 @@ if [ "${1}" = "early" ]; then
     | sed "s/2d6520302e39/2d6520312e32/" \
     | xxd -r -p >"${SO_FILE}" 2>/dev/null
   rm -f "${SO_FILE}.tmp"
+
+  if echo "epyc7003ntb" | grep -wq "${PLATFORM}"; then
+    # for epyc7003ntb console error "sh: invalid number 'Read error'"
+    sed -i 's/^main "\$@"$/# main "\$@"/' "/usr/syno/sbin/i2c_hb_checker.sh" 2>/dev/null || true
+    sed -i -E 's/169\.254\.4\.(1|2)/127.0.0.1/g; s/ --interface ntb_eth[0-9]{1,2}//g; s/check_ntb_connection$/exit 0 # check_ntb_connection/' /usr/syno/share/clusterInstall.sh || true
+  fi
 
 elif [ "${1}" = "patches" ]; then
   # getty
@@ -90,6 +98,9 @@ elif [ "${1}" = "rcExit" ]; then
     sleep 1
   done &
 
+  # for epyc7003ntb web error
+  sed -i 's/check_ntb_connection$/exit 0 # check_ntb_connection/' "/usr/syno/share/clusterInstall.sh" 2>/dev/null || true
+
   # disable DisabledPortDisks
   sed -i 's/^DisabledPortDisks=.*$/DisabledPortDisks=""/' /usr/syno/web/webman/get_state.cgi 2>/dev/null
 
@@ -111,11 +122,12 @@ elif [ "${1}" = "late" ]; then
   mkdir -vp /tmpRoot/usr/arc/addons
   # cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
-  echo "Killing ttyd ..."
+  echo "Killing ttyd dufs..."
   /usr/bin/killall ttyd 2>/dev/null || true
-
-  echo "Killing dufs ..."
   /usr/bin/killall dufs 2>/dev/null || true
+
+  # cp -pf /usr/sbin/ttyd /tmpRoot/usr/sbin/ttyd
+  # cp -pf /usr/sbin/dufs /tmpRoot/usr/sbin/dufs
 
   # ethtool
   [ ! -f "/tmpRoot/usr/bin/ethtool" ] && cp -pf /usr/bin/ethtool /tmpRoot/usr/bin/ethtool
@@ -205,19 +217,6 @@ elif [ "${1}" = "late" ]; then
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno_update_disk_logs.service 2>/dev/null
-  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-nic-supported-check.service 2>/dev/null
-  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-switch-check.service 2>/dev/null
-  # numanod: only disable on single-node systems; let it run on real multi-socket NUMA.
-  # /proc/buddyinfo has one line per (node, zone) — count distinct node numbers.
-  NUMA_NODES=$(awk '/^Node/ {print $2}' /proc/buddyinfo 2>/dev/null | sort -u | wc -l)
-  if [ "${NUMA_NODES}" -le 1 ]; then
-    sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
-    sed -i 's|^Restart=.*|Restart=no|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
-    sed -i 's|^Type=.*|Type=oneshot|g' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
-    grep -q "^RemainAfterExit=" /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null \
-      && sed -i 's|^RemainAfterExit=.*|RemainAfterExit=yes|g' /tmpRoot/usr/lib/systemd/system/numanod.service \
-      || sed -i '/^\[Service\]/a RemainAfterExit=yes' /tmpRoot/usr/lib/systemd/system/numanod.service 2>/dev/null
-  fi
 
   # getty
   for I in $(cat /proc/cmdline 2>/dev/null | grep -Eo 'getty=[^ ]+' | sed 's/getty=//'); do
