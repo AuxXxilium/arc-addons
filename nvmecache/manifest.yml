@@ -20,4 +20,6 @@ v1000nk: false
 r1000: false
 r1000nk: false
 epyc7002: false
+epyc7003: false
+icelaked: false
 epyc7003ntb: false
