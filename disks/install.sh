@@ -35,7 +35,7 @@ elif [ "${1}" = "late" ]; then
     cp -vpf /etc/extensionPorts /tmpRoot/etc/extensionPorts
     cp -vpf /etc/extensionPorts /tmpRoot/etc.defaults/extensionPorts
   fi
-  KVLIST="${KVLIST} maxdisks supportnvme support_m2_pool" # support_ssd_cache support_write_cache"
+  KVLIST="${KVLIST} maxdisks supportnvme support_m2_pool" # support_ssd_cache support_write_cache
 
   for K in ${KVLIST}; do
     V="$(/bin/get_key_value "/etc.defaults/synoinfo.conf" "${K}")"
