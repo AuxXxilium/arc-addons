@@ -10,49 +10,34 @@ ROOT_PATH=""
 GKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/bin/get_key_value")
 SKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
 
-# Logging
 _log() {
   echo "disks: $*"
   /bin/logger -p "error" -t "disks" "$@"
 }
 
-# Get values in synoinfo.conf
-# Args: $1 key
 __get_conf_kv() {
   "${GKV}" "${ROOT_PATH}/etc.defaults/synoinfo.conf" "${1}" 2>/dev/null
 }
 
-# Replace/add values in synoinfo.conf
-# Args: $1 key, $2 val
 __set_conf_kv() {
   for F in "${ROOT_PATH}/etc/synoinfo.conf" "${ROOT_PATH}/etc.defaults/synoinfo.conf"; do "${SKV}" "${F}" "${1}" "${2}"; done
 }
 
-# Check if the user has customized the key
-# Args: $1 key
 _check_user_conf() {
   [ -f "/addons/synoinfo.conf" ] && UCONF="/addons/synoinfo.conf" || UCONF="/usr/arc/addons/synoinfo.conf"
   grep -Eq "^${1}=" "${UCONF}" 2>/dev/null
 }
 
-# Check if any HBA/SCSI/RAID controller is present via PCI class codes.
-#   0100 = SCSI storage controller
-#   0104 = RAID bus controller
-#   0107 = Serial Attached SCSI (SAS) controller
 _has_hba_driver() {
   lspci -n 2>/dev/null | grep -qE ' (0100|0104|0107):'
 }
 
-# Count block devices matching a glob pattern (e.g. /sys/block/sd* or /sys/block/sata*).
 _count_disks() {
   C=0
   for _F in ${1}; do [ -e "${_F}" ] && C=$((C + 1)); done
   echo "${C}"
 }
 
-# Wait until HBA disk enumeration becomes stable across one or more glob patterns.
-# Args: $1 $2 ... glob patterns to watch (counts are summed); defaults to /sys/block/sd*
-# The one-shot guard prevents re-waiting when called multiple times in the same script run.
 _wait_hba_disks_stable() {
   [ "${_HBA_WAIT_DONE:-0}" = "1" ] && return 0
   _HBA_WAIT_DONE=1
@@ -62,7 +47,6 @@ _wait_hba_disks_stable() {
     return 0
   fi
 
-  # Accept multiple glob patterns; sum their counts so adding disks on any pattern restarts the timer.
   _whba_globs="${*:-/sys/block/sd*}"
 
   _whba_count() {
@@ -93,8 +77,6 @@ _wait_hba_disks_stable() {
   fi
 }
 
-# Convert disk name to integer
-# Args: $1 disk name
 _atoi() {
   DISKNAME=${1}
   NUM=0
@@ -109,8 +91,6 @@ _atoi() {
   echo $((NUM - 1))
 }
 
-# Check if the raid has been completed currently
-# Returns: 0 if yes, 1 if no
 _check_rootraidstatus() {
   [ "$(__get_conf_kv supportraid)" = "yes" ] || return 1
   [ -f "/sys/block/md0/md/array_state" ] || return 1
@@ -121,8 +101,6 @@ _check_rootraidstatus() {
   return 0
 }
 
-# Convert integer to disk name
-# Args: $1 disks mask
 _itol() {
   IFS="${IFS:- }"
   NUM="$(echo $((${1:-"-1"})))"
@@ -131,8 +109,8 @@ _itol() {
   while [ ${NUM} -gt 0 ]; do
     if [ "$((NUM & 1))" = 1 ]; then
       case $((IDX / 26)) in
-        0) dev="$(printf sd\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;;                                                              # sda-z
-        *) dev="$(printf sd\\x"$(printf "%x" "$((IDX / 26 - 1 + $(printf '%d' "'a")))")"\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;; # sdaa-zz
+        0) dev="$(printf sd\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;;
+        *) dev="$(printf sd\\x"$(printf "%x" "$((IDX / 26 - 1 + $(printf '%d' "'a")))")"\\x"$(printf "%x" "$((IDX % 26 + $(printf '%d' "'a")))")")" ;;
       esac
       DISKLIST="${DISKLIST:+${DISKLIST}${IFS}}${dev}"
     fi
@@ -142,7 +120,6 @@ _itol() {
   echo "${DISKLIST}"
 }
 
-# Check if the disk is lossed
 checkAlldisk() {
   for F in $(LC_ALL=C printf '%s\n' /sys/block/* | sort -V); do
     [ ! -e "${F}" ] && continue
@@ -164,7 +141,6 @@ checkAlldisk() {
 
 }
 
-# Check if the disk is a boot disk
 checkSynoboot() {
   if [ ! -b /dev/synoboot ] || [ ! -b /dev/synoboot1 ] || [ ! -b /dev/synoboot2 ] || [ ! -b /dev/synoboot3 ]; then
     [ -z "${BOOTDISK}" ] && return
@@ -186,7 +162,6 @@ checkSynoboot() {
   fi
 }
 
-# USB ports
 getUsbPorts() {
   for F in $(LC_ALL=C printf '%s\n' /sys/bus/usb/devices/usb* | sort -V); do
     [ ! -e "${F}" ] && continue
@@ -211,20 +186,16 @@ getUsbPorts() {
   echo
 }
 
-# DT model
 dtModel() {
   _log dtModel
 
   UNIQUE=$(__get_conf_kv unique)
 
-  # Wait for late HBA/SATA/SAS probes before enumerating slots.
-  # Native SATA is always sata*. HBA/PCI-storage disks appear as sas* on DT because
-  # the LKM leaves their syno_port_type as SAS. sd* covers VirtIO and other SCSI hosts.
-  _wait_hba_disks_stable "/sys/block/sata*" "/sys/block/sas*" "/sys/block/sd*"
+  _wait_hba_disks_stable "/sys/block/sata*"
 
   DEST="/etc/model.dts"
   [ -f "/addons/model.dts" ] && cp -vpf "/addons/model.dts" "${DEST}"
-  if [ ! -f "${DEST}" ]; then # Users can put their own dts.
+  if [ ! -f "${DEST}" ]; then
     mkdir -p "$(dirname "${DEST}" 2>/dev/null)"
     {
       echo "/dts-v1/;"
@@ -237,14 +208,7 @@ dtModel() {
       echo '    power_limit = "";'
     } >"${DEST}"
 
-    # SATA ports
-    # One slot per attached sata* disk, in natural device-name order (sata0, sata1, ...).
-    # pcie_root format is kernel-version-dependent; the sed pass at the end of dtModel() normalises:
-    #   kernel < 5.x expects "BB:DD.F", kernel >= 5.x expects "0000:BB:DD.F"
-    # We always store full DDDD:BB:DD.F internally so normalisation is deterministic.
     COUNT=0
-    _DT_SEEN="/tmp/_dt_seen_ctrl"
-    : >"${_DT_SEEN}"
 
     for _F in $(LC_ALL=C printf '%s\n' /sys/block/sata* | sort -V); do
       [ -e "${_F}" ] || continue
@@ -266,7 +230,6 @@ dtModel() {
         _log "unknown: ${_F}"; continue
       fi
       [ -z "${_DR}" ] && { _log "unknown driver: ${_F}"; continue; }
-      # Fallback ataport: index of this ata* within the controller's sorted ata* list.
       if [ -z "${_AT}" ] && [ -n "${_PP}" ]; then
         _FB_ATA="$(printf '%s' "${_PP}" | grep -Eo 'ata[0-9]+' | head -1)"
         _FB_CTRL="/sys${_PP%%/ata*}"
@@ -284,14 +247,9 @@ dtModel() {
       if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ -n "${BOOTDISK_ATAPORT}" ] && [ "${BOOTDISK_ATAPORT}" = "${_AT}" ]; then
         _log "bootloader (port ${_AT}): ${_F}"; continue
       fi
-      # Skip only this disk (never the whole controller) when boot disk shares this pcie_root
-      # but ataport could not be resolved. pciepath can collapse to a shared upstream bridge
-      # address on HBAs/RAID controllers with multiple disks (e.g. HP P840), so blanket-skipping
-      # every disk on that address would hide the entire controller instead of just the boot disk.
       if [ -z "${BOOTDISK_ATAPORT}" ] && [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_PP}" ]; then
         _log "bootloader (physdevpath): ${_F}"; continue
       fi
-      echo "${_PC}" >>"${_DT_SEEN}"
       COUNT=$((COUNT + 1))
       {
         echo "    internal_slot@${COUNT} {"
@@ -305,66 +263,6 @@ dtModel() {
       } >>"${DEST}"
     done
 
-    # SAS*/SD* fallback: HBA/RAID devices without sata* aliases.
-    # On DT the LKM deliberately leaves HBA PCI-storage disks with syno_port_type=SAS so that
-    # sd.c assigns them the sas* device name (/sys/block/sas0, sas1, ...) rather than sd*.
-    # sd* covers VirtIO and any other SCSI host whose port type was not changed by the LKM.
-    # Multiple disks may share a pcie_root (e.g. a multi-drive SAS/RAID HBA like the HP P840,
-    # where all drives report the same upstream bridge address), so dedup by pcie_root+SCSI
-    # address rather than skipping the whole controller after the first disk.
-    _DT_SD_SEEN="/tmp/_dt_sd_seen"
-    : >"${_DT_SD_SEEN}"
-    for _F in $(LC_ALL=C printf '%s\n' /sys/block/sd* /sys/block/sas* | sort -V); do
-      [ -e "${_F}" ] || continue
-      _N="$(basename "${_F}")"
-      [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && continue
-      _PC="$(grep 'pciepath' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      _DR="$(grep 'driver' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      _PP="$(awk -F= '/PHYSDEVPATH/{print $2}' "${_F}/uevent" 2>/dev/null)"
-      if [ -z "${_PC}" ] && [ -n "${_PP}" ]; then
-        _PC="$(printf '%s' "${_PP}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-      fi
-      if [ -n "${_PC}" ] && [ -z "${_DR}" ] && [ -L "/sys/bus/pci/devices/${_PC}/driver" ]; then
-        _DR="$(basename "$(readlink -f "/sys/bus/pci/devices/${_PC}/driver")")"
-      fi
-      { [ -z "${_PC}" ] || [ -z "${_DR}" ]; } && continue
-      case "${_PC}" in *:*:*.*) : ;; *) _PC="0000:${_PC}" ;; esac
-      _SCSI="$(readlink -f "${_F}/device" 2>/dev/null | grep -Eo '[0-9]+:[0-9]+:[0-9]+:[0-9]+' | head -1)"
-      _SCSI="${_SCSI:-0:0:0:0}"
-      if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
-        _log "bootloader (alias): ${_F}"; continue
-      fi
-      # Only treat as the boot disk's controller when we can't tell devices on this pcie_root
-      # apart (no SCSI address) - otherwise pciepath alone is unreliable: it can collapse to a
-      # shared upstream bridge address on multi-disk HBAs/RAID controllers (e.g. HP P840), which
-      # would wrongly match every data disk behind that HBA as "the boot controller".
-      if [ -n "${BOOTDISK_PCIEPATH}" ] && [ -n "${_PC}" ] && [ "${_PC}" = "${BOOTDISK_PCIEPATH}" ] && [ "${_SCSI}" = "0:0:0:0" ]; then
-        _log "bootloader (pciepath): ${_F}"; continue
-      fi
-      # Skip if this pcie_root is already claimed by a sata* entry above (proper sata* disks
-      # take priority; the sas*/sd* fallback only covers disks without a sata* alias).
-      grep -qxF "${_PC}" "${_DT_SEEN}" 2>/dev/null && continue
-      # Skip only the exact same disk (by pcie_root+SCSI address) already handled by a prior
-      # entry in this loop, not merely any disk sharing this controller's pcie_root - multiple
-      # physical drives behind one HBA/RAID controller share the same pcie_root and must each
-      # get their own slot.
-      _DT_SD_SEEN_KEY="${_PC} ${_SCSI}"
-      grep -qxF "${_DT_SD_SEEN_KEY}" "${_DT_SD_SEEN}" 2>/dev/null && continue
-      echo "${_DT_SD_SEEN_KEY}" >>"${_DT_SD_SEEN}"
-      COUNT=$((COUNT + 1))
-      {
-        echo "    internal_slot@${COUNT} {"
-        echo '        protocol_type = "sata";'
-        echo "        ${_DR} {"
-        echo "            pcie_root = \"${_PC}\";"
-        echo "            internal_mode;"
-        echo "        };"
-        echo "    };"
-      } >>"${DEST}"
-    done
-    rm -f "${_DT_SD_SEEN}" "${_DT_SEEN}"
-
-    # NVME ports
     if echo "${UNIQUE}" | grep -q 'epyc7003ntb'; then
       COUNT=0
       for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
@@ -384,7 +282,7 @@ dtModel() {
           _log "bootloader: ${F}"
           continue
         fi
-        grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue # An nvme controller only recognizes one disk
+        grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue
         COUNT=$((COUNT + 1))
         {
           echo "    internal_slot@${COUNT} {"
@@ -400,7 +298,6 @@ dtModel() {
       for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
         [ ! -e "${F}" ] && continue
         N="$(basename "${F}")"
-        # Skip loader disk by name (e.g. nvme0n1 is the Arc loader disk on NVMe).
         [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
         PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
         _NVME_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
@@ -415,8 +312,8 @@ dtModel() {
           _log "bootloader: ${F}"
           continue
         fi
-        grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue # An nvme controller only recognizes one disk
-        [ $((${#POWER_LIMIT} + 2)) -gt 30 ] && break               # POWER_LIMIT string length limit 30 characters
+        grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue
+        [ $((${#POWER_LIMIT} + 2)) -gt 30 ] && break
         POWER_LIMIT="${POWER_LIMIT:+${POWER_LIMIT},}0"
         COUNT=$((COUNT + 1))
         {
@@ -430,7 +327,6 @@ dtModel() {
       [ -n "${POWER_LIMIT}" ] && sed -i "s/power_limit = .*/power_limit = \"${POWER_LIMIT}\";/" "${DEST}" || sed -i '/power_limit/d' "${DEST}"
     fi
 
-    # USB ports
     COUNT=0
     for I in $(getUsbPorts); do
       COUNT=$((COUNT + 1))
@@ -449,17 +345,13 @@ dtModel() {
     echo "};" >>"${DEST}"
   fi
 
-  # fix pcie_root prefix
   _release=$(/bin/uname -r)
   if [ "$(/bin/echo "${_release%%[-+]*}" | /usr/bin/cut -d'.' -f1)" -lt 5 ]; then
-    # Old kernel expects abbreviated "XX:YY.Z": strip 0000: domain prefix from all pcie_root paths.
     sed -i 's/"0000:\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\)"/"\1"/g' "${DEST}"
   else
-    # New kernel expects full "0000:XX:YY.Z": add 0000: domain to any abbreviated pcie_root paths.
     sed -i 's/"\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\)"/"0000:\1"/g' "${DEST}"
   fi
 
-  # fix model name
   sed -i "0,/version = .*;/s/model = \".*\";/model = \"${UNIQUE}\";/" "${DEST}"
 
   MAXDISKS=$(grep -c "internal_slot@" "${DEST}" 2>/dev/null)
@@ -467,11 +359,8 @@ dtModel() {
     MAXDISKS=$(($(__get_conf_kv maxdisks)))
     _log "get maxdisks=${MAXDISKS:-0}"
   else
-    # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-    # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
     [ "${MAXDISKS:-0}" -lt 26 ] && MAXDISKS=26
   fi
-  # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
   if ! _check_rootraidstatus && [ "${MAXDISKS:-0}" -gt 26 ]; then
     MAXDISKS=26
     _log "set maxdisks=26 [${MAXDISKS:-0}]"
@@ -482,7 +371,7 @@ dtModel() {
   if grep -q "nvme_slot@" "${DEST}" 2>/dev/null; then
     __set_conf_kv "supportnvme" "yes"
     __set_conf_kv "support_m2_pool" "yes"
-    #__set_conf_kv "support_ssd_cache" "yes"  # block nvmesystem addon
+    #__set_conf_kv "support_ssd_cache" "yes"
     #__set_conf_kv "support_write_cache" "yes"
   fi
 
@@ -493,7 +382,6 @@ dtModel() {
     cp -vpf /etc/model.dtb /etc.defaults/model.dtb
     cp -vpf /etc/model.dtb /run/model.dtb
     /usr/syno/bin/syno_slot_mapping
-    # Check if the storagepanel.service is existing
     [ -f "/usr/lib/systemd/system/storagepanel.service" ] && systemctl restart storagepanel.service
     return 0
   else
@@ -504,7 +392,6 @@ dtModel() {
   fi
 }
 
-# DT model update
 dtUpdate() {
   _log dtUpdate "$*"
 
@@ -519,7 +406,6 @@ dtUpdate() {
   USBPORT="$(grep 'usb_path' "/sys/block/${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
 
   if [ -z "${PCIEPATH}" ] && [ -z "${USBPORT}" ]; then
-    # Fall back to PHYSDEVPATH extraction (same as dtModel sd* fallback).
     _DTUPDATE_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "/sys/block/${F}/uevent" 2>/dev/null)"
     if [ -n "${_DTUPDATE_PHYSDEVPATH}" ]; then
       PCIEPATH="$(echo "${_DTUPDATE_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
@@ -534,7 +420,6 @@ dtUpdate() {
   TEMP_DTS="/tmp/model.dts"
   dtc -I dtb -O dts /etc/model.dtb >"${TEMP_DTS}"
   if [ -z "${ATAPORT}" ]; then
-    # HBA-style: any entry with matching pcie_root covers this disk.
     sata_slot_find="$(grep "pcie_root = \"${PCIEPATH}\";" "${TEMP_DTS}" 2>/dev/null | head -1)"
   else
     sata_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/ata_port = <0x$(printf '%02X' ${ATAPORT})>;/p}" "${TEMP_DTS}" 2>/dev/null)"
@@ -550,11 +435,9 @@ dtUpdate() {
   dtModel
 }
 
-# non-DT model
 nondtModel() {
   _log nondtModel
 
-  # Wait for asynchronous HBA probes to complete.
   _wait_hba_disks_stable "/sys/block/sd*"
 
   MAXDISKS=0
@@ -601,7 +484,6 @@ nondtModel() {
     fi
   done
 
-  # Only reserve USB slots when USB disks are actually present.
   if [ "${hasUSB}" = "true" ]; then
     if [ ${MAXNONUSBIDX} -lt ${USBMINIDX} ]; then
       [ $((USBMAXIDX - USBMINIDX)) -lt $((6 - 1)) ] && USBMAXIDX=$((USBMINIDX + 6 - 1))
@@ -613,14 +495,10 @@ nondtModel() {
     MAXDISKS=$(($(__get_conf_kv maxdisks)))
     printf "get maxdisks=%d\n" "${MAXDISKS}"
   else
-    # fix isSingleBay issue: if maxdisks is 1, there is no create button in the storage panel
-    # [ ${MAXDISKS} -le 2 ] && MAXDISKS=4
     printf "cal maxdisks=%d\n" "${MAXDISKS}"
   fi
 
   if grep -wq "usbinternal" /proc/cmdline 2>/dev/null; then
-    # LKM promotes USB disks to SYNO_PORT_TYPE_SATA when usbinternal is set — DSM sees them
-    # as SATA disks already, so no USB port bitmask is needed.
     USBPORTCFG=0
     __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
     printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
@@ -630,7 +508,6 @@ nondtModel() {
   elif [ "${hasUSB}" = "true" ]; then
     # shellcheck disable=SC3019
     USBPORTCFG=$(($((2 ** $((USBMAXIDX + 1)) - 1)) ^ $((2 ** USBMINIDX - 1))))
-    # Do not classify any currently detected non-USB disk index as USB.
     OVERLAPMASK=$((USBPORTCFG & NONUSBMASK))
     if [ ${OVERLAPMASK} -ne 0 ]; then
       USBPORTCFG=$((USBPORTCFG ^ OVERLAPMASK))
@@ -661,7 +538,6 @@ nondtModel() {
     printf 'set internalportcfg=0x%.2x\n' "${INTERNALPORTCFG}"
   fi
 
-  # Raidtool will read maxdisks, but when maxdisks is greater than 27, formatting error will occur 8%.
   if ! _check_rootraidstatus && [ ${MAXDISKS} -gt 26 ]; then
     MAXDISKS=26
     printf "set maxdisks=26 [%d]\n" "${MAXDISKS}"
@@ -669,7 +545,6 @@ nondtModel() {
   __set_conf_kv "maxdisks" "${MAXDISKS}"
   printf "set maxdisks=%d\n" "${MAXDISKS}"
 
-  # NVME
   COUNT=0
   echo "[pci]" >/etc/extensionPorts
   for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
@@ -695,12 +570,11 @@ nondtModel() {
   if [ "${COUNT}" -gt 0 ]; then
     __set_conf_kv "supportnvme" "yes"
     __set_conf_kv "support_m2_pool" "yes"
-    #__set_conf_kv "support_ssd_cache" "yes"  # block nvmesystem addon
+    #__set_conf_kv "support_ssd_cache" "yes"
     #__set_conf_kv "support_write_cache" "yes"
   fi
 }
 
-# non-DT model update
 nondtUpdate() {
   _log nondtUpdate "$*"
   F="$(basename "${1:-}" 2>/dev/null)"
@@ -710,23 +584,20 @@ nondtUpdate() {
     return $?
   fi
 
-  # Recompute portcfg/maxdisks when a new disk appears (HBA hot-plug etc.)
   nondtModel
   return 0
 }
 
-# lock
 if type flock >/dev/null 2>&1 && type trap >/dev/null 2>&1; then
   LOCKFILE="/var/run/disks.lock"
   exec 3>"$LOCKFILE"
   flock -w 60 3 || {
     _log "Failed to acquire lock after 60 seconds. Exiting."
     exit 1
-  }                                                      # 60 seconds timeout
-  trap 'flock -u 3; rm -f "$LOCKFILE"' EXIT INT TERM HUP # Release lock on exit or error or signal or hangup
+  }
+  trap 'flock -u 3; rm -f "$LOCKFILE"' EXIT INT TERM HUP
 fi
 
-# get the boot disk info
 [ -z "$(/sbin/blkid -L ARC3 2>/dev/null)" ] && checkAlldisk
 
 BOOTDISK_PART3_PATH="$(/sbin/blkid -L ARC3 2>/dev/null)"
@@ -755,8 +626,6 @@ echo "BOOTDISK_ATAPORT=${BOOTDISK_ATAPORT}"
 
 checkSynoboot
 
-###################
-
 case ${1} in
   "--create")
     if [ "$(__get_conf_kv supportportmappingv2)" = "yes" ]; then
@@ -777,9 +646,8 @@ case ${1} in
     fi
     ;;
   *)
-    echo "Usage: $0 [--modules|--create|--update]"
+    echo "Usage: $0 [--create|--update]"
     echo
-    echo "       --modules: update synoinfo.conf"
     echo "       --create: create dts file and update synoinfo.conf"
     echo "       --update: update dts file and update synoinfo.conf"
     exit 1

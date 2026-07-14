@@ -718,7 +718,7 @@ fixdrivemodel(){
     fi
 }
 
-get_size_gb(){ 
+get_size_gb(){
     # $1 is /sys/block/sata1 or /sys/block/nvme0n1 etc
     local disk_size_gb
     #disk_size_gb=$(synodisk --info /dev/"$(basename -- "$1")" 2>/dev/null | grep 'Total capacity' | awk '{print int($4 * 1.073741824)}')
