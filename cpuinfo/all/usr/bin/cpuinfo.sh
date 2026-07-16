@@ -66,28 +66,217 @@ applyPatch() {
   return 1
 }
 
-CARDN=$(ls -d /sys/class/drm/card* 2>/dev/null | head -1)
-if [ -d "${CARDN}" ]; then
+_json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+# _gpu_name_fallback resolves a GPU display name from PCI vendor:device IDs
+# when lspci's pci.ids database is missing/outdated and only prints the raw
+# "Device <vid>:<did>". Newer (2021+) Intel desktop iGPUs (Alder/Raptor Lake)
+# are the common victims. A curated table gives exact marketing names; anything
+# else falls back to a vendor-prefixed label so the result is never wrong.
+# Args: $1=vid (4 hex, no 0x) $2=did
+_gpu_name_fallback() {
+  local vid="$1" did="$2" dev="" vendor=""
+  case "${vid}:${did}" in
+    8086:5902) dev="Kaby Lake-S GT1 [HD Graphics 610]" ;;
+    8086:5912) dev="Kaby Lake-S GT2 [HD Graphics 630]" ;;
+    8086:3e90|8086:3e93) dev="CoffeeLake-S GT1 [UHD Graphics 610]" ;;
+    8086:3e91|8086:3e92|8086:3e98) dev="CoffeeLake-S GT2 [UHD Graphics 630]" ;;
+    8086:9ba8) dev="CometLake-S GT1 [UHD Graphics 610]" ;;
+    8086:9bc5|8086:9bc8) dev="CometLake-S GT2 [UHD Graphics 630]" ;;
+    8086:4c8a) dev="RocketLake-S GT1 [UHD Graphics 750]" ;;
+    8086:4c8b) dev="RocketLake-S GT1 [UHD Graphics 730]" ;;
+    8086:4680|8086:4690) dev="Alder Lake-S GT1 [UHD Graphics 770]" ;;
+    8086:4682|8086:4692) dev="Alder Lake-S GT1 [UHD Graphics 730]" ;;
+    8086:4693) dev="Alder Lake-S GT1 [UHD Graphics 710]" ;;
+    8086:46d0|8086:46d1|8086:46d2) dev="Alder Lake-N [UHD Graphics]" ;;
+    8086:a780) dev="Raptor Lake-S GT1 [UHD Graphics 770]" ;;
+    8086:a781|8086:a782|8086:a783|8086:a788|8086:a789|8086:a78a|8086:a78b) dev="Raptor Lake-S [UHD Graphics]" ;;
+    1002:6985) dev="Lexa XT [Radeon PRO WX 3100]" ;;
+  esac
+  case "${vid}" in
+    8086) vendor="Intel Corporation" ;;
+    10de) vendor="NVIDIA Corporation" ;;
+    1002) vendor="Advanced Micro Devices, Inc. [AMD/ATI]" ;;
+  esac
+  if [ -n "${dev}" ]; then
+    printf '%s %s' "${vendor:-Vendor ${vid}}" "${dev}"
+  elif [ -n "${vendor}" ]; then
+    printf '%s Graphics [%s:%s]' "${vendor}" "${vid}" "${did}"
+  else
+    printf 'Device [%s:%s]' "${vid}" "${did}"
+  fi
+}
+
+# _pci_name resolves a PCI device display name from vendor:device IDs, mirroring
+# _gpu_name_fallback. lspci is tried first; when pci.ids is missing/outdated it
+# only yields "Device <ids>" (or nothing), so a curated table + vendor label is
+# used, always suffixed with "[vid:did]". Args: $1=vid $2=did (4 hex, no 0x)
+_pci_name() {
+  local vid="$1" did="$2" dev="" vendor="" name=""
+  name="$(lspci -d "${vid}:${did}" 2>/dev/null | head -1 | sed 's/^[0-9a-f:.]* [^:]*: //; s/ *(rev [0-9a-fA-F]*)//')"
+  if [ -n "${name}" ] && ! printf '%s' "${name}" | grep -qiE '^Device '; then
+    printf '%s [%s:%s]' "${name}" "${vid}" "${did}"; return
+  fi
+  case "${vid}:${did}" in
+    10ec:8168|10ec:8161|10ec:8169) dev="RTL8111/8168/8411 Gigabit Ethernet" ;;
+    10ec:8125) dev="RTL8125 2.5GbE" ;;
+    10ec:8126) dev="RTL8126 5GbE" ;;
+    8086:1533) dev="I210 Gigabit Network" ;;
+    8086:1539) dev="I211 Gigabit Network" ;;
+    8086:1521) dev="I350 Gigabit Network" ;;
+    8086:10d3) dev="82574L Gigabit Network" ;;
+    8086:1572|8086:1583|8086:1584|8086:1585) dev="X710/XL710 10/40GbE" ;;
+    8086:1563|8086:15d1) dev="X550 10GbE" ;;
+    15b3:1015|15b3:1017) dev="ConnectX-4/5 25/100GbE" ;;
+  esac
+  case "${vid}" in
+    8086) vendor="Intel" ;;
+    10ec) vendor="Realtek" ;;
+    10de) vendor="NVIDIA" ;;
+    1002) vendor="AMD/ATI" ;;
+    1b21|1b4b) vendor="ASMedia/Marvell" ;;
+    1000) vendor="Broadcom/LSI" ;;
+    9005) vendor="Adaptec" ;;
+    15b3) vendor="Mellanox" ;;
+    1c5c|144d|1cc1|1e0f|c0a9) vendor="NVMe SSD" ;;
+  esac
+  if [ -n "${dev}" ]; then
+    printf '%s %s [%s:%s]' "${vendor:-Vendor ${vid}}" "${dev}" "${vid}" "${did}"
+  elif [ -n "${vendor}" ]; then
+    printf '%s Device [%s:%s]' "${vendor}" "${vid}" "${did}"
+  else
+    printf 'Device [%s:%s]' "${vid}" "${did}"
+  fi
+}
+
+# _pci_slot_info prints the external_pci_slot_info JSON array. An "add-in PCIe
+# card" is any endpoint function 0 that sits behind a root-port bridge (bus !=
+# 00) and is not itself a bridge. Slots are numbered 1..N in PCI address order.
+# Prints "[]" when none are found.
+_pci_slot_info() {
+  local D bdf bus cls vid did nm elems="" slot=0 e
+  for D in $(ls -d /sys/bus/pci/devices/0000:* 2>/dev/null | sort); do
+    bdf="$(basename "${D}")"
+    bus="$(echo "${bdf}" | cut -d: -f2)"
+    [ "${bus}" = "00" ] && continue                 # onboard/root complex — skip
+    cls="$(cat "${D}/class" 2>/dev/null)"
+    case "${cls}" in 0x0604*|0x0600*|0x0601*) continue ;; esac  # bridges — skip
+    [ "${bdf##*.}" = "0" ] || continue              # multifunction: function 0 only
+    vid="$(sed 's/^0x//' "${D}/vendor" 2>/dev/null)"
+    did="$(sed 's/^0x//' "${D}/device" 2>/dev/null)"
+    [ -n "${vid}" ] && [ -n "${did}" ] || continue
+    nm="$(_pci_name "${vid}" "${did}")"
+    slot=$((slot + 1))
+    e="$(printf '{"slot":"%s","Occupied":"yes","Recognized":"yes","cardName":"%s"}' \
+      "${slot}" "$(_json_escape "${nm}")")"
+    [ -z "${elems}" ] && elems="${e}" || elems="${elems},${e}"
+  done
+  printf '[%s]' "${elems}"
+}
+
+# Accumulate one JSON object per GPU into GPU_ELEMS (comma-joined). FIRST_*
+# captures the first GPU for the legacy DSM <= 7.3 single-object t.gpu path.
+GPU_ELEMS=""
+FIRST_NAME=""; FIRST_CLOCK=""; FIRST_MEMORY=""
+_append_gpu() { [ -z "${GPU_ELEMS}" ] && GPU_ELEMS="$1" || GPU_ELEMS="${GPU_ELEMS},$1"; }
+
+# 1. DRM cards (Intel i915 / AMD amdgpu). NVIDIA is skipped here and handled
+#    via nvidia-smi below, since its proprietary driver exposes no
+#    /sys/class/drm/card* node unless nvidia-drm modeset=1.
+for CARDN in /sys/class/drm/card[0-9]*; do
+  [ -d "${CARDN}" ] || continue
+  case "${CARDN##*/}" in *-*) continue ;; esac          # skip connector nodes (card0-DP-1)
+  DRV="$(awk -F= '/^DRIVER=/{print $2}' "${CARDN}/device/uevent" 2>/dev/null)"
+  case "${DRV}" in nvidia|nvidia-drm) continue ;; esac
   PCIDN="$(awk -F= '/PCI_SLOT_NAME/ {print $2}' "${CARDN}/device/uevent" 2>/dev/null)"
-  LNAME="$(lspci -s ${PCIDN:-"99:99.9"} 2>/dev/null | sed "s/.*: //")"
-  # LABLE="$(cat "/sys/class/drm/card0/device/label" 2>/dev/null)"
+  LNAME="$(lspci -s ${PCIDN:-"99:99.9"} 2>/dev/null | sed "s/.*: //" | sed "s/ *(rev [0-9a-fA-F]*)//")"
+  if [ -z "${LNAME}" ] || printf '%s' "${LNAME}" | grep -qiE '^Device '; then
+    GVID="$(sed 's/^0x//' "${CARDN}/device/vendor" 2>/dev/null)"
+    GDID="$(sed 's/^0x//' "${CARDN}/device/device" 2>/dev/null)"
+    [ -n "${GVID}" ] && [ -n "${GDID}" ] && LNAME="$(_gpu_name_fallback "${GVID}" "${GDID}")"
+  fi
   CLOCK="0 MHz"
   [ -f "${CARDN}/gt_max_freq_mhz" ] && CLOCK="$(cat "${CARDN}/gt_max_freq_mhz" 2>/dev/null) MHz"
-  [ -f "${CARDN}/device/pp_dpm_sclk" ] && CLOCK="$(cat "${CARDN}/device/pp_dpm_sclk" 2>/dev/null | grep '\*' | awk '{print $2}') MHz"
+  if [ -f "${CARDN}/device/pp_dpm_sclk" ]; then
+    GMHZ="$(awk '{v=$2; gsub(/[^0-9]/,"",v); if(v+0>m)m=v+0} END{print m}' "${CARDN}/device/pp_dpm_sclk" 2>/dev/null)"
+    [ -n "${GMHZ}" ] && [ "${GMHZ}" != "0" ] && CLOCK="${GMHZ} MHz"
+  fi
   MEMORY="$(awk '{s=(strtonum($2)-strtonum($1)+1)/1048576} (and(strtonum($3),0x200))&&(and(strtonum($3),0x2000))&&(and(strtonum($3),0x40000))&&s>0{print int(s) " MiB"; exit}' "${CARDN}/device/resource" 2>/dev/null)"
-  if [ -n "${LNAME}" ] && [ -n "${CLOCK}" ] && [ -n "${MEMORY}" ]; then
-    echo "GPU Info set to: \"${LNAME}\" \"${CLOCK}\" \"${MEMORY}\""
-    if grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
-      # t.gpu={};t.gpu.clock=\"455 MHz\";t.gpu.memory=\"8192 MiB\";t.gpu.name=\"Tesla P4\";t.gpu.temperature_c=47;t.gpu.tempwarn=false;
+  [ -n "${LNAME}" ] && [ -n "${CLOCK}" ] && [ -n "${MEMORY}" ] || continue
+  [ -z "${FIRST_NAME}" ] && { FIRST_NAME="${LNAME}"; FIRST_CLOCK="${CLOCK}"; FIRST_MEMORY="${MEMORY}"; }
+  echo "GPU Info set to: \"${LNAME}\" \"${CLOCK}\" \"${MEMORY}\"${PCIDN:+ [${PCIDN}]}"
+  # built_in_gpu_slot_num keeps the iGPU labeled as the onboard GPU slot;
+  # discrete cards use pci_slot_num so Info Center shows a PCIe slot row.
+  if [ "${DRV}" = "i915" ] || [ -z "${PCIDN}" ]; then
+    _append_gpu "$(printf '{"name":"%s","status":"compatible","clock":"%s","memory":"%s","pci_slot_num":"","built_in_gpu_slot_num":"1","temperature_c":0,"tempwarn":false}' \
+      "$(_json_escape "${LNAME}")" "${CLOCK}" "${MEMORY}")"
+  else
+    _append_gpu "$(printf '{"name":"%s","status":"compatible","clock":"%s","memory":"%s","pci_slot_num":"%s","built_in_gpu_slot_num":"","temperature_c":0,"tempwarn":false}' \
+      "$(_json_escape "${LNAME}")" "${CLOCK}" "${MEMORY}" "${PCIDN}")"
+  fi
+done
+
+# 2. NVIDIA via nvidia-smi (proprietary driver). One row per GPU:
+#    name, max graphics clock (MHz), total memory (MiB), pci.bus_id.
+if command -v nvidia-smi >/dev/null 2>&1 && ls /dev/nvidia[0-9]* >/dev/null 2>&1; then
+  while IFS=, read -r NVN NVC NVM NVPCI; do
+    NVN="$(printf '%s' "${NVN}" | sed 's/^ *//; s/ *$//')"
+    NVC="$(printf '%s' "${NVC}" | tr -dc '0-9')"
+    NVM="$(printf '%s' "${NVM}" | tr -dc '0-9')"
+    # nvidia-smi pci.bus_id: "00000000:01:00.0" -> strip leading 4 zeros -> "0000:01:00.0"
+    NVPCI="$(printf '%s' "${NVPCI}" | tr -d ' ' | cut -c5-)"
+    [ -n "${NVN}" ] || continue
+    NVNAME="NVIDIA ${NVN}"; NVCLOCK="${NVC:-0} MHz"; NVMEM="${NVM:-0} MiB"
+    [ -z "${FIRST_NAME}" ] && { FIRST_NAME="${NVNAME}"; FIRST_CLOCK="${NVCLOCK}"; FIRST_MEMORY="${NVMEM}"; }
+    echo "GPU Info (nvidia) set to: \"${NVNAME}\" \"${NVCLOCK}\" \"${NVMEM}\"${NVPCI:+ [${NVPCI}]}"
+    _append_gpu "$(printf '{"name":"%s","status":"compatible","clock":"%s","memory":"%s","pci_slot_num":"%s","built_in_gpu_slot_num":"","temperature_c":0,"tempwarn":false}' \
+      "$(_json_escape "${NVNAME}")" "${NVCLOCK}" "${NVMEM}" "${NVPCI:-}")"
+  done < <(nvidia-smi --query-gpu=name,clocks.max.graphics,memory.total,pci.bus_id --format=csv,noheader,nounits 2>/dev/null)
+fi
+
+# PCIe add-in slot occupancy — external_pci_slot_info. Baked in only when at
+# least one add-in card is present; DSM's genuine (all-"no") value is left
+# alone otherwise. cardName's default "Synology " prefix is dropped below so
+# the Info Center shows the bare device name.
+PCISLOTS="$(_pci_slot_info)"
+
+if [ -n "${GPU_ELEMS}" ] || { [ -n "${PCISLOTS}" ] && [ "${PCISLOTS}" != "[]" ]; }; then
+  if grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
+    # Legacy DSM <= 7.3 client path only understands a single t.gpu object;
+    # only the first detected GPU is exposed here.
+    if [ -n "${FIRST_NAME}" ]; then
+      echo "GPU Info (legacy t.gpu) set to: \"${FIRST_NAME}\" \"${FIRST_CLOCK}\" \"${FIRST_MEMORY}\""
+      # '#' delimiter: GPU/device names may contain '/' (e.g. lspci's
+      # "GeForce RTX 4090/PCIe/SSE2"), which would otherwise break the s/// syntax.
       applyPatch "nvidia GPU info injection (getActiveApi)" 't=this\.getActiveApi(t);let' \
-        "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!t.gpu){t.gpu={};t.gpu.clock=\"${CLOCK}\";t.gpu.memory=\"${MEMORY}\";t.gpu.name=\"${LNAME}\";}let/g"
-    else
-      # b.gpu_info=[{name:\"Tesla P4\",status:\"compatible\",clock:\"455 MHz\",memory:\"8192 MiB\",pci_slot_num:\"0000:00:1c.0\",built_in_gpu_slot_num:\"\",temperature_c:47,tempwarn:false}];
-      PCISLOT="${PCIDN:-}"
-      applyPatch "legacy GPU info injection (getActiveApi)" 't=this\.getActiveApi(t);let' \
-        "s/t=this.getActiveApi(t);let/t=this.getActiveApi(t);if(!b.support_gpu){b.support_gpu=true;b.gpu_info=[{name:\"${LNAME}\",status:\"compatible\",clock:\"${CLOCK}\",memory:\"${MEMORY}\",pci_slot_num:\"${PCISLOT}\",built_in_gpu_slot_num:\"\",temperature_c:0,tempwarn:false}];}let/g"
+        "s#t=this.getActiveApi(t);let#t=this.getActiveApi(t);if(!t.gpu){t.gpu={};t.gpu.clock=\"${FIRST_CLOCK}\";t.gpu.memory=\"${FIRST_MEMORY}\";t.gpu.name=\"$(_json_escape "${FIRST_NAME}")\";}let#g"
+    fi
+  else
+    # DSM 7.4 path: full multi-GPU array + PCIe slot occupancy.
+    PATCH=""
+    if [ -n "${GPU_ELEMS}" ]; then
+      PATCH="if(!b.support_gpu){b.support_gpu=true;b.gpu_info=[${GPU_ELEMS}];}"
+    fi
+    if [ -n "${PCISLOTS}" ] && [ "${PCISLOTS}" != "[]" ]; then
+      echo "PCIe slot info set to: ${PCISLOTS}"
+      PATCH="${PATCH}if(!b.external_pci_slot_info||!b.external_pci_slot_info.length){b.external_pci_slot_info=${PCISLOTS};}"
+    fi
+    if [ -n "${PATCH}" ]; then
+      # '#' delimiter: GPU/device names embedded in PATCH may contain '/'
+      # (e.g. lspci's "GeForce RTX 4090/PCIe/SSE2"), which would otherwise
+      # break the s/// syntax.
+      applyPatch "DSM 7.4 GPU/PCIe info injection (getActiveApi)" 't=this\.getActiveApi(t);let' \
+        "s#t=this.getActiveApi(t);let#t=this.getActiveApi(t);${PATCH}let#g"
     fi
   fi
+fi
+
+# PCIe slot device name: formatExternalDeviceInfo() renders an occupied slot
+# as "Synology ${r.cardName}"; drop the hardcoded prefix so our injected
+# cardName (the real device name) shows bare.
+if grep -qF '`Synology ${r.cardName}`' "${FILE_JS}"; then
+  sed -i 's#`Synology ${r.cardName}`#`${r.cardName}`#g' "${FILE_JS}"
+  echo "pcie_slot cardName prefix patch applied (drop 'Synology ')"
 fi
 if [ "${MEV}" = "physical" ]; then
   LEGACY_SYS_TEMP_PATCHED=0
@@ -105,8 +294,19 @@ if [ "${MEV}" = "physical" ]; then
     applyPatch "legacy sys_temp renderer (,t,i,n)})" ',t,i,n)}' \
       's/,t,i,n)}/,t,i,e.sys_temp?n+" \| "+this.renderTempFromC(e.sys_temp):n)}/g' \
       && LEGACY_SYS_TEMP_PATCHED=1
-    applyPatch "legacy GPU temp renderer (font_normal)" 'font_normal"),"</div>","</div>"\].join("")' \
-      's#font_normal"),"</div>","</div>"].join("")#font_normal")," | "+this.renderTempFromC(h),"</div>","</div>"].join("")#g'
+    # DSM 7.4's formatGpuInfo() renders each gpu_info[] entry's thermal status
+    # as normal/over_temperature with no temperature suffix.
+    # Try the precise anchor (ternary + ,"</div>","</div>"].join) first; DSM
+    # builds shuffle minified var names ('u'/'h' here) but not this structure.
+    # Falls back to the older, looser anchor if DSM's minifier reshapes it.
+    if grep -q 'over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' "${FILE_JS}"; then
+      applyPatch "DSM 7.4 GPU temp renderer (formatGpuInfo)" \
+        'over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' \
+        's#\(_T("system","over_temperature"):_T("helpbrowser","font_normal")\),"</div>","</div>"\].join#(\1)+(h?" | "+this.renderTempFromC(h):""),"</div>","</div>"].join#g'
+    else
+      applyPatch "legacy GPU temp renderer (font_normal)" 'font_normal"),"</div>","</div>"\].join("")' \
+        's#font_normal"),"</div>","</div>"].join("")#font_normal")," | "+this.renderTempFromC(h),"</div>","</div>"].join("")#g'
+    fi
     applyPatch "fan RPM renderer (rcpower,s)" '_T("rcpower",s),' \
       's/_T("rcpower",s),/_T("rcpower", s)?e.fan_list?_T("rcpower", s) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", s):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", s),/g'
   fi
