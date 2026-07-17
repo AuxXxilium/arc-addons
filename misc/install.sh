@@ -24,6 +24,35 @@ if [ "${1}" = "early" ]; then
     # for epyc7003ntb console error "sh: invalid number 'Read error'"
     sed -i 's/^main "\$@"$/# main "\$@"/' "/usr/syno/sbin/i2c_hb_checker.sh" 2>/dev/null || true
     sed -i -E 's/169\.254\.4\.(1|2)/127.0.0.1/g; s/ --interface ntb_eth[0-9]{1,2}//g; s/check_ntb_connection$/exit 0 # check_ntb_connection/' /usr/syno/share/clusterInstall.sh || true
+
+    # synomulticontroller is a symlink to scemd (the multicall HA/NTB daemon binary).
+    # On a single-node redpill box there's no real NTB peer, so the genuine binary
+    # blocks scemd's apply-lock/HA identity checks (--up_lock_ctrl, --location, etc.)
+    # waiting on a peer that will never answer, which stalls synoconfstored/nginx
+    # and leaves the WebUI unreachable even though the DSM install itself completed.
+    # Replace it with a shim that always reports "no peer, degraded, lock granted".
+    SMC="/usr/syno/bin/synomulticontroller"
+    # Must rm the symlink first, not overwrite through it - it points at the real
+    # scemd daemon binary, and writing through the link would corrupt scemd itself.
+    if [ -e "${SMC}" ]; then
+      rm -f "${SMC}"
+      cat >"${SMC}" <<'EOF'
+#!/bin/sh
+# Single-node synomulticontroller shim (epyc7003ntb, no NTB peer).
+for a in "$@"; do
+  case "${a}" in
+    --location)            echo "location:0"; exit 0 ;;
+    --check_chassis_match) echo "Chassis match"; exit 0 ;;
+    --is_remote_power_on)  exit 1 ;;
+    --ntb_heartbeat_check) echo "Current link is down"; exit 1 ;;
+    --link_status)         echo "link down"; exit 1 ;;
+  esac
+done
+# Lock/apply calls etc: no peer to coordinate with, treat as success.
+exit 0
+EOF
+      chmod +x "${SMC}"
+    fi
   fi
 
 elif [ "${1}" = "patches" ]; then
