@@ -622,19 +622,19 @@ vendor_from_id(){
         0x05dc) vendor=Lexar ;;
         0x1d79) vendor=Transcend;;
         *)
-            # Get vendor from syno_hdd_vendor_ids.txt
-            vidlist="$scriptpath/syno_hdd_vendor_ids.txt"
-            if [[ -r "$vidlist" ]]; then
-                val=$(/usr/syno/bin/synogetkeyvalue "$vidlist" "$1")
+            # Fall back to the pci.ids database shipped by the misc addon
+            # (arc has no syno_hdd_vendor_ids.txt of its own)
+            pciids="/usr/local/share/pci.ids.gz"
+            vidnum="${1#0x}"
+            if [[ -r "$pciids" ]]; then
+                val=$(gzip -dc "$pciids" 2>/dev/null | grep -im1 "^${vidnum}[[:space:]]" | sed -E 's/^[0-9a-fA-F]+[[:space:]]+//')
                 if [[ -n "$val" ]]; then
                     vendor="$val"
                 else
-                    echo -e "\n${Yellow}WARNING${Off} No vendor found for vid $1" >&2
-                    echo -e "You can add ${Cyan}$1${Off} and your drive's vendor to: " >&2
-                    echo "$vidlist" >&2
+                    echo -e "\n${Yellow}WARNING${Off} No vendor found for vid $1 in $pciids" >&2
                 fi
             else
-                echo -e "\n${Error}ERROR{OFF} $vidlist not found!" >&2
+                echo -e "\n${Error}ERROR${Off} $pciids not found!" >&2
             fi
         ;;
     esac
@@ -2336,6 +2336,36 @@ if [[ $arch == "x86_64" ]]; then
         fi
     fi
 fi
+
+
+#------------------------------------------------------------------------------
+# Merged from diskcompat.sh (forbid_unsupport_extdev, general_settings.db,
+# pool_compatibility) - kept as a single service so nothing can race hdddb's
+# own .db patches above.
+
+# Allow using unsupported expansion units
+/usr/syno/bin/synosetkeyvalue "$synoinfo" forbid_unsupport_extdev "no"
+
+# Allow new/unlisted drives to be treated as normal in Storage Manager
+gs_db="/var/lib/storage_setting/general_settings.db"
+if [[ -f "$gs_db" ]] && jq -e . "$gs_db" >/dev/null 2>&1; then
+    gs_tmp="${gs_db}.tmp.$$"
+    if jq -c '.settings.allow_new_hcl_as_normal = {"dsm_ver":[],"values":[true]}' "$gs_db" > "$gs_tmp"; then
+        mv -f "$gs_tmp" "$gs_db"
+    else
+        rm -f "$gs_tmp"
+    fi
+fi
+
+# Force every pool compatibility entry to "support" regardless of its current
+# value, so Storage Manager doesn't keep showing stale warnings for drives we
+# just marked as supported above.
+for f in /run/space/pool_compatibility /run/space/pool_compatibility_legacy \
+    /var/lib/space/pool_compatibility /var/lib/space/pool_compatibility_legacy; do
+    [[ -f "$f" ]] || continue
+    pc_tmp="${f}.tmp.$$"
+    awk -F= '{ if (NF > 1) print $1"=support"; else print "support" }' "$f" > "$pc_tmp" && mv -f "$pc_tmp" "$f"
+done
 
 
 #------------------------------------------------------------------------------
