@@ -107,16 +107,6 @@ elif [ "${1}" = "late" ]; then
     KERNEL="Official"
   fi
 
-  if [ ! -d "${MODVER}" ]; then
-    echo "${KERNEL} Kernel - backup existing modules."
-    rm -rf /tmpRoot/usr/lib/modules.* 2>/dev/null || true
-    /tmpRoot/bin/cp -rpf "${MODDIR}" "${MODVER}" 2>/dev/null || true
-  else
-    echo "${KERNEL} Kernel - restore modules from backup."
-    /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
-    /tmpRoot/bin/mv -f "${MODVER}" "${MODDIR}" 2>/dev/null || true
-  fi
-
   # Remove stale module backups that don't match current platform-productver
   for OLD in /tmpRoot/usr/lib/modules.*; do
     [ "${OLD}" = "${MODVER}" ] && continue
@@ -125,9 +115,22 @@ elif [ "${1}" = "late" ]; then
   done
 
   if [ "${KERNEL}" = "Custom" ]; then
+    if [ -d "${MODVER}" ]; then
+      echo "Custom Kernel - restore stock modules from backup."
+      /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
+      /tmpRoot/bin/cp -rpf "${MODVER}" "${MODDIR}" 2>/dev/null || true
+    else
+      echo "Custom Kernel - backup stock modules."
+      /tmpRoot/bin/cp -rpf "${MODDIR}" "${MODVER}" 2>/dev/null || true
+    fi
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* "${MODDIR}" 2>/dev/null || true
     isChange=true
   else
+    if [ -d "${MODVER}" ]; then
+      echo "Official Kernel - restore modules from backup."
+      /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
+      /tmpRoot/bin/mv -f "${MODVER}" "${MODDIR}" 2>/dev/null || true
+    fi
     for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk 'NF==2 {print $1"###"$2}'); do
       O="${L%%###*}"
       M="${L##*###}"
