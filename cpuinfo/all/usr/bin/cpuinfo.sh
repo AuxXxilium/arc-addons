@@ -51,11 +51,6 @@ else
   cp -pf "${FILE_JS}.bak" "${FILE_JS}"
 fi
 
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_vendor/\1\"${VENDOR//\"/}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_family/\1\"${FAMILY//\"/}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_series/\1\"${SERIES//\"/}\"/g" "${FILE_JS}"
-sed -i "s/\(\(,\)\|\((\)\).\.cpu_cores/\1\"${CORES//\"/}\"/g" "${FILE_JS}"
-
 applyPatch() {
   # $1=description $2=grep-anchor(BRE) $3=sed-script
   if grep -q "$2" "${FILE_JS}"; then
@@ -66,7 +61,19 @@ applyPatch() {
   return 1
 }
 
-_json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+# _json_escape makes a string safe both as JSON string content and as a sed
+# replacement/delimiter operand (values from this are inserted into sed
+# replacement text using '#' as the delimiter in several call sites below,
+# and hardware/vendor strings from lspci or /proc/cpuinfo can contain '#',
+# '&', or '/' — any one of which, left unescaped, either breaks the sed
+# command (silently truncating the JS patch mid-statement) or, for '&',
+# re-inserts the whole matched anchor text via sed's replacement metachar.
+_json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/&/\\&/g; s/#/\\#/g'; }
+
+sed -i "s#\(\(,\)\|\((\)\).\.cpu_vendor#\1\"$(_json_escape "${VENDOR}")\"#g" "${FILE_JS}"
+sed -i "s#\(\(,\)\|\((\)\).\.cpu_family#\1\"$(_json_escape "${FAMILY}")\"#g" "${FILE_JS}"
+sed -i "s#\(\(,\)\|\((\)\).\.cpu_series#\1\"$(_json_escape "${SERIES}")\"#g" "${FILE_JS}"
+sed -i "s#\(\(,\)\|\((\)\).\.cpu_cores#\1\"$(_json_escape "${CORES}")\"#g" "${FILE_JS}"
 
 # _gpu_name_fallback resolves a GPU display name from PCI vendor:device IDs
 # when lspci's pci.ids database is missing/outdated and only prints the raw
