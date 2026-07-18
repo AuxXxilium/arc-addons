@@ -61,12 +61,6 @@ applyPatch() {
   return 1
 }
 
-# _json_escape makes a string safe both as JSON string content and as a sed
-# replacement/delimiter operand (values from this are inserted into sed
-# replacement text using '#' as the delimiter in several call sites below,
-# and hardware/vendor strings from lspci or /proc/cpuinfo can contain '#',
-# '&', or '/' — any one of which, left unescaped, either breaks the sed
-# command (silently truncating the JS patch mid-statement) or, for '&',
 # re-inserts the whole matched anchor text via sed's replacement metachar.
 _json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/&/\\&/g; s/#/\\#/g'; }
 
@@ -75,11 +69,6 @@ sed -i "s#\(\(,\)\|\((\)\).\.cpu_family#\1\"$(_json_escape "${FAMILY}")\"#g" "${
 sed -i "s#\(\(,\)\|\((\)\).\.cpu_series#\1\"$(_json_escape "${SERIES}")\"#g" "${FILE_JS}"
 sed -i "s#\(\(,\)\|\((\)\).\.cpu_cores#\1\"$(_json_escape "${CORES}")\"#g" "${FILE_JS}"
 
-# _gpu_name_fallback resolves a GPU display name from PCI vendor:device IDs
-# when lspci's pci.ids database is missing/outdated and only prints the raw
-# "Device <vid>:<did>". Newer (2021+) Intel desktop iGPUs (Alder/Raptor Lake)
-# are the common victims. A curated table gives exact marketing names; anything
-# else falls back to a vendor-prefixed label so the result is never wrong.
 # Args: $1=vid (4 hex, no 0x) $2=did
 _gpu_name_fallback() {
   local vid="$1" did="$2" dev="" vendor=""
@@ -112,73 +101,6 @@ _gpu_name_fallback() {
   else
     printf 'Device [%s:%s]' "${vid}" "${did}"
   fi
-}
-
-# _pci_name resolves a PCI device display name from vendor:device IDs, mirroring
-# _gpu_name_fallback. lspci is tried first; when pci.ids is missing/outdated it
-# only yields "Device <ids>" (or nothing), so a curated table + vendor label is
-# used, always suffixed with "[vid:did]". Args: $1=vid $2=did (4 hex, no 0x)
-_pci_name() {
-  local vid="$1" did="$2" dev="" vendor="" name=""
-  name="$(lspci -d "${vid}:${did}" 2>/dev/null | head -1 | sed 's/^[0-9a-f:.]* [^:]*: //; s/ *(rev [0-9a-fA-F]*)//')"
-  if [ -n "${name}" ] && ! printf '%s' "${name}" | grep -qiE '^Device '; then
-    printf '%s [%s:%s]' "${name}" "${vid}" "${did}"; return
-  fi
-  case "${vid}:${did}" in
-    10ec:8168|10ec:8161|10ec:8169) dev="RTL8111/8168/8411 Gigabit Ethernet" ;;
-    10ec:8125) dev="RTL8125 2.5GbE" ;;
-    10ec:8126) dev="RTL8126 5GbE" ;;
-    8086:1533) dev="I210 Gigabit Network" ;;
-    8086:1539) dev="I211 Gigabit Network" ;;
-    8086:1521) dev="I350 Gigabit Network" ;;
-    8086:10d3) dev="82574L Gigabit Network" ;;
-    8086:1572|8086:1583|8086:1584|8086:1585) dev="X710/XL710 10/40GbE" ;;
-    8086:1563|8086:15d1) dev="X550 10GbE" ;;
-    15b3:1015|15b3:1017) dev="ConnectX-4/5 25/100GbE" ;;
-  esac
-  case "${vid}" in
-    8086) vendor="Intel" ;;
-    10ec) vendor="Realtek" ;;
-    10de) vendor="NVIDIA" ;;
-    1002) vendor="AMD/ATI" ;;
-    1b21|1b4b) vendor="ASMedia/Marvell" ;;
-    1000) vendor="Broadcom/LSI" ;;
-    9005) vendor="Adaptec" ;;
-    15b3) vendor="Mellanox" ;;
-    1c5c|144d|1cc1|1e0f|c0a9) vendor="NVMe SSD" ;;
-  esac
-  if [ -n "${dev}" ]; then
-    printf '%s %s [%s:%s]' "${vendor:-Vendor ${vid}}" "${dev}" "${vid}" "${did}"
-  elif [ -n "${vendor}" ]; then
-    printf '%s Device [%s:%s]' "${vendor}" "${vid}" "${did}"
-  else
-    printf 'Device [%s:%s]' "${vid}" "${did}"
-  fi
-}
-
-# _pci_slot_info prints the external_pci_slot_info JSON array. An "add-in PCIe
-# card" is any endpoint function 0 that sits behind a root-port bridge (bus !=
-# 00) and is not itself a bridge. Slots are numbered 1..N in PCI address order.
-# Prints "[]" when none are found.
-_pci_slot_info() {
-  local D bdf bus cls vid did nm elems="" slot=0 e
-  for D in $(ls -d /sys/bus/pci/devices/0000:* 2>/dev/null | sort); do
-    bdf="$(basename "${D}")"
-    bus="$(echo "${bdf}" | cut -d: -f2)"
-    [ "${bus}" = "00" ] && continue                 # onboard/root complex — skip
-    cls="$(cat "${D}/class" 2>/dev/null)"
-    case "${cls}" in 0x0604*|0x0600*|0x0601*) continue ;; esac  # bridges — skip
-    [ "${bdf##*.}" = "0" ] || continue              # multifunction: function 0 only
-    vid="$(sed 's/^0x//' "${D}/vendor" 2>/dev/null)"
-    did="$(sed 's/^0x//' "${D}/device" 2>/dev/null)"
-    [ -n "${vid}" ] && [ -n "${did}" ] || continue
-    nm="$(_pci_name "${vid}" "${did}")"
-    slot=$((slot + 1))
-    e="$(printf '{"slot":"%s","Occupied":"yes","Recognized":"yes","cardName":"%s"}' \
-      "${slot}" "$(_json_escape "${nm}")")"
-    [ -z "${elems}" ] && elems="${e}" || elems="${elems},${e}"
-  done
-  printf '[%s]' "${elems}"
 }
 
 # Accumulate one JSON object per GPU into GPU_ELEMS (comma-joined). FIRST_*
@@ -241,50 +163,12 @@ if command -v nvidia-smi >/dev/null 2>&1 && ls /dev/nvidia[0-9]* >/dev/null 2>&1
   done < <(nvidia-smi --query-gpu=name,clocks.max.graphics,memory.total,pci.bus_id --format=csv,noheader,nounits 2>/dev/null)
 fi
 
-# PCIe add-in slot occupancy — external_pci_slot_info. Baked in only when at
-# least one add-in card is present; DSM's genuine (all-"no") value is left
-# alone otherwise. cardName's default "Synology " prefix is dropped below so
-# the Info Center shows the bare device name.
-PCISLOTS="$(_pci_slot_info)"
-
-if [ -n "${GPU_ELEMS}" ] || { [ -n "${PCISLOTS}" ] && [ "${PCISLOTS}" != "[]" ]; }; then
-  if grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
-    # Legacy DSM <= 7.3 client path only understands a single t.gpu object;
-    # only the first detected GPU is exposed here.
-    if [ -n "${FIRST_NAME}" ]; then
-      echo "GPU Info (legacy t.gpu) set to: \"${FIRST_NAME}\" \"${FIRST_CLOCK}\" \"${FIRST_MEMORY}\""
-      # '#' delimiter: GPU/device names may contain '/' (e.g. lspci's
-      # "GeForce RTX 4090/PCIe/SSE2"), which would otherwise break the s/// syntax.
-      applyPatch "nvidia GPU info injection (getActiveApi)" 't=this\.getActiveApi(t);let' \
-        "s#t=this.getActiveApi(t);let#t=this.getActiveApi(t);if(!t.gpu){t.gpu={};t.gpu.clock=\"${FIRST_CLOCK}\";t.gpu.memory=\"${FIRST_MEMORY}\";t.gpu.name=\"$(_json_escape "${FIRST_NAME}")\";}let#g"
-    fi
-  else
-    # DSM 7.4 path: full multi-GPU array + PCIe slot occupancy.
-    PATCH=""
-    if [ -n "${GPU_ELEMS}" ]; then
-      PATCH="if(!b.support_gpu){b.support_gpu=true;b.gpu_info=[${GPU_ELEMS}];}"
-    fi
-    if [ -n "${PCISLOTS}" ] && [ "${PCISLOTS}" != "[]" ]; then
-      echo "PCIe slot info set to: ${PCISLOTS}"
-      PATCH="${PATCH}if(!b.external_pci_slot_info||!b.external_pci_slot_info.length){b.external_pci_slot_info=${PCISLOTS};}"
-    fi
-    if [ -n "${PATCH}" ]; then
-      # '#' delimiter: GPU/device names embedded in PATCH may contain '/'
-      # (e.g. lspci's "GeForce RTX 4090/PCIe/SSE2"), which would otherwise
-      # break the s/// syntax.
-      applyPatch "DSM 7.4 GPU/PCIe info injection (getActiveApi)" 't=this\.getActiveApi(t);let' \
-        "s#t=this.getActiveApi(t);let#t=this.getActiveApi(t);${PATCH}let#g"
-    fi
-  fi
+if [ -n "${FIRST_NAME}" ]; then
+  echo "GPU Info (legacy t.gpu) set to: \"${FIRST_NAME}\" \"${FIRST_CLOCK}\" \"${FIRST_MEMORY}\""
+  applyPatch "GPU info injection (getActiveApi)" 't=this\.getActiveApi(t);let' \
+    "s#t=this.getActiveApi(t);let#t=this.getActiveApi(t);t.gpu||(t.gpu={clock:\"${FIRST_CLOCK}\",memory:\"${FIRST_MEMORY}\",name:\"$(_json_escape "${FIRST_NAME}")\"});let#g"
 fi
 
-# PCIe slot device name: formatExternalDeviceInfo() renders an occupied slot
-# as "Synology ${r.cardName}"; drop the hardcoded prefix so our injected
-# cardName (the real device name) shows bare.
-if grep -qF '`Synology ${r.cardName}`' "${FILE_JS}"; then
-  sed -i 's#`Synology ${r.cardName}`#`${r.cardName}`#g' "${FILE_JS}"
-  echo "pcie_slot cardName prefix patch applied (drop 'Synology ')"
-fi
 if [ "${MEV}" = "physical" ]; then
   LEGACY_SYS_TEMP_PATCHED=0
   if grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
@@ -292,30 +176,42 @@ if [ "${MEV}" = "physical" ]; then
       's/_D("support_nvidia_gpu")},/_D("support_nvidia_gpu")||true},/g'
     applyPatch "GPU temp renderer (,C,D);)" ',C,D);' \
       's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g'
-    applyPatch "legacy sys_temp renderer (,t,i,s)})" ',t,i,s)}' \
-      's/,t,i,s)}/,t,i,e.sys_temp?s+" \| "+this.renderTempFromC(e.sys_temp):s)}/g' \
+  fi
+
+  _CPUVAR="$(grep -oE ',t,i,[a-z]\)' "${FILE_JS}" | head -1 | sed 's/.*,//; s/)//')"
+  if [ -n "${_CPUVAR}" ]; then
+    applyPatch "sys_temp renderer (,t,i,${_CPUVAR})})" ",t,i,${_CPUVAR})}" \
+      "s/,t,i,${_CPUVAR})}/,t,i,e.sys_temp?${_CPUVAR}+\" \\| \"+this.renderTempFromC(e.sys_temp):${_CPUVAR})}/g" \
       && LEGACY_SYS_TEMP_PATCHED=1
-    applyPatch "fan RPM renderer (rcpower,n)" '_T("rcpower",n),' \
-      's/_T("rcpower",n),/_T("rcpower", n)?e.fan_list?_T("rcpower", n) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", n):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", n),/g'
   else
-    applyPatch "legacy sys_temp renderer (,t,i,n)})" ',t,i,n)}' \
-      's/,t,i,n)}/,t,i,e.sys_temp?n+" \| "+this.renderTempFromC(e.sys_temp):n)}/g' \
-      && LEGACY_SYS_TEMP_PATCHED=1
-    # DSM 7.4's formatGpuInfo() renders each gpu_info[] entry's thermal status
-    # as normal/over_temperature with no temperature suffix.
-    # Try the precise anchor (ternary + ,"</div>","</div>"].join) first; DSM
-    # builds shuffle minified var names ('u'/'h' here) but not this structure.
-    # Falls back to the older, looser anchor if DSM's minifier reshapes it.
-    if grep -q 'over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' "${FILE_JS}"; then
+    echo "cpuinfo: sys_temp — pattern ',t,i,X)' not found, skipping"
+  fi
+
+  if ! grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
+    if grep -q 'u?_T("system","over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' "${FILE_JS}"; then
       applyPatch "DSM 7.4 GPU temp renderer (formatGpuInfo)" \
-        'over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' \
-        's#\(_T("system","over_temperature"):_T("helpbrowser","font_normal")\),"</div>","</div>"\].join#(\1)+(h?" | "+this.renderTempFromC(h):""),"</div>","</div>"].join#g'
+        'u?_T("system","over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' \
+        's#u?_T("system","over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join#(u?_T("system","over_temperature"):_T("helpbrowser","font_normal"))+(h?" | "+this.renderTempFromC(h):""),"</div>","</div>"].join#g'
     else
       applyPatch "legacy GPU temp renderer (font_normal)" 'font_normal"),"</div>","</div>"\].join("")' \
         's#font_normal"),"</div>","</div>"].join("")#font_normal")," | "+this.renderTempFromC(h),"</div>","</div>"].join("")#g'
     fi
-    applyPatch "fan RPM renderer (rcpower,s)" '_T("rcpower",s),' \
-      's/_T("rcpower",s),/_T("rcpower", s)?e.fan_list?_T("rcpower", s) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", s):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", s),/g'
+  fi
+
+  _FANVAR="$(grep -oE '"rcpower",[a-z]\)' "${FILE_JS}" | head -1 | sed 's/.*,//; s/)//')"
+  if [ -n "${_FANVAR}" ]; then
+    FAN_SED="/tmp/_cpuinfo_fan_patch.sed"
+    printf 's/_T("rcpower",%s),/_T("rcpower", %s)?e.fan_list?_T("rcpower", %s) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", %s):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", %s),/g\n' \
+      "${_FANVAR}" "${_FANVAR}" "${_FANVAR}" "${_FANVAR}" "${_FANVAR}" >"${FAN_SED}"
+    if grep -q "\"rcpower\",${_FANVAR})," "${FILE_JS}"; then
+      sed -i -f "${FAN_SED}" "${FILE_JS}"
+      echo "cpuinfo: fan RPM renderer (rcpower,${_FANVAR}) applied"
+    else
+      echo "cpuinfo: fan RPM renderer (rcpower,${_FANVAR}) anchor not found, skipping"
+    fi
+    rm -f "${FAN_SED}"
+  else
+    echo "cpuinfo: fan_list — pattern '_T(\"rcpower\",X)' not found, skipping"
   fi
 
   if [ "${LEGACY_SYS_TEMP_PATCHED}" -eq 0 ]; then
