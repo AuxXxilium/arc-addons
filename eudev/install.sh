@@ -99,9 +99,9 @@ elif [ "${1}" = "late" ]; then
   PRODUCTVER=$(awk -F'"' '/^export PRODUCTVER=/ {print $2}' "/addons/addons.sh")
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-  MODVER="/tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}"
+  MODBAK="/tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}"
   MODDIR="/tmpRoot/usr/lib/modules"
-  if grep -q 'RR@RR' /proc/version 2>/dev/null; then
+  if grep -q 'AuxXxilium@Xpenology' /proc/version 2>/dev/null; then
     KERNEL="Custom"
   else
     KERNEL="Official"
@@ -109,27 +109,27 @@ elif [ "${1}" = "late" ]; then
 
   # Remove stale module backups that don't match current platform-productver
   for OLD in /tmpRoot/usr/lib/modules.*; do
-    [ "${OLD}" = "${MODVER}" ] && continue
+    [ "${OLD}" = "${MODBAK}" ] && continue
     echo "Removing stale module backup: ${OLD}"
     /tmpRoot/bin/rm -rf "${OLD}" 2>/dev/null || true
   done
 
   if [ "${KERNEL}" = "Custom" ]; then
-    if [ -d "${MODVER}" ]; then
+    if [ -d "${MODBAK}" ]; then
       echo "Custom Kernel - restore stock modules from backup."
       /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
-      /tmpRoot/bin/cp -rpf "${MODVER}" "${MODDIR}" 2>/dev/null || true
+      /tmpRoot/bin/cp -rpf "${MODBAK}" "${MODDIR}" 2>/dev/null || true
     else
       echo "Custom Kernel - backup stock modules."
-      /tmpRoot/bin/cp -rpf "${MODDIR}" "${MODVER}" 2>/dev/null || true
+      /tmpRoot/bin/cp -rpf "${MODDIR}" "${MODBAK}" 2>/dev/null || true
     fi
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* "${MODDIR}" 2>/dev/null || true
     isChange=true
   else
-    if [ -d "${MODVER}" ]; then
+    if [ -d "${MODBAK}" ]; then
       echo "Official Kernel - restore modules from backup."
       /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
-      /tmpRoot/bin/mv -f "${MODVER}" "${MODDIR}" 2>/dev/null || true
+      /tmpRoot/bin/mv -f "${MODBAK}" "${MODDIR}" 2>/dev/null || true
     fi
     for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk 'NF==2 {print $1"###"$2}'); do
       O="${L%%###*}"
