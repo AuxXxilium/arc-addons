@@ -6,17 +6,20 @@
 # See /LICENSE for more information.
 #
 
-if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
-   echo "non-DT models is not supported nvmesystem addon!"
-   exit 0
- fi
-# _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
-# if [ ${_BUILD:-42218} -lt 42218 ]; then
-#   echo "${_BUILD} is not supported nvmesystem addon!"
-#   exit 0
-# fi
+checkSupported() {
+  if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
+    echo "non-DT models is not supported nvmesystem addon!"
+    exit 0
+  fi
+  # _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
+  # if [ ${_BUILD:-42218} -lt 42218 ]; then
+  #   echo "${_BUILD} is not supported nvmesystem addon!"
+  #   exit 0
+  # fi
+}
 
 if [ "${1}" = "early" ]; then
+  checkSupported
   echo "Installing addon nvmesystem - ${1}"
 
   # System volume is assembled with SSD Cache only, please remove SSD Cache and then reboot
@@ -32,6 +35,7 @@ if [ "${1}" = "early" ]; then
   rm -f "${SO_FILE}.tmp"
 
 elif [ "${1}" = "late" ]; then
+  checkSupported
   echo "Installing addon nvmesystem - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
