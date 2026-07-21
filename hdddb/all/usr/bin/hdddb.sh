@@ -2009,6 +2009,27 @@ backupdb "$synoinfo" ||{
     exit 9
 }
 
+# Ensure support_disk_compatibility is "yes" so DSM actually runs the disk
+# compatibility check against the .db files this script patches. With it set
+# to "no", DSM reports every disk's runtime compatibility as "disabled"
+# instead of "support", which storage_panel.js treats as WORSE than
+# unverified (see set_disk_compatibility_action below).
+sdc=support_disk_compatibility
+setting="$(/usr/syno/bin/synogetkeyvalue "$synoinfo" $sdc)"
+if [[ $setting != "yes" ]]; then
+    for f in "$synoinfo" /etc/synoinfo.conf; do
+        [[ -f "$f" ]] && /usr/syno/bin/synosetkeyvalue "$f" "$sdc" "yes"
+    done
+    setting="$(/usr/syno/bin/synogetkeyvalue "$synoinfo" $sdc)"
+    if [[ $setting == "yes" ]]; then
+        echo -e "\nEnabled support disk compatibility."
+    else
+        echo -e "\n${Error}ERROR${Off} Failed to enable support disk compatibility!"
+    fi
+else
+    echo -e "\nSupport disk compatibility already enabled."
+fi
+
 # Optionally disable memory compatibility warnings
 smc=support_memory_compatibility
 setting="$(/usr/syno/bin/synogetkeyvalue $synoinfo $smc)"

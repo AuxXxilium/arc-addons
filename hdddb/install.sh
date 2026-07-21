@@ -22,7 +22,7 @@ if [ "${1}" = "late" ]; then
 [Unit]
 Description=HDDs/SSDs drives databases
 Wants=smpkg-custom-install.service pkgctl-StorageManager.service
-After=smpkg-custom-install.service
+After=smpkg-custom-install.service synostoraged.service
 
 [Service]
 Type=oneshot
