@@ -12,10 +12,10 @@ if [ "${1}" = "late" ]; then
   echo "Installing addon hdddb - ${1}"
 
   # Create necessary directories and copy files
-  mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/sbin/" "/tmpRoot/usr/syno/sbin/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
+  mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/sbin/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   cp -pf /usr/bin/hdddb.sh /tmpRoot/usr/bin/hdddb.sh
-  cp -pf /usr/syno/sbin/dhm_tool /tmpRoot/usr/syno/sbin/dhm_tool
+  cp -pf /usr/bin/dhm_tool /tmpRoot/usr/bin/dhm_tool
 
   # Create systemd service file
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/hdddb.service"
@@ -34,16 +34,12 @@ WantedBy=multi-user.target
 EOF
 
   ln -vsf /usr/lib/systemd/system/hdddb.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/hdddb.service
-
-  echo 'ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ENV{DEVNAME}=="/dev/nvme*|/dev/sas*|/dev/sd*|/dev/sata*", RUN+="/usr/bin/systemctl restart hdddb.service"' \
-    >"/tmpRoot/usr/lib/udev/rules.d/05-hdddb-update.rules"
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon hdddb - ${1}"
 
   # Remove systemd files
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/hdddb.service" \
-        "/tmpRoot/usr/lib/systemd/system/hdddb.service" \
-        "/tmpRoot/usr/lib/udev/rules.d/05-hdddb-update.rules"
+        "/tmpRoot/usr/lib/systemd/system/hdddb.service"
 
   # Create revert script if not present
   [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && {
