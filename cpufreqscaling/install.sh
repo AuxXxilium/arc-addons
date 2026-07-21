@@ -22,7 +22,7 @@ After=multi-user.target
 Type=oneshot
 RemainAfterExit=yes
 Restart=no
-ExecStart=-/usr/sbin/scaling.sh
+ExecStart=/usr/sbin/scaling.sh
 
 [Install]
 WantedBy=multi-user.target

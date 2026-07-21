@@ -9,11 +9,11 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon revert - ${1}"
 
-  mkdir -p "/tmpRoot/usr/arc/addons/"
-
+  mkdir -p "/tmpRoot/usr/arc/"
   echo '#!/usr/bin/env bash' >"/tmpRoot/usr/arc/revert.sh"
   chmod +x "/tmpRoot/usr/arc/revert.sh"
-  
+
+  mkdir -p "/tmpRoot/usr/arc/addons/"
   for F in $(LC_ALL=C printf '%s\n' /tmpRoot/usr/arc/addons/* | sort -V); do
     [ ! -e "${F}" ] && continue
     grep -q "/addons/$(basename "${F}")" "/addons/addons.sh" 2>/dev/null && continue
@@ -32,7 +32,7 @@ if [ "${1}" = "late" ]; then
       echo "[Service]"
       echo "Type=oneshot"
       echo "RemainAfterExit=yes"
-      echo "ExecStart=-/usr/arc/revert.sh"
+      echo "ExecStart=/usr/arc/revert.sh"
       echo
       echo "[Install]"
       echo "WantedBy=multi-user.target"
@@ -56,5 +56,4 @@ if [ "${1}" = "late" ]; then
     mkdir -p "/tmpRoot/usr/arc/backup"
     cp -rpf /usr/arc/backup/* "/tmpRoot/usr/arc/backup/"
   fi
-  [ -f "/tmpRoot/usr/arc/backup/p1/VERSION" ] && rm -f "/tmpRoot/usr/arc/backup/p1/VERSION"
 fi
