@@ -6,15 +6,20 @@
 # See /LICENSE for more information.
 #
 
-PLATFORMS="apollolake geminilake"
-PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
+checkSupported() {
+  PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
 
-if ! echo "${PLATFORMS}" | grep -wq "${PLATFORM}"; then
-  echo "${PLATFORM} is not supported i915 addon!"
-  exit 0
-fi
+  case "${PLATFORM}" in
+  apollolake | geminilake) ;;
+  *)
+    echo "${PLATFORM} is not supported i915 addon!"
+    exit 0
+    ;;
+  esac
+}
 
 if [ "${1}" = "patches" ]; then
+  checkSupported
   echo "Installing addon i915 - ${1}"
 
   if [ -n "${2}" ]; then
@@ -56,6 +61,7 @@ if [ "${1}" = "patches" ]; then
   [ "${isLoad}" = "1" ] && /usr/sbin/modprobe i915
 
 elif [ "${1}" = "late" ]; then
+  checkSupported
   echo "Installing addon i915 - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
