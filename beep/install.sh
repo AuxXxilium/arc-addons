@@ -30,7 +30,7 @@ if [ "${1}" = "late" ]; then
       BS="beep -f 500 -l 500 -d 500 -r 1"
     fi
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-DELETE FROM task WHERE task_name LIKE 'BeepOnBoot';
+DELETE FROM task WHERE task_name LIKE 'BeepOnBootup';
 INSERT INTO task VALUES('BeepOnBootup', '', 'bootup', '', 1, 0, 0, 0, '', 0, '${BB}', 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'BeepOnShutdown';
 INSERT INTO task VALUES('BeepOnShutdown', '', 'shutdown', '', 1, 0, 0, 0, '', 0, '${BS}', 'script', '{}', '', '', '{}', '{}');
@@ -44,7 +44,7 @@ elif [ "${1}" = "uninstall" ]; then
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete beep task from esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
-DELETE FROM task WHERE task_name LIKE 'BeepOnBoot';
+DELETE FROM task WHERE task_name LIKE 'BeepOnBootup';
 DELETE FROM task WHERE task_name LIKE 'BeepOnShutdown';
 EOF
   fi

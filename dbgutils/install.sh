@@ -6,6 +6,10 @@
 # See /LICENSE for more information.
 #
 
+cleanlogs() {
+  find "${1}" -mindepth 1 -maxdepth 1 -mtime +3 -exec rm -rf {} + 2>/dev/null || true
+}
+
 getlog() {
   if [ -z "${1}" ]; then
     echo "Usage: ${0} {early|jrExit|rcExit|late|dsm}"
@@ -32,6 +36,8 @@ getlog() {
     echo "Can't mount ${LOADER_DISK_PART1}."
     exit 1
   }
+
+  cleanlogs "${WORK_PATH}/logs"
 
   DEST_PATH="${WORK_PATH}/logs/${1}"
   rm -rf "${DEST_PATH}"

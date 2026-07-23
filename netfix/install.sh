@@ -17,10 +17,10 @@ if [ "${1}" = "patches" ]; then
     if [ "${MAC}" = "00:00:00:00:00:00" ]; then
       RMAC=$(grep -Eo "R${BUS}=[^ ]*" /proc/cmdline | cut -d'=' -f2)
       if [ -n "${RMAC}" ]; then
-        isRunning=$(ip link show "${ETH}" 2>/dev/null | grep -wq "state UP")
-        [ "${isRunning}" = "0" ] && ip link set dev "${ETH}" down
+        if ip link show "${ETH}" 2>/dev/null | grep -wq "state UP"; then isRunning=1; else isRunning=0; fi
+        [ "${isRunning}" = "1" ] && ip link set dev "${ETH}" down
         ip link set dev "${ETH}" address "${RMAC}"
-        [ "${isRunning}" = "0" ] && ip link set dev "${ETH}" up
+        [ "${isRunning}" = "1" ] && ip link set dev "${ETH}" up
         isSetting=true
       fi
     fi
