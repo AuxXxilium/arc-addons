@@ -136,7 +136,7 @@ if options="$(getopt -o SIabcdefghijklmnopqrstuvwxyz0123456789 -l \
             -n|--nodbupdate|--noupdate)  # Disable disk compatibility db updates
                 nodbupdate=yes
                 ;;
-            -f|--force)         # No-op: support_disk_compatibility is set by arc-configs
+            -f|--force)         # Disable "support_disk_compatibility"
                 force=yes
                 ;;
             -r|--ram)           # Disable "support_memory_compatibility"
@@ -198,18 +198,6 @@ if [[ $( whoami ) != "root" ]]; then
     echo -e "${Error}ERROR${Off} This script must be run as sudo or root!"
     exit 1
 fi
-
-detect_scheduler(){ 
-    # Check if stdin is a terminal (interactive)
-    [ ! -t 0 ] && return 0
-    
-    # Check parent process
-    local parent
-    parent=$(ps -p $PPID -o comm=)
-    [[ "$parent" =~ (TaskS|systemd-run|sched|crond) ]] && return 0
-    
-    return 1
-}
 
 # Get DSM major version
 dsm=$(/usr/syno/bin/synogetkeyvalue /etc.defaults/VERSION majorversion)
@@ -334,15 +322,6 @@ echo "Running from: ${scriptpath}/$scriptfile"
 #echo "Script filename: $scriptfile"  # debug
 
 
-# Show if running in shell or via task scheduler
-if detect_scheduler; then
-    echo "Running via task scheduler"
-    sch_task="yes"
-else
-    echo "Running in interactive shell"
-    sch_task=""
-fi
-
 
 # Warn if script located on M.2 drive
 get_script_vol() {
@@ -465,7 +444,7 @@ if [[ $restore == "yes" ]]; then
 
         # Restore synoinfo.conf from backup
         if [[ -f ${synoinfo}.bak ]]; then
-            keyvalues=("support_memory_compatibility")
+            keyvalues=("support_disk_compatibility" "support_memory_compatibility")
             keyvalues+=("mem_max_mb" "supportnvme" "support_m2_pool" "support_wdda")
             for v in "${!keyvalues[@]}"; do
                 defaultval="$(/usr/syno/bin/synogetkeyvalue ${synoinfo}.bak "${keyvalues[v]}")"
@@ -879,14 +858,7 @@ getcardmodel(){
     fi
 }
 
-m2_pool_support(){ 
-    # M.2 drives in M2 adaptor card do not officially support storage pools
-    if [[ -f /run/synostorage/disks/"$(basename -- "$1")"/m2_pool_support ]]; then  # GitHub issue #86, 87
-        echo -n 1 > /run/synostorage/disks/"$(basename -- "$1")"/m2_pool_support
-    fi
-}
-
-m2_drive(){ 
+m2_drive(){
     # $1 is nvme1 etc
     # $2 is drive type (nvme or nvc)
     if [[ $m2 != "no" ]]; then
@@ -909,9 +881,6 @@ m2_drive(){
 
             # Get M.2 card model if in M.2 card
             getcardmodel /dev/"$(basename -- "$1")"
-
-            # Enable creating M.2 storage pool and volume in Storage Manager
-            m2_pool_support "$1"
 
             rebootmsg=yes  # Show reboot message at end
         fi
@@ -2009,25 +1978,28 @@ backupdb "$synoinfo" ||{
     exit 9
 }
 
-# Ensure support_disk_compatibility is "yes" so DSM actually runs the disk
-# compatibility check against the .db files this script patches. With it set
-# to "no", DSM reports every disk's runtime compatibility as "disabled"
-# instead of "support", which storage_panel.js treats as WORSE than
-# unverified (see set_disk_compatibility_action below).
-sdc=support_disk_compatibility
-setting="$(/usr/syno/bin/synogetkeyvalue "$synoinfo" $sdc)"
-if [[ $setting != "yes" ]]; then
-    for f in "$synoinfo" /etc/synoinfo.conf; do
-        [[ -f "$f" ]] && /usr/syno/bin/synosetkeyvalue "$f" "$sdc" "yes"
-    done
+if [[ $force == "yes" ]]; then
+    sdc=support_disk_compatibility
     setting="$(/usr/syno/bin/synogetkeyvalue "$synoinfo" $sdc)"
-    if [[ $setting == "yes" ]]; then
-        echo -e "\nEnabled support disk compatibility."
-    else
-        echo -e "\n${Error}ERROR${Off} Failed to enable support disk compatibility!"
+    settingbak="$(/usr/syno/bin/synogetkeyvalue "${synoinfo}.bak" $sdc)"
+
+    if [[ -z $settingbak ]]; then
+        /usr/syno/bin/synosetkeyvalue "${synoinfo}.bak" "$sdc" "$setting"
     fi
-else
-    echo -e "\nSupport disk compatibility already enabled."
+
+    if [[ $setting == "yes" ]]; then
+        for f in "$synoinfo" /etc/synoinfo.conf; do
+            [[ -f "$f" ]] && /usr/syno/bin/synosetkeyvalue "$f" "$sdc" "no"
+        done
+        setting="$(/usr/syno/bin/synogetkeyvalue "$synoinfo" $sdc)"
+        if [[ $setting == "no" ]]; then
+            echo -e "\nDisabled support disk compatibility."
+        else
+            echo -e "\n${Error}ERROR${Off} Failed to disable support disk compatibility!"
+        fi
+    else
+        echo -e "\nSupport disk compatibility already disabled."
+    fi
 fi
 
 # Optionally disable memory compatibility warnings
@@ -2467,14 +2439,6 @@ if [[ -f /usr/syno/sbin/synostgdisk ]]; then  # DSM 6.2.3 does not have synostgd
         fi
     fi
 fi
-
-# Enable creating M.2 storage pool and volume in Storage Manager
-for d in /sys/block/nvme*; do
-    # $d is /sys/block/nvme0n1 etc
-    if [[ $d =~ nvme[0-9][0-9]?n[0-9][0-9]?$ ]]; then
-        m2_pool_support "$d"
-    fi
-done
 
 # Show TRIM warning if required
 if [[ $show_trim_warning == "yes" ]]; then
