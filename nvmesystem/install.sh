@@ -31,7 +31,15 @@ if [ "${1}" = "early" ]; then
   cp -f "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
     sed "s/4584ed74b7488b4c24083b01/4584ed75b7488b4c24083b01/; s/4584f674b7488b4c24083b01/4584f675b7488b4c24083b01/;" | # P1: [69057,?); P2: [42218,69057);
-    xxd -r -p >"${SO_FILE}" 2>/dev/null
+    xxd -r -p >"${SO_FILE}.new" 2>/dev/null
+  ORIG_SIZE="$(wc -c <"${SO_FILE}.tmp" 2>/dev/null)"
+  NEW_SIZE="$(wc -c <"${SO_FILE}.new" 2>/dev/null)"
+  if [ -n "${NEW_SIZE}" ] && [ "${NEW_SIZE}" = "${ORIG_SIZE}" ]; then
+    mv -f "${SO_FILE}.new" "${SO_FILE}"
+  else
+    echo "WARNING: scemd patch produced unexpected output (size ${NEW_SIZE:-0} vs ${ORIG_SIZE:-0}), leaving file untouched"
+    rm -f "${SO_FILE}.new"
+  fi
   rm -f "${SO_FILE}.tmp"
 
 elif [ "${1}" = "late" ]; then
@@ -49,13 +57,21 @@ elif [ "${1}" = "late" ]; then
     sed "s/0f95c00fb6c0488b94240810/0f94c00fb6c0488b94240810/; s/85e40f884e0100004585ed0f/85e49090909090904585ed0f/" | # [42962,69057); (from SA6400 42962)
     sed "s/0f95c00fb6c0488b4c242864/0f94c00fb6c0488b4c242864/; s/85e40f884e0100004585ed0f/85e49090909090904585ed0f/" | # [42962,69057); (from DS920+ 42962)
     sed "s/0f95c00fb6c04883c408c348/0f94c00fb6c04883c408c348/; s/85e40f88580100004585ed0f/85e49090909090904585ed0f/" | # [42218,42962); (from DS920+ 42218)
-    xxd -r -p >"${SO_FILE}" 2>/dev/null
-  if cmp -s "${SO_FILE}.tmp" "${SO_FILE}"; then
-    _BUILD="$(/bin/get_key_value /tmpRoot/etc.defaults/VERSION buildnumber)"
-    echo "WARNING: libhwcontrol patch found NO matching pattern for build ${_BUILD} - DiskInfoEnum will fail!"
-    echo "WARNING: Candidate 0f95c0 (setne) contexts in libhwcontrol.so.1 build ${_BUILD} for new pattern derivation:"
-    xxd -p "${SO_FILE}.tmp" 2>/dev/null | tr -d '\n' | grep -oE '.{24}0f95c0.{24}' | while read -r CTX; do echo "  CANDIDATE: ${CTX}"; done
-    unset _BUILD
+    xxd -r -p >"${SO_FILE}.new" 2>/dev/null
+  ORIG_SIZE="$(wc -c <"${SO_FILE}.tmp" 2>/dev/null)"
+  NEW_SIZE="$(wc -c <"${SO_FILE}.new" 2>/dev/null)"
+  if [ -n "${NEW_SIZE}" ] && [ "${NEW_SIZE}" = "${ORIG_SIZE}" ]; then
+    mv -f "${SO_FILE}.new" "${SO_FILE}"
+    if cmp -s "${SO_FILE}.tmp" "${SO_FILE}"; then
+      _BUILD="$(/bin/get_key_value /tmpRoot/etc.defaults/VERSION buildnumber)"
+      echo "WARNING: libhwcontrol patch found NO matching pattern for build ${_BUILD} - DiskInfoEnum will fail!"
+      echo "WARNING: Candidate 0f95c0 (setne) contexts in libhwcontrol.so.1 build ${_BUILD} for new pattern derivation:"
+      xxd -p "${SO_FILE}.tmp" 2>/dev/null | tr -d '\n' | grep -oE '.{24}0f95c0.{24}' | while read -r CTX; do echo "  CANDIDATE: ${CTX}"; done
+      unset _BUILD
+    fi
+  else
+    echo "WARNING: libhwcontrol patch produced unexpected output (size ${NEW_SIZE:-0} vs ${ORIG_SIZE:-0}), leaving file untouched"
+    rm -f "${SO_FILE}.new"
   fi
   rm -f "${SO_FILE}.tmp"
 

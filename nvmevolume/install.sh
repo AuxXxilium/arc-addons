@@ -22,7 +22,15 @@ if [ "${1}" = "late" ]; then
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null \
     | sed "s/803e00b801000000752.488b/803e00b8010000009090488b/" \
-    | xxd -r -p >"${SO_FILE}" 2>/dev/null
+    | xxd -r -p >"${SO_FILE}.new" 2>/dev/null
+  ORIG_SIZE="$(wc -c <"${SO_FILE}.tmp" 2>/dev/null)"
+  NEW_SIZE="$(wc -c <"${SO_FILE}.new" 2>/dev/null)"
+  if [ -n "${NEW_SIZE}" ] && [ "${NEW_SIZE}" = "${ORIG_SIZE}" ]; then
+    mv -f "${SO_FILE}.new" "${SO_FILE}"
+  else
+    echo "WARNING: libhwcontrol patch produced unexpected output (size ${NEW_SIZE:-0} vs ${ORIG_SIZE:-0}), leaving file untouched"
+    rm -f "${SO_FILE}.new"
+  fi
   rm -f "${SO_FILE}.tmp"
 
   cat >"/tmpRoot/usr/bin/nvmevolume.sh" <<'SCRIPT'

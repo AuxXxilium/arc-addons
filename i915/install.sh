@@ -53,9 +53,18 @@ if [ "${1}" = "patches" ]; then
   else
     echo "Patching i915.ko"
     xxd -c "$(xxd -p "${KO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${KO_FILE}.tmp" 2>/dev/null \
-      | sed "s/${GPU_DEF}/${GPU_BIN}/; s/308201f706092a86.*70656e6465647e0a//" \
-      | xxd -r -p >"${KO_FILE}" 2>/dev/null
-    echo "true" >"/etc/i915patched"
+      | sed "s/${GPU_DEF}/${GPU_BIN}/" \
+      | sed -E "s/308201f706092a86.{1,4000}70656e6465647e0a//" \
+      | xxd -r -p >"${KO_FILE}.new" 2>/dev/null
+    ORIG_SIZE="$(wc -c <"${KO_FILE}.tmp" 2>/dev/null)"
+    NEW_SIZE="$(wc -c <"${KO_FILE}.new" 2>/dev/null)"
+    if [ -n "${NEW_SIZE}" ] && [ "${NEW_SIZE}" -gt 0 ] && [ "${NEW_SIZE}" -le "${ORIG_SIZE}" ]; then
+      mv -f "${KO_FILE}.new" "${KO_FILE}"
+      echo "true" >"/etc/i915patched"
+    else
+      echo "WARNING: i915.ko patch produced unexpected output (size ${NEW_SIZE:-0} vs ${ORIG_SIZE:-0}), leaving file untouched"
+      rm -f "${KO_FILE}.new"
+    fi
   fi
   rm -f "${KO_FILE}.tmp"
   [ "${isLoad}" = "1" ] && /usr/sbin/modprobe i915

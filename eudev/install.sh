@@ -46,12 +46,7 @@ elif [ "${1}" = "modules" ]; then
 
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
 
-  mkdir -p /run/udev
   /usr/sbin/depmod -a || echo "boot depmod skipped"
-  # modprobe modules before triggering udev so cold-plug events see them
-  for M in sg pcspeaker pcspkr drivetemp coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
-    /usr/sbin/modprobe "${M}" 2>/dev/null || true
-  done
   /usr/sbin/udevd -d || {
     echo "FAIL"
     exit 1
@@ -63,6 +58,17 @@ elif [ "${1}" = "modules" ]; then
   udevadm settle --timeout=60 || echo "udevadm settle after add/change failed"
   sleep 10
   /usr/bin/killall udevd 2>/dev/null || true
+
+  # modprobe modules for the beep
+  /usr/sbin/modprobe pcspeaker || true
+  /usr/sbin/modprobe pcspkr || true
+  # modprobe modules for the sensors
+  for I in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
+    /usr/sbin/modprobe "${I}" || true
+  done
+  # modprobe modules for the virtiofs
+  /usr/sbin/modprobe 9p || true
+  /usr/sbin/modprobe virtiofs || true
 
   for P in tcp sch; do
     for F in $(LC_ALL=C printf '%s\n' /usr/lib/modules/${P}_*.ko | sort -V); do
