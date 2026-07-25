@@ -6,17 +6,20 @@
 # See /LICENSE for more information.
 #
 
-if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
-   echo "non-DT models is not supported nvmesystem addon!"
-   exit 0
- fi
-# _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
-# if [ ${_BUILD:-42218} -lt 42218 ]; then
-#   echo "${_BUILD} is not supported nvmesystem addon!"
-#   exit 0
-# fi
+checkSupported() {
+  if [ ! "$(/bin/get_key_value /etc/synoinfo.conf supportportmappingv2)" = "yes" ]; then
+    echo "non-DT models is not supported nvmesystem addon!"
+    exit 0
+  fi
+  # _BUILD="$(/bin/get_key_value /etc.defaults/VERSION buildnumber)"
+  # if [ ${_BUILD:-42218} -lt 42218 ]; then
+  #   echo "${_BUILD} is not supported nvmesystem addon!"
+  #   exit 0
+  # fi
+}
 
 if [ "${1}" = "early" ]; then
+  checkSupported
   echo "Installing addon nvmesystem - ${1}"
 
   # System volume is assembled with SSD Cache only, please remove SSD Cache and then reboot
@@ -28,10 +31,20 @@ if [ "${1}" = "early" ]; then
   cp -f "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
     sed "s/4584ed74b7488b4c24083b01/4584ed75b7488b4c24083b01/; s/4584f674b7488b4c24083b01/4584f675b7488b4c24083b01/;" | # P1: [69057,?); P2: [42218,69057);
-    xxd -r -p >"${SO_FILE}" 2>/dev/null
-  rm -f "${SO_FILE}.tmp"
+    xxd -r -p >"${SO_FILE}.new" 2>/dev/null
+  ORIG_SIZE="$(wc -c <"${SO_FILE}.tmp" 2>/dev/null)"
+  NEW_SIZE="$(wc -c <"${SO_FILE}.new" 2>/dev/null)"
+  if [ -n "${NEW_SIZE}" ] && [ "${NEW_SIZE}" = "${ORIG_SIZE}" ]; then
+    # Write in place (not mv) so the existing inode/mode (incl. exec bit) is kept -
+    # mv would replace it with .new's fresh, umask-based mode and drop +x.
+    cat "${SO_FILE}.new" >"${SO_FILE}"
+  else
+    echo "WARNING: scemd patch produced unexpected output (size ${NEW_SIZE:-0} vs ${ORIG_SIZE:-0}), leaving file untouched"
+  fi
+  rm -f "${SO_FILE}.new" "${SO_FILE}.tmp"
 
 elif [ "${1}" = "late" ]; then
+  checkSupported
   echo "Installing addon nvmesystem - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -45,15 +58,24 @@ elif [ "${1}" = "late" ]; then
     sed "s/0f95c00fb6c0488b94240810/0f94c00fb6c0488b94240810/; s/85e40f884e0100004585ed0f/85e49090909090904585ed0f/" | # [42962,69057); (from SA6400 42962)
     sed "s/0f95c00fb6c0488b4c242864/0f94c00fb6c0488b4c242864/; s/85e40f884e0100004585ed0f/85e49090909090904585ed0f/" | # [42962,69057); (from DS920+ 42962)
     sed "s/0f95c00fb6c04883c408c348/0f94c00fb6c04883c408c348/; s/85e40f88580100004585ed0f/85e49090909090904585ed0f/" | # [42218,42962); (from DS920+ 42218)
-    xxd -r -p >"${SO_FILE}" 2>/dev/null
-  if cmp -s "${SO_FILE}.tmp" "${SO_FILE}"; then
-    _BUILD="$(/bin/get_key_value /tmpRoot/etc.defaults/VERSION buildnumber)"
-    echo "WARNING: libhwcontrol patch found NO matching pattern for build ${_BUILD} - DiskInfoEnum will fail!"
-    echo "WARNING: Candidate 0f95c0 (setne) contexts in libhwcontrol.so.1 build ${_BUILD} for new pattern derivation:"
-    xxd -p "${SO_FILE}.tmp" 2>/dev/null | tr -d '\n' | grep -oE '.{24}0f95c0.{24}' | while read -r CTX; do echo "  CANDIDATE: ${CTX}"; done
-    unset _BUILD
+    xxd -r -p >"${SO_FILE}.new" 2>/dev/null
+  ORIG_SIZE="$(wc -c <"${SO_FILE}.tmp" 2>/dev/null)"
+  NEW_SIZE="$(wc -c <"${SO_FILE}.new" 2>/dev/null)"
+  if [ -n "${NEW_SIZE}" ] && [ "${NEW_SIZE}" = "${ORIG_SIZE}" ]; then
+    # Write in place (not mv) so the existing inode/mode is kept - mv would replace
+    # it with .new's fresh, umask-based mode.
+    cat "${SO_FILE}.new" >"${SO_FILE}"
+    if cmp -s "${SO_FILE}.tmp" "${SO_FILE}"; then
+      _BUILD="$(/bin/get_key_value /tmpRoot/etc.defaults/VERSION buildnumber)"
+      echo "WARNING: libhwcontrol patch found NO matching pattern for build ${_BUILD} - DiskInfoEnum will fail!"
+      echo "WARNING: Candidate 0f95c0 (setne) contexts in libhwcontrol.so.1 build ${_BUILD} for new pattern derivation:"
+      xxd -p "${SO_FILE}.tmp" 2>/dev/null | tr -d '\n' | grep -oE '.{24}0f95c0.{24}' | while read -r CTX; do echo "  CANDIDATE: ${CTX}"; done
+      unset _BUILD
+    fi
+  else
+    echo "WARNING: libhwcontrol patch produced unexpected output (size ${NEW_SIZE:-0} vs ${ORIG_SIZE:-0}), leaving file untouched"
   fi
-  rm -f "${SO_FILE}.tmp"
+  rm -f "${SO_FILE}.new" "${SO_FILE}.tmp"
 
   # Create storage pool page without RAID type.
   cp -vpf /usr/bin/nvmesystem.sh /tmpRoot/usr/bin/nvmesystem.sh

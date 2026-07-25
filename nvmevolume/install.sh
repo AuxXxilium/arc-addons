@@ -6,12 +6,12 @@
 # https://github.com/PeterSuh-Q3/tcrp-addons/blob/main/nvmevolume-onthefly/src/install.sh
 #
 
-if grep -wq "/addons/nvmesystem.sh" "/addons/addons.sh"; then
-  echo "nvmevolume is not required if nvmesystem exists!"
-  exit 0
-fi
-
 if [ "${1}" = "late" ]; then
+  if [ -f "/addons/nvmesystem.sh" ]; then
+    echo "nvmevolume is not required if nvmesystem exists!"
+    exit 0
+  fi
+
   echo "Installing addon nvmevolume - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
@@ -22,8 +22,17 @@ if [ "${1}" = "late" ]; then
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null \
     | sed "s/803e00b801000000752.488b/803e00b8010000009090488b/" \
-    | xxd -r -p >"${SO_FILE}" 2>/dev/null
-  rm -f "${SO_FILE}.tmp"
+    | xxd -r -p >"${SO_FILE}.new" 2>/dev/null
+  ORIG_SIZE="$(wc -c <"${SO_FILE}.tmp" 2>/dev/null)"
+  NEW_SIZE="$(wc -c <"${SO_FILE}.new" 2>/dev/null)"
+  if [ -n "${NEW_SIZE}" ] && [ "${NEW_SIZE}" = "${ORIG_SIZE}" ]; then
+    # Write in place (not mv) so the existing inode/mode is kept - mv would replace
+    # it with .new's fresh, umask-based mode.
+    cat "${SO_FILE}.new" >"${SO_FILE}"
+  else
+    echo "WARNING: libhwcontrol patch produced unexpected output (size ${NEW_SIZE:-0} vs ${ORIG_SIZE:-0}), leaving file untouched"
+  fi
+  rm -f "${SO_FILE}.new" "${SO_FILE}.tmp"
 
   cat >"/tmpRoot/usr/bin/nvmevolume.sh" <<'SCRIPT'
 #!/usr/bin/env sh

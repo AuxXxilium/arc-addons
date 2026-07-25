@@ -6,15 +6,20 @@
 # See /LICENSE for more information.
 #
 
-PLATFORMS="apollolake geminilake"
-PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
+checkSupported() {
+  PLATFORM="$(/bin/get_key_value /etc.defaults/synoinfo.conf unique | cut -d"_" -f2)"
 
-if ! echo "${PLATFORMS}" | grep -wq "${PLATFORM}"; then
-  echo "${PLATFORM} is not supported i915 addon!"
-  exit 0
-fi
+  case "${PLATFORM}" in
+  apollolake | geminilake) ;;
+  *)
+    echo "${PLATFORM} is not supported i915 addon!"
+    exit 0
+    ;;
+  esac
+}
 
 if [ "${1}" = "patches" ]; then
+  checkSupported
   echo "Installing addon i915 - ${1}"
 
   if [ -n "${2}" ]; then
@@ -48,14 +53,26 @@ if [ "${1}" = "patches" ]; then
   else
     echo "Patching i915.ko"
     xxd -c "$(xxd -p "${KO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${KO_FILE}.tmp" 2>/dev/null \
-      | sed "s/${GPU_DEF}/${GPU_BIN}/; s/308201f706092a86.*70656e6465647e0a//" \
-      | xxd -r -p >"${KO_FILE}" 2>/dev/null
-    echo "true" >"/etc/i915patched"
+      | sed "s/${GPU_DEF}/${GPU_BIN}/" \
+      | sed -E "s/308201f706092a86.{1,4000}70656e6465647e0a//" \
+      | xxd -r -p >"${KO_FILE}.new" 2>/dev/null
+    ORIG_SIZE="$(wc -c <"${KO_FILE}.tmp" 2>/dev/null)"
+    NEW_SIZE="$(wc -c <"${KO_FILE}.new" 2>/dev/null)"
+    if [ -n "${NEW_SIZE}" ] && [ "${NEW_SIZE}" -gt 0 ] && [ "${NEW_SIZE}" -le "${ORIG_SIZE}" ]; then
+      # Write in place (not mv) so the existing inode/mode is kept - mv would replace
+      # it with .new's fresh, umask-based mode.
+      cat "${KO_FILE}.new" >"${KO_FILE}"
+      echo "true" >"/etc/i915patched"
+    else
+      echo "WARNING: i915.ko patch produced unexpected output (size ${NEW_SIZE:-0} vs ${ORIG_SIZE:-0}), leaving file untouched"
+    fi
+    rm -f "${KO_FILE}.new"
   fi
   rm -f "${KO_FILE}.tmp"
   [ "${isLoad}" = "1" ] && /usr/sbin/modprobe i915
 
 elif [ "${1}" = "late" ]; then
+  checkSupported
   echo "Installing addon i915 - ${1}"
   mkdir -p "/tmpRoot/usr/arc/addons/"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"

@@ -46,32 +46,29 @@ elif [ "${1}" = "modules" ]; then
 
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
 
-  mkdir -p /run/udev
   /usr/sbin/depmod -a || echo "boot depmod skipped"
-  # modprobe modules before triggering udev so cold-plug events see them
-  for M in sg pcspeaker pcspkr drivetemp coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
-    /usr/sbin/modprobe "${M}" 2>/dev/null || true
-  done
   /usr/sbin/udevd -d || {
     echo "FAIL"
     exit 1
   }
   echo "Triggering events to udev"
-  udevadm trigger --type=subsystems --action=add
-  udevadm settle --timeout=10 || echo "udevadm settle after subsystems add failed"
+  udevadm trigger --type=subsystem --action=add
   udevadm trigger --type=devices --action=add
-  udevadm settle --timeout=30 || echo "udevadm settle after add failed"
   udevadm trigger --type=devices --action=change
-  udevadm settle --timeout=30 || echo "udevadm settle after change failed"
+  udevadm settle --timeout=60 || echo "udevadm settle after add/change failed"
   sleep 10
-  udevadm control --stop 2>/dev/null || /usr/bin/killall udevd 2>/dev/null || true
-  # Wait for udevd to fully exit before DSM boots its own udev
-  for _i in $(seq 1 5); do
-    ps aux 2>/dev/null | grep -Fv grep | grep -qw udevd || break
-    sleep 1
+  /usr/bin/killall udevd 2>/dev/null || true
+
+  # modprobe modules for the beep
+  /usr/sbin/modprobe pcspeaker || true
+  /usr/sbin/modprobe pcspkr || true
+  # modprobe modules for the sensors
+  for I in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
+    /usr/sbin/modprobe "${I}" || true
   done
-  /usr/bin/killall -9 udevd 2>/dev/null || true
-  rm -rf /run/udev
+  # modprobe modules for the virtiofs
+  /usr/sbin/modprobe 9p || true
+  /usr/sbin/modprobe virtiofs || true
 
   for P in tcp sch; do
     for F in $(LC_ALL=C printf '%s\n' /usr/lib/modules/${P}_*.ko | sort -V); do
@@ -99,9 +96,9 @@ elif [ "${1}" = "late" ]; then
   PRODUCTVER=$(awk -F'"' '/^export PRODUCTVER=/ {print $2}' "/addons/addons.sh")
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-  MODVER="/tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}"
+  MODBAK="/tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}"
   MODDIR="/tmpRoot/usr/lib/modules"
-  if grep -q 'RR@RR' /proc/version 2>/dev/null; then
+  if grep -q 'AuxXxilium@Xpenology' /proc/version 2>/dev/null; then
     KERNEL="Custom"
   else
     KERNEL="Official"
@@ -109,27 +106,27 @@ elif [ "${1}" = "late" ]; then
 
   # Remove stale module backups that don't match current platform-productver
   for OLD in /tmpRoot/usr/lib/modules.*; do
-    [ "${OLD}" = "${MODVER}" ] && continue
+    [ "${OLD}" = "${MODBAK}" ] && continue
     echo "Removing stale module backup: ${OLD}"
     /tmpRoot/bin/rm -rf "${OLD}" 2>/dev/null || true
   done
 
   if [ "${KERNEL}" = "Custom" ]; then
-    if [ -d "${MODVER}" ]; then
+    if [ -d "${MODBAK}" ]; then
       echo "Custom Kernel - restore stock modules from backup."
       /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
-      /tmpRoot/bin/cp -rpf "${MODVER}" "${MODDIR}" 2>/dev/null || true
+      /tmpRoot/bin/cp -rpf "${MODBAK}" "${MODDIR}" 2>/dev/null || true
     else
       echo "Custom Kernel - backup stock modules."
-      /tmpRoot/bin/cp -rpf "${MODDIR}" "${MODVER}" 2>/dev/null || true
+      /tmpRoot/bin/cp -rpf "${MODDIR}" "${MODBAK}" 2>/dev/null || true
     fi
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* "${MODDIR}" 2>/dev/null || true
     isChange=true
   else
-    if [ -d "${MODVER}" ]; then
+    if [ -d "${MODBAK}" ]; then
       echo "Official Kernel - restore modules from backup."
       /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
-      /tmpRoot/bin/mv -f "${MODVER}" "${MODDIR}" 2>/dev/null || true
+      /tmpRoot/bin/mv -f "${MODBAK}" "${MODDIR}" 2>/dev/null || true
     fi
     for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk 'NF==2 {print $1"###"$2}'); do
       O="${L%%###*}"

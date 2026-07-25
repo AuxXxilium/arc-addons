@@ -94,11 +94,12 @@ sudo env PATH="${PATH}" make DESTDIR="${SYSROOT}" install
 # kmod's own Makefile.am only declares insmod/rmmod/lsmod/modprobe/modinfo/depmod
 # as noinst_SCRIPTS (build-tree symlinks to the kmod binary, used by its test
 # suite) — `make install` intentionally does not install them, only bin/kmod
-# itself. depmod in particular is required by disks.sh elsewhere in this
-# ramdisk, so recreate the multicall symlinks ourselves, in sbin/ to match
-# where these admin tools have always lived in this addon.
+# itself. Recreate only the multicall symlinks actually used at runtime
+# (depmod, lsmod, modprobe, modinfo — see install.sh), in sbin/ to match
+# where these admin tools have always lived in this addon. insmod/rmmod are
+# unused by this addon and omitted.
 mkdir -p "${OUT}/usr/sbin"
-for TOOL in depmod insmod rmmod lsmod modprobe modinfo; do
+for TOOL in depmod lsmod modprobe modinfo; do
   ln -sf ../bin/kmod "${OUT}/usr/sbin/${TOOL}"
 done
 

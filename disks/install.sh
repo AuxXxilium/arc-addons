@@ -28,7 +28,11 @@ elif [ "${1}" = "late" ]; then
     cp -vpf /usr/bin/dtc /tmpRoot/usr/bin/dtc
     cp -vpf /etc/model.dtb /tmpRoot/etc/model.dtb
     cp -vpf /etc/model.dtb /tmpRoot/etc.defaults/model.dtb
-    [ -f "/addons/model.dts" ] && cp -vpf /addons/model.dts /tmpRoot/etc/user_model.dts || rm -rf /tmpRoot/etc/user_model.dts
+    if [ -f "/addons/model.dts" ]; then
+      cp -vpf /addons/model.dts /tmpRoot/etc/user_model.dts
+    else
+      rm -rf /tmpRoot/etc/user_model.dts
+    fi
   else
     KVLIST="${KVLIST} usbportcfg esataportcfg eunitseq internalportcfg"
 
