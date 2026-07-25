@@ -90,8 +90,4 @@ elif [ "${1}" = "uninstall" ]; then
   # syno-dump-core
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
   [ -f "${SH_FILE}.bak" ] && mv -f "${SH_FILE}.bak" "${SH_FILE}"
-
-  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
-  echo "/usr/bin/reducelogs.sh -r" >>/tmpRoot/usr/arc/revert.sh
-  echo "rm -f /usr/bin/reducelogs.sh" >>/tmpRoot/usr/arc/revert.sh
 fi

@@ -30,13 +30,13 @@ if [ "${1}" = "late" ]; then
   fi
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-  if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "SetRootPw||bootup||1|0|0|0||0|"; then
+  if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "SetRootPw||bootup||1|0|0|0|"; then
     echo "setrootpw task already exists and it is enabled"
   else
     echo "insert setrootpw task to esynoscheduler.db"
     /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'SetRootPw';
-INSERT INTO task VALUES('SetRootPw', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
+INSERT INTO task VALUES('SetRootPw', '', 'bootup', '', 1, 0, 0, 0, '', 0, '
 PW=""    # Please change to the password you need.
 [ -n "\${PW}" ] && /usr/syno/sbin/synouser --setpw root \${PW} && synogroup --memberadd administrators root && systemctl restart sshd
 synowebapi -s --exec api=SYNO.Core.Terminal method=set version=3 enable_ssh=true ssh_port=22
