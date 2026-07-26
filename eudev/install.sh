@@ -91,39 +91,20 @@ elif [ "${1}" = "late" ]; then
   echo "copy modules"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   isChange=false
-  # read config
-  PLATFORM=$(awk -F'"' '/^export PLATFORM=/ {print $2}' "/addons/addons.sh")
-  PRODUCTVER=$(awk -F'"' '/^export PRODUCTVER=/ {print $2}' "/addons/addons.sh")
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   MODBAK="/tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}"
   MODDIR="/tmpRoot/usr/lib/modules"
+
   if grep -q 'AuxXxilium@Xpenology' /proc/version 2>/dev/null; then
-    KERNEL="Custom"
-  else
-    KERNEL="Official"
-  fi
-
-  # Remove stale module backups that don't match current platform-productver
-  for OLD in /tmpRoot/usr/lib/modules.*; do
-    [ "${OLD}" = "${MODBAK}" ] && continue
-    echo "Removing stale module backup: ${OLD}"
-    /tmpRoot/bin/rm -rf "${OLD}" 2>/dev/null || true
-  done
-
-  if [ "${KERNEL}" = "Custom" ]; then
-    if [ ! -d "${MODBAK}" ]; then
+    if [ -d "${MODBAK}" ]; then
+      echo "Custom Kernel - restore stock modules from backup."
+      /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
+      /tmpRoot/bin/cp -rpf "${MODBAK}" "${MODDIR}" 2>/dev/null || true
+    else
       echo "Custom Kernel - backup stock modules."
       /tmpRoot/bin/cp -rpf "${MODDIR}" "${MODBAK}" 2>/dev/null || true
     fi
-    # Rebuild MODDIR from the stock backup every boot instead of overlaying
-    # onto whatever is already there, so a module dropped from - or changed
-    # in - this build's /usr/lib/modules/* can never survive as a stale
-    # leftover from a previous custom build (mismatched .ko/vmlinux export
-    # ABI, e.g. ipv6.ko referencing symbols the current kernel dropped).
-    echo "Custom Kernel - restore stock modules from backup, then overlay custom modules."
-    /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
-    /tmpRoot/bin/cp -rpf "${MODBAK}" "${MODDIR}" 2>/dev/null || true
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* "${MODDIR}" 2>/dev/null || true
     isChange=true
   else
