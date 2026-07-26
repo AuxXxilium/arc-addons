@@ -352,14 +352,16 @@ elif [ "${1}" = "late" ]; then
   # (error 272 "Failed to reload apparmor") - blocking start of any package that ships an
   # AppArmor profile (OAuthService, SynoFinder/Universal Search, FileStation, ...).
   AA_SH="/tmpRoot/usr/syno/etc/rc.sysv/apparmor.sh"
-  if [ -f "${AA_SH}" ] && ! grep -q "is_apparmor_loaded" <<EOF_MARK
-$(sed -n '/^apparmor_add_packages_profile() {/,/^}/p' "${AA_SH}")
-EOF_MARK
-  then
+  AA_ANCHOR="apparmor_add_packages_profile() {"
+  # Only apparmor_remove_packages_profile() has the guard in the stock script, so a plain
+  # grep for is_apparmor_loaded would always match and the patch would never apply - check
+  # specifically for our guard directly following the add_packages_profile() anchor instead.
+  if [ -f "${AA_SH}" ] && ! grep -A1 -F "${AA_ANCHOR}" "${AA_SH}" | grep -q "is_apparmor_loaded"; then
     echo "Patching apparmor_add_packages_profile() to skip when AppArmor isn't loaded"
-    sed -i '/^apparmor_add_packages_profile() {$/a\
-\tif ! is_apparmor_loaded ; then\
-\t\treturn 0\
-\tfi' "${AA_SH}"
+    AA_TMP="${AA_SH}.tmp"
+    awk -v anchor="${AA_ANCHOR}" '
+      { print }
+      index($0, anchor) == 1 { print "\tif ! is_apparmor_loaded ; then"; print "\t\treturn 0"; print "\tfi" }
+    ' "${AA_SH}" >"${AA_TMP}" && cat "${AA_TMP}" >"${AA_SH}" && rm -f "${AA_TMP}"
   fi
 fi
