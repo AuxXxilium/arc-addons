@@ -128,9 +128,11 @@ elif [ "${1}" = "late" ]; then
   # Force load amdgpu if AMD GPU detected
   if [ -f /usr/lib/modules/amdgpu.ko ] && grep -iq 1002 /proc/bus/pci/devices 2>/dev/null; then
     echo "AMD GPU detected, forcing amdgpu to load"
-    for M in $(modinfo -F depends /usr/lib/modules/amdgpu.ko 2>/dev/null | tr ',' ' ') amdgpu; do
-      [ -f "/usr/lib/modules/${M}.ko" ] && /tmpRoot/bin/cp -vpf "/usr/lib/modules/${M}.ko" "${MODDIR}/" 2>/dev/null || true
-    done
+    if ! grep -q 'AuxXxilium@Xpenology' /proc/version 2>/dev/null; then
+      for M in $(modinfo -F depends /usr/lib/modules/amdgpu.ko 2>/dev/null | tr ',' ' ') amdgpu; do
+        [ -f "/usr/lib/modules/${M}.ko" ] && /tmpRoot/bin/cp -vpf "/usr/lib/modules/${M}.ko" "${MODDIR}/" 2>/dev/null || true
+      done
+    fi
     mkdir -vp /tmpRoot/usr/lib/modules-load.d
     echo "amdgpu" >/tmpRoot/usr/lib/modules-load.d/70-syno-amdgpu-gpu.conf
     isChange=true
