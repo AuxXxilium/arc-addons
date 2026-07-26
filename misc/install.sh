@@ -342,4 +342,24 @@ elif [ "${1}" = "late" ]; then
 
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/wol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/wol.service
+
+  # apparmor: apparmor_add_packages_profile() has no is_apparmor_loaded guard, unlike its
+  # sibling apparmor_remove_packages_profile() right below it. When the kernel builds without
+  # AppArmor (see dsm_linux build.sh, CONFIG_SECURITY_APPARMOR=n - DSM's userspace ships no real
+  # AppArmor profiles, so leaving AppArmor on as the enforcing LSM denies exec on every
+  # /usr/syno/* binary instead), this function still unconditionally calls apparmor_parser
+  # against the (nonexistent) kernel AppArmor interface, which fails and synopkg treats as fatal
+  # (error 272 "Failed to reload apparmor") - blocking start of any package that ships an
+  # AppArmor profile (OAuthService, SynoFinder/Universal Search, FileStation, ...).
+  AA_SH="/tmpRoot/usr/syno/etc/rc.sysv/apparmor.sh"
+  if [ -f "${AA_SH}" ] && ! grep -q "is_apparmor_loaded" <<EOF_MARK
+$(sed -n '/^apparmor_add_packages_profile() {/,/^}/p' "${AA_SH}")
+EOF_MARK
+  then
+    echo "Patching apparmor_add_packages_profile() to skip when AppArmor isn't loaded"
+    sed -i '/^apparmor_add_packages_profile() {$/a\
+\tif ! is_apparmor_loaded ; then\
+\t\treturn 0\
+\tfi' "${AA_SH}"
+  fi
 fi
