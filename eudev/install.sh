@@ -112,14 +112,18 @@ elif [ "${1}" = "late" ]; then
   done
 
   if [ "${KERNEL}" = "Custom" ]; then
-    if [ -d "${MODBAK}" ]; then
-      echo "Custom Kernel - restore stock modules from backup."
-      /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
-      /tmpRoot/bin/cp -rpf "${MODBAK}" "${MODDIR}" 2>/dev/null || true
-    else
+    if [ ! -d "${MODBAK}" ]; then
       echo "Custom Kernel - backup stock modules."
       /tmpRoot/bin/cp -rpf "${MODDIR}" "${MODBAK}" 2>/dev/null || true
     fi
+    # Rebuild MODDIR from the stock backup every boot instead of overlaying
+    # onto whatever is already there, so a module dropped from - or changed
+    # in - this build's /usr/lib/modules/* can never survive as a stale
+    # leftover from a previous custom build (mismatched .ko/vmlinux export
+    # ABI, e.g. ipv6.ko referencing symbols the current kernel dropped).
+    echo "Custom Kernel - restore stock modules from backup, then overlay custom modules."
+    /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
+    /tmpRoot/bin/cp -rpf "${MODBAK}" "${MODDIR}" 2>/dev/null || true
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* "${MODDIR}" 2>/dev/null || true
     isChange=true
   else
