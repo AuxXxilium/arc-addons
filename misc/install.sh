@@ -343,25 +343,14 @@ elif [ "${1}" = "late" ]; then
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/wol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/wol.service
 
-  # apparmor: apparmor_add_packages_profile() has no is_apparmor_loaded guard, unlike its
-  # sibling apparmor_remove_packages_profile() right below it. When the kernel builds without
-  # AppArmor (see dsm_linux build.sh, CONFIG_SECURITY_APPARMOR=n - DSM's userspace ships no real
-  # AppArmor profiles, so leaving AppArmor on as the enforcing LSM denies exec on every
-  # /usr/syno/* binary instead), this function still unconditionally calls apparmor_parser
-  # against the (nonexistent) kernel AppArmor interface, which fails and synopkg treats as fatal
-  # (error 272 "Failed to reload apparmor") - blocking start of any package that ships an
-  # AppArmor profile (OAuthService, SynoFinder/Universal Search, FileStation, ...).
-  AA_SH="/tmpRoot/usr/syno/etc/rc.sysv/apparmor.sh"
-  AA_ANCHOR="apparmor_add_packages_profile() {"
-  # Only apparmor_remove_packages_profile() has the guard in the stock script, so a plain
-  # grep for is_apparmor_loaded would always match and the patch would never apply - check
-  # specifically for our guard directly following the add_packages_profile() anchor instead.
-  if [ -f "${AA_SH}" ] && ! grep -A1 -F "${AA_ANCHOR}" "${AA_SH}" | grep -q "is_apparmor_loaded"; then
-    echo "Patching apparmor_add_packages_profile() to skip when AppArmor isn't loaded"
-    AA_TMP="${AA_SH}.tmp"
-    awk -v anchor="${AA_ANCHOR}" '
-      { print }
-      index($0, anchor) == 1 { print "\tif ! is_apparmor_loaded ; then"; print "\t\treturn 0"; print "\tfi" }
-    ' "${AA_SH}" >"${AA_TMP}" && cat "${AA_TMP}" >"${AA_SH}" && rm -f "${AA_TMP}"
-  fi
+  #AA_SH="/tmpRoot/usr/syno/etc/rc.sysv/apparmor.sh"
+  #AA_ANCHOR="apparmor_add_packages_profile() {"
+  #if [ -f "${AA_SH}" ] && ! grep -A1 -F "${AA_ANCHOR}" "${AA_SH}" | grep -q "is_apparmor_loaded"; then
+  #  echo "Patching apparmor_add_packages_profile() to skip when AppArmor isn't loaded"
+  #  AA_TMP="${AA_SH}.tmp"
+  #  awk -v anchor="${AA_ANCHOR}" '
+  #    { print }
+  #    index($0, anchor) == 1 { print "\tif ! is_apparmor_loaded ; then"; print "\t\treturn 0"; print "\tfi" }
+  #  ' "${AA_SH}" >"${AA_TMP}" && cat "${AA_TMP}" >"${AA_SH}" && rm -f "${AA_TMP}"
+  #fi
 fi
