@@ -2000,6 +2000,28 @@ if [[ $force == "yes" ]]; then
     else
         echo -e "\nSupport disk compatibility already disabled."
     fi
+else
+    sdc=support_disk_compatibility
+    setting="$(/usr/syno/bin/synogetkeyvalue "$synoinfo" $sdc)"
+    settingbak="$(/usr/syno/bin/synogetkeyvalue "${synoinfo}.bak" $sdc)"
+
+    if [[ -z $settingbak ]]; then
+        /usr/syno/bin/synosetkeyvalue "${synoinfo}.bak" "$sdc" "$setting"
+    fi
+
+    if [[ $setting == "no" ]]; then
+        for f in "$synoinfo" /etc/synoinfo.conf; do
+            [[ -f "$f" ]] && /usr/syno/bin/synosetkeyvalue "$f" "$sdc" "yes"
+        done
+        setting="$(/usr/syno/bin/synogetkeyvalue "$synoinfo" $sdc)"
+        if [[ $setting == "yes" ]]; then
+            echo -e "\nEnabled support disk compatibility."
+        else
+            echo -e "\n${Error}ERROR${Off} Failed to enable support disk compatibility!"
+        fi
+    else
+        echo -e "\nSupport disk compatibility already enabled."
+    fi
 fi
 
 # Optionally disable memory compatibility warnings
