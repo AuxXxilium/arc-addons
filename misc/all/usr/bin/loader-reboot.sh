@@ -61,6 +61,8 @@ mount -t vfat "${LOADER_DISK_PART1}" "${WORK_PATH}" || { echo "Can't mount ${LOA
 GRUBPATH="$(dirname "$(find "${WORK_PATH}" -name grub.cfg | head -1)")"
 [ -z "${GRUBPATH}" ] && echo "Error: GRUB path not found" && cleanup && reset_arcsu && exit 1
 
+[ "$1" = "automated" ] && touch "${WORK_PATH}/automated"
+
 ENVFILE="$GRUBPATH/grubenv"
 
 if grub-editenv --help >/dev/null 2>&1; then
