@@ -201,9 +201,7 @@ fi
 
 # Get DSM major version
 dsm=$(/usr/syno/bin/synogetkeyvalue /etc.defaults/VERSION majorversion)
-if [[ $dsm -gt "6" ]]; then
-    version="_v$dsm"
-fi
+version="_v$dsm"
 
 # Get DSM major and minor version
 major=$(/usr/syno/bin/synogetkeyvalue /etc.defaults/VERSION majorversion)
@@ -321,32 +319,6 @@ echo "Running from: ${scriptpath}/$scriptfile"
 #echo "Source: $source"               # debug
 #echo "Script filename: $scriptfile"  # debug
 
-
-
-# Warn if script located on M.2 drive
-get_script_vol() {
-    local script_root vol_num vg_name
-    script_root="${scriptpath#/*}"
-    script_root="${script_root%%/*}"
-    if [[ $script_root =~ ^volume ]]; then
-        vol_num="${script_root:6}"
-        vg_name=$(lvs --noheadings --select=lv_name="volume_$vol_num" --options=vg_name)
-        vg_name="${vg_name// }"
-        # Only get first partition on volume group
-        vol_name=$(pvs --noheadings --select=vg_name="$vg_name" --options=pv_name | awk '{print $1}' | head -n 1)
-    else
-        vol_name=$(df --output=source "/$script_root" | sed 1d)  # sed 1d = delete first line
-    fi
-}
-if which lvm >/dev/null; then
-    # Single bay Synology NAS don't have lvm
-    get_script_vol # sets $vol_name to /dev/whatever
-    if grep -qE "^${vol_name#/dev/} .+ nvme" /proc/mdstat; then
-        ding
-        echo -e "\n${Yellow}WARNING${Off} Don't store this script on an NVMe volume!"
-        exit 3
-    fi
-fi
 
 
 #------------------------------------------------------------------------------
@@ -887,43 +859,22 @@ m2_drive(){
     fi
 }
 
-is_ssd(){ 
-    # $1 is sda, sata1 or nvme0
-    # Show TRIM warning if SSD or NVMe in RAID 5 or 6
-    if ! synodisk --isssd /dev/"$1" >/dev/null; then
-        # exit code 0 = is not SSD
-        # exit code 1 = is SSD
-
-        # Ignore Synology SSDs/NVMe drives
-        brand="$(cat /sys/block/"$1"/device/vendor)"
-
-        if grep -q "$1" /proc/mdstat | grep -E 'raid5|raid6'; then
-            if [[ $show_trim_warning != "yes" && $brand != "Synology" ]]; then
-                show_trim_warning="yes" 
-            fi
-        fi
-    fi
-}
-
 for d in /sys/block/*; do
     # $d is /sys/block/sata1 etc
     case "$(basename -- "${d}")" in
         sd*|hd*)
             if [[ $d =~ [hs]d[a-z][a-z]?$ ]]; then
                 getdriveinfo "$d"
-                is_ssd "$(basename -- "${d}")"
             fi
         ;;
         sas*)
             if [[ $d =~ sas[0-9][0-9]?[0-9]?$ ]]; then
                 getdriveinfo "$d"
-                is_ssd "$(basename -- "${d}")"
             fi
         ;;
         sata*)
             if [[ $d =~ sata[0-9][0-9]?[0-9]?$ ]]; then
                 getdriveinfo "$d"
-                is_ssd "$(basename -- "${d}")"
 
                 # In case it's a SATA M.2 SSD in device tree model NAS
                 # M.2 SATA drives in M2D18 or M2S17
@@ -933,13 +884,11 @@ for d in /sys/block/*; do
         nvme*)
             if [[ $d =~ nvme[0-9][0-9]?n[0-9][0-9]?$ ]]; then
                 m2_drive "$d" "nvme"
-                #is_ssd "$(basename -- "${d}")"
             fi
         ;;
         nvc*)  # M.2 SATA drives (in PCIe M2D18 or M2S17 only?)
             if [[ $d =~ nvc[0-9][0-9]?$ ]]; then
                 m2_drive "$d" "nvc"
-                is_ssd "$(basename -- "${d}")"
             fi
         ;;
     esac
@@ -2084,75 +2033,73 @@ else
 fi
 
 # Optionally set mem_max_mb to the amount of installed memory
-if [[ $dsm -gt "6" ]]; then  # DSM 6 as has no dmidecode
-    if [[ $ram == "yes" && -f /usr/sbin/dmidecode ]]; then
-        # Get total amount of installed memory
-        #IFS=$'\n' read -r -d '' -a array < <(dmidecode -t memory | grep "[Ss]ize")  # GitHub issue #86, 87
-        IFS=$'\n' read -r -d '' -a array < <(dmidecode -t memory |\
-            grep -E "[Ss]ize: [0-9]+ [MG]{1}[B]{1}$")  # GitHub issue #86, 87, 106
-        if [[ ${#array[@]} -gt "0" ]]; then
-            num="0"
-            while [[ $num -lt "${#array[@]}" ]]; do
-                check=$(printf %s "${array[num]}" | awk '{print $1}')
-                if [[ ${check,,} == "size:" ]]; then
-                    ramsize=$(printf %s "${array[num]}" | awk '{print $2}')           # GitHub issue #86, 87
-                    bytes=$(printf %s "${array[num]}" | awk '{print $3}')             # GitHub issue #86, 87
-                    if [[ $ramsize =~ ^[0-9]+$ ]]; then  # Check $ramsize is numeric  # GitHub issue #86, 87
-                        if [[ $bytes == "GB" ]]; then    # DSM 7.2 dmidecode returned GB
-                            ramsize=$((ramsize * 1024))  # Convert to MB              # GitHub issue #107
-                        fi
-                        if [[ $ramtotal ]]; then
-                            ramtotal=$((ramtotal +ramsize))
-                        else
-                            ramtotal="$ramsize"
-                        fi
+if [[ $ram == "yes" && -f /usr/sbin/dmidecode ]]; then
+    # Get total amount of installed memory
+    #IFS=$'\n' read -r -d '' -a array < <(dmidecode -t memory | grep "[Ss]ize")  # GitHub issue #86, 87
+    IFS=$'\n' read -r -d '' -a array < <(dmidecode -t memory |\
+        grep -E "[Ss]ize: [0-9]+ [MG]{1}[B]{1}$")  # GitHub issue #86, 87, 106
+    if [[ ${#array[@]} -gt "0" ]]; then
+        num="0"
+        while [[ $num -lt "${#array[@]}" ]]; do
+            check=$(printf %s "${array[num]}" | awk '{print $1}')
+            if [[ ${check,,} == "size:" ]]; then
+                ramsize=$(printf %s "${array[num]}" | awk '{print $2}')           # GitHub issue #86, 87
+                bytes=$(printf %s "${array[num]}" | awk '{print $3}')             # GitHub issue #86, 87
+                if [[ $ramsize =~ ^[0-9]+$ ]]; then  # Check $ramsize is numeric  # GitHub issue #86, 87
+                    if [[ $bytes == "GB" ]]; then    # DSM 7.2 dmidecode returned GB
+                        ramsize=$((ramsize * 1024))  # Convert to MB              # GitHub issue #107
+                    fi
+                    if [[ $ramtotal ]]; then
+                        ramtotal=$((ramtotal +ramsize))
+                    else
+                        ramtotal="$ramsize"
                     fi
                 fi
-                num=$((num +1))
-            done
-        fi
-        # Set mem_max_mb to the amount of installed memory
-        setting="$(/usr/syno/bin/synogetkeyvalue $synoinfo mem_max_mb)"
-        settingbak="$(/usr/syno/bin/synogetkeyvalue ${synoinfo}.bak mem_max_mb)"      # GitHub issue #107
-        if [[ $ramtotal =~ ^[0-9]+$ ]]; then   # Check $ramtotal is numeric
-            if [[ $ramtotal -gt "$setting" ]]; then
-                /usr/syno/bin/synosetkeyvalue "$synoinfo" mem_max_mb "$ramtotal"
-                # Check we changed mem_max_mb
-                setting="$(/usr/syno/bin/synogetkeyvalue $synoinfo mem_max_mb)"
-                if [[ $ramtotal == "$setting" ]]; then
-                    #echo -e "\nSet max memory to $ramtotal MB."
-                    ramgb=$((ramtotal / 1024))
-                    echo -e "\nSet max memory to $ramgb GB."
-                else
-                    echo -e "\n${Error}ERROR${Off} Failed to change max memory!"
-                fi
-
-            elif [[ $setting -gt "$ramtotal" && $setting -gt "$settingbak" ]];  # GitHub issue #107 
-            then
-                # Fix setting is greater than both ramtotal and default in syninfo.conf.bak
-                /usr/syno/bin/synosetkeyvalue "$synoinfo" mem_max_mb "$settingbak"
-                # Check we restored mem_max_mb
-                setting="$(/usr/syno/bin/synogetkeyvalue $synoinfo mem_max_mb)"
-                if [[ $settingbak == "$setting" ]]; then
-                    #echo -e "\nSet max memory to $ramtotal MB."
-                    ramgb=$((ramtotal / 1024))
-                    echo -e "\nRestored max memory to $ramgb GB."
-                else
-                    echo -e "\n${Error}ERROR${Off} Failed to restore max memory!"
-                fi
-
-            elif [[ $ramtotal == "$setting" ]]; then
-                #echo -e "\nMax memory already set to $ramtotal MB."
-                ramgb=$((ramtotal / 1024))
-                echo -e "\nMax memory already set to $ramgb GB."
-            else [[ $ramtotal -lt "$setting" ]]
-                #echo -e "\nMax memory is set to $setting MB."
-                ramgb=$((setting / 1024))
-                echo -e "\nMax memory is set to $ramgb GB."
             fi
-        else
-            echo -e "\n${Error}ERROR${Off} Total memory size is not numeric: '$ramtotal'"
+            num=$((num +1))
+        done
+    fi
+    # Set mem_max_mb to the amount of installed memory
+    setting="$(/usr/syno/bin/synogetkeyvalue $synoinfo mem_max_mb)"
+    settingbak="$(/usr/syno/bin/synogetkeyvalue ${synoinfo}.bak mem_max_mb)"      # GitHub issue #107
+    if [[ $ramtotal =~ ^[0-9]+$ ]]; then   # Check $ramtotal is numeric
+        if [[ $ramtotal -gt "$setting" ]]; then
+            /usr/syno/bin/synosetkeyvalue "$synoinfo" mem_max_mb "$ramtotal"
+            # Check we changed mem_max_mb
+            setting="$(/usr/syno/bin/synogetkeyvalue $synoinfo mem_max_mb)"
+            if [[ $ramtotal == "$setting" ]]; then
+                #echo -e "\nSet max memory to $ramtotal MB."
+                ramgb=$((ramtotal / 1024))
+                echo -e "\nSet max memory to $ramgb GB."
+            else
+                echo -e "\n${Error}ERROR${Off} Failed to change max memory!"
+            fi
+
+        elif [[ $setting -gt "$ramtotal" && $setting -gt "$settingbak" ]];  # GitHub issue #107
+        then
+            # Fix setting is greater than both ramtotal and default in syninfo.conf.bak
+            /usr/syno/bin/synosetkeyvalue "$synoinfo" mem_max_mb "$settingbak"
+            # Check we restored mem_max_mb
+            setting="$(/usr/syno/bin/synogetkeyvalue $synoinfo mem_max_mb)"
+            if [[ $settingbak == "$setting" ]]; then
+                #echo -e "\nSet max memory to $ramtotal MB."
+                ramgb=$((ramtotal / 1024))
+                echo -e "\nRestored max memory to $ramgb GB."
+            else
+                echo -e "\n${Error}ERROR${Off} Failed to restore max memory!"
+            fi
+
+        elif [[ $ramtotal == "$setting" ]]; then
+            #echo -e "\nMax memory already set to $ramtotal MB."
+            ramgb=$((ramtotal / 1024))
+            echo -e "\nMax memory already set to $ramgb GB."
+        else [[ $ramtotal -lt "$setting" ]]
+            #echo -e "\nMax memory is set to $setting MB."
+            ramgb=$((setting / 1024))
+            echo -e "\nMax memory is set to $ramgb GB."
         fi
+    else
+        echo -e "\n${Error}ERROR${Off} Total memory size is not numeric: '$ramtotal'"
     fi
 fi
 
@@ -2446,34 +2393,20 @@ fi
 # Finished
 
 # Make Synology check disk compatibility
-if [[ -f /usr/syno/sbin/synostgdisk ]]; then  # DSM 6.2.3 does not have synostgdisk
+if [[ -f /usr/syno/sbin/synostgdisk ]]; then
     /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
     status=$?
     if [[ $status -eq "0" ]]; then
         echo -e "\nDSM successfully checked disk compatibility."
         rebootmsg=yes  # Show reboot message at end
     else
-        # Ignore DSM 6.2.4 as it returns 255 for "synostgdisk --check-all-disks-compatibility"
-        # and DSM 6.2.3 and lower have no synostgdisk command
-        if [[ $dsm -gt "6" ]]; then
-            echo -e "\nDSM ${Red}failed${Off} to check disk compatibility with exit code $status"
-            rebootmsg=yes  # Show reboot message at end
-        fi
+        echo -e "\nDSM ${Red}failed${Off} to check disk compatibility with exit code $status"
+        rebootmsg=yes  # Show reboot message at end
     fi
 fi
 
-# Show TRIM warning if required
-if [[ $show_trim_warning == "yes" ]]; then
-    ding
-    echo -e "\n${Warn}WARNING${Off} Enabling SSD TRIM on drives in RAID 5, 6 or SHR with 3 more drives can"
-    echo "result in data loss if the SSD/NVMe drives marks trimmed blocks as released."
-    echo "SSDs that use Method 1 are okay. Do NOT enable TRIM for SSDs that use Method 2."
-    echo "See Why_is_SSD_TRIM_available_only_for_SSDs_in_the_compatibility_list here:"
-    echo "https://tinyurl.com/ssd-trim"
-fi
-
 # Show reboot message if required
-if [[ $dsm -eq "6" || $rebootmsg == "yes" ]]; then
+if [[ $rebootmsg == "yes" ]]; then
     echo -e "\nYou may need to ${Cyan}reboot the Synology${Off} to see the changes."
 fi
 
