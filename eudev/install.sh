@@ -93,25 +93,35 @@ elif [ "${1}" = "late" ]; then
   isChange=false
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
-  MODBAK="/tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}"
+  MODBAK="/tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}.tgz"
   MODDIR="/tmpRoot/usr/lib/modules"
 
+  # Remove stale backups from other platform/productver combos (old dirs and old tgz alike)
+  for STALE in /tmpRoot/usr/lib/modules.*; do
+    [ -e "${STALE}" ] || continue
+    [ "${STALE}" = "${MODBAK}" ] && continue
+    /tmpRoot/bin/rm -rf "${STALE}" 2>/dev/null || true
+  done
+
   if grep -q 'AuxXxilium@Xpenology' /proc/version 2>/dev/null; then
-    if [ -d "${MODBAK}" ]; then
+    if [ -f "${MODBAK}" ]; then
       echo "Custom Kernel - restore stock modules from backup."
       /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
-      /tmpRoot/bin/cp -rpf "${MODBAK}" "${MODDIR}" 2>/dev/null || true
+      mkdir -p "${MODDIR}"
+      tar -zxf "${MODBAK}" -C "${MODDIR}" 2>/dev/null || true
     else
       echo "Custom Kernel - backup stock modules."
-      /tmpRoot/bin/cp -rpf "${MODDIR}" "${MODBAK}" 2>/dev/null || true
+      tar -zcf "${MODBAK}" -C "${MODDIR}" . 2>/dev/null || true
     fi
     /tmpRoot/bin/cp -rpf /usr/lib/modules/* "${MODDIR}" 2>/dev/null || true
     isChange=true
   else
-    if [ -d "${MODBAK}" ]; then
+    if [ -f "${MODBAK}" ]; then
       echo "Official Kernel - restore modules from backup."
       /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
-      /tmpRoot/bin/mv -f "${MODBAK}" "${MODDIR}" 2>/dev/null || true
+      mkdir -p "${MODDIR}"
+      tar -zxf "${MODBAK}" -C "${MODDIR}" 2>/dev/null || true
+      /tmpRoot/bin/rm -f "${MODBAK}" 2>/dev/null || true
     fi
     for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk 'NF==2 {print $1"###"$2}'); do
       O="${L%%###*}"
