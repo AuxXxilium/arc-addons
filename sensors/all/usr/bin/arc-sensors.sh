@@ -23,6 +23,12 @@ CURVE_MID="${DEFCURVE_MID}"
 CURVE_MAX="${DEFCURVE_MAX}"
 FANMODES=()
 
+# Fan mode index: 0=fullfan, 1=coolfan, 2=quietfan. This is a single global DSM setting
+# (synoinfo fan_config_type_internal) with exactly these three options — it selects which
+# column of the curve every fan uses, and is never set per-fan. Per-fan tuning is done with
+# the CURVE_*_<key> row overrides instead. Coolfan is the default when DSM has no valid value.
+DEFAULT_FANMODE=1
+
 # Space-separated list of fan_curve_key() identifiers (e.g. "nct6775_pwm2") to leave under
 # BIOS/hardware automatic control instead of fan2go. Set via FAN_EXCLUDE in the DB task.
 FAN_EXCLUDE=""
@@ -140,7 +146,23 @@ load_task() {
   local OP
   OP="$(sqlite3 "${ESYNOSCHEDULER_DB}" "SELECT operation FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null)"
   if [ -n "${OP}" ]; then
-    eval "${OP}" 2>/dev/null || true
+    # Evaluate assignments line-by-line rather than eval'ing the whole blob: a single
+    # malformed line (stray quote, smart quote pasted from a browser) would otherwise
+    # abort the eval partway and silently leave later curve values unset, so the user's
+    # edited curve "doesn't stick" with no error reported anywhere.
+    local _line _err=0
+    while IFS= read -r _line; do
+      case "${_line}" in
+        ''|'#'*) continue ;;
+        CURVE_MIN=*|CURVE_MID=*|CURVE_MAX=*|CURVE_MIN_*=*|CURVE_MID_*=*|CURVE_MAX_*=*|FAN_EXCLUDE=*) ;;
+        *) continue ;;
+      esac
+      if ! eval "${_line}" 2>/dev/null; then
+        echo "arc-sensors: ignoring malformed fan curve line: ${_line}" >&2
+        _err=1
+      fi
+    done <<<"${OP}"
+    [ "${_err}" -eq 1 ] && echo "arc-sensors: some fan curve settings were skipped, check the 'Fancontrol 2.0' task" >&2
     [[ "${FAN_EXCLUDE}" =~ ^[A-Za-z0-9_\ ]*$ ]] || FAN_EXCLUDE=""
     [[ "${CURVE_MIN}" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || CURVE_MIN="${DEFCURVE_MIN}"
     [[ "${CURVE_MID}" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || CURVE_MID="${DEFCURVE_MID}"
@@ -300,7 +322,7 @@ fan_mode_curve() {
 # own curve (CURVE_*_<key> override if set, else the global CURVE_MIN/MID/MAX).
 # $1: mode index (0=fullfan, 1=coolfan, 2=quietfan)
 generate_fan2go_config() {
-  local MIDX="${1:-1}"
+  local MIDX="${1:-${DEFAULT_FANMODE}}"
   [ "${#FANMODES[@]}" -eq 0 ] && derive_curve_vars
 
   local CPU_SENSOR
@@ -561,7 +583,7 @@ init_fans() {
 }
 
 start_fan2go() {
-  local FanMode="${1:-1}"
+  local FanMode="${1:-${DEFAULT_FANMODE}}"
   generate_fan2go_config "${FanMode}"
   restart_fan2go
 }
@@ -571,7 +593,7 @@ fantype_to_mode() {
     fullfan | full)  echo "0" ;;
     coolfan | high)  echo "1" ;;
     quietfan | low)  echo "2" ;;
-    *)               echo "1" ;;
+    *)               echo "${DEFAULT_FANMODE}" ;;
   esac
 }
 
@@ -611,7 +633,7 @@ main() {
       restore_excluded_pwm_enable
       discover_fans
       save_fan_channels
-      generate_fan2go_config "${FanBaseMode:-1}"
+      generate_fan2go_config "${FanBaseMode}"
       restart_fan2go
       continue
     fi
