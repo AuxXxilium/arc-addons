@@ -77,7 +77,7 @@ elif [ "${1}" = "modules" ]; then
     exit 1
   }
   echo "Triggering events to udev"
-  udevadm trigger --type=subsystem --action=add
+  udevadm trigger --type=subsystems --action=add
   udevadm trigger --type=devices --action=add
   udevadm trigger --type=devices --action=change
   udevadm settle --timeout=60 || echo "udevadm settle after add/change failed"
