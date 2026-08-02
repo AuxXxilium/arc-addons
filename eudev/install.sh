@@ -46,6 +46,31 @@ elif [ "${1}" = "modules" ]; then
 
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
 
+  # DSM ships Realtek's PG-tool driver, which claims the same PCI IDs as the
+  # real NIC drivers (8125/8136/8161/8167/8168/8169). It is a factory
+  # MAC/EEPROM programming tool, not a network driver, and it sorts before
+  # r81xx in modules.order - so it wins every alias tie and binds the NIC
+  # first, leaving r8168/r8125/r8169 loaded but bound to nothing. Drop it
+  # before depmod so it never enters the alias tables.
+  rm -f /usr/lib/modules/pgdrv.ko 2>/dev/null || true
+
+  # depmod warns (harmlessly) when these are missing, but modules.order also
+  # decides which module wins when two of them claim the same alias - the
+  # earlier-listed one is preferred. Generating it alphabetically keeps the
+  # vendor drivers (r8125/r8126/r8127/r8168) ahead of the in-tree r8169 on
+  # the device IDs they share. modules.builtin is only needed as a stub here;
+  # depmod just wants the file to exist.
+  [ -e /usr/lib/modules/modules.builtin ] || : > /usr/lib/modules/modules.builtin
+  if [ -d /usr/lib/modules ]; then
+    # Paths must be relative to the module root: depmod matches these lines
+    # against each module's path with the module-root prefix stripped, so
+    # absolute paths here would never match and the ordering would be a no-op.
+    (cd /usr/lib/modules && find . -type f -name "*.ko" | sed 's|^\./||' | sort) \
+      > /usr/lib/modules/modules.order
+  else
+    : > /usr/lib/modules/modules.order
+  fi
+
   /usr/sbin/depmod -a || echo "boot depmod skipped"
   /usr/sbin/udevd -d || {
     echo "FAIL"
@@ -135,6 +160,16 @@ elif [ "${1}" = "late" ]; then
     done
   fi
 
+  # Drop DSM's Realtek PG-tool driver from the installed system too. This has
+  # to run after MODDIR is rebuilt above (both branches either restore it from
+  # the stock backup or copy modules in), otherwise the restore just puts it
+  # back. See the matching removal in the "modules" stage for why.
+  if [ -f "${MODDIR}/pgdrv.ko" ]; then
+    echo "Removing pgdrv.ko (Realtek PG tool) - conflicts with the r81xx NIC drivers"
+    /tmpRoot/bin/rm -f "${MODDIR}/pgdrv.ko" 2>/dev/null || true
+    isChange=true
+  fi
+
   # Force load amdgpu if AMD GPU detected
   if [ -f /usr/lib/modules/amdgpu.ko ] && grep -iq 1002 /proc/bus/pci/devices 2>/dev/null; then
     echo "AMD GPU detected, forcing amdgpu to load"
@@ -150,6 +185,10 @@ elif [ "${1}" = "late" ]; then
 
   echo "isChange: ${isChange}"
   if [ "${isChange}" = true ]; then
+    # Carry the generated metadata over so the DSM-side depmod below sees the
+    # same module ordering as the boot-side one above.
+    [ -f /usr/lib/modules/modules.builtin ] && cp -f /usr/lib/modules/modules.builtin /tmpRoot/usr/lib/modules/modules.builtin
+    [ -f /usr/lib/modules/modules.order ] && cp -f /usr/lib/modules/modules.order /tmpRoot/usr/lib/modules/modules.order
     /usr/sbin/depmod -a -b /tmpRoot || echo "dsm depmod skipped"
   fi
 
