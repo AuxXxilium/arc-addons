@@ -102,6 +102,26 @@ elif [ "${1}" = "modules" ]; then
     done
   done
 
+  # DSM's early boot insmods /lib/modules directly, without resolving
+  # dependencies, so any module whose provider had not been loaded yet fails:
+  #
+  #   qed: Unknown symbol crc8 (err -2)
+  #   qede: Unknown symbol qed_get_eth_ops (err -2)
+  #   hfsplus: Unknown symbol cdrom_read_tocentry (err -2)
+  #
+  # Nothing is wrong with those modules -- "modprobe qed" loads crc8 first and
+  # works. Retry just the ones that actually failed, after depmod -a above has
+  # built modules.dep so modprobe can resolve the ordering.
+  #
+  # The candidates come from dmesg rather than a hardcoded list or a sweep of
+  # modules.dep: only modules that really hit "Unknown symbol" are retried, so
+  # nothing gets loaded that the boot did not already try to load.
+  for M in $(dmesg 2>/dev/null | sed -n 's/^\[[0-9. ]*\] \([a-z0-9_-]*\): Unknown symbol .*/\1/p' \
+               | sort -u); do
+    [ -f "/usr/lib/modules/${M}.ko" ] || continue
+    /usr/sbin/modprobe "${M}" 2>/dev/null && echo "reloaded ${M} (boot insmod raced its dependencies)"
+  done
+
   # Remove kvm module
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_intel && /usr/sbin/modprobe -r kvm_intel || true # kvm-intel.ko
   /usr/sbin/lsmod 2>/dev/null | grep -q ^kvm_amd && /usr/sbin/modprobe -r kvm_amd || true     # kvm-amd.ko
