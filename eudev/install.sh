@@ -9,8 +9,6 @@
 if [ "${1}" = "early" ]; then
   echo "Installing addon eudev - ${1}"
 
-  # Only the eudev-<dsmver>-<kver>.tgz matching this build is copied to
-  # /addons/ (see installAddon() in addons.sh), so just pick whichever is there.
   EUDEVPKG="$(ls /addons/eudev-*-*.tgz 2>/dev/null | head -n1)"
   if [ -z "${EUDEVPKG}" ]; then
     echo "ERROR: no eudev-*.tgz found in /addons/"
@@ -46,25 +44,10 @@ elif [ "${1}" = "modules" ]; then
 
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
 
-  # DSM ships Realtek's PG-tool driver, which claims the same PCI IDs as the
-  # real NIC drivers (8125/8136/8161/8167/8168/8169). It is a factory
-  # MAC/EEPROM programming tool, not a network driver, and it sorts before
-  # r81xx in modules.order - so it wins every alias tie and binds the NIC
-  # first, leaving r8168/r8125/r8169 loaded but bound to nothing. Drop it
-  # before depmod so it never enters the alias tables.
   rm -f /usr/lib/modules/pgdrv.ko 2>/dev/null || true
 
-  # depmod warns (harmlessly) when these are missing, but modules.order also
-  # decides which module wins when two of them claim the same alias - the
-  # earlier-listed one is preferred. Generating it alphabetically keeps the
-  # vendor drivers (r8125/r8126/r8127/r8168) ahead of the in-tree r8169 on
-  # the device IDs they share. modules.builtin is only needed as a stub here;
-  # depmod just wants the file to exist.
   [ -e /usr/lib/modules/modules.builtin ] || : > /usr/lib/modules/modules.builtin
   if [ -d /usr/lib/modules ]; then
-    # Paths must be relative to the module root: depmod matches these lines
-    # against each module's path with the module-root prefix stripped, so
-    # absolute paths here would never match and the ordering would be a no-op.
     (cd /usr/lib/modules && find . -type f -name "*.ko" | sed 's|^\./||' | sort) \
       > /usr/lib/modules/modules.order
   else
@@ -80,20 +63,26 @@ elif [ "${1}" = "modules" ]; then
   udevadm trigger --type=subsystems --action=add
   udevadm trigger --type=devices --action=add
   udevadm trigger --type=devices --action=change
-  udevadm settle --timeout=60 || echo "udevadm settle after add/change failed"
-  sleep 10
+  udevadm settle --timeout=60 || echo "udevadm settle after 60s failed"
   /usr/bin/killall udevd 2>/dev/null || true
 
-  # modprobe modules for the beep
   /usr/sbin/modprobe pcspeaker || true
   /usr/sbin/modprobe pcspkr || true
-  # modprobe modules for the sensors
-  for I in coretemp k10temp hwmon-vid it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
+
+  for I in coretemp k10temp hwmon-vid; do
     /usr/sbin/modprobe "${I}" || true
   done
-  # modprobe modules for the virtiofs
-  /usr/sbin/modprobe 9p || true
-  /usr/sbin/modprobe virtiofs || true
+
+  # to match, so they need an explicit modprobe.
+  MEV="$(sed -n 's/.*\bmev=\([^ ]*\).*/\1/p' /proc/cmdline 2>/dev/null)"
+  if [ "${MEV}" = "physical" ] || [ -z "${MEV}" ]; then
+    for I in it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
+      /usr/sbin/modprobe "${I}" || true
+    done
+  else
+    /usr/sbin/modprobe 9p || true
+    /usr/sbin/modprobe virtiofs || true
+  fi
 
   for P in tcp sch; do
     for F in $(LC_ALL=C printf '%s\n' /usr/lib/modules/${P}_*.ko | sort -V); do
@@ -102,24 +91,11 @@ elif [ "${1}" = "modules" ]; then
     done
   done
 
-  # DSM's early boot insmods /lib/modules directly, without resolving
-  # dependencies, so any module whose provider had not been loaded yet fails:
-  #
-  #   qed: Unknown symbol crc8 (err -2)
-  #   qede: Unknown symbol qed_get_eth_ops (err -2)
-  #   hfsplus: Unknown symbol cdrom_read_tocentry (err -2)
-  #
-  # Nothing is wrong with those modules -- "modprobe qed" loads crc8 first and
-  # works. Retry just the ones that actually failed, after depmod -a above has
-  # built modules.dep so modprobe can resolve the ordering.
-  #
-  # The candidates come from dmesg rather than a hardcoded list or a sweep of
-  # modules.dep: only modules that really hit "Unknown symbol" are retried, so
-  # nothing gets loaded that the boot did not already try to load.
-  for M in $(dmesg 2>/dev/null | sed -n 's/^\[[0-9. ]*\] \([a-z0-9_-]*\): Unknown symbol .*/\1/p' \
-               | sort -u); do
-    [ -f "/usr/lib/modules/${M}.ko" ] || continue
-    /usr/sbin/modprobe "${M}" 2>/dev/null && echo "reloaded ${M} (boot insmod raced its dependencies)"
+  for D in /sys/bus/*/devices/*/modalias /sys/devices/*/modalias; do
+    [ -r "${D}" ] && cat "${D}"
+  done 2>/dev/null | sort -u | while read -r A; do
+    [ -n "${A}" ] || continue
+    /usr/sbin/modprobe "${A}" 2>/dev/null && echo "loaded driver for ${A}"
   done
 
   # Remove kvm module
@@ -180,10 +156,6 @@ elif [ "${1}" = "late" ]; then
     done
   fi
 
-  # Drop DSM's Realtek PG-tool driver from the installed system too. This has
-  # to run after MODDIR is rebuilt above (both branches either restore it from
-  # the stock backup or copy modules in), otherwise the restore just puts it
-  # back. See the matching removal in the "modules" stage for why.
   if [ -f "${MODDIR}/pgdrv.ko" ]; then
     echo "Removing pgdrv.ko (Realtek PG tool) - conflicts with the r81xx NIC drivers"
     /tmpRoot/bin/rm -f "${MODDIR}/pgdrv.ko" 2>/dev/null || true
@@ -205,8 +177,6 @@ elif [ "${1}" = "late" ]; then
 
   echo "isChange: ${isChange}"
   if [ "${isChange}" = true ]; then
-    # Carry the generated metadata over so the DSM-side depmod below sees the
-    # same module ordering as the boot-side one above.
     [ -f /usr/lib/modules/modules.builtin ] && cp -f /usr/lib/modules/modules.builtin /tmpRoot/usr/lib/modules/modules.builtin
     [ -f /usr/lib/modules/modules.order ] && cp -f /usr/lib/modules/modules.order /tmpRoot/usr/lib/modules/modules.order
     /usr/sbin/depmod -a -b /tmpRoot || echo "dsm depmod skipped"
