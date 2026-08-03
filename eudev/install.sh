@@ -69,14 +69,19 @@ elif [ "${1}" = "modules" ]; then
   /usr/sbin/modprobe pcspeaker || true
   /usr/sbin/modprobe pcspkr || true
 
+  /usr/sbin/modprobe sg || true
+
   for I in coretemp k10temp hwmon-vid; do
     /usr/sbin/modprobe "${I}" || true
   done
 
-  # to match, so they need an explicit modprobe.
   MEV="$(sed -n 's/.*\bmev=\([^ ]*\).*/\1/p' /proc/cmdline 2>/dev/null)"
   if [ "${MEV}" = "physical" ] || [ -z "${MEV}" ]; then
-    for I in it87 nct6683 nct6775 adt7470 adt7475 adm1021 adm1031 adm9240 lm75 lm78 lm90; do
+    for I in it87 nct6683 nct6775 nct7802 f71805f f71882fg f75375s dme1737 \
+             w83627ehf w83627hf w83781d w83791d w83792d w83793 w83795 asc7621 \
+             adt7462 adt7470 adt7475 adm1021 adm1025 adm1026 adm1031 adm9240 \
+             lm63 lm75 lm77 lm78 lm80 lm85 lm90 lm95245 max6639 \
+             drivetemp asus_atk0110; do
       /usr/sbin/modprobe "${I}" || true
     done
   else
@@ -95,7 +100,7 @@ elif [ "${1}" = "modules" ]; then
     [ -r "${D}" ] && cat "${D}"
   done 2>/dev/null | sort -u | while read -r A; do
     [ -n "${A}" ] || continue
-    /usr/sbin/modprobe "${A}" 2>/dev/null && echo "loaded driver for ${A}"
+    /usr/sbin/modprobe "${A}" 2>/dev/null && echo "eudev: loaded driver for ${A}" || true
   done
 
   # Remove kvm module
@@ -157,14 +162,20 @@ elif [ "${1}" = "late" ]; then
   fi
 
   if [ -f "${MODDIR}/pgdrv.ko" ]; then
-    echo "Removing pgdrv.ko (Realtek PG tool) - conflicts with the r81xx NIC drivers"
+    echo "eudev: Removing pgdrv.ko (Realtek PG tool) - conflicts with the r81xx NIC drivers"
     /tmpRoot/bin/rm -f "${MODDIR}/pgdrv.ko" 2>/dev/null || true
+    isChange=true
+  fi
+
+  if [ -f /usr/lib/modules/sg.ko ] && [ ! -f "${MODDIR}/sg.ko" ]; then
+    echo "eudev: Adding sg.ko (SCSI generic - needed by IronWolf Health Management)"
+    /tmpRoot/bin/cp -vpf /usr/lib/modules/sg.ko "${MODDIR}/" 2>/dev/null || true
     isChange=true
   fi
 
   # Force load amdgpu if AMD GPU detected
   if [ -f /usr/lib/modules/amdgpu.ko ] && grep -iq 1002 /proc/bus/pci/devices 2>/dev/null; then
-    echo "AMD GPU detected, forcing amdgpu to load"
+    echo "eudev: AMD GPU detected, forcing amdgpu to load"
     if ! grep -q 'AuxXxilium@Xpenology' /proc/version 2>/dev/null; then
       for M in $(modinfo -F depends /usr/lib/modules/amdgpu.ko 2>/dev/null | tr ',' ' ') amdgpu; do
         [ -f "/usr/lib/modules/${M}.ko" ] && /tmpRoot/bin/cp -vpf "/usr/lib/modules/${M}.ko" "${MODDIR}/" 2>/dev/null || true

@@ -106,7 +106,7 @@ if [ "${1}" = "late" ]; then
       # echo "PIDFile=${VMTOOLS_PID}"
       echo "Environment=PATH=${VMTOOLS_PATH}/bin:${VMTOOLS_PATH}/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
       echo "Environment=LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:/usr/lib:/lib"
-      echo "ExecStart=-echo Unknown mev"
+      echo "ExecStart=/bin/echo Unknown mev"
       # echo "ExecReload=/bin/kill -HUP \$MAINPID"
       # echo "Restart=always"
       # echo "RestartSec=10"

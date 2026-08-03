@@ -24,7 +24,7 @@ if [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/arc-virtiofs.sh"
+    echo "ExecStart=/usr/bin/arc-virtiofs.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"

@@ -11,7 +11,7 @@ if [ "${1}" = "late" ]; then
 
   mkdir -p /tmpRoot/usr/arc/addons/ /tmpRoot/usr/sbin /tmpRoot/usr/bin /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
-  cp -pf "/usr/sbin/scaling.sh" "/tmpRoot/usr/sbin/"
+  cp -pf /usr/sbin/scaling.sh /tmpRoot/usr/sbin/scaling.sh
 
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/cpufreqscaling.service"
 [Unit]
@@ -22,7 +22,7 @@ After=multi-user.target
 Type=oneshot
 RemainAfterExit=yes
 Restart=no
-ExecStart=-/usr/sbin/scaling.sh
+ExecStart=/usr/sbin/scaling.sh
 
 [Install]
 WantedBy=multi-user.target
