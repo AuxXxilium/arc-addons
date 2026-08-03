@@ -251,8 +251,7 @@ elif [ "${1}" = "late" ]; then
   # SynoInitEth syno-oob-check-status syno_update_disk_logs syno-nic-supported-check syno-switch-check
   mkdir -vp /tmpRoot/usr/lib/systemd/system
   rm -f /tmpRoot/usr/lib/modules-load.d/70-network*.conf
-  # rm -f /tmpRoot/usr/lib/modules-load.d/70-net-kernel.conf
-  sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
+  sed -i 's|^ExecStart=/|ExecStart=-/|g' /tmpRoot/usr/lib/systemd/system/systemd-modules-load.service 2>/dev/null
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/SynoInitEth.service 2>/dev/null
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno-oob-check-status.service 2>/dev/null
   sed -i 's|ExecStart=.*|ExecStart=/bin/true|g' /tmpRoot/usr/lib/systemd/system/syno_update_disk_logs.service 2>/dev/null
@@ -290,7 +289,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/arc-misc.sh"
+    echo "ExecStart=/usr/bin/arc-misc.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
@@ -313,7 +312,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/arc-once.sh"
+    echo "ExecStart=/usr/bin/arc-once.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
@@ -334,7 +333,7 @@ elif [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
-    echo "ExecStart=-/usr/bin/wol.sh"
+    echo "ExecStart=/usr/bin/wol.sh"
     echo
     echo "[Install]"
     echo "WantedBy=multi-user.target"
@@ -342,15 +341,4 @@ elif [ "${1}" = "late" ]; then
 
   mkdir -p /tmpRoot/usr/lib/systemd/system/multi-user.target.wants
   ln -vsf /usr/lib/systemd/system/wol.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/wol.service
-
-  #AA_SH="/tmpRoot/usr/syno/etc/rc.sysv/apparmor.sh"
-  #AA_ANCHOR="apparmor_add_packages_profile() {"
-  #if [ -f "${AA_SH}" ] && ! grep -A1 -F "${AA_ANCHOR}" "${AA_SH}" | grep -q "is_apparmor_loaded"; then
-  #  echo "Patching apparmor_add_packages_profile() to skip when AppArmor isn't loaded"
-  #  AA_TMP="${AA_SH}.tmp"
-  #  awk -v anchor="${AA_ANCHOR}" '
-  #    { print }
-  #    index($0, anchor) == 1 { print "\tif ! is_apparmor_loaded ; then"; print "\t\treturn 0"; print "\tfi" }
-  #  ' "${AA_SH}" >"${AA_TMP}" && cat "${AA_TMP}" >"${AA_SH}" && rm -f "${AA_TMP}"
-  #fi
 fi
