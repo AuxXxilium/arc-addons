@@ -8,7 +8,7 @@
 
 # Fan curve — three temperature points, one column per mode:
 #
-#          fullfan        coolfan        quietfan
+#          fullfan        coolfan        silentfan
 #        temp  pwm%     temp  pwm%     temp  pwm%
 DEFCURVE_MIN="20 50  20 30  20 20"
 DEFCURVE_MID="35 75  40 50  45 30"
@@ -23,7 +23,7 @@ CURVE_MID="${DEFCURVE_MID}"
 CURVE_MAX="${DEFCURVE_MAX}"
 FANMODES=()
 
-# Fan mode index: 0=fullfan, 1=coolfan, 2=quietfan. This is a single global DSM setting
+# Fan mode index: 0=fullfan, 1=coolfan, 2=silentfan. This is a single global DSM setting
 # (synoinfo fan_config_type_internal) with exactly these three options — it selects which
 # column of the curve every fan uses, and is never set per-fan. Per-fan tuning is done with
 # the CURVE_*_<key> row overrides instead. Coolfan is the default when DSM has no valid value.
@@ -182,7 +182,7 @@ update_task() {
   local operation
   operation='# Fan curve — edit the values below to change fan behavior:
 #
-#          fullfan        coolfan        quietfan
+#          fullfan        coolfan        silentfan
 #        temp  pwm%     temp  pwm%     temp  pwm%
 CURVE_MIN="'"${CURVE_MIN}"'"
 CURVE_MID="'"${CURVE_MID}"'"
@@ -292,7 +292,7 @@ hwmon_platform() {
 # Compute MINTEMP/MIDTEMP/MAXTEMP + PWM_MIN/MID/MAX (0-255) for one fan at the given mode
 # index, honoring that fan's CURVE_*_<key> override if set. Results are echoed as a single
 # "MINTEMP MIDTEMP MAXTEMP PWM_MIN PWM_MID PWM_MAX" line for the caller to read into vars.
-# $1: mode index (0=fullfan, 1=coolfan, 2=quietfan), $2: fan curve key (chip_pwmN)
+# $1: mode index (0=fullfan, 1=coolfan, 2=silentfan), $2: fan curve key (chip_pwmN)
 fan_mode_curve() {
   local MIDX="${1}" key="${2}"
   local mn mid mx
@@ -320,7 +320,7 @@ fan_mode_curve() {
 
 # Generate /etc/fan2go/fan2go.yaml from FAN_CHANNELS + active mode index, using each fan's
 # own curve (CURVE_*_<key> override if set, else the global CURVE_MIN/MID/MAX).
-# $1: mode index (0=fullfan, 1=coolfan, 2=quietfan)
+# $1: mode index (0=fullfan, 1=coolfan, 2=silentfan)
 generate_fan2go_config() {
   local MIDX="${1:-${DEFAULT_FANMODE}}"
   [ "${#FANMODES[@]}" -eq 0 ] && derive_curve_vars
@@ -588,13 +588,47 @@ start_fan2go() {
   restart_fan2go
 }
 
+# Map DSM's fan_config_type_internal to a curve column index.
+#
+# The vocabulary here is DSM's, not ours, and it varies by model and DSM version. The
+# quiet setting in particular is written as "silentfan" on DSM 7.x — which the older
+# "quietfan|low" list did not match, so it fell through to DEFAULT_FANMODE (coolfan) and
+# the user's quiet selection never took effect. Keep every known spelling of each mode
+# here; an unrecognized value is reported once rather than silently defaulting, so the
+# next unknown spelling is visible in the log instead of presenting as "the mode doesn't
+# stick".
+#
+# Echoes "<mode index> <raw value>" so the caller can report an unrecognized value without
+# this function keeping state: it runs in a command substitution, so any variable it set
+# would be lost with the subshell and the warning would repeat on every tick.
 fantype_to_mode() {
-  case "$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)" in
-    fullfan | full)  echo "0" ;;
-    coolfan | high)  echo "1" ;;
-    quietfan | low)  echo "2" ;;
-    *)               echo "${DEFAULT_FANMODE}" ;;
+  local raw
+  raw="$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)"
+  case "${raw}" in
+    fullfan | fullfanspeed | full | maxfan | max)
+      echo "0 ${raw}" ;;
+    coolfan | coolmode | cool | high | middlefan | middle)
+      echo "1 ${raw}" ;;
+    silentfan | silentmode | silent | quietfan | quietmode | quiet | lownoise | low)
+      echo "2 ${raw}" ;;
+    *)
+      echo "${DEFAULT_FANMODE} ?${raw}" ;;
   esac
+}
+
+# Resolve the current fan mode index into the variable named by $1, warning once per
+# distinct unrecognized fan_config_type_internal value (tracked in _FANTYPE_WARNED).
+_FANTYPE_WARNED=""
+read_fan_mode() {
+  local _out_var="${1}" _idx _raw
+  read -r _idx _raw <<<"$(fantype_to_mode)"
+  if [ "${_raw#\?}" != "${_raw}" ]; then
+    if [ "${_FANTYPE_WARNED}" != "${_raw}" ]; then
+      _FANTYPE_WARNED="${_raw}"
+      echo "arc-sensors: unknown fan_config_type_internal '${_raw#\?}', using default mode ${DEFAULT_FANMODE}" >&2
+    fi
+  fi
+  printf -v "${_out_var}" '%s' "${_idx}"
 }
 
 main() {
@@ -602,7 +636,8 @@ main() {
 
   trap 'reload_config' HUP
 
-  FanBaseMode="$(fantype_to_mode)"
+  read_fan_mode FanBaseMode
+  echo "Fan mode at start: ${FanBaseMode} (0=fullfan 1=coolfan 2=silentfan)"
 
   if init_fans; then
     FansActive=1
@@ -642,7 +677,7 @@ main() {
     # write it via a temp-file-then-rename dance, and gating on mtime risks
     # permanently missing an update if the gate's mtime snapshot races it).
     local FanCurtMode
-    FanCurtMode="$(fantype_to_mode)"
+    read_fan_mode FanCurtMode
 
     if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
       echo "Fan mode changed to ${FanCurtMode}"
