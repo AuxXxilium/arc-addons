@@ -37,6 +37,11 @@ FANMODES=()
 # DSM to show it at all (see set_fan_conf).
 DEFAULT_FANMODE=1
 
+# Curve column to use, set via FANMODE in the DB task and read by read_fan_mode. Empty
+# means "not set", in which case the mode falls back to DSM's fan_config_type_internal and
+# then to DEFAULT_FANMODE.
+FANMODE=""
+
 # Space-separated list of fan_curve_key() identifiers (e.g. "nct6775_pwm2") to leave under
 # BIOS/hardware automatic control instead of fan2go. Set via FAN_EXCLUDE in the DB task.
 FAN_EXCLUDE=""
@@ -189,6 +194,7 @@ load_task() {
   CURVE_MID="${DEFCURVE_MID}"
   CURVE_MAX="${DEFCURVE_MAX}"
   FAN_EXCLUDE=""
+  FANMODE=""
 
   # Clear per-fan overrides from any previous load so removed/renamed entries don't linger.
   local _stale
@@ -208,7 +214,7 @@ load_task() {
     while IFS= read -r _line; do
       case "${_line}" in
         ''|'#'*) continue ;;
-        CURVE_MIN=*|CURVE_MID=*|CURVE_MAX=*|CURVE_MIN_*=*|CURVE_MID_*=*|CURVE_MAX_*=*|FAN_EXCLUDE=*) ;;
+        CURVE_MIN=*|CURVE_MID=*|CURVE_MAX=*|CURVE_MIN_*=*|CURVE_MID_*=*|CURVE_MAX_*=*|FAN_EXCLUDE=*|FANMODE=*) ;;
         *) continue ;;
       esac
       if ! eval "${_line}" 2>/dev/null; then
@@ -218,6 +224,13 @@ load_task() {
     done <<<"${OP}"
     [ "${_err}" -eq 1 ] && echo "arc-sensors: some fan curve settings were skipped, check the 'Fancontrol 2.0' task" >&2
     [[ "${FAN_EXCLUDE}" =~ ^[A-Za-z0-9_\ ]*$ ]] || FAN_EXCLUDE=""
+
+    # Anything outside 0-2 would index past the end of FANMODES and produce an empty curve,
+    # so report it and fall back rather than running the fans off a garbage config.
+    if [ -n "${FANMODE}" ] && ! [[ "${FANMODE}" =~ ^[0-2]$ ]]; then
+      echo "arc-sensors: FANMODE='${FANMODE}' is not 0, 1 or 2 - ignoring it" >&2
+      FANMODE=""
+    fi
 
     [[ "${CURVE_MIN}" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || CURVE_MIN="${DEFCURVE_MIN}"
     [[ "${CURVE_MID}" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || CURVE_MID="${DEFCURVE_MID}"
@@ -235,10 +248,17 @@ update_task() {
   [ "${exists:-0}" -gt 0 ] && return
 
   local operation
-  operation='# Fan curve — edit the values below to change fan behavior.
+  operation='# Fan control — edit the values below to change fan behavior.
 #
-# One column per DSM Fan Speed Mode (Control Panel > Hardware & Power > General).
-# Each row is a "temperature pwm%" pair for that mode.
+# Which curve column is used. Set this to pick the fan profile:
+#   0 = Full-speed    1 = Cool (default)    2 = Quiet
+#
+# DSM Control Panel also has a Fan Speed Mode selector, but on this hardware applying it
+# writes nothing to disk, so it cannot be read back and has no effect. Set FANMODE here
+# instead - it lives in this task, so it survives a reboot.
+FANMODE="'"${DEFAULT_FANMODE}"'"
+#
+# One "temperature pwm%" pair per mode, per row.
 #
 #           Full-speed   Cool        Quiet
 #           temp  pwm%   temp  pwm%  temp  pwm%
@@ -360,11 +380,13 @@ fan_mode_curve() {
   derive_curve_vars "${mn}" "${mx}"
   FANMODES_LOCAL=("${FANMODES[@]}")
 
-  local FANMODE="${FANMODES_LOCAL[${MIDX}]}"
+  # Named _MODE_RANGE, not FANMODE: FANMODE is the global holding the task's mode index,
+  # and shadowing it here would hide that value from anything called further down.
+  local _MODE_RANGE="${FANMODES_LOCAL[${MIDX}]}"
   local MINTEMP MIDTEMP MAXTEMP
   local _tempcol=$(( MIDX * 2 + 1 ))
-  MINTEMP="$(echo "${FANMODE}" | cut -d' ' -f1)"
-  MAXTEMP="$(echo "${FANMODE}" | cut -d' ' -f2)"
+  MINTEMP="$(echo "${_MODE_RANGE}" | cut -d' ' -f1)"
+  MAXTEMP="$(echo "${_MODE_RANGE}" | cut -d' ' -f2)"
   MIDTEMP="$(echo "${mid}" | awk "{print \$${_tempcol}}")"
 
   local _pwmcol=$(( MIDX * 2 + 2 ))
@@ -690,11 +712,23 @@ fantype_to_mode() {
 _FANTYPE_WARNED=""
 read_fan_mode() {
   local _out_var="${1}" _idx _raw
+
+  # FANMODE from the 'Fancontrol 2.0' task wins when set. DSM's Control Panel selector
+  # writes nothing on this hardware - applying a Fan Speed Mode leaves synoinfo.conf and
+  # every file under /etc, /etc.defaults and /usr/syno/etc untouched - so synoinfo alone
+  # leaves the mode pinned to DEFAULT_FANMODE and the other curve columns unreachable.
+  # The task lives in the esynoscheduler DB, so a value set there survives reboots.
+  if [[ "${FANMODE}" =~ ^[0-2]$ ]]; then
+    printf -v "${_out_var}" '%s' "${FANMODE}"
+    return
+  fi
+
   read -r _idx _raw <<<"$(fantype_to_mode)"
   if [ "${_raw#\?}" != "${_raw}" ]; then
     if [ "${_FANTYPE_WARNED}" != "${_raw}" ]; then
       _FANTYPE_WARNED="${_raw}"
-      echo "arc-sensors: unknown fan_config_type_internal '${_raw#\?}', using default mode ${DEFAULT_FANMODE}" >&2
+      echo "arc-sensors: no fan mode set (FANMODE in the 'Fancontrol 2.0' task, or DSM's" >&2
+      echo "arc-sensors: fan_config_type_internal), using default mode ${DEFAULT_FANMODE}" >&2
     fi
   fi
   printf -v "${_out_var}" '%s' "${_idx}"
@@ -705,12 +739,16 @@ main() {
 
   trap 'reload_config' HUP
 
-  read_fan_mode FanBaseMode
-  echo "Fan mode at start: ${FanBaseMode} (0=Full-speed/fullfan, 1=Cool/coolfan, 2=Quiet/quietfan)"
-
+  # Resolve the mode only after init_fans, since it runs load_task and that is what
+  # populates FANMODE. Reading it earlier would always see an empty FANMODE and fall back
+  # to synoinfo, so a mode set in the task would not apply until the first reload.
   if init_fans; then
     FansActive=1
+    read_fan_mode FanBaseMode
+    echo "Fan mode at start: ${FanBaseMode} (0=Full-speed/fullfan, 1=Cool/coolfan, 2=Quiet/quietfan)"
     start_fan2go "${FanBaseMode}"
+  else
+    read_fan_mode FanBaseMode
   fi
 
   while true; do
@@ -734,6 +772,9 @@ main() {
       RELOAD_NEEDED=0
       rm -f "${RELOAD_FLAG}"
       load_task
+      # load_task may have brought in a new FANMODE, so re-resolve before regenerating
+      # rather than reusing the mode this loop started with.
+      read_fan_mode FanBaseMode
       restore_excluded_pwm_enable
       discover_fans
       save_fan_channels
@@ -742,16 +783,19 @@ main() {
       continue
     fi
 
-    # Mode change: read synoinfo.conf every tick (no mtime gate - DSM may
-    # write it via a temp-file-then-rename dance, and gating on mtime risks
-    # permanently missing an update if the gate's mtime snapshot races it).
+    # Mode change: re-read the task and synoinfo every tick. load_task is what refreshes
+    # FANMODE, so it has to run here too - otherwise a mode edited in the 'Fancontrol 2.0'
+    # task would sit unnoticed until something else triggered a reload. No mtime gate on
+    # either source: DSM may write synoinfo.conf via a temp-file-then-rename dance, and
+    # gating on mtime risks permanently missing an update if the snapshot races it.
     local FanCurtMode
+    load_task
     read_fan_mode FanCurtMode
 
     if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
       echo "Fan mode changed to ${FanCurtMode}"
       FanBaseMode="${FanCurtMode}"
-      load_task
+      # load_task already ran above, so the curves are current.
       generate_fan2go_config "${FanBaseMode}"
       restart_fan2go
     fi
