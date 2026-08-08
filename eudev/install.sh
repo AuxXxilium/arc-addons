@@ -30,19 +30,18 @@ elif [ "${1}" = "modules" ]; then
   # /usr/lib/modules/update, throwing away the very i915.ko that supports the GPU.
   GPU="$(lspci -n 2>/dev/null | grep -E ' 03[0-9a-fA-F]{2}: 8086:[0-9a-fA-F]{4}' \
     | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
+  # i915.ko ships only in /usr/lib/modules/update, never at the module root, so the update
+  # copy is the only one to test. Install the whole directory when it supports this GPU -
+  # the accompanying DRM stack (drm, drm_kms_helper, ttm, ...) is built against it and has
+  # to move with it - and drop it otherwise so a mismatched i915 cannot bind.
   if [ -f "/usr/lib/modules/update/i915.ko" ] && [ -n "${GPU}" ]; then
-    PCI="pci:v0000$(echo "${GPU:-}" | cut -c1-4)d0000$(echo "${GPU:-}" | cut -c5-8)"
-    if modinfo -F alias "/usr/lib/modules/i915.ko" 2>/dev/null | grep -iq "${PCI}"; then
-      echo "base i915.ko supports ${GPU}"
-      rm -rf /usr/lib/modules/update 2>/dev/null || true
+    PCI="pci:v0000$(echo "${GPU}" | cut -c1-4)d0000$(echo "${GPU}" | cut -c5-8)"
+    if modinfo -F alias "/usr/lib/modules/update/i915.ko" 2>/dev/null | grep -iq "${PCI}"; then
+      echo "eudev: i915 support ${GPU}"
+      mv -vf /usr/lib/modules/update/* /usr/lib/modules/ 2>/dev/null
     else
-      if modinfo -F alias "/usr/lib/modules/update/i915.ko" 2>/dev/null | grep -iq "${PCI}"; then
-        echo "update i915.ko supports ${GPU}"
-        mv -vf /usr/lib/modules/update/* /usr/lib/modules/ 2>/dev/null
-      else
-        echo "No i915.ko supports ${GPU}"
-        rm -rf /usr/lib/modules/update 2>/dev/null || true
-      fi
+      echo "eudev: i915 does not support ${GPU}"
+      rm -rf /usr/lib/modules/update 2>/dev/null || true
     fi
   else
     rm -rf /usr/lib/modules/update 2>/dev/null || true
