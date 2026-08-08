@@ -23,8 +23,14 @@ if [ "${1}" = "early" ]; then
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
-  if [ -f "/usr/lib/modules/update/i915.ko" ] && lspci -nd ::300 2>/dev/null | grep -Eq '8086:[0-9a-fA-F]{4}'; then
-    GPU="$(lspci -nd ::300 2>/dev/null | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
+  # Match the whole PCI display class (03), not just subclass 0300 "VGA compatible
+  # controller". Modern Intel iGPUs report 0380 "Display controller" instead - a Raptor
+  # Lake-S UHD (8086:a782) shows up as class 0380 - and some report 0302. With the old
+  # "-nd ::300" filter those systems fell into the else branch below, which deletes
+  # /usr/lib/modules/update, throwing away the very i915.ko that supports the GPU.
+  GPU="$(lspci -n 2>/dev/null | grep -E ' 03[0-9a-fA-F]{2}: 8086:[0-9a-fA-F]{4}' \
+    | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
+  if [ -f "/usr/lib/modules/update/i915.ko" ] && [ -n "${GPU}" ]; then
     PCI="pci:v0000$(echo "${GPU:-}" | cut -c1-4)d0000$(echo "${GPU:-}" | cut -c5-8)"
     if modinfo -F alias "/usr/lib/modules/i915.ko" 2>/dev/null | grep -iq "${PCI}"; then
       echo "base i915.ko supports ${GPU}"

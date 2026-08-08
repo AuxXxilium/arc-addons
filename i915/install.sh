@@ -25,7 +25,11 @@ if [ "${1}" = "patches" ]; then
   if [ -n "${2}" ]; then
     GPU="$(echo "${2}" | sed 's/://g; s/.*/\L&/')"
   else
-    GPU="$(lspci -nd ::300 2>/dev/null | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
+    # Match the whole PCI display class (03), not just subclass 0300 "VGA compatible
+    # controller" - modern Intel iGPUs report 0380 "Display controller" (e.g. Raptor
+    # Lake-S UHD 8086:a782) and would otherwise not be detected at all.
+    GPU="$(lspci -n 2>/dev/null | grep -E ' 03[0-9a-fA-F]{2}: 8086:[0-9a-fA-F]{4}' \
+      | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
     grep -iq "${GPU}" "/addons/i915ids" 2>/dev/null || GPU=""
   fi
   if [ -z "${GPU}" ] || [ "$(printf "%b" "${GPU}" | wc -c)" -ne 8 ]; then
