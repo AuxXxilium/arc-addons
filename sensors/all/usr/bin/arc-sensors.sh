@@ -30,16 +30,17 @@ FANMODES=()
 # 2="Quiet mode" (quietfan). It selects which column of the curve every fan uses, and is
 # never set per-fan — per-fan tuning is done with the CURVE_*_<key> row overrides instead.
 #
-# The mode comes from synoinfo fan_config_type_internal, which DSM's AdminCenter module
-# sets to one of fullfan/coolfan/quietfan/highfan/lowfan. Note that on a Test-i5 box the
-# key was absent and applying a Fan Speed Mode left synoinfo.conf byte-identical, so
-# DEFAULT_FANMODE is what actually ran there; the selector needs supportadt7490 set for
-# DSM to show it at all (see set_fan_conf).
+# The mode comes from FANMODE in the 'Fancontrol 2.0' task, which is the only place it is
+# stored. synoinfo's fan_config_type_internal is read once as a fallback, for platforms
+# whose DSM populates it, and is never written. DSM's own Fan Speed Mode selector is not a
+# source: applying a mode there writes nothing, and the selector does not reflect the key
+# either (it showed "Quiet" while the key said fullfan and the fan ran at pwm 222), which
+# is why set_fan_conf no longer enables the flags that display it.
 DEFAULT_FANMODE=1
 
 # Curve column to use, set via FANMODE in the DB task and read by read_fan_mode. Empty
-# means "not set", in which case the mode falls back to DSM's fan_config_type_internal and
-# then to DEFAULT_FANMODE.
+# means "not set", in which case the mode falls back to synoinfo's
+# fan_config_type_internal and then to DEFAULT_FANMODE.
 FANMODE=""
 
 # Space-separated list of fan_curve_key() identifiers (e.g. "nct6775_pwm2") to leave under
@@ -86,25 +87,31 @@ apply_amd_tctl_offset() {
   fi
 }
 
-# supportadt7490 has to stay enabled: DSM hides the Fan Speed Mode selector in Control
-# Panel entirely without it. It does mean scemd still believes there is an ADT7490 to
-# drive, so strip_scemd_fan_config() below removes the pwm/fan mappings that would let it
-# reach the same channels fan2go owns.
+# Only support_fan is set, which is what makes DSM show fan speed and temperature.
+#
+# supportadt7490 and support_fan_adjust_dual_mode are deliberately left alone (they
+# default to "no"). Both render Control Panel selectors that do nothing here: DSM neither
+# writes fan_config_type_internal when one is applied nor reads it back to show the
+# current state, so the selector displayed "Quiet" while the key said fullfan and the fan
+# was running at pwm 222. A control that reports the wrong profile and cannot change it is
+# worse than no control - the fan mode lives in FANMODE in the 'Fancontrol 2.0' task
+# instead. None of these keys affect fan control itself: discovery, pwm ownership and the
+# curve all come from sysfs and that task, never from synoinfo.
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-    for K in "support_fan" "support_fan_adjust_dual_mode" "supportadt7490"; do
-      /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-"no"}"
-    done
+    /usr/syno/bin/synosetkeyvalue "${F}" "support_fan" "${1:-"no"}"
   done
 }
 
 SCEMD_XML="/usr/syno/etc/scemd.xml"
 
 # Empty the <adt_fan_config> blocks in scemd.xml so scemd has no pwm channel or fan mapping
-# to act on. supportadt7490 must stay set for DSM to show the Fan Speed Mode selector, but
-# with it set scemd would otherwise drive the very pwm channels fan2go controls (the stock
-# file maps pwm2 to the internal fan, which is the same channel discover_fans finds), and
-# the two would fight over the same registers.
+# to act on. The stock file maps pwm2 to the internal fan, which is the same channel
+# discover_fans claims, so the two would be driving one register.
+#
+# Belt and braces: set_fan_conf no longer enables supportadt7490, so scemd should not take
+# the ADT path at all, and it was never actually seen fighting fan2go (pwm*_enable stayed
+# 1 and the pwm value tracked our curve). This only removes a way for that to start.
 #
 # Only the <adt_fan_config> elements are touched. The <fan_config hw_version="Synology-...">
 # entries further down describe eBox/expansion units, which we do not control, and the
@@ -253,9 +260,9 @@ update_task() {
 # Which curve column is used. Set this to pick the fan profile:
 #   0 = Full-speed    1 = Cool (default)    2 = Quiet
 #
-# Kept in step with DSM: if Control Panel > Hardware & Power writes a Fan Speed Mode,
-# that value is copied back here, and arc-control writes both at once. Editing this line
-# by hand works too - it lives in this task, so the choice survives a reboot.
+# Set it in arc-control, or edit this line - either way it lives in this task, so the
+# choice survives a reboot. DSM Control Panel has no working Fan Speed Mode selector on
+# this hardware (it neither saves nor displays the real mode), so it is not shown.
 FANMODE="'"${DEFAULT_FANMODE}"'"
 #
 # One "temperature pwm%" pair per mode, per row.
@@ -634,8 +641,7 @@ init_fans() {
   fi
 
   set_fan_conf "yes"
-  # set_fan_conf leaves supportadt7490 on so DSM keeps showing the Fan Speed Mode selector,
-  # so take scemd's fan mappings away before claiming the pwm channels below.
+  # Take scemd's fan mappings away before claiming the pwm channels below.
   strip_scemd_fan_config
 
   # Load FAN_EXCLUDE (+ curves) before touching pwm*_enable so excluded fans are left
@@ -707,10 +713,11 @@ fantype_to_mode() {
   esac
 }
 
-# Write mode index $1 into the 'Fancontrol 2.0' task's FANMODE line, so a mode picked in
-# DSM survives a reboot. Only that one line is touched: the curves, comments and per-fan
-# CURVE_*_<key> overrides around it are the user's and must come through untouched, which
-# is also why this rewrites the existing operation text instead of regenerating it.
+# Write mode index $1 into the 'Fancontrol 2.0' task's FANMODE line, used to adopt a mode
+# from synoinfo into the task once. Only that one line is touched: the curves, comments
+# and per-fan CURVE_*_<key> overrides around it are the user's and must come through
+# untouched, which is why this rewrites the existing operation text rather than
+# regenerating it.
 persist_fan_mode() {
   local _mode="${1}"
   [[ "${_mode}" =~ ^[0-2]$ ]] || return 0
@@ -743,40 +750,28 @@ _FANTYPE_WARNED=""
 read_fan_mode() {
   local _out_var="${1}" _idx _raw
 
-  # There are two writers of the mode and they have to converge on one value:
+  # FANMODE in the 'Fancontrol 2.0' task is the one store, so it wins outright. Nothing
+  # writes synoinfo's fan_config_type_internal any more - not arc-control, and not DSM,
+  # whose Fan Speed Mode selector neither saves to that key nor displays it, which is why
+  # set_fan_conf stopped enabling the flags that render it.
   #
-  #   arc-control  writes FANMODE into the 'Fancontrol 2.0' task AND mirrors it into
-  #                synoinfo's fan_config_type_internal, so both agree immediately.
-  #   DSM          may write only fan_config_type_internal, from Control Panel's Fan
-  #                Speed Mode selector, leaving the task stale.
-  #
-  # So a *recognized* synoinfo value is taken as the newer intent and copied back into
-  # the task, which is what makes a DSM-side change stick across a reboot. When the two
-  # already agree - the normal case after an arc-control save - nothing is written.
-  #
-  # Note this hardware does not appear to write the key at all (applying a mode in
-  # Control Panel leaves synoinfo.conf and every file under /etc, /etc.defaults and
-  # /usr/syno/etc untouched), in which case fantype_to_mode reports it as unset and the
-  # task's FANMODE below is what runs.
-  read -r _idx _raw <<<"$(fantype_to_mode)"
-
-  if [ "${_raw#\?}" = "${_raw}" ]; then
-    # synoinfo holds a mode we understand.
-    if [[ "${FANMODE}" =~ ^[0-2]$ ]] && [ "${FANMODE}" != "${_idx}" ]; then
-      echo "arc-sensors: fan mode changed in DSM to '${_raw}' (${_idx}), updating the task"
-      persist_fan_mode "${_idx}"
-    elif ! [[ "${FANMODE}" =~ ^[0-2]$ ]]; then
-      # Task has no mode yet - adopt DSM's so the two stay in step from here on.
-      persist_fan_mode "${_idx}"
-    fi
-    FANMODE="${_idx}"
-    printf -v "${_out_var}" '%s' "${_idx}"
+  # The key is still read once, but only when the task has no mode: that adopts a value
+  # from a platform whose DSM does populate it, and persist_fan_mode writes it into the
+  # task so the lookup does not repeat. Keeping a second copy in sync was the alternative,
+  # and it could only drift from the task and then override it.
+  if [[ "${FANMODE}" =~ ^[0-2]$ ]]; then
+    printf -v "${_out_var}" '%s' "${FANMODE}"
     return
   fi
 
-  # synoinfo unset or a value that is not a fan-aggressiveness mode: the task decides.
-  if [[ "${FANMODE}" =~ ^[0-2]$ ]]; then
-    printf -v "${_out_var}" '%s' "${FANMODE}"
+  read -r _idx _raw <<<"$(fantype_to_mode)"
+
+  # Task has no mode but DSM has one: adopt it and record it in the task, so this is a
+  # one-time migration rather than a lookup repeated forever.
+  if [ "${_raw#\?}" = "${_raw}" ]; then
+    persist_fan_mode "${_idx}"
+    FANMODE="${_idx}"
+    printf -v "${_out_var}" '%s' "${_idx}"
     return
   fi
 
