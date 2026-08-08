@@ -6,13 +6,16 @@
 # See /LICENSE for more information.
 #
 
-# Fan curve — three temperature points, one column per mode:
+# Fan curve — three temperature points, one column per mode. Column names are DSM's own
+# fan_config_type_internal values; the headings are the labels Control Panel shows for them
+# ("Full-speed mode" / "Cool mode", from webman/texts/enu/strings rcfancontrol_*).
 #
-#          fullfan        coolfan        silentfan
-#        temp  pwm%     temp  pwm%     temp  pwm%
-DEFCURVE_MIN="20 50  20 30  20 20"
-DEFCURVE_MID="35 75  40 50  45 30"
-DEFCURVE_MAX="50 100 60 70  70 50"
+#              Full-speed   Cool
+#               (fullfan)   (coolfan)
+#              temp  pwm%   temp  pwm%
+DEFCURVE_MIN="20 50  20 30"
+DEFCURVE_MID="35 75  40 50"
+DEFCURVE_MAX="50 100 60 70"
 
 # Runtime curve state — overridden by load_task from DB values.
 # Per-fan overrides use variables named CURVE_MIN_<key>/CURVE_MID_<key>/CURVE_MAX_<key>,
@@ -23,10 +26,16 @@ CURVE_MID="${DEFCURVE_MID}"
 CURVE_MAX="${DEFCURVE_MAX}"
 FANMODES=()
 
-# Fan mode index: 0=fullfan, 1=coolfan, 2=silentfan. This is a single global DSM setting
-# (synoinfo fan_config_type_internal) with exactly these three options — it selects which
-# column of the curve every fan uses, and is never set per-fan. Per-fan tuning is done with
-# the CURVE_*_<key> row overrides instead. Coolfan is the default when DSM has no valid value.
+# Fan mode index: 0="Full-speed mode" (fullfan), 1="Cool mode" (coolfan). It selects which
+# column of the curve every fan uses, and is never set per-fan — per-fan tuning is done
+# with the CURVE_*_<key> row overrides instead.
+#
+# The mode comes from synoinfo fan_config_type_internal, which DSM's AdminCenter module
+# sets to one of fullfan/coolfan/quietfan/highfan/lowfan. On the systems this addon targets
+# that key is absent: applying a Fan Speed Mode in Control Panel leaves synoinfo.conf
+# byte-identical (scemd resolves it internally against the DUAL_MODE_LOW/DUAL_MODE_HIGH
+# blocks in /usr/syno/etc/scemd.xml), so coolfan below is what actually runs. Reading the
+# key still matters for platforms that do write it.
 DEFAULT_FANMODE=1
 
 # Space-separated list of fan_curve_key() identifiers (e.g. "nct6775_pwm2") to leave under
@@ -73,9 +82,14 @@ apply_amd_tctl_offset() {
   fi
 }
 
+# supportadt7490 advertises an ADT7490 hardware fan controller that these systems do not
+# have. With it set, scemd drives the same pwm channel fan2go owns (see the pwm_config /
+# fan_mapping_config entries in /usr/syno/etc/scemd.xml), so it is forced off here
+# regardless of the caller's value. support_fan and support_fan_adjust_dual_mode still
+# follow $1 — they control whether DSM shows fan speed/temperature at all.
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-    for K in "support_fan" "support_fan_adjust_dual_mode" "supportadt7490"; do
+    for K in "support_fan" "support_fan_adjust_dual_mode"; do
       /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-"no"}"
     done
   done
@@ -95,7 +109,6 @@ derive_curve_vars() {
   FANMODES=(
     "$(echo "${mn}" | awk '{print $1}') $(echo "${mx}" | awk '{print $1}')"
     "$(echo "${mn}" | awk '{print $3}') $(echo "${mx}" | awk '{print $3}')"
-    "$(echo "${mn}" | awk '{print $5}') $(echo "${mx}" | awk '{print $5}')"
   )
 }
 
@@ -121,7 +134,7 @@ fan_is_excluded() {
 curve_for_fan_key() {
   local key="${1}"
   local -n _min="CURVE_MIN_${key}" _mid="CURVE_MID_${key}" _max="CURVE_MAX_${key}"
-  local pattern='^[0-9]+ +[0-9]+ +[0-9]+ +[0-9]+ +[0-9]+ +[0-9]+$'
+  local pattern='^[0-9]+ +[0-9]+ +[0-9]+ +[0-9]+$'
   if [[ "${_min:-}" =~ ${pattern} ]] && [[ "${_mid:-}" =~ ${pattern} ]] && [[ "${_max:-}" =~ ${pattern} ]]; then
     echo "${_min}|${_mid}|${_max}"
   else
@@ -164,9 +177,21 @@ load_task() {
     done <<<"${OP}"
     [ "${_err}" -eq 1 ] && echo "arc-sensors: some fan curve settings were skipped, check the 'Fancontrol 2.0' task" >&2
     [[ "${FAN_EXCLUDE}" =~ ^[A-Za-z0-9_\ ]*$ ]] || FAN_EXCLUDE=""
-    [[ "${CURVE_MIN}" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || CURVE_MIN="${DEFCURVE_MIN}"
-    [[ "${CURVE_MID}" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || CURVE_MID="${DEFCURVE_MID}"
-    [[ "${CURVE_MAX}" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || CURVE_MAX="${DEFCURVE_MAX}"
+
+    # A task written before the silentfan column was dropped still carries six fields per
+    # row. Those are rejected below and silently replaced by the defaults, which looks like
+    # a tuned curve reverting on its own, so say what happened and how to fix it.
+    if [[ "${CURVE_MIN}" =~ ^([0-9]+[[:space:]]+){5}[0-9]+$ ]] ||
+       [[ "${CURVE_MID}" =~ ^([0-9]+[[:space:]]+){5}[0-9]+$ ]] ||
+       [[ "${CURVE_MAX}" =~ ^([0-9]+[[:space:]]+){5}[0-9]+$ ]]; then
+      echo "arc-sensors: the 'Fancontrol 2.0' task still has the old 3-column (6 value) curve format." >&2
+      echo "arc-sensors: only Full-speed mode and Cool mode remain - drop the last two values from each CURVE_* row." >&2
+      echo "arc-sensors: using built-in defaults until then." >&2
+    fi
+
+    [[ "${CURVE_MIN}" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || CURVE_MIN="${DEFCURVE_MIN}"
+    [[ "${CURVE_MID}" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || CURVE_MID="${DEFCURVE_MID}"
+    [[ "${CURVE_MAX}" =~ ^[0-9]+\ +[0-9]+\ +[0-9]+\ +[0-9]+$ ]] || CURVE_MAX="${DEFCURVE_MAX}"
   fi
   derive_curve_vars
 }
@@ -180,10 +205,13 @@ update_task() {
   [ "${exists:-0}" -gt 0 ] && return
 
   local operation
-  operation='# Fan curve — edit the values below to change fan behavior:
+  operation='# Fan curve — edit the values below to change fan behavior.
 #
-#          fullfan        coolfan        silentfan
-#        temp  pwm%     temp  pwm%     temp  pwm%
+# One column per DSM Fan Speed Mode (Control Panel > Hardware & Power > General).
+# Each row is a "temperature pwm%" pair for that mode.
+#
+#           Full-speed   Cool
+#           temp  pwm%   temp  pwm%
 CURVE_MIN="'"${CURVE_MIN}"'"
 CURVE_MID="'"${CURVE_MID}"'"
 CURVE_MAX="'"${CURVE_MAX}"'"
@@ -292,7 +320,7 @@ hwmon_platform() {
 # Compute MINTEMP/MIDTEMP/MAXTEMP + PWM_MIN/MID/MAX (0-255) for one fan at the given mode
 # index, honoring that fan's CURVE_*_<key> override if set. Results are echoed as a single
 # "MINTEMP MIDTEMP MAXTEMP PWM_MIN PWM_MID PWM_MAX" line for the caller to read into vars.
-# $1: mode index (0=fullfan, 1=coolfan, 2=silentfan), $2: fan curve key (chip_pwmN)
+# $1: mode index (0=fullfan/Full-speed, 1=coolfan/Cool), $2: fan curve key (chip_pwmN)
 fan_mode_curve() {
   local MIDX="${1}" key="${2}"
   local mn mid mx
@@ -320,7 +348,7 @@ fan_mode_curve() {
 
 # Generate /etc/fan2go/fan2go.yaml from FAN_CHANNELS + active mode index, using each fan's
 # own curve (CURVE_*_<key> override if set, else the global CURVE_MIN/MID/MAX).
-# $1: mode index (0=fullfan, 1=coolfan, 2=silentfan)
+# $1: mode index (0=fullfan/Full-speed, 1=coolfan/Cool)
 generate_fan2go_config() {
   local MIDX="${1:-${DEFAULT_FANMODE}}"
   [ "${#FANMODES[@]}" -eq 0 ] && derive_curve_vars
@@ -590,13 +618,23 @@ start_fan2go() {
 
 # Map DSM's fan_config_type_internal to a curve column index.
 #
-# The vocabulary here is DSM's, not ours, and it varies by model and DSM version. The
-# quiet setting in particular is written as "silentfan" on DSM 7.x — which the older
-# "quietfan|low" list did not match, so it fell through to DEFAULT_FANMODE (coolfan) and
-# the user's quiet selection never took effect. Keep every known spelling of each mode
-# here; an unrecognized value is reported once rather than silently defaulting, so the
-# next unknown spelling is visible in the log instead of presenting as "the mode doesn't
-# stick".
+# The vocabulary is DSM's, not ours. The AdminCenter UI module emits exactly five values —
+# fullfan, coolfan, quietfan, highfan, lowfan — and the labels in webman/texts/enu/strings
+# show they are two different axes:
+#
+#   fullfan  "Full-speed mode"      loudest, always maximum
+#   coolfan  "Cool mode"            higher speed, cooler, more noise
+#   quietfan "Quiet mode"           lower speed, quieter, warmer
+#   highfan  '3.5" hard disk mode'  disk-type profile, not a noise level
+#   lowfan   '2.5" hard disk mode'  disk-type profile, not a noise level
+#
+# Only the first three describe fan aggressiveness. highfan/lowfan select a profile for the
+# installed disk type and say nothing about how hard to run the fan, so mapping them onto a
+# noise column would be a guess — they fall through to the default and get logged instead.
+#
+# The curve table has two columns (fullfan, coolfan), so quietfan maps onto coolfan, the
+# quieter of the two. Note DSM does not write this key at all on the systems this addon
+# targets; see the DEFAULT_FANMODE comment at the top of the file.
 #
 # Echoes "<mode index> <raw value>" so the caller can report an unrecognized value without
 # this function keeping state: it runs in a command substitution, so any variable it set
@@ -605,12 +643,10 @@ fantype_to_mode() {
   local raw
   raw="$(/bin/get_key_value /etc/synoinfo.conf fan_config_type_internal 2>/dev/null)"
   case "${raw}" in
-    fullfan | fullfanspeed | full | maxfan | max)
+    fullfan)
       echo "0 ${raw}" ;;
-    coolfan | coolmode | cool | high | middlefan | middle)
+    coolfan | quietfan)
       echo "1 ${raw}" ;;
-    silentfan | silentmode | silent | quietfan | quietmode | quiet | lownoise | low)
-      echo "2 ${raw}" ;;
     *)
       echo "${DEFAULT_FANMODE} ?${raw}" ;;
   esac
@@ -637,7 +673,7 @@ main() {
   trap 'reload_config' HUP
 
   read_fan_mode FanBaseMode
-  echo "Fan mode at start: ${FanBaseMode} (0=fullfan 1=coolfan 2=silentfan)"
+  echo "Fan mode at start: ${FanBaseMode} (0=Full-speed mode/fullfan, 1=Cool mode/coolfan)"
 
   if init_fans; then
     FansActive=1
