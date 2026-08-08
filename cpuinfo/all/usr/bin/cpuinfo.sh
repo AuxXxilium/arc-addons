@@ -136,11 +136,7 @@ _gpu_name_fallback() {
   fi
 }
 
-# Accumulate one JSON object per GPU into GPU_ELEMS (comma-joined). FIRST_*
-# captures the first GPU for the legacy DSM <= 7.3 single-object t.gpu path.
-GPU_ELEMS=""
 FIRST_NAME=""; FIRST_CLOCK=""; FIRST_MEMORY=""
-_append_gpu() { [ -z "${GPU_ELEMS}" ] && GPU_ELEMS="$1" || GPU_ELEMS="${GPU_ELEMS},$1"; }
 
 # 1. DRM cards (Intel i915 / AMD amdgpu). NVIDIA is skipped here and handled
 #    via nvidia-smi below, since its proprietary driver exposes no
@@ -167,15 +163,6 @@ for CARDN in /sys/class/drm/card[0-9]*; do
   [ -n "${LNAME}" ] && [ -n "${CLOCK}" ] && [ -n "${MEMORY}" ] || continue
   [ -z "${FIRST_NAME}" ] && { FIRST_NAME="${LNAME}"; FIRST_CLOCK="${CLOCK}"; FIRST_MEMORY="${MEMORY}"; }
   echo "GPU Info set to: \"${LNAME}\" \"${CLOCK}\" \"${MEMORY}\"${PCIDN:+ [${PCIDN}]}"
-  # built_in_gpu_slot_num keeps the iGPU labeled as the onboard GPU slot;
-  # discrete cards use pci_slot_num so Info Center shows a PCIe slot row.
-  if [ "${DRV}" = "i915" ] || [ -z "${PCIDN}" ]; then
-    _append_gpu "$(printf '{"name":"%s","status":"compatible","clock":"%s","memory":"%s","pci_slot_num":"","built_in_gpu_slot_num":"1","temperature_c":0,"tempwarn":false}' \
-      "$(_json_escape "${LNAME}")" "${CLOCK}" "${MEMORY}")"
-  else
-    _append_gpu "$(printf '{"name":"%s","status":"compatible","clock":"%s","memory":"%s","pci_slot_num":"%s","built_in_gpu_slot_num":"","temperature_c":0,"tempwarn":false}' \
-      "$(_json_escape "${LNAME}")" "${CLOCK}" "${MEMORY}" "${PCIDN}")"
-  fi
 done
 
 # 2. NVIDIA via nvidia-smi (proprietary driver). One row per GPU:
@@ -191,8 +178,6 @@ if command -v nvidia-smi >/dev/null 2>&1 && ls /dev/nvidia[0-9]* >/dev/null 2>&1
     NVNAME="NVIDIA ${NVN}"; NVCLOCK="${NVC:-0} MHz"; NVMEM="${NVM:-0} MiB"
     [ -z "${FIRST_NAME}" ] && { FIRST_NAME="${NVNAME}"; FIRST_CLOCK="${NVCLOCK}"; FIRST_MEMORY="${NVMEM}"; }
     echo "GPU Info (nvidia) set to: \"${NVNAME}\" \"${NVCLOCK}\" \"${NVMEM}\"${NVPCI:+ [${NVPCI}]}"
-    _append_gpu "$(printf '{"name":"%s","status":"compatible","clock":"%s","memory":"%s","pci_slot_num":"%s","built_in_gpu_slot_num":"","temperature_c":0,"tempwarn":false}' \
-      "$(_json_escape "${NVNAME}")" "${NVCLOCK}" "${NVMEM}" "${NVPCI:-}")"
   done < <(nvidia-smi --query-gpu=name,clocks.max.graphics,memory.total,pci.bus_id --format=csv,noheader,nounits 2>/dev/null)
 fi
 
@@ -202,7 +187,6 @@ if [ -n "${FIRST_NAME}" ]; then
     "s#t=this.getActiveApi(t);let#t=this.getActiveApi(t);t.gpu||(t.gpu={clock:\"${FIRST_CLOCK}\",memory:\"${FIRST_MEMORY}\",name:\"$(_json_escape "${FIRST_NAME}")\"});let#g"
 fi
 
-if [ "${MEV}" = "physical" ]; then
   LEGACY_SYS_TEMP_PATCHED=0
   if grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
     applyPatch "nvidia GPU support flag (_D(\"support_nvidia_gpu\")})" '_D("support_nvidia_gpu")},' \
@@ -219,6 +203,12 @@ if [ "${MEV}" = "physical" ]; then
   else
     echo "cpuinfo: sys_temp — pattern ',t,i,X)' not found, skipping"
   fi
+
+  applyPatch "PCIe slot vendor prefix (Synology \${r.cardName})" '`Synology ${r\.cardName}`' \
+    's#`Synology ${r\.cardName}`#`${r.cardName}`#g'
+
+  applyPatch "DSM 7.4 GPU section gate (b.support_gpu)" 'if(b\.support_gpu){' \
+    's#if(b\.support_gpu){const \([a-z]\)=this\.formatGpuInfo(b\.gpu_info)#if(b.support_gpu||t.gpu_info){const \1=this.formatGpuInfo(b.support_gpu?b.gpu_info:t.gpu_info)#g'
 
   if ! grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
     if grep -q 'u?_T("system","over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' "${FILE_JS}"; then
@@ -251,7 +241,6 @@ if [ "${MEV}" = "physical" ]; then
     applyPatch "sys_temp row (rcfancontrol_desc)" 'i.unshift(\[_T("rcpower","rcfancontrol_desc")' \
       's/i\.unshift(\[_T("rcpower","rcfancontrol_desc"),/e.sys_temp\&\&i.unshift(["System Temperature",this.renderTempFromC(e.sys_temp),n]),i.unshift([_T("rcpower","rcfancontrol_desc"),/g'
   fi
-fi
 
 # nginx runs with gzip_static on, so it serves admin_center.js.gz in preference
 # to admin_center.js whenever the .gz exists. Regenerating it only when a
