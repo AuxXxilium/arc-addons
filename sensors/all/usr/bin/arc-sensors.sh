@@ -87,19 +87,23 @@ apply_amd_tctl_offset() {
   fi
 }
 
-# Only support_fan is set, which is what makes DSM show fan speed and temperature.
+# support_fan and support_fan_adjust_dual_mode are set: together they are what make DSM
+# show fan speed and temperature.
 #
-# supportadt7490 and support_fan_adjust_dual_mode are deliberately left alone (they
-# default to "no"). Both render Control Panel selectors that do nothing here: DSM neither
-# writes fan_config_type_internal when one is applied nor reads it back to show the
-# current state, so the selector displayed "Quiet" while the key said fullfan and the fan
-# was running at pwm 222. A control that reports the wrong profile and cannot change it is
-# worse than no control - the fan mode lives in FANMODE in the 'Fancontrol 2.0' task
-# instead. None of these keys affect fan control itself: discovery, pwm ownership and the
-# curve all come from sysfs and that task, never from synoinfo.
+# supportadt7490 is deliberately left alone (it defaults to "no"). It is the flag that
+# renders Control Panel's Fan Speed Mode selector, and that selector does nothing here:
+# DSM neither writes fan_config_type_internal when a mode is applied nor reads it back to
+# show the current one, so it displayed "Quiet" while the key said fullfan and the fan was
+# running at pwm 222. A control that reports the wrong profile and cannot change it is
+# worse than no control - the mode lives in FANMODE in the 'Fancontrol 2.0' task instead.
+#
+# None of these keys affect fan control itself: discovery, pwm ownership and the curve all
+# come from sysfs and that task, never from synoinfo.
 set_fan_conf() {
   for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do
-    /usr/syno/bin/synosetkeyvalue "${F}" "support_fan" "${1:-"no"}"
+    for K in "support_fan" "support_fan_adjust_dual_mode"; do
+      /usr/syno/bin/synosetkeyvalue "${F}" "${K}" "${1:-"no"}"
+    done
   done
 }
 
