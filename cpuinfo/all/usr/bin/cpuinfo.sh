@@ -24,24 +24,57 @@ if [ ! -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ]; then
 fi
 
 if [ "${1}" = "-r" ]; then
+  # Restore with cp, not mv: keeping the .bak means a later re-run still has a
+  # pristine reference. A mv here leaves the system with no restore point at
+  # all, and the next run then adopts the *current* (possibly patched) file as
+  # its new "pristine" baseline, baking the patches in permanently.
   if [ -f "${FILE_GZ}.bak" ]; then
     rm -f "${FILE_JS}" "${FILE_GZ}"
-    mv -f "${FILE_GZ}.bak" "${FILE_GZ}"
+    cp -pf "${FILE_GZ}.bak" "${FILE_GZ}"
     gzip -dc "${FILE_GZ}" >"${FILE_JS}"
   elif [ -f "${FILE_JS}.bak" ]; then
-    mv -f "${FILE_JS}.bak" "${FILE_JS}"
+    cp -pf "${FILE_JS}.bak" "${FILE_JS}"
+    # nginx has gzip_static on, so a stale .gz would be served in preference to
+    # the .js we just restored. Keep the pair consistent.
+    [ -f "${FILE_GZ}" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
+  else
+    echo "cpuinfo: no backup found - admin_center.js is left as-is and may still be patched"
+    echo "cpuinfo: reinstall AdminCenter if DSM's System Information page misbehaves"
   fi
   systemctl stop cpuinfo.service cpuinfo-setup.service 2>/dev/null || kill -9 "$(ps aux 2>/dev/null | grep -F "/usr/sbin/cpuinfo" | grep -v grep | awk '{print $2}' | head -1)" 2>/dev/null || true
-  [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
-  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
+  [ -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
+  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
   systemctl reload nginx
   exit 0
 fi
 
+# Never adopt an already-patched file as the pristine baseline. Without this
+# check a .gz regenerated from a patched .js (by us or by a DSM update landing
+# mid-cycle) becomes the permanent "original", so every later run restores
+# patched content and -r can never repair the system.
+_is_patched() {
+  [ -f "$1" ] || return 1
+  grep -q 'renderTempFromC(e\.sys_temp)\|e\.fan_list\.map\|t\.gpu||(t\.gpu=' "$1" 2>/dev/null
+}
+
 if [ -f "${FILE_GZ}" ]; then
-  [ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
+  if [ ! -f "${FILE_GZ}.bak" ]; then
+    if gzip -dc "${FILE_GZ}" 2>/dev/null | grep -q 'renderTempFromC(e\.sys_temp)\|e\.fan_list\.map\|t\.gpu||(t\.gpu='; then
+      echo "cpuinfo: ${FILE_GZ} is already patched and no pristine backup exists - refusing to"
+      echo "cpuinfo: adopt it as the baseline. Reinstall AdminCenter to restore, then re-run."
+      exit 1
+    fi
+    cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
+  fi
 else
-  [ ! -f "${FILE_JS}.bak" ] && cp -pf "${FILE_JS}" "${FILE_JS}.bak"
+  if [ ! -f "${FILE_JS}.bak" ]; then
+    if _is_patched "${FILE_JS}"; then
+      echo "cpuinfo: ${FILE_JS} is already patched and no pristine backup exists - refusing to"
+      echo "cpuinfo: adopt it as the baseline. Reinstall AdminCenter to restore, then re-run."
+      exit 1
+    fi
+    cp -pf "${FILE_JS}" "${FILE_JS}.bak"
+  fi
 fi
 
 rm -f "${FILE_JS}" 2>/dev/null
@@ -220,7 +253,28 @@ if [ "${MEV}" = "physical" ]; then
   fi
 fi
 
-[ -f "${FILE_GZ}.bak" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
+# nginx runs with gzip_static on, so it serves admin_center.js.gz in preference
+# to admin_center.js whenever the .gz exists. Regenerating it only when a
+# .gz.bak happened to exist left the two out of sync: the browser kept getting
+# a stale .gz (potentially months old, from before a DSM update) while the
+# freshly patched .js was never served. Always rebuild the .gz when one is
+# present, so what nginx serves matches what we just patched.
+if [ -f "${FILE_GZ}" ] || [ -f "${FILE_GZ}.bak" ]; then
+  gzip -c "${FILE_JS}" >"${FILE_GZ}"
+fi
+
+# The nginx redirect below is only safe once the daemon owns the socket, and
+# the daemon is a separate unit that this script never started. `-r` stops it,
+# so any later manual run would otherwise sit out the timeout below and revert,
+# reporting a missing socket rather than the stopped service that caused it.
+if [ ! -S "/run/arc_synoscgi.sock" ]; then
+  if systemctl start cpuinfo.service 2>/dev/null; then
+    echo "cpuinfo: started cpuinfo.service"
+  elif [ -x /usr/sbin/cpuinfo ]; then
+    echo "cpuinfo: systemctl unavailable, starting /usr/sbin/cpuinfo directly"
+    /usr/sbin/cpuinfo &
+  fi
+fi
 
 [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
 sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /etc/nginx/nginx.conf
@@ -235,8 +289,11 @@ while [ ! -S "/run/arc_synoscgi.sock" ] && [ "${TIMEOUT}" -gt 0 ]; do
 done
 if [ ! -S "/run/arc_synoscgi.sock" ]; then
   echo "cpuinfo: socket /run/arc_synoscgi.sock did not appear, reverting nginx patch"
-  [ -f "/etc/nginx/nginx.conf.bak" ] && mv -f /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
-  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && mv -f /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
+  echo "cpuinfo: the daemon is not running - check 'systemctl status cpuinfo.service'"
+  echo "cpuinfo: or run /usr/sbin/cpuinfo in the foreground to see why it exits"
+  # cp, not mv: keep the .bak so a later run still has a pristine reference.
+  [ -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
+  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
   exit 1
 fi
 
