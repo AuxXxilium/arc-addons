@@ -253,9 +253,9 @@ update_task() {
 # Which curve column is used. Set this to pick the fan profile:
 #   0 = Full-speed    1 = Cool (default)    2 = Quiet
 #
-# DSM Control Panel also has a Fan Speed Mode selector, but on this hardware applying it
-# writes nothing to disk, so it cannot be read back and has no effect. Set FANMODE here
-# instead - it lives in this task, so it survives a reboot.
+# Kept in step with DSM: if Control Panel > Hardware & Power writes a Fan Speed Mode,
+# that value is copied back here, and arc-control writes both at once. Editing this line
+# by hand works too - it lives in this task, so the choice survives a reboot.
 FANMODE="'"${DEFAULT_FANMODE}"'"
 #
 # One "temperature pwm%" pair per mode, per row.
@@ -707,29 +707,83 @@ fantype_to_mode() {
   esac
 }
 
+# Write mode index $1 into the 'Fancontrol 2.0' task's FANMODE line, so a mode picked in
+# DSM survives a reboot. Only that one line is touched: the curves, comments and per-fan
+# CURVE_*_<key> overrides around it are the user's and must come through untouched, which
+# is also why this rewrites the existing operation text instead of regenerating it.
+persist_fan_mode() {
+  local _mode="${1}"
+  [[ "${_mode}" =~ ^[0-2]$ ]] || return 0
+  [ -f "${ESYNOSCHEDULER_DB}" ] || return 0
+
+  local _op
+  _op="$(sqlite3 "${ESYNOSCHEDULER_DB}" "SELECT operation FROM task WHERE task_name='Fancontrol 2.0';" 2>/dev/null)"
+  [ -n "${_op}" ] || return 0
+
+  local _new
+  if printf '%s\n' "${_op}" | grep -q '^FANMODE='; then
+    _new="$(printf '%s\n' "${_op}" | sed "s/^FANMODE=.*/FANMODE=\"${_mode}\"/")"
+  else
+    _new="FANMODE=\"${_mode}\"
+${_op}"
+  fi
+
+  # Nothing to do if the substitution changed nothing, so we never rewrite the row - and
+  # never race arc-control writing the same task - on every poll tick.
+  [ "${_new}" = "${_op}" ] && return 0
+
+  sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF 2>/dev/null || echo "arc-sensors: could not save FANMODE=${_mode} to the task" >&2
+UPDATE task SET operation='$(printf '%s' "${_new}" | sed "s/'/''/g")' WHERE task_name='Fancontrol 2.0';
+EOF
+}
+
 # Resolve the current fan mode index into the variable named by $1, warning once per
 # distinct unrecognized fan_config_type_internal value (tracked in _FANTYPE_WARNED).
 _FANTYPE_WARNED=""
 read_fan_mode() {
   local _out_var="${1}" _idx _raw
 
-  # FANMODE from the 'Fancontrol 2.0' task wins when set. DSM's Control Panel selector
-  # writes nothing on this hardware - applying a Fan Speed Mode leaves synoinfo.conf and
-  # every file under /etc, /etc.defaults and /usr/syno/etc untouched - so synoinfo alone
-  # leaves the mode pinned to DEFAULT_FANMODE and the other curve columns unreachable.
-  # The task lives in the esynoscheduler DB, so a value set there survives reboots.
+  # There are two writers of the mode and they have to converge on one value:
+  #
+  #   arc-control  writes FANMODE into the 'Fancontrol 2.0' task AND mirrors it into
+  #                synoinfo's fan_config_type_internal, so both agree immediately.
+  #   DSM          may write only fan_config_type_internal, from Control Panel's Fan
+  #                Speed Mode selector, leaving the task stale.
+  #
+  # So a *recognized* synoinfo value is taken as the newer intent and copied back into
+  # the task, which is what makes a DSM-side change stick across a reboot. When the two
+  # already agree - the normal case after an arc-control save - nothing is written.
+  #
+  # Note this hardware does not appear to write the key at all (applying a mode in
+  # Control Panel leaves synoinfo.conf and every file under /etc, /etc.defaults and
+  # /usr/syno/etc untouched), in which case fantype_to_mode reports it as unset and the
+  # task's FANMODE below is what runs.
+  read -r _idx _raw <<<"$(fantype_to_mode)"
+
+  if [ "${_raw#\?}" = "${_raw}" ]; then
+    # synoinfo holds a mode we understand.
+    if [[ "${FANMODE}" =~ ^[0-2]$ ]] && [ "${FANMODE}" != "${_idx}" ]; then
+      echo "arc-sensors: fan mode changed in DSM to '${_raw}' (${_idx}), updating the task"
+      persist_fan_mode "${_idx}"
+    elif ! [[ "${FANMODE}" =~ ^[0-2]$ ]]; then
+      # Task has no mode yet - adopt DSM's so the two stay in step from here on.
+      persist_fan_mode "${_idx}"
+    fi
+    FANMODE="${_idx}"
+    printf -v "${_out_var}" '%s' "${_idx}"
+    return
+  fi
+
+  # synoinfo unset or a value that is not a fan-aggressiveness mode: the task decides.
   if [[ "${FANMODE}" =~ ^[0-2]$ ]]; then
     printf -v "${_out_var}" '%s' "${FANMODE}"
     return
   fi
 
-  read -r _idx _raw <<<"$(fantype_to_mode)"
-  if [ "${_raw#\?}" != "${_raw}" ]; then
-    if [ "${_FANTYPE_WARNED}" != "${_raw}" ]; then
-      _FANTYPE_WARNED="${_raw}"
-      echo "arc-sensors: no fan mode set (FANMODE in the 'Fancontrol 2.0' task, or DSM's" >&2
-      echo "arc-sensors: fan_config_type_internal), using default mode ${DEFAULT_FANMODE}" >&2
-    fi
+  if [ "${_FANTYPE_WARNED}" != "${_raw}" ]; then
+    _FANTYPE_WARNED="${_raw}"
+    echo "arc-sensors: no fan mode set (FANMODE in the 'Fancontrol 2.0' task, or DSM's" >&2
+    echo "arc-sensors: fan_config_type_internal), using default mode ${DEFAULT_FANMODE}" >&2
   fi
   printf -v "${_out_var}" '%s' "${_idx}"
 }
