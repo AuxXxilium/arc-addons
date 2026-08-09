@@ -33,7 +33,7 @@ Description=Adds uGreen LED control
 After=multi-user.target
 
 [Service]
-Type=one-shot
+Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/ledcontrol.sh
 
