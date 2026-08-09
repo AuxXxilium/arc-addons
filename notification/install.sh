@@ -16,6 +16,7 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/notification.service"
 [Unit]
 Description=notification daemon
+Wants=synoscgi.service nginx.service
 After=synoscgi.service nginx.service
 
 [Service]
