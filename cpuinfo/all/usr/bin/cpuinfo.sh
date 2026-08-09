@@ -224,8 +224,8 @@ fi
   _FANVAR="$(grep -oE '"rcpower",[a-z]\)' "${FILE_JS}" | head -1 | sed 's/.*,//; s/)//')"
   if [ -n "${_FANVAR}" ]; then
     FAN_SED="/tmp/_cpuinfo_fan_patch.sed"
-    printf 's/_T("rcpower",%s),/_T("rcpower", %s)?e.fan_list?_T("rcpower", %s) + e.fan_list.map(fan => ` | ${fan} RPM`).join(""):_T("rcpower", %s):e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", %s),/g\n' \
-      "${_FANVAR}" "${_FANVAR}" "${_FANVAR}" "${_FANVAR}" "${_FANVAR}" >"${FAN_SED}"
+    printf 's/_T("rcpower",%s),/e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", %s),/g\n' \
+      "${_FANVAR}" "${_FANVAR}" >"${FAN_SED}"
     if grep -q "\"rcpower\",${_FANVAR})," "${FILE_JS}"; then
       sed -i -f "${FAN_SED}" "${FILE_JS}"
       echo "cpuinfo: fan RPM renderer (rcpower,${_FANVAR}) applied"
