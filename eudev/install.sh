@@ -122,6 +122,7 @@ elif [ "${1}" = "late" ]; then
   echo "copy modules"
   export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
   isChange=false
+  SKIPOVERLAY=false
   # Copy firmware files
   /tmpRoot/bin/cp -rnf /usr/lib/firmware/* /tmpRoot/usr/lib/firmware/
   MODBAK="/tmpRoot/usr/lib/modules.${PLATFORM}-${PRODUCTVER}.tgz"
@@ -135,23 +136,41 @@ elif [ "${1}" = "late" ]; then
   done
 
   if grep -q 'AuxXxilium@Xpenology' /proc/version 2>/dev/null; then
-    if [ -f "${MODBAK}" ]; then
+    if [ -f "${MODBAK}" ] && tar -tzf "${MODBAK}" >/dev/null 2>&1; then
       echo "Custom Kernel - restore stock modules from backup."
       /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
       mkdir -p "${MODDIR}"
       tar -zxf "${MODBAK}" -C "${MODDIR}" 2>/dev/null || true
     else
+      # A backup that exists but does not list is truncated or corrupt - drop it and take a
+      # fresh one. Restoring from it would wipe MODDIR and leave nothing bootable behind.
+      [ -f "${MODBAK}" ] && echo "Custom Kernel - backup is unreadable, discarding it."
+      /tmpRoot/bin/rm -f "${MODBAK}" 2>/dev/null || true
       echo "Custom Kernel - backup stock modules."
-      tar -zcf "${MODBAK}" -C "${MODDIR}" . 2>/dev/null || true
+      if ! tar -zcf "${MODBAK}" -C "${MODDIR}" . 2>/dev/null || ! tar -tzf "${MODBAK}" >/dev/null 2>&1; then
+        # Without a good backup the overlay below is a one-way trip: the official-kernel boot
+        # would have nothing to restore and would keep running custom modules. Skip it.
+        echo "eudev: WARNING - module backup failed, skipping custom module overlay."
+        /tmpRoot/bin/rm -f "${MODBAK}" 2>/dev/null || true
+        isChange=false
+        SKIPOVERLAY=true
+      fi
     fi
-    /tmpRoot/bin/cp -rpf /usr/lib/modules/* "${MODDIR}" 2>/dev/null || true
-    isChange=true
+    if [ "${SKIPOVERLAY}" != true ]; then
+      /tmpRoot/bin/cp -rpf /usr/lib/modules/* "${MODDIR}" 2>/dev/null || true
+      isChange=true
+    fi
   else
-    if [ -f "${MODBAK}" ]; then
+    if [ -f "${MODBAK}" ] && tar -tzf "${MODBAK}" >/dev/null 2>&1; then
       echo "Official Kernel - restore modules from backup."
       /tmpRoot/bin/rm -rf "${MODDIR}" 2>/dev/null || true
       mkdir -p "${MODDIR}"
       tar -zxf "${MODBAK}" -C "${MODDIR}" 2>/dev/null || true
+      /tmpRoot/bin/rm -f "${MODBAK}" 2>/dev/null || true
+    elif [ -f "${MODBAK}" ]; then
+      # Corrupt backup: leave MODDIR alone. It still holds the custom modules from the last
+      # boot, which is wrong but bootable - wiping it for a failed extract would not be.
+      echo "eudev: WARNING - module backup is unreadable, keeping modules as-is."
       /tmpRoot/bin/rm -f "${MODBAK}" 2>/dev/null || true
     fi
     for L in $(grep -v '^\s*$\|^\s*#' /addons/modulelist 2>/dev/null | awk 'NF==2 {print $1"###"$2}'); do
