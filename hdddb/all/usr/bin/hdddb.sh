@@ -1504,6 +1504,11 @@ if [[ "${#db2list[@]}" -gt "0" ]]; then
     done
 fi
 
+# Wrapped so the verify step at the end can re-run it if the db edits did not
+# land. Safe to repeat: backupdb skips when a .bak already exists, updatedb
+# takes its "already exists" branch, and the sed edits are search-and-replace.
+patch_drive_dbs(){
+
 # HDDs and SATA SSDs
 num="0"
 while [[ $num -lt "${#hdds[@]}" ]]; do
@@ -1561,6 +1566,10 @@ while [[ $num -lt "${#nvmes[@]}" ]]; do
 
     num=$((num +1))
 done
+
+}
+
+patch_drive_dbs
 
 
 #------------------------------------------------------------------------------
@@ -2390,6 +2399,110 @@ fi
 
 
 #------------------------------------------------------------------------------
+# Verify
+
+# Re-read the db files and synoinfo.conf to confirm the edits actually landed.
+# Most failure paths above only print an ERROR and carry on, and the script ends
+# in a bare "exit", so a run that patched nothing still reports success to
+# systemd. This checks the end state instead of trusting that the steps ran.
+# Every drive the script tried to add must now be in at least one host db file
+verify_drive_in_db(){
+    # $1 "model,fwrev,size_gb"
+    local model fwrev f
+    model=$(printf "%s" "$1" | cut -d"," -f 1)
+    fwrev=$(printf "%s" "$1" | cut -d"," -f 2)
+    [[ -z $model ]] && return 0
+    for f in "${db1list[@]}" "${db2list[@]}"; do
+        [[ -f "$f" ]] || continue
+        getdbtype "$f"
+        if [[ $dbtype -gt "6" ]]; then
+            jq -e --arg m "$model" --arg fw "$fwrev" \
+                '.disk_compatbility_info[$m] | has($fw)' "$f" >/dev/null 2>&1 && return 0
+        else
+            grep -q "$model" "$f" 2>/dev/null && return 0
+        fi
+    done
+    return 1
+}
+
+verify_patched(){
+    # $1 "quiet" to suppress per-item errors on a non-final attempt
+    local quiet="$1" f num actual_sdc expected_sdc
+    verify_failed=""
+
+    # An empty drive or db list means nothing was examined - that must not pass
+    # as "verified", or a run that enumerated nothing looks like a success.
+    if [[ ${#hdds[@]} -eq 0 ]] && [[ ${#nvmes[@]} -eq 0 ]]; then
+        [[ $quiet != "quiet" ]] &&\
+            echo -e "${Error}ERROR${Off} No drives were enumerated - nothing to verify."
+        verify_failed=yes
+        return
+    fi
+    if [[ ${#db1list[@]} -eq 0 ]] && [[ ${#db2list[@]} -eq 0 ]]; then
+        [[ $quiet != "quiet" ]] &&\
+            echo -e "${Error}ERROR${Off} No db files found - nothing to verify."
+        verify_failed=yes
+        return
+    fi
+
+    for num in "${!hdds[@]}"; do
+        if ! verify_drive_in_db "${hdds[$num]}"; then
+            [[ $quiet != "quiet" ]] &&\
+                echo -e "${Error}ERROR${Off} $(printf "%s" "${hdds[$num]}" | cut -d"," -f 1) is ${Red}not${Off} in any db file!"
+            verify_failed=yes
+        fi
+    done
+    for num in "${!nvmes[@]}"; do
+        if ! verify_drive_in_db "${nvmes[$num]}"; then
+            [[ $quiet != "quiet" ]] &&\
+                echo -e "${Error}ERROR${Off} $(printf "%s" "${nvmes[$num]}" | cut -d"," -f 1) is ${Red}not${Off} in any db file!"
+            verify_failed=yes
+        fi
+    done
+
+    # No drive may be left marked incompatible in the db files
+    for f in "${db1list[@]}" "${db2list[@]}"; do
+        [[ -f "$f" ]] || continue
+        if grep -q 'not_support\|unverified' "$f" 2>/dev/null; then
+            [[ $quiet != "quiet" ]] &&\
+                echo -e "${Error}ERROR${Off} $(basename -- "$f") still has ${Red}incompatible${Off} drive entries!"
+            verify_failed=yes
+        fi
+    done
+
+    # synoinfo.conf must hold the disk compatibility value this run intended
+    if [[ $force == "yes" ]]; then expected_sdc="no"; else expected_sdc="yes"; fi
+    for f in "$synoinfo" /etc/synoinfo.conf; do
+        [[ -f "$f" ]] || continue
+        actual_sdc="$(/usr/syno/bin/synogetkeyvalue "$f" support_disk_compatibility)"
+        if [[ -n $actual_sdc ]] && [[ $actual_sdc != "$expected_sdc" ]]; then
+            [[ $quiet != "quiet" ]] &&\
+                echo -e "${Error}ERROR${Off} $f has support_disk_compatibility=${Red}${actual_sdc}${Off}, expected ${expected_sdc}!"
+            verify_failed=yes
+        fi
+    done
+}
+
+# Verify, and re-run the db edits once if anything did not land. Only the drive
+# db patching is repeated - binary installs and card edits above are left alone.
+verify_patched quiet
+if [[ -n $verify_failed ]]; then
+    echo -e "\nVerification failed - retrying the drive database edits."
+    patch_drive_dbs
+    verify_patched
+    if [[ -z $verify_failed ]]; then
+        echo -e "\nVerified: drives are patched (after retry)."
+    fi
+else
+    echo -e "\nVerified: drives are patched."
+fi
+
+if [[ -n $verify_failed ]]; then
+    echo -e "\n${Error}ERROR${Off} Verification ${Red}failed${Off} - drives are not fully patched."
+fi
+
+
+#------------------------------------------------------------------------------
 # Finished
 
 # Make Synology check disk compatibility
@@ -2416,4 +2529,8 @@ if [[ $rebootmsg == "yes" ]]; then
     echo -e "\nYou may need to ${Cyan}reboot the Synology${Off} to see the changes."
 fi
 
-exit
+# Report the verification result, so a run that patched nothing does not look
+# like a success. A bare "exit" returns the status of whatever ran last.
+[[ -n $verify_failed ]] && exit 10
+
+exit 0
