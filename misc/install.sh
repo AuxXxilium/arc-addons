@@ -196,6 +196,33 @@ elif [ "${1}" = "late" ]; then
       echo "CPU supports CPU Performance Scaling, enabling"
       sed -i 's/^# acpi-cpufreq/acpi-cpufreq/g' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
       cp -vpf /usr/lib/modules/cpufreq_* /tmpRoot/usr/lib/modules/
+
+      # cpufreq_init_policy() picks a policy's governor by name: last_governor,
+      # then the cpufreq.default_governor= parameter, then the compiled-in
+      # default. A governor module has to be loaded for that lookup to find it,
+      # and modules-load.d runs at sysinit.target, before the policies appear.
+      # So list the module the selected governor needs, and nothing else -
+      # DSM ships this conf with cpufreq_performance/cpufreq_powersave listed
+      # regardless of what governor= asks for. schedutil is built into the 5.x
+      # kernel and has no module, so nothing is listed for it.
+      GOVERNOR="$(grep -o 'governor=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
+      sed -i '/^cpufreq_/d;/^# cpufreq_/d' /tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
+      case "${GOVERNOR}" in
+        schedutil|'')
+          echo "Governor ${GOVERNOR:-default}: no governor module needed"
+          ;;
+        performance|powersave|userspace|ondemand|conservative|interactive)
+          if [ -f "/usr/lib/modules/cpufreq_${GOVERNOR}.ko" ]; then
+            echo "Governor ${GOVERNOR}: loading cpufreq_${GOVERNOR} at boot"
+            echo "cpufreq_${GOVERNOR}" >>/tmpRoot/usr/lib/modules-load.d/70-cpufreq-kernel.conf
+          else
+            echo "Governor ${GOVERNOR}: cpufreq_${GOVERNOR}.ko not built, addon will handle it"
+          fi
+          ;;
+        *)
+          echo "Governor ${GOVERNOR}: unknown, leaving governor modules out"
+          ;;
+      esac
     fi
   fi
   modprobe -r acpi-cpufreq
