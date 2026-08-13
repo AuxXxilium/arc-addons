@@ -2510,9 +2510,9 @@ if [[ -f /usr/syno/sbin/synostgdisk ]]; then
     # synostoraged still holds the pre-edit synoinfo.conf in memory, so the
     # check below runs against the old support_disk_compatibility value and the
     # change only takes effect after a reboot. Restarting synostoraged first
-    # applies it immediately - untested on a live DSM, so left disabled.
-    #synosystemctl restart synostoraged
-    #sleep 10
+    # applies it immediately.
+    synosystemctl restart synostoraged
+    sleep 5
     /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
     status=$?
     if [[ $status -eq "0" ]]; then
