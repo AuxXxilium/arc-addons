@@ -1741,11 +1741,17 @@ ECNT
     [ -n "$result" ] || return 1
 }
 
-install_binfile(){ 
+install_binfile(){
     # install_binfile <file> <file-url> <destination> <chmod> <bundled-path> <hash>
     # example:
     #  file_url="https://raw.githubusercontent.com/${repo}/main/bin/dtc"
     #  install_binfile dtc "$file_url" /usr/bin/dtc a+x bin/dtc
+    #
+    # Returns non-zero if the binary could not be installed. It never exits: the
+    # callers install optional helpers (dtc, dhm_tool) long after the drive database
+    # patching is done, and each re-checks for its binary and reports its own error,
+    # so a missing download must not take the whole script - and with it the hdddb
+    # service - down with it.
 
     if [[ -f "${scriptpath}/$5" ]]; then
         binfile="${scriptpath}/$5"
@@ -1759,6 +1765,12 @@ install_binfile(){
             reply=y
         elif is_schedule_running "$(basename -- "$0")"; then
             reply=y
+        elif [[ ! -t 0 ]]; then
+            # No terminal to prompt on (systemd unit, cron, piped input). read would
+            # hit EOF immediately and fall through with an empty reply, so decline
+            # deliberately instead of appearing to have asked.
+            echo -e "\nNeed to download ${1}, but there is no terminal to ask on - skipping."
+            reply=n
         else
             echo -e "\nNeed to download ${1}"
             echo -e "${Cyan}Do you want to download ${1}?${Off} [y/n]"
@@ -1768,7 +1780,7 @@ install_binfile(){
             echo -e "\nDownloading ${1}"
             if ! curl -kL -m 30 --connect-timeout 5 "$2" -o "/tmp/$1"; then
                 echo -e "${Error}ERROR${Off} Failed to download ${1}!"
-                return
+                return 1
             fi
             binfile="/tmp/${1}"
 
@@ -1779,19 +1791,19 @@ install_binfile(){
             if [[ $md5 != "$6" ]]; then
                 echo "Expected md5:   $6"
                 echo -e "${Error}ERROR${Off} Downloaded $1 md5 hash does not match!"
-                exit 1
+                return 1
             fi
         else
-            echo -e "${Error}ERROR${Off} Cannot add M2 PCIe card without ${1}!"
-            exit 1
+            echo -e "${Error}ERROR${Off} ${1} is not installed!"
+            return 1
         fi
     fi
 
     # Set binfile executable
-    chmod "$4" "$binfile"
+    chmod "$4" "$binfile" || return 1
 
     # Copy binfile to destination
-    cp -p "$binfile" "$3"
+    cp -p "$binfile" "$3" || return 1
 }
 
 edit_modeldtb(){ 
@@ -2366,7 +2378,9 @@ if [[ $arch == "x86_64" ]]; then
             branch="main"
             file_url="https://raw.githubusercontent.com/${repo}/${branch}/bin/dhm_tool"
             # install_binfile <file> <file-url> <destination> <chmod> <bundled-path> <hash>
-            install_binfile dhm_tool "$file_url" /usr/syno/sbin/dhm_tool "755" bin/dhm_tool "$md5hash"
+            if ! install_binfile dhm_tool "$file_url" /usr/syno/sbin/dhm_tool "755" bin/dhm_tool "$md5hash"; then
+                echo -e "${Error}ERROR${Off} Could not install dhm_tool - IronWolf Health Management is enabled but inactive."
+            fi
         else
             # Check if dhm_tool needs updating
             dhm_version="$(/usr/syno/sbin/dhm_tool --version | grep "Utility Version" | awk '{print $NF}')"
@@ -2383,8 +2397,9 @@ if [[ $arch == "x86_64" ]]; then
                 # install_binfile <file> <file-url> <destination> <chmod> <bundled-path> <hash>
                 install_binfile dhm_tool "$file_url" /usr/syno/sbin/dhm_tool "755" bin/dhm_tool "$md5hash"
 
-                # Check dhm_tool updated
-                dhm_version="$(/usr/syno/sbin/dhm_tool --version | grep "Utility Version" | awk '{print $NF}')"
+                # Check dhm_tool updated. The existing binary is still in place if the
+                # install failed, so this reports the old version rather than erroring.
+                dhm_version="$(/usr/syno/sbin/dhm_tool --version 2>/dev/null | grep "Utility Version" | awk '{print $NF}')"
                 if [[ $dhm_version == "2.5.1" ]]; then
                     echo "Updated IronWolf Health Management."
                 else
