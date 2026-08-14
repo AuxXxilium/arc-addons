@@ -23,17 +23,8 @@ if [ "${1}" = "early" ]; then
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
-  # Match the whole PCI display class (03), not just subclass 0300 "VGA compatible
-  # controller". Modern Intel iGPUs report 0380 "Display controller" instead - a Raptor
-  # Lake-S UHD (8086:a782) shows up as class 0380 - and some report 0302. With the old
-  # "-nd ::300" filter those systems fell into the else branch below, which deletes
-  # /usr/lib/modules/update, throwing away the very i915.ko that supports the GPU.
   GPU="$(lspci -n 2>/dev/null | grep -E ' 03[0-9a-fA-F]{2}: 8086:[0-9a-fA-F]{4}' \
     | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
-  # i915.ko ships only in /usr/lib/modules/update, never at the module root, so the update
-  # copy is the only one to test. Install the whole directory when it supports this GPU -
-  # the accompanying DRM stack (drm, drm_kms_helper, ttm, ...) is built against it and has
-  # to move with it - and drop it otherwise so a mismatched i915 cannot bind.
   if [ -f "/usr/lib/modules/update/i915.ko" ] && [ -n "${GPU}" ]; then
     PCI="pci:v0000$(echo "${GPU}" | cut -c1-4)d0000$(echo "${GPU}" | cut -c5-8)"
     if modinfo -F alias "/usr/lib/modules/update/i915.ko" 2>/dev/null | grep -iq "${PCI}"; then
@@ -52,9 +43,10 @@ elif [ "${1}" = "modules" ]; then
   rm -f /usr/lib/modules/pgdrv.ko 2>/dev/null || true
 
   [ -e /usr/lib/modules/modules.builtin ] || : > /usr/lib/modules/modules.builtin
+
   if [ -d /usr/lib/modules ]; then
-    (cd /usr/lib/modules && find . -type f -name "*.ko" | sed 's|^\./||' | sort) \
-      > /usr/lib/modules/modules.order
+    (cd /usr/lib/modules && find . -path ./update -prune -o -type f -name "*.ko" -print \
+      | sed 's|^\./||' | sort) > /usr/lib/modules/modules.order
   else
     : > /usr/lib/modules/modules.order
   fi
@@ -194,19 +186,6 @@ elif [ "${1}" = "late" ]; then
   if [ -f /usr/lib/modules/sg.ko ] && [ ! -f "${MODDIR}/sg.ko" ]; then
     echo "eudev: Adding sg.ko (SCSI generic - needed by IronWolf Health Management)"
     /tmpRoot/bin/cp -vpf /usr/lib/modules/sg.ko "${MODDIR}/" 2>/dev/null || true
-    isChange=true
-  fi
-
-  # Force load amdgpu if AMD GPU detected
-  if [ -f /usr/lib/modules/amdgpu.ko ] && grep -iq 1002 /proc/bus/pci/devices 2>/dev/null; then
-    echo "eudev: AMD GPU detected, forcing amdgpu to load"
-    if ! grep -q 'AuxXxilium@Xpenology' /proc/version 2>/dev/null; then
-      for M in $(modinfo -F depends /usr/lib/modules/amdgpu.ko 2>/dev/null | tr ',' ' ') amdgpu; do
-        [ -f "/usr/lib/modules/${M}.ko" ] && /tmpRoot/bin/cp -vpf "/usr/lib/modules/${M}.ko" "${MODDIR}/" 2>/dev/null || true
-      done
-    fi
-    mkdir -vp /tmpRoot/usr/lib/modules-load.d
-    echo "amdgpu" >/tmpRoot/usr/lib/modules-load.d/70-syno-amdgpu-gpu.conf
     isChange=true
   fi
 
