@@ -23,19 +23,38 @@ if [ "${1}" = "early" ]; then
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
+  # Match the whole PCI display class (03), not just subclass 0300 "VGA compatible
+  # controller". Modern Intel iGPUs report 0380 "Display controller" instead - a Raptor
+  # Lake-S UHD (8086:a782) shows up as class 0380 - and some report 0302.
   GPU="$(lspci -n 2>/dev/null | grep -E ' 03[0-9a-fA-F]{2}: 8086:[0-9a-fA-F]{4}' \
     | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
-  if [ -f "/usr/lib/modules/update/i915.ko" ] && [ -n "${GPU}" ]; then
+  # There is no /usr/lib/modules/update any more: build.sh now ships a single
+  # flat module set, because the kernel's own 5.10 DRM modules that used to
+  # collide by name with the backport's v6.5 ones (drm, ttm, drm_kms_helper,
+  # i2c-algo-bit) are no longer built at all. So the decision here is not
+  # "which of two stacks wins" but simply "does this box need i915".
+  #
+  # The whole stack goes together when it is not needed. i915 is the only
+  # consumer of these modules left in the set - amdgpu, vmwgfx, virtio-gpu and
+  # udl were dropped at build time - so with no supported Intel iGPU present
+  # every one of them is dead weight that can only misbind or waste memory.
+  I915_STACK="i915 i915-compat intel-gtt drm drm_kms_helper drm_display_helper \
+              drm_buddy drm_mipi_dsi ttm dmabuf"
+  if [ -f "/usr/lib/modules/i915.ko" ] && [ -n "${GPU}" ]; then
     PCI="pci:v0000$(echo "${GPU}" | cut -c1-4)d0000$(echo "${GPU}" | cut -c5-8)"
-    if modinfo -F alias "/usr/lib/modules/update/i915.ko" 2>/dev/null | grep -iq "${PCI}"; then
-      echo "eudev: i915 support ${GPU}"
-      mv -vf /usr/lib/modules/update/* /usr/lib/modules/ 2>/dev/null
+    if modinfo -F alias "/usr/lib/modules/i915.ko" 2>/dev/null | grep -iq "${PCI}"; then
+      echo "eudev: i915 supports ${GPU}, keeping the DRM stack"
     else
-      echo "eudev: i915 does not support ${GPU}"
-      rm -rf /usr/lib/modules/update 2>/dev/null || true
+      echo "eudev: i915 does not support ${GPU}, removing the DRM stack"
+      for M in ${I915_STACK}; do
+        rm -f "/usr/lib/modules/${M}.ko" 2>/dev/null || true
+      done
     fi
-  else
-    rm -rf /usr/lib/modules/update 2>/dev/null || true
+  elif [ -f "/usr/lib/modules/i915.ko" ]; then
+    echo "eudev: no Intel GPU present, removing the DRM stack"
+    for M in ${I915_STACK}; do
+      rm -f "/usr/lib/modules/${M}.ko" 2>/dev/null || true
+    done
   fi
 
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
@@ -44,6 +63,9 @@ elif [ "${1}" = "modules" ]; then
 
   [ -e /usr/lib/modules/modules.builtin ] || : > /usr/lib/modules/modules.builtin
 
+  # The prune of ./update stays as a safety net for an older module set that
+  # still ships that directory. Current builds are flat and have none, in which
+  # case -path ./update simply never matches.
   if [ -d /usr/lib/modules ]; then
     (cd /usr/lib/modules && find . -path ./update -prune -o -type f -name "*.ko" -print \
       | sed 's|^\./||' | sort) > /usr/lib/modules/modules.order
