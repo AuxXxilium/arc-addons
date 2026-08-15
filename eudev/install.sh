@@ -28,34 +28,62 @@ elif [ "${1}" = "modules" ]; then
   # Lake-S UHD (8086:a782) shows up as class 0380 - and some report 0302.
   GPU="$(lspci -n 2>/dev/null | grep -E ' 03[0-9a-fA-F]{2}: 8086:[0-9a-fA-F]{4}' \
     | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
-  # There is no /usr/lib/modules/update any more: build.sh now ships a single
-  # flat module set, because the kernel's own 5.10 DRM modules that used to
-  # collide by name with the backport's v6.5 ones (drm, ttm, drm_kms_helper,
-  # i2c-algo-bit) are no longer built at all. So the decision here is not
-  # "which of two stacks wins" but simply "does this box need i915".
+  # Two module-set layouts are in the field and both have to work here:
   #
-  # The whole stack goes together when it is not needed. i915 is the only
-  # consumer of these modules left in the set - amdgpu, vmwgfx, virtio-gpu and
-  # udl were dropped at build time - so with no supported Intel iGPU present
-  # every one of them is dead weight that can only misbind or waste memory.
+  #   split - i915 and its DRM stack live in /usr/lib/modules/update, shadowing
+  #           the kernel's own 5.10 drm/ttm/drm_kms_helper by the same names.
+  #           depmod treats update/ as higher priority on its own, so leaving
+  #           the directory in place silently installs the backport whether or
+  #           not it fits this GPU. The directory therefore has to be either
+  #           moved down into the module root or deleted outright.
+  #   flat  - a single set with i915.ko at the module root and no update/ at
+  #           all, because the colliding 5.10 DRM modules are not built. Here
+  #           nothing shadows anything and the only question is whether i915
+  #           is wanted; if not, the stack is removed by name.
+  #
+  # Either way the whole DRM stack travels together: it is built against this
+  # i915 and i915 is its only consumer left in the set - amdgpu, vmwgfx,
+  # virtio-gpu and udl are dropped at build time - so with no supported Intel
+  # iGPU present every one of them is dead weight that can only misbind.
   I915_STACK="i915 i915-compat intel-gtt drm drm_kms_helper drm_display_helper \
               drm_buddy drm_mipi_dsi ttm dmabuf"
-  if [ -f "/usr/lib/modules/i915.ko" ] && [ -n "${GPU}" ]; then
+  if [ -f "/usr/lib/modules/update/i915.ko" ]; then
+    I915KO="/usr/lib/modules/update/i915.ko"
+  elif [ -f "/usr/lib/modules/i915.ko" ]; then
+    I915KO="/usr/lib/modules/i915.ko"
+  else
+    I915KO=""
+  fi
+
+  I915_WANTED=false
+  if [ -n "${I915KO}" ] && [ -n "${GPU}" ]; then
     PCI="pci:v0000$(echo "${GPU}" | cut -c1-4)d0000$(echo "${GPU}" | cut -c5-8)"
-    if modinfo -F alias "/usr/lib/modules/i915.ko" 2>/dev/null | grep -iq "${PCI}"; then
+    if modinfo -F alias "${I915KO}" 2>/dev/null | grep -iq "${PCI}"; then
+      I915_WANTED=true
       echo "eudev: i915 supports ${GPU}, keeping the DRM stack"
     else
       echo "eudev: i915 does not support ${GPU}, removing the DRM stack"
+    fi
+  elif [ -n "${I915KO}" ]; then
+    echo "eudev: no Intel GPU present, removing the DRM stack"
+  fi
+
+  if [ -n "${I915KO}" ]; then
+    if [ "${I915_WANTED}" = true ]; then
+      # On a split set the backport has to come down to the module root, where
+      # it replaces the 5.10 modules of the same name - the whole point of the
+      # shadowing. On a flat set there is nothing to move and the mv is a no-op.
+      [ -d /usr/lib/modules/update ] && mv -f /usr/lib/modules/update/* /usr/lib/modules/ 2>/dev/null
+    else
       for M in ${I915_STACK}; do
         rm -f "/usr/lib/modules/${M}.ko" 2>/dev/null || true
       done
     fi
-  elif [ -f "/usr/lib/modules/i915.ko" ]; then
-    echo "eudev: no Intel GPU present, removing the DRM stack"
-    for M in ${I915_STACK}; do
-      rm -f "/usr/lib/modules/${M}.ko" 2>/dev/null || true
-    done
   fi
+  # Nothing below may see update/ any more: it is either merged, or its content
+  # is unwanted. Anything else left in there would still outrank the base set at
+  # depmod time without ever appearing in modules.order.
+  rm -rf /usr/lib/modules/update 2>/dev/null || true
 
   [ -e /proc/sys/kernel/hotplug ] && printf '\000\000\000\000' >/proc/sys/kernel/hotplug
 
@@ -63,9 +91,9 @@ elif [ "${1}" = "modules" ]; then
 
   [ -e /usr/lib/modules/modules.builtin ] || : > /usr/lib/modules/modules.builtin
 
-  # The prune of ./update stays as a safety net for an older module set that
-  # still ships that directory. Current builds are flat and have none, in which
-  # case -path ./update simply never matches.
+  # The prune of ./update is belt and braces: the GPU check above already
+  # merged or deleted the directory, so on both layouts -path ./update should
+  # no longer match anything by the time we get here.
   if [ -d /usr/lib/modules ]; then
     (cd /usr/lib/modules && find . -path ./update -prune -o -type f -name "*.ko" -print \
       | sed 's|^\./||' | sort) > /usr/lib/modules/modules.order
@@ -90,18 +118,13 @@ elif [ "${1}" = "modules" ]; then
 
   /usr/sbin/modprobe sg || true
 
-  # hwmon-vid and wmi are pulled in first because the sensor drivers below
-  # link against them: every Super-I/O driver here needs vid_from_reg, and the
-  # it87 we ship (the frankcrawford one, not mainline's) also calls
-  # wmi_evaluate_method to read the Gigabyte board config. Loading them here
-  # keeps it87 working even if the dependency is not resolved for us.
-  for I in coretemp k10temp hwmon-vid wmi; do
+  for I in coretemp k10temp hwmon-vid; do
     /usr/sbin/modprobe "${I}" || true
   done
 
   MEV="$(sed -n 's/.*\bmev=\([^ ]*\).*/\1/p' /proc/cmdline 2>/dev/null)"
   if [ "${MEV}" = "physical" ] || [ -z "${MEV}" ]; then
-    for I in it87 nct6683 nct6775 nct7802 f71805f f71882fg f75375s dme1737 \
+    for I in wmi it87 nct6683 nct6775 nct7802 f71805f f71882fg f75375s dme1737 \
              w83627ehf w83627hf w83781d w83791d w83792d w83793 w83795 asc7621 \
              adt7462 adt7470 adt7475 adm1021 adm1025 adm1026 adm1031 adm9240 \
              lm63 lm75 lm77 lm78 lm80 lm85 lm90 lm95245 max6639 \
@@ -133,7 +156,7 @@ elif [ "${1}" = "modules" ]; then
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon eudev - ${1}"
-  # [ ! -L "/tmpRoot/usr/sbin/modprobe" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modprobe
+  [ ! -L "/tmpRoot/usr/sbin/modprobe" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modprobe
   [ ! -L "/tmpRoot/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modinfo
   [ ! -L "/tmpRoot/usr/sbin/depmod" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/depmod
   [ ! -f "/tmpRoot/usr/bin/eject" ] && cp -vpf /usr/bin/eject /tmpRoot/usr/bin/eject
