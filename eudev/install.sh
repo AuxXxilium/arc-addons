@@ -90,7 +90,12 @@ elif [ "${1}" = "modules" ]; then
 
   /usr/sbin/modprobe sg || true
 
-  for I in coretemp k10temp hwmon-vid; do
+  # hwmon-vid and wmi are pulled in first because the sensor drivers below
+  # link against them: every Super-I/O driver here needs vid_from_reg, and the
+  # it87 we ship (the frankcrawford one, not mainline's) also calls
+  # wmi_evaluate_method to read the Gigabyte board config. Loading them here
+  # keeps it87 working even if the dependency is not resolved for us.
+  for I in coretemp k10temp hwmon-vid wmi; do
     /usr/sbin/modprobe "${I}" || true
   done
 
