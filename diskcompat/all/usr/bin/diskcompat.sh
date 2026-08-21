@@ -67,6 +67,9 @@ collect_disks() {
     [ -d "${BLOCK_DIR}" ] || continue
     DEV="$(basename "${BLOCK_DIR}")"
     case "${DEV}" in
+      # Partitions carry the same prefix as their disk, so they have to go
+      # first - sata1p1, sdq1 and nvme0n1p1 are not drives.
+      sata*p[0-9]* | sas*p[0-9]* | sd*[0-9] | nvme*p[0-9]*) continue ;;
       sata* | sas* | sd* | nvme*) ;;
       *) continue ;;
     esac
