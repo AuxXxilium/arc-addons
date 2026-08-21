@@ -63,6 +63,8 @@ Options:
                         and sets max memory to the amount of installed memory
   -f, --force           Force DSM to not check drive compatibility
                         Do not use this option unless absolutely needed
+  -i, --incompatible    Change incompatible drives to supported
+                        Do not use this option unless absolutely needed
   -w, --wdda            Disable WD Device Analytics to prevent DSM showing
                         a false warning for WD drives that are 3 years old
                           DSM 7.2.1 and later already has WDDA disabled
@@ -105,7 +107,7 @@ args=("$@")
 
 # Check for flags with getopt
 if options="$(getopt -o SIabcdefghijklmnopqrstuvwxyz0123456789 -l \
-    ssd:,ihm,restore,noupdate,nodbupdate,force,ram,pcie,wdda,email,help,version -- "$@")"; then
+    ssd:,ihm,restore,noupdate,nodbupdate,force,incompatible,ram,pcie,wdda,email,help,version -- "$@")"; then
     eval set -- "$options"
     while true; do
         case "$1" in
@@ -138,6 +140,9 @@ if options="$(getopt -o SIabcdefghijklmnopqrstuvwxyz0123456789 -l \
                 ;;
             -f|--force)         # Disable "support_disk_compatibility"
                 force=yes
+                ;;
+            -i|--incompatible)  # Change incompatible drives to supported
+                incompatible=yes
                 ;;
             -r|--ram)           # Disable "support_memory_compatibility"
                 ram=yes
@@ -564,7 +569,7 @@ if [[ $restore == "yes" ]]; then
         # Restore writemostly if set
         if [[ $ssd_restore == "yes" ]]; then
             # Get array of internal drives
-            readarray -t internal_drives < <(synodisk --enum -t internal | grep 'Disk path' | cut -d"/" -f3)
+            readarray -t internal_drives < <(/usr/syno/bin/synodisk --enum -t internal | grep 'Disk path' | cut -d"/" -f3)
 
             # Restore all internal drives to just in_sync
             echo -e "\nRestoring internal drive's state"
@@ -728,9 +733,9 @@ fixdrivemodel(){
 get_size_gb(){ 
     # $1 is /sys/block/sata1 or /sys/block/nvme0n1 etc
     local disk_size_gb
-    #disk_size_gb=$(synodisk --info /dev/"$(basename -- "$1")" 2>/dev/null | grep 'Total capacity' | awk '{print int($4 * 1.073741824)}')
+    #disk_size_gb=$(/usr/syno/bin/synodisk --info /dev/"$(basename -- "$1")" 2>/dev/null | grep 'Total capacity' | awk '{print int($4 * 1.073741824)}')
     # Prevent 6 TB drives getting rounded up to 6001 !!!
-    disk_size_gb=$(synodisk --info /dev/"$(basename -- "$1")" 2>/dev/null | grep 'Total capacity' | awk '{gb = $4 * 1.073741824; printf "%d\n", int(gb / 4 + 0.5) * 4}')
+    disk_size_gb=$(/usr/syno/bin/synodisk --info /dev/"$(basename -- "$1")" 2>/dev/null | grep 'Total capacity' | awk '{gb = $4 * 1.073741824; printf "%d\n", int(gb / 4 + 0.5) * 4}')
     echo "$disk_size_gb"
 }
 
@@ -1004,7 +1009,7 @@ get_eunit_container_aliases(){
 
 
 # Expansion units
-ebox_conected=$(synodisk --enum -t ebox)
+ebox_conected=$(/usr/syno/bin/synodisk --enum -t ebox)
 if [[ $ebox_conected ]]; then
     # Only device tree models have syno_slot_mapping
     # eSATA and InfiniBand ports both appear in syno_slot_mapping as:
@@ -1419,10 +1424,12 @@ updatedb(){
         fi
 
         # Edit existing drives in db with compatibility:not_support
-        if grep -q 'not_support' "$2"; then
-            sed -i 's/not_support/support/g' "$2"
-            if ! grep -q 'not_support' "$2"; then
-                echo -e "Edited incompatible drives in ${Cyan}$(basename -- "$2")${Off}" >&2
+        if [[ $incompatible == "yes" ]]; then
+            if grep -q 'not_support' "$2"; then
+                sed -i 's/not_support/support/g' "$2"
+                if ! grep -q 'not_support' "$2"; then
+                    echo -e "Edited incompatible drives in ${Cyan}$(basename -- "$2")${Off}" >&2
+                fi
             fi
         fi
 
@@ -1891,7 +1898,7 @@ done
 
 if [[ $ssd == "yes" ]]; then
     # Get array of internal drives
-    readarray -t internal_drives < <(synodisk --enum -t internal | grep 'Disk path' | cut -d"/" -f3)
+    readarray -t internal_drives < <(/usr/syno/bin/synodisk --enum -t internal | grep 'Disk path' | cut -d"/" -f3)
 
     if [[ $ssd_restore == "yes" ]]; then
         # Restore all internal drives to just in_sync
@@ -1915,7 +1922,7 @@ if [[ $ssd == "yes" ]]; then
         # Get list of internal HDDs and qty of SSDs
         internal_ssd_qty="0"
         for idrive in "${internal_drives[@]}"; do
-            if synodisk --isssd /dev/"${idrive:?}" >/dev/null; then
+            if /usr/syno/bin/synodisk --isssd /dev/"${idrive:?}" >/dev/null; then
                 # exit code 0 = is not SSD
                 # exit code 1 = is SSD
 
@@ -2522,12 +2529,6 @@ fi
 
 # Make Synology check disk compatibility
 if [[ -f /usr/syno/sbin/synostgdisk ]]; then
-    # synostoraged still holds the pre-edit synoinfo.conf in memory, so the
-    # check below runs against the old support_disk_compatibility value and the
-    # change only takes effect after a reboot. Restarting synostoraged first
-    # applies it immediately.
-    synosystemctl restart synostoraged
-    sleep 5
     /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
     status=$?
     if [[ $status -eq "0" ]]; then

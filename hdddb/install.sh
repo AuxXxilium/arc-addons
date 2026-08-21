@@ -27,7 +27,7 @@ After=smpkg-custom-install.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=-/usr/sbin/modprobe sg
-ExecStart=/usr/bin/hdddb.sh -nrwpeI
+ExecStart=/usr/bin/hdddb.sh -nrwpeSI
 
 [Install]
 WantedBy=multi-user.target
