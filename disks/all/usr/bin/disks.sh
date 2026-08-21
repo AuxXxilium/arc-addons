@@ -63,7 +63,7 @@ _wait_hba_disks_stable() {
     CUR_COUNT="$(_whba_count)"
     if [ "${CUR_COUNT}" = "${PREV_COUNT}" ]; then
       STABLE_ROUNDS=$((STABLE_ROUNDS + 1))
-      [ "${STABLE_ROUNDS}" -ge 5 ] && break
+      [ "${STABLE_ROUNDS}" -ge 3 ] && break
     else
       STABLE_ROUNDS=0
       PREV_COUNT="${CUR_COUNT}"
@@ -191,7 +191,7 @@ dtModel() {
 
   UNIQUE=$(__get_conf_kv unique)
 
-  _wait_hba_disks_stable "/sys/block/sata*"
+  _wait_hba_disks_stable "/sys/block/sata* /sys/block/sd*"
 
   DEST="/etc/model.dts"
   [ -f "/addons/model.dts" ] && cp -vpf "/addons/model.dts" "${DEST}"
