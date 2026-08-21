@@ -1,0 +1,25 @@
+version: 1
+name: diskcompat
+description: "Add current drives to DSM disk compatibility data and clear unsupported-drive storage pool warnings"
+system: false
+beta: false
+all:
+  install-script: "install.sh"
+  copy: "all"
+apollolake: true
+broadwell: true
+broadwellnk: true
+broadwellnkv2: true
+broadwellntbap: true
+denverton: true
+geminilake: true
+geminilakenk: true
+purley: true
+v1000: true
+v1000nk: true
+r1000: true
+r1000nk: true
+epyc7002: true
+epyc7003: true
+icelaked: true
+epyc7003ntb: true
