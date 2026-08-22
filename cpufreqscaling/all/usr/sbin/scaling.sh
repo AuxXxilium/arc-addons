@@ -45,14 +45,45 @@ wait_for_cpufreq() {
   return 1
 }
 
+load_governor_modules() {
+  GOV_MODULES=""
+  for DIR in /usr/lib/modules; do
+    [ -d "${DIR}" ] || continue
+    GOV_MODULES="$(find "${DIR}" -name 'cpufreq_*.ko*' -type f 2>/dev/null \
+      | sed 's|.*/||; s|\.ko.*$||' \
+      | sort -u)"
+    [ -n "${GOV_MODULES}" ] && break
+  done
+
+  # Try the known set anyway; modprobe -q simply fails for the ones absent.
+  if [ -z "${GOV_MODULES}" ]; then
+    GOV_MODULES="cpufreq_ondemand cpufreq_conservative cpufreq_userspace cpufreq_powersave cpufreq_performance cpufreq_interactive"
+  fi
+
+  LOADED=""
+  for MODULE in acpi_cpufreq cpufreq_governor cpufreq_stats ${GOV_MODULES}; do
+    if lsmod | grep -qw "${MODULE}"; then
+      LOADED="${LOADED} ${MODULE}"
+    elif /usr/sbin/modprobe -q "${MODULE}" 2>/dev/null; then
+      LOADED="${LOADED} ${MODULE}"
+    fi
+  done
+  echo "CPUFreqScaling: Governor modules loaded:${LOADED:- none}"
+}
+
 echo "CPUFreqScaling: Starting CPU frequency scaling setup"
+
+# Load the modules unconditionally, before any early exit. The governors have to
+# exist as loaded modules for anything to select them - including S99governor.sh
+# below, which only writes scaling_governor and loads nothing itself.
+load_governor_modules
 
 # An explicit choice in Arc Control outranks the boot cmdline, which is only the
 # default for a system nobody has configured. Both write the same sysfs files at
 # overlapping times during boot, so without this the last writer would win.
 ARCCONTROL_OVERRIDE="/usr/local/etc/rc.d/S99governor.sh"
 if [ -f "${ARCCONTROL_OVERRIDE}" ]; then
-  echo "CPUFreqScaling: Arc Control override present, leaving governor to it, exiting"
+  echo "CPUFreqScaling: Arc Control override present, modules loaded, leaving governor to it"
   exit 0
 fi
 
@@ -61,24 +92,6 @@ GOVERNOR="$(grep -o 'governor=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
 if [ -z "${GOVERNOR}" ]; then
   echo "CPUFreqScaling: No governor specified, exiting"
   exit 1
-fi
-
-# schedutil is built into the kernel, everything else may need a module
-if [ "${GOVERNOR}" != "schedutil" ]; then
-  ALL_GOVERNORS=("ondemand" "conservative" "userspace" "powersave" "performance" "interactive")
-  REQUIRED_MODULES=("cpufreq_stats" "cpufreq_governor")
-  for GOV in "${ALL_GOVERNORS[@]}"; do
-    REQUIRED_MODULES+=("cpufreq_${GOV}")
-  done
-
-  for MODULE in "${REQUIRED_MODULES[@]}"; do
-    if ! lsmod | grep -qw "${MODULE}"; then
-      MODULE_PATH="/usr/lib/modules/${MODULE}.ko"
-      if [ -f "${MODULE_PATH}" ]; then
-        insmod "${MODULE_PATH}" 2>/dev/null || true
-      fi
-    fi
-  done
 fi
 
 if ! wait_for_cpufreq; then
