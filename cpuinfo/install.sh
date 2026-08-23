@@ -18,7 +18,6 @@ if [ "${1}" = "late" ]; then
 [Unit]
 Description=cpuinfo daemon
 After=synoscgi.service nginx.service
-Requires=synoscgi.service nginx.service
 
 [Service]
 Type=simple
@@ -36,12 +35,13 @@ EOF
 [Unit]
 Description=cpuinfo setup (JS patch + nginx redirect)
 After=synoscgi.service nginx.service cpuinfo.service
-Requires=synoscgi.service nginx.service cpuinfo.service
+Wants=cpuinfo.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/bin/cpuinfo.sh
+TimeoutStartSec=90
 
 [Install]
 WantedBy=multi-user.target
