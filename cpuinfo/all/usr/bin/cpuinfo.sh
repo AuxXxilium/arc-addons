@@ -24,6 +24,7 @@ if [ ! -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ]; then
 fi
 
 if [ "${1}" = "-r" ]; then
+  rm -f "/usr/syno/synoman/webman/modules/AdminCenter/.cpuinfo.stamp"
   # Restore with cp, not mv: keeping the .bak means a later re-run still has a
   # pristine reference. A mv here leaves the system with no restore point at
   # all, and the next run then adopts the *current* (possibly patched) file as
@@ -56,51 +57,6 @@ _is_patched() {
   [ -f "$1" ] || return 1
   grep -q 'renderTempFromC(e\.sys_temp)\|e\.fan_list\.map\|t\.gpu||(t\.gpu=' "$1" 2>/dev/null
 }
-
-if [ -f "${FILE_GZ}" ]; then
-  if [ ! -f "${FILE_GZ}.bak" ]; then
-    if gzip -dc "${FILE_GZ}" 2>/dev/null | grep -q 'renderTempFromC(e\.sys_temp)\|e\.fan_list\.map\|t\.gpu||(t\.gpu='; then
-      echo "cpuinfo: ${FILE_GZ} is already patched and no pristine backup exists - refusing to"
-      echo "cpuinfo: adopt it as the baseline. Reinstall AdminCenter to restore, then re-run."
-      exit 1
-    fi
-    cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
-  fi
-else
-  if [ ! -f "${FILE_JS}.bak" ]; then
-    if _is_patched "${FILE_JS}"; then
-      echo "cpuinfo: ${FILE_JS} is already patched and no pristine backup exists - refusing to"
-      echo "cpuinfo: adopt it as the baseline. Reinstall AdminCenter to restore, then re-run."
-      exit 1
-    fi
-    cp -pf "${FILE_JS}" "${FILE_JS}.bak"
-  fi
-fi
-
-rm -f "${FILE_JS}" 2>/dev/null
-if [ -f "${FILE_GZ}.bak" ]; then
-  gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
-else
-  cp -pf "${FILE_JS}.bak" "${FILE_JS}"
-fi
-
-applyPatch() {
-  # $1=description $2=grep-anchor(BRE) $3=sed-script
-  if grep -q "$2" "${FILE_JS}"; then
-    sed -i "$3" "${FILE_JS}"
-    return 0
-  fi
-  echo "cpuinfo: $1 anchor not found, skipping"
-  return 1
-}
-
-# re-inserts the whole matched anchor text via sed's replacement metachar.
-_json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/&/\\&/g; s/#/\\#/g'; }
-
-sed -i "s#\(\(,\)\|\((\)\).\.cpu_vendor#\1\"$(_json_escape "${VENDOR}")\"#g" "${FILE_JS}"
-sed -i "s#\(\(,\)\|\((\)\).\.cpu_family#\1\"$(_json_escape "${FAMILY}")\"#g" "${FILE_JS}"
-sed -i "s#\(\(,\)\|\((\)\).\.cpu_series#\1\"$(_json_escape "${SERIES}")\"#g" "${FILE_JS}"
-sed -i "s#\(\(,\)\|\((\)\).\.cpu_cores#\1\"$(_json_escape "${CORES}")\"#g" "${FILE_JS}"
 
 # Args: $1=vid (4 hex, no 0x) $2=did
 _gpu_name_fallback() {
@@ -181,81 +137,143 @@ if command -v nvidia-smi >/dev/null 2>&1 && ls /dev/nvidia[0-9]* >/dev/null 2>&1
   done < <(nvidia-smi --query-gpu=name,clocks.max.graphics,memory.total,pci.bus_id --format=csv,noheader,nounits 2>/dev/null)
 fi
 
-if [ -n "${FIRST_NAME}" ]; then
-  echo "GPU Info (legacy t.gpu) set to: \"${FIRST_NAME}\" \"${FIRST_CLOCK}\" \"${FIRST_MEMORY}\""
-  applyPatch "GPU info injection (getActiveApi)" 't=this\.getActiveApi(t);let' \
-    "s#t=this.getActiveApi(t);let#t=this.getActiveApi(t);t.gpu||(t.gpu={clock:\"${FIRST_CLOCK}\",memory:\"${FIRST_MEMORY}\",name:\"$(_json_escape "${FIRST_NAME}")\"});let#g"
+STAMP_FILE="/usr/syno/synoman/webman/modules/AdminCenter/.cpuinfo.stamp"
+
+_stamp_now() {
+  _src=""
+  [ -f "${FILE_GZ}.bak" ] && _src="$(md5sum "${FILE_GZ}.bak" 2>/dev/null | awk '{print $1}')"
+  [ -z "${_src}" ] && [ -f "${FILE_JS}.bak" ] && _src="$(md5sum "${FILE_JS}.bak" 2>/dev/null | awk '{print $1}')"
+  printf 'v1|%s|%s|%s|%s|%s|%s|%s\n' "${_src}" "${SERIES}" "${CORES}" \
+    "${FIRST_NAME}" "${FIRST_CLOCK}" "${FIRST_MEMORY}" "${VENDOR}${FAMILY}"
+}
+
+if [ -f "${STAMP_FILE}" ] && [ "$(cat "${STAMP_FILE}" 2>/dev/null)" = "$(_stamp_now)" ]; then
+  _served_ok=0
+  if [ -f "${FILE_GZ}" ]; then
+    gzip -dc "${FILE_GZ}" 2>/dev/null | grep -q 'renderTempFromC(e\.sys_temp)\|e\.fan_list\.map\|t\.gpu||(t\.gpu=' && _served_ok=1
+  elif _is_patched "${FILE_JS}"; then
+    _served_ok=1
+  fi
+  if [ "${_served_ok}" = "1" ]; then
+    echo "cpuinfo: admin_center.js already patched and inputs unchanged, skipping patch pass"
+    SKIP_PATCH=1
+  fi
 fi
 
-  LEGACY_SYS_TEMP_PATCHED=0
-  if grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
-    applyPatch "nvidia GPU support flag (_D(\"support_nvidia_gpu\")})" '_D("support_nvidia_gpu")},' \
-      's/_D("support_nvidia_gpu")},/_D("support_nvidia_gpu")||true},/g'
-    applyPatch "GPU temp renderer (,C,D);)" ',C,D);' \
-      's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g'
-  fi
-
-  _CPUVAR="$(grep -oE ',t,i,[a-z]\)' "${FILE_JS}" | head -1 | sed 's/.*,//; s/)//')"
-  if [ -n "${_CPUVAR}" ]; then
-    applyPatch "sys_temp renderer (,t,i,${_CPUVAR})})" ",t,i,${_CPUVAR})}" \
-      "s/,t,i,${_CPUVAR})}/,t,i,e.sys_temp?${_CPUVAR}+\" \\| \"+this.renderTempFromC(e.sys_temp):${_CPUVAR})}/g" \
-      && LEGACY_SYS_TEMP_PATCHED=1
+if [ "${SKIP_PATCH:-0}" != "1" ]; then
+  if [ -f "${FILE_GZ}" ]; then
+    if [ ! -f "${FILE_GZ}.bak" ]; then
+      if gzip -dc "${FILE_GZ}" 2>/dev/null | grep -q 'renderTempFromC(e\.sys_temp)\|e\.fan_list\.map\|t\.gpu||(t\.gpu='; then
+        echo "cpuinfo: ${FILE_GZ} is already patched and no pristine backup exists - refusing to"
+        echo "cpuinfo: adopt it as the baseline. Reinstall AdminCenter to restore, then re-run."
+        exit 1
+      fi
+      cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
+    fi
   else
-    echo "cpuinfo: sys_temp — pattern ',t,i,X)' not found, skipping"
-  fi
-
-  applyPatch "PCIe slot vendor prefix (Synology \${r.cardName})" '`Synology ${r\.cardName}`' \
-    's#`Synology ${r\.cardName}`#`${r.cardName}`#g'
-
-  applyPatch "DSM 7.4 GPU section gate (b.support_gpu)" 'if(b\.support_gpu){' \
-    's#if(b\.support_gpu){const \([a-z]\)=this\.formatGpuInfo(b\.gpu_info)#if(b.support_gpu||t.gpu_info){const \1=this.formatGpuInfo(b.support_gpu?b.gpu_info:t.gpu_info)#g'
-
-  if ! grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
-    if grep -q 'u?_T("system","over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' "${FILE_JS}"; then
-      applyPatch "DSM 7.4 GPU temp renderer (formatGpuInfo)" \
-        'u?_T("system","over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' \
-        's#u?_T("system","over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join#(u?_T("system","over_temperature"):_T("helpbrowser","font_normal"))+(h?" | "+this.renderTempFromC(h):""),"</div>","</div>"].join#g'
-    else
-      applyPatch "legacy GPU temp renderer (font_normal)" 'font_normal"),"</div>","</div>"\].join("")' \
-        's#font_normal"),"</div>","</div>"].join("")#font_normal")," | "+this.renderTempFromC(h),"</div>","</div>"].join("")#g'
+    if [ ! -f "${FILE_JS}.bak" ]; then
+      if _is_patched "${FILE_JS}"; then
+        echo "cpuinfo: ${FILE_JS} is already patched and no pristine backup exists - refusing to"
+        echo "cpuinfo: adopt it as the baseline. Reinstall AdminCenter to restore, then re-run."
+        exit 1
+      fi
+      cp -pf "${FILE_JS}" "${FILE_JS}.bak"
     fi
   fi
 
-  _FANVAR="$(grep -oE '"rcpower",[a-z]\)' "${FILE_JS}" | head -1 | sed 's/.*,//; s/)//')"
-  if [ -n "${_FANVAR}" ]; then
-    FAN_SED="/tmp/_cpuinfo_fan_patch.sed"
-    printf 's/_T("rcpower",%s),/e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", %s),/g\n' \
-      "${_FANVAR}" "${_FANVAR}" >"${FAN_SED}"
-    if grep -q "\"rcpower\",${_FANVAR})," "${FILE_JS}"; then
-      sed -i -f "${FAN_SED}" "${FILE_JS}"
-      echo "cpuinfo: fan RPM renderer (rcpower,${_FANVAR}) applied"
-    else
-      echo "cpuinfo: fan RPM renderer (rcpower,${_FANVAR}) anchor not found, skipping"
-    fi
-    rm -f "${FAN_SED}"
+  rm -f "${FILE_JS}" 2>/dev/null
+  if [ -f "${FILE_GZ}.bak" ]; then
+    gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
   else
-    echo "cpuinfo: fan_list — pattern '_T(\"rcpower\",X)' not found, skipping"
+    cp -pf "${FILE_JS}.bak" "${FILE_JS}"
   fi
 
-  if [ "${LEGACY_SYS_TEMP_PATCHED}" -eq 0 ]; then
-    applyPatch "sys_temp row (rcfancontrol_desc)" 'i.unshift(\[_T("rcpower","rcfancontrol_desc")' \
-      's/i\.unshift(\[_T("rcpower","rcfancontrol_desc"),/e.sys_temp\&\&i.unshift(["System Temperature",this.renderTempFromC(e.sys_temp),n]),i.unshift([_T("rcpower","rcfancontrol_desc"),/g'
+  applyPatch() {
+    # $1=description $2=grep-anchor(BRE) $3=sed-script
+    if grep -q "$2" "${FILE_JS}"; then
+      sed -i "$3" "${FILE_JS}"
+      return 0
+    fi
+    echo "cpuinfo: $1 anchor not found, skipping"
+    return 1
+  }
+
+  # re-inserts the whole matched anchor text via sed's replacement metachar.
+  _json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/&/\\&/g; s/#/\\#/g'; }
+
+  sed -i "s#\(\(,\)\|\((\)\).\.cpu_vendor#\1\"$(_json_escape "${VENDOR}")\"#g" "${FILE_JS}"
+  sed -i "s#\(\(,\)\|\((\)\).\.cpu_family#\1\"$(_json_escape "${FAMILY}")\"#g" "${FILE_JS}"
+  sed -i "s#\(\(,\)\|\((\)\).\.cpu_series#\1\"$(_json_escape "${SERIES}")\"#g" "${FILE_JS}"
+  sed -i "s#\(\(,\)\|\((\)\).\.cpu_cores#\1\"$(_json_escape "${CORES}")\"#g" "${FILE_JS}"
+
+  if [ -n "${FIRST_NAME}" ]; then
+    echo "GPU Info (legacy t.gpu) set to: \"${FIRST_NAME}\" \"${FIRST_CLOCK}\" \"${FIRST_MEMORY}\""
+    applyPatch "GPU info injection (getActiveApi)" 't=this\.getActiveApi(t);let' \
+      "s#t=this.getActiveApi(t);let#t=this.getActiveApi(t);t.gpu||(t.gpu={clock:\"${FIRST_CLOCK}\",memory:\"${FIRST_MEMORY}\",name:\"$(_json_escape "${FIRST_NAME}")\"});let#g"
   fi
 
-# nginx runs with gzip_static on, so it serves admin_center.js.gz in preference
-# to admin_center.js whenever the .gz exists. Regenerating it only when a
-# .gz.bak happened to exist left the two out of sync: the browser kept getting
-# a stale .gz (potentially months old, from before a DSM update) while the
-# freshly patched .js was never served. Always rebuild the .gz when one is
-# present, so what nginx serves matches what we just patched.
-if [ -f "${FILE_GZ}" ] || [ -f "${FILE_GZ}.bak" ]; then
-  gzip -c "${FILE_JS}" >"${FILE_GZ}"
+    LEGACY_SYS_TEMP_PATCHED=0
+    if grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
+      applyPatch "nvidia GPU support flag (_D(\"support_nvidia_gpu\")})" '_D("support_nvidia_gpu")},' \
+        's/_D("support_nvidia_gpu")},/_D("support_nvidia_gpu")||true},/g'
+      applyPatch "GPU temp renderer (,C,D);)" ',C,D);' \
+        's/,C,D);/,C,t.gpu.temperature_c?D+" \| "+this.renderTempFromC(t.gpu.temperature_c):D);/g'
+    fi
+
+    _CPUVAR="$(grep -oE ',t,i,[a-z]\)' "${FILE_JS}" | head -1 | sed 's/.*,//; s/)//')"
+    if [ -n "${_CPUVAR}" ]; then
+      applyPatch "sys_temp renderer (,t,i,${_CPUVAR})})" ",t,i,${_CPUVAR})}" \
+        "s/,t,i,${_CPUVAR})}/,t,i,e.sys_temp?${_CPUVAR}+\" \\| \"+this.renderTempFromC(e.sys_temp):${_CPUVAR})}/g" \
+        && LEGACY_SYS_TEMP_PATCHED=1
+    else
+      echo "cpuinfo: sys_temp — pattern ',t,i,X)' not found, skipping"
+    fi
+
+    applyPatch "PCIe slot vendor prefix (Synology \${r.cardName})" '`Synology ${r\.cardName}`' \
+      's#`Synology ${r\.cardName}`#`${r.cardName}`#g'
+
+    applyPatch "DSM 7.4 GPU section gate (b.support_gpu)" 'if(b\.support_gpu){' \
+      's#if(b\.support_gpu){const \([a-z]\)=this\.formatGpuInfo(b\.gpu_info)#if(b.support_gpu||t.gpu_info){const \1=this.formatGpuInfo(b.support_gpu?b.gpu_info:t.gpu_info)#g'
+
+    if ! grep -q 'support_nvidia_gpu' "${FILE_JS}"; then
+      if grep -q 'u?_T("system","over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' "${FILE_JS}"; then
+        applyPatch "DSM 7.4 GPU temp renderer (formatGpuInfo)" \
+          'u?_T("system","over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join' \
+          's#u?_T("system","over_temperature"):_T("helpbrowser","font_normal"),"</div>","</div>"\].join#(u?_T("system","over_temperature"):_T("helpbrowser","font_normal"))+(h?" | "+this.renderTempFromC(h):""),"</div>","</div>"].join#g'
+      else
+        applyPatch "legacy GPU temp renderer (font_normal)" 'font_normal"),"</div>","</div>"\].join("")' \
+          's#font_normal"),"</div>","</div>"].join("")#font_normal")," | "+this.renderTempFromC(h),"</div>","</div>"].join("")#g'
+      fi
+    fi
+
+    _FANVAR="$(grep -oE '"rcpower",[a-z]\)' "${FILE_JS}" | head -1 | sed 's/.*,//; s/)//')"
+    if [ -n "${_FANVAR}" ]; then
+      FAN_SED="/tmp/_cpuinfo_fan_patch.sed"
+      printf 's/_T("rcpower",%s),/e.fan_list?e.fan_list.map(fan => `${fan} RPM`).join(" | "):_T("rcpower", %s),/g\n' \
+        "${_FANVAR}" "${_FANVAR}" >"${FAN_SED}"
+      if grep -q "\"rcpower\",${_FANVAR})," "${FILE_JS}"; then
+        sed -i -f "${FAN_SED}" "${FILE_JS}"
+        echo "cpuinfo: fan RPM renderer (rcpower,${_FANVAR}) applied"
+      else
+        echo "cpuinfo: fan RPM renderer (rcpower,${_FANVAR}) anchor not found, skipping"
+      fi
+      rm -f "${FAN_SED}"
+    else
+      echo "cpuinfo: fan_list — pattern '_T(\"rcpower\",X)' not found, skipping"
+    fi
+
+    if [ "${LEGACY_SYS_TEMP_PATCHED}" -eq 0 ]; then
+      applyPatch "sys_temp row (rcfancontrol_desc)" 'i.unshift(\[_T("rcpower","rcfancontrol_desc")' \
+        's/i\.unshift(\[_T("rcpower","rcfancontrol_desc"),/e.sys_temp\&\&i.unshift(["System Temperature",this.renderTempFromC(e.sys_temp),n]),i.unshift([_T("rcpower","rcfancontrol_desc"),/g'
+    fi
+
+  if [ -f "${FILE_GZ}" ] || [ -f "${FILE_GZ}.bak" ]; then
+    gzip -c "${FILE_JS}" >"${FILE_GZ}"
+  fi
+
+  _stamp_now >"${STAMP_FILE}" 2>/dev/null || true
 fi
 
-# The nginx redirect below is only safe once the daemon owns the socket, and
-# the daemon is a separate unit that this script never started. `-r` stops it,
-# so any later manual run would otherwise sit out the timeout below and revert,
-# reporting a missing socket rather than the stopped service that caused it.
 if [ ! -S "/run/arc_synoscgi.sock" ]; then
   if systemctl start cpuinfo.service 2>/dev/null; then
     echo "cpuinfo: started cpuinfo.service"
@@ -271,9 +289,13 @@ sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /etc/nginx/nginx.conf
 sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' /usr/syno/share/nginx/nginx.mustache
 
 # Wait for the cpuinfo daemon to create the socket before reloading nginx.
-TIMEOUT=10
+if sleep 0.1 2>/dev/null; then
+  SLEEP_STEP="0.1"; TIMEOUT=100
+else
+  SLEEP_STEP="1"; TIMEOUT=10
+fi
 while [ ! -S "/run/arc_synoscgi.sock" ] && [ "${TIMEOUT}" -gt 0 ]; do
-  sleep 1
+  sleep "${SLEEP_STEP}"
   TIMEOUT=$((TIMEOUT - 1))
 done
 if [ ! -S "/run/arc_synoscgi.sock" ]; then
