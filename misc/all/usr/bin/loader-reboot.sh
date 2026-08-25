@@ -15,7 +15,7 @@ if [ "$(id -u)" -ne 0 ]; then
     echo "Error: This script must be run as root or with 'arcsu'."
     exit 1
   fi
-  exec env ARCSU_ACTIVE=1 arcsu "$0" "$@"
+  exec env ARCSU_ACTIVE=1 /usr/bin/arcsu "$0" "$@"
 fi
 
 reset_arcsu() {
