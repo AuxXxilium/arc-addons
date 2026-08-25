@@ -785,7 +785,15 @@ read_fan_mode() {
 }
 
 main() {
-  local FanBaseMode="" FansActive=0 NoFanTick=0
+  local FanBaseMode="" FansActive=0 NoFanTick=0 NoFanRetries=0
+
+  # hwmon/pwm nodes can show up after this service starts (driver load ordering), and
+  # discover_fans only counts a fan once it reports RPM > 0 with a writable pwm, so the
+  # first look can legitimately come up empty. Retry every 6 ticks (30s) for ~2 minutes,
+  # then give up: a box with no controllable fans has nothing to control, and idling in
+  # a retry loop forever just wakes up to re-read the task. Exit 0 so systemd leaves it
+  # stopped - the unit uses Restart=on-failure, so a clean exit is final.
+  local NOFAN_MAX_RETRIES=4
 
   trap 'reload_config' HUP
 
@@ -810,7 +818,17 @@ main() {
         NoFanTick=0
         if init_fans; then
           FansActive=1
+          read_fan_mode FanBaseMode
           start_fan2go "${FanBaseMode}"
+        else
+          NoFanRetries=$(( NoFanRetries + 1 ))
+          if [ "${NoFanRetries}" -ge "${NOFAN_MAX_RETRIES}" ]; then
+            echo "No controllable PWM fans after $(( NoFanRetries * 30 ))s, stopping fan control."
+            # cleanup restores the pwm*_enable values init_fans switched to manual; the
+            # INT/TERM/HUP trap does not fire on a normal return, so call it here.
+            cleanup
+            return 0
+          fi
         fi
       fi
       continue
