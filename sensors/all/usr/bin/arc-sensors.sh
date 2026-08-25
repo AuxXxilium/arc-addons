@@ -255,14 +255,15 @@ update_task() {
   [ "${exists:-0}" -gt 0 ] && return
 
   local operation
-  operation='# Fan control — edit the values below to change fan behavior.
+  operation='# Fan control — set these in arc-control, which applies them right away.
+# Editing them here works too, but only takes effect after: systemctl restart sensors
 #
 # Which curve column is used. Set this to pick the fan profile:
 #   0 = Full-speed    1 = Cool (default)    2 = Quiet
 #
-# Set it in arc-control, or edit this line - either way it lives in this task, so the
-# choice survives a reboot. DSM Control Panel has no working Fan Speed Mode selector on
-# this hardware (it neither saves nor displays the real mode), so it is not shown.
+# The mode lives in this task either way, so the choice survives a reboot. DSM Control
+# Panel has no working Fan Speed Mode selector on this hardware (it neither saves nor
+# displays the real mode), so it is not shown.
 FANMODE="'"${DEFAULT_FANMODE}"'"
 #
 # One "temperature pwm%" pair per mode, per row.
@@ -815,7 +816,11 @@ main() {
       continue
     fi
 
-    # Reload triggered by arc-control save&apply or SIGHUP — check every tick
+    # Curves and FANMODE are only re-read on an explicit reload, never polled. Saving in
+    # arc-control restarts this service, so its changes are already live by the time the
+    # next tick runs; polling the task added an sqlite3 fork every 5s to catch nothing.
+    # A task edited by hand in DSM's Task Scheduler applies on the next restart, or
+    # immediately via SIGHUP / touching RELOAD_FLAG.
     if [ "${RELOAD_NEEDED}" -eq 1 ] || [ -f "${RELOAD_FLAG}" ]; then
       echo "Reloading fan curves..."
       RELOAD_NEEDED=0
@@ -827,24 +832,6 @@ main() {
       restore_excluded_pwm_enable
       discover_fans
       save_fan_channels
-      generate_fan2go_config "${FanBaseMode}"
-      restart_fan2go
-      continue
-    fi
-
-    # Mode change: re-read the task and synoinfo every tick. load_task is what refreshes
-    # FANMODE, so it has to run here too - otherwise a mode edited in the 'Fancontrol 2.0'
-    # task would sit unnoticed until something else triggered a reload. No mtime gate on
-    # either source: DSM may write synoinfo.conf via a temp-file-then-rename dance, and
-    # gating on mtime risks permanently missing an update if the snapshot races it.
-    local FanCurtMode
-    load_task
-    read_fan_mode FanCurtMode
-
-    if [ "${FanCurtMode}" != "${FanBaseMode}" ]; then
-      echo "Fan mode changed to ${FanCurtMode}"
-      FanBaseMode="${FanCurtMode}"
-      # load_task already ran above, so the curves are current.
       generate_fan2go_config "${FanBaseMode}"
       restart_fan2go
     fi
