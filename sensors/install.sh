@@ -45,7 +45,7 @@ if [ "${1}" = "late" ]; then
       echo "[Service]"
       echo "Type=simple"
       echo "ExecStart=/usr/bin/arc-sensors.sh"
-      echo "Restart=always"
+      echo "Restart=on-failure"
       echo "RestartSec=5"
       echo "StartLimitBurst=5"
       echo "StartLimitInterval=60"
