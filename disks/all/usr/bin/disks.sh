@@ -225,7 +225,7 @@ dtModel() {
         _DR="$(basename "$(readlink -f "/sys/bus/pci/devices/${_PC}/driver")")"
       fi
       if [ -n "${_PC}" ]; then
-        case "${_PC}" in *:*:*.*) : ;; *) _PC="0000:${_PC}" ;; esac
+        case "${_PC}" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) : ;; *) _PC="0000:${_PC}" ;; esac
       else
         _log "unknown: ${_F}"; continue
       fi
@@ -347,9 +347,9 @@ dtModel() {
 
   _release=$(/bin/uname -r)
   if [ "$(/bin/echo "${_release%%[-+]*}" | /usr/bin/cut -d'.' -f1)" -lt 5 ]; then
-    sed -i 's/"0000:\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\)"/"\1"/g' "${DEST}"
+    sed -i 's/"0000:\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\(,[0-9a-f][0-9a-f]\.[0-7]\)\{0,1\}\)"/"\1"/g' "${DEST}"
   else
-    sed -i 's/"\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\)"/"0000:\1"/g' "${DEST}"
+    sed -i 's/"\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\(,[0-9a-f][0-9a-f]\.[0-7]\)\{0,1\}\)"/"0000:\1"/g' "${DEST}"
   fi
 
   sed -i "0,/version = .*;/s/model = \".*\";/model = \"${UNIQUE}\";/" "${DEST}"
@@ -375,8 +375,11 @@ dtModel() {
     #__set_conf_kv "support_write_cache" "yes"
   fi
 
-  dtc -I dts -O dtb "${DEST}" >/etc/model.dtb
-  if [ $? -eq 0 ]; then
+  _DTB_TMP="/tmp/model.dtb.$$"
+  dtc -I dts -O dtb "${DEST}" >"${_DTB_TMP}"
+  if [ $? -eq 0 ] && [ -s "${_DTB_TMP}" ]; then
+    cat "${_DTB_TMP}" >/etc/model.dtb
+    rm -f "${_DTB_TMP}"
     _log "dtc success"
     rm -vf "${DEST}"
     cp -vpf /etc/model.dtb /etc.defaults/model.dtb
@@ -386,6 +389,7 @@ dtModel() {
     return 0
   else
     _log "dtc error"
+    rm -f "${_DTB_TMP}"
     rm -vf "${DEST}"
     cp -vpf /etc.defaults/model.dtb /etc/model.dtb
     return 1
