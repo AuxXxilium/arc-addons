@@ -9,8 +9,15 @@
 # Remove set -e to handle errors explicitly
 set -u
 
-if [ -z "${ARCSU_ACTIVE:-}" ]; then
-  exec env ARCSU_ACTIVE=1 arcsu "$0" "$@"
+# Already root (the arc-control package runs as root) - nothing to escalate.
+# Otherwise re-exec through arcsu, by absolute path: a CGI inherits nginx's
+# minimal PATH, which need not contain /usr/bin.
+if [ "$(id -u)" -ne 0 ]; then
+  if [ ! -x /usr/bin/arcsu ]; then
+    echo "Error: This script must be run as root or with 'arcsu'."
+    exit 1
+  fi
+  exec env ARCSU_ACTIVE=1 /usr/bin/arcsu "$0" "$@"
 fi
 
 reset_arcsu() {
