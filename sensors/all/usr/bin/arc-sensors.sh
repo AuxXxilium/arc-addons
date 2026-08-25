@@ -326,9 +326,14 @@ load_fan_channels() {
   done <"${FAN_CHANNELS_CONF}"
 }
 
-# Discover hwmon fans with RPM > 0 and a matching writable pwm channel, skipping any
-# listed in FAN_EXCLUDE (identified by fan_curve_key()). Populates FAN_CHANNELS array.
+# Discover hwmon fans with a matching writable pwm channel, skipping any listed in
+# FAN_EXCLUDE (identified by fan_curve_key()). Populates FAN_CHANNELS array.
 # Requires FAN_EXCLUDE to already be loaded (call load_task first).
+#
+# RPM is deliberately not used as a liveness test. With BIOS fan-stop (Q-Fan and the
+# various "silent" profiles) a perfectly controllable fan sits at 0 RPM until something
+# heats up, which on an idle NAS may be hours - so a fan reporting 0 now says nothing
+# about whether it can be driven. A writable pwm channel is the thing that matters.
 discover_fans() {
   FAN_CHANNELS=()
   for HW in /sys/class/hwmon/hwmon*; do
@@ -336,11 +341,9 @@ discover_fans() {
     IDX="$(basename "${HW}" | sed 's/hwmon//')"
     for FAN in "${HW}"/fan[0-9]*_input; do
       [ -r "${FAN}" ] || continue
-      local FNUM RPM
+      local FNUM
       FNUM="$(basename "${FAN}" | sed 's/fan\([0-9]*\)_input/\1/')"
       [ -w "${HW}/pwm${FNUM}" ] || continue
-      RPM="$(cat "${FAN}" 2>/dev/null || echo 0)"
-      [ "${RPM:-0}" -gt 0 ] || continue
       fan_is_excluded "$(fan_curve_key "${IDX}" "${FNUM}")" && continue
       FAN_CHANNELS+=("hwmon${IDX}/pwm${FNUM}")
     done
@@ -662,7 +665,7 @@ init_fans() {
   discover_fans
 
   if [ "${#FAN_CHANNELS[@]}" -eq 0 ]; then
-    echo "No controllable PWM fans found (fans present but RPM=0 or PWM not writable), skipping fan control..."
+    echo "No controllable PWM fans found (no fan with a writable pwm channel), skipping fan control..."
     set_fan_conf "no"
     return 1
   fi
@@ -787,13 +790,12 @@ read_fan_mode() {
 main() {
   local FanBaseMode="" FansActive=0 NoFanTick=0 NoFanRetries=0
 
-  # hwmon/pwm nodes can show up after this service starts (driver load ordering), and
-  # discover_fans only counts a fan once it reports RPM > 0 with a writable pwm, so the
-  # first look can legitimately come up empty. Retry every 6 ticks (30s) for ~2 minutes,
-  # then give up: a box with no controllable fans has nothing to control, and idling in
-  # a retry loop forever just wakes up to re-read the task. Exit 0 so systemd leaves it
-  # stopped - the unit uses Restart=on-failure, so a clean exit is final.
-  local NOFAN_MAX_RETRIES=4
+  # hwmon/pwm nodes can show up after this service starts (driver load ordering), so the
+  # first look can legitimately come up empty. Retry every 6 ticks (30s) for ~5 minutes,
+  # then give up: a box with no writable pwm channel has nothing to control, and idling
+  # in a retry loop forever just wakes up to re-read the task. Exit 0 so systemd leaves
+  # it stopped - the unit uses Restart=on-failure, so a clean exit is final.
+  local NOFAN_MAX_RETRIES=10
 
   trap 'reload_config' HUP
 
