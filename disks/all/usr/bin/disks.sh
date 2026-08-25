@@ -488,12 +488,20 @@ nondtModel() {
     fi
   done
 
-  if [ "${hasUSB}" = "true" ]; then
-    if [ ${MAXNONUSBIDX} -lt ${USBMINIDX} ]; then
-      [ $((USBMAXIDX - USBMINIDX)) -lt $((6 - 1)) ] && USBMAXIDX=$((USBMINIDX + 6 - 1))
-    fi
-    [ $((USBMAXIDX + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((USBMAXIDX + 1))
+  # Reserve at least 6 USB slots, even when no USB disk is attached at boot:
+  # a disk plugged in later must land in a slot that already exists, otherwise
+  # it falls outside both masks and DSM has no bay for it. With "usbinternal"
+  # the reserved range stays in internalportcfg, which is what makes USB disks
+  # usable as internal disks. Never reserve across indices held by non-USB
+  # disks (AHCI/HBA) - that would mis-classify them as USB.
+  if [ "${hasUSB}" = "false" ]; then
+    USBMINIDX=$((MAXNONUSBIDX + 1))
+    [ ${USBMINIDX} -lt ${MAXDISKS} ] && USBMINIDX=${MAXDISKS}
+    USBMAXIDX=$((USBMINIDX + 6 - 1))
+  elif [ ${MAXNONUSBIDX} -lt ${USBMINIDX} ]; then
+    [ $((USBMAXIDX - USBMINIDX)) -lt $((6 - 1)) ] && USBMAXIDX=$((USBMINIDX + 6 - 1))
   fi
+  [ $((USBMAXIDX + 1)) -gt ${MAXDISKS} ] && MAXDISKS=$((USBMAXIDX + 1))
 
   if _check_user_conf "maxdisks"; then
     MAXDISKS=$(($(__get_conf_kv maxdisks)))
@@ -509,7 +517,7 @@ nondtModel() {
   elif _check_user_conf "usbportcfg"; then
     USBPORTCFG=$(($(__get_conf_kv usbportcfg)))
     printf 'get usbportcfg=0x%.2x\n' "${USBPORTCFG}"
-  elif [ "${hasUSB}" = "true" ]; then
+  else
     # shellcheck disable=SC3019
     USBPORTCFG=$(($((2 ** $((USBMAXIDX + 1)) - 1)) ^ $((2 ** USBMINIDX - 1))))
     OVERLAPMASK=$((USBPORTCFG & NONUSBMASK))
@@ -517,10 +525,6 @@ nondtModel() {
       USBPORTCFG=$((USBPORTCFG ^ OVERLAPMASK))
       _log "fix usbportcfg overlap: clear mask=0x$(printf '%x' ${OVERLAPMASK})"
     fi
-    __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
-    printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
-  else
-    USBPORTCFG=0
     __set_conf_kv "usbportcfg" "$(printf '0x%.2x' ${USBPORTCFG})"
     printf 'set usbportcfg=0x%.2x\n' "${USBPORTCFG}"
   fi
