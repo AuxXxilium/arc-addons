@@ -1,0 +1,29 @@
+#
+# Copyright (C) 2026 AuxXxilium <https://github.com/AuxXxilium>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
+# Keep e1000e out of PCI runtime power management.
+#
+# e1000e_pm_runtime_idle() arms a 5s suspend timer whenever the link is down.
+# When the timer fires, __e1000_shutdown() has to reach the PHY - and on some
+# PCH-integrated PHYs (I219 on 300-series and later) that access fails. The
+# suspend callback then calls e1000e_pm_runtime_resume(), which brings the
+# whole device back up, and returns -EBUSY. The device goes idle again, the
+# idle callback re-arms the timer, and the cycle repeats indefinitely.
+#
+# The symptom is a permanently busy "kworker/N:M+pm" (the down/up cycle runs
+# on pm_wq) alongside ksoftirqd/N (e1000e_up re-enables IRQs and NAPI each
+# time round), plus a link that never settles.
+#
+# Setting power/control to "on" stops the PM core from ever attempting a
+# runtime suspend, which breaks the cycle. Cost is a small amount of idle
+# power on a NIC that is expected to stay up anyway. Hardware where runtime
+# suspend works correctly loses nothing but that idle saving.
+#
+
+# Match on "bind" as well as "add": on "add" the driver is not necessarily
+# bound yet, so DRIVER== can still be empty at that point. Matching the device
+# itself (DRIVER) rather than the parent chain (DRIVERS) keeps this to the NIC.
+ACTION=="add|bind", SUBSYSTEM=="pci", DRIVER=="e1000e", ATTR{power/control}="on"
