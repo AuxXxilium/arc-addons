@@ -1,8 +1,8 @@
 version: 1
 name: diskcompat
-description: "Add current drives to DSM disk compatibility data and clear unsupported-drive storage pool warnings"
+description: "Force add current drives to DSM disk compatibility data (only select if hdddb is not working)"
 system: false
-beta: false
+beta: true
 all:
   install-script: "install.sh"
   copy: "all"
