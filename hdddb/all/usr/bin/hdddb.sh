@@ -765,9 +765,23 @@ getdriveinfo(){
 
         # Get firmware version with smartctl if $fwrev null
         # for M.2 SATA SSD and SAS drives. Github issue #407
+        #
+        # Bounded with timeout(1): "-d ata -T permissive" forces the ATA command
+        # set at a device that may not speak it (SAS, M.2 SATA behind an adapter,
+        # anything on an HBA with unclean ATA passthrough), and each such call
+        # then sits in SCSI command timeouts. Unbounded, a handful of drives can
+        # hold hdddb.service - and with it multi-user.target - for minutes on a
+        # first boot, when DSM's caches are cold and more drives reach this path.
+        # A drive that times out just keeps an empty fwrev and is skipped below,
+        # which is the same outcome as smartctl failing outright.
         if [[ -z $fwrev ]]; then
             dev=/dev/"$(basename -- "$1")"
-            fwrev=$(smartctl -a -d ata -T permissive "$dev" | grep -i firmware | awk '{print $NF}')
+            if which timeout >/dev/null 2>&1; then
+                fwrev=$(timeout 10 smartctl -a -d ata -T permissive "$dev" | grep -i firmware | awk '{print $NF}')
+            else
+                fwrev=$(smartctl -a -d ata -T permissive "$dev" | grep -i firmware | awk '{print $NF}')
+            fi
+            [[ -z $fwrev ]] && echo "No firmware revision for $dev, skipping"
         fi
 
         # Get drive GB size
