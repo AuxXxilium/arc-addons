@@ -55,25 +55,37 @@ _wait_hba_disks_stable() {
     echo "${_C}"
   }
 
-  PREV_COUNT="$(_whba_count)"
+  # This runs in the "patches" boot phase, before DSM userspace comes up, so
+  # every second spent here is a second the login screen is not shown. Two
+  # things keep that cost down:
+  #   - the short-circuit below: if udev already enumerated everything before
+  #     we got here (the common case), the count never moves and we leave
+  #     after the first two rounds instead of waiting out three stable ones;
+  #   - a 60s ceiling, which still covers staggered backplane spin-up but no
+  #     longer lets a genuinely stuck controller hold the WebUI for 5 minutes.
+  START_COUNT="$(_whba_count)"
+  PREV_COUNT="${START_COUNT}"
   STABLE_ROUNDS=0
   I=0
-  while [ "${I}" -lt 100 ]; do
+  while [ "${I}" -lt 20 ]; do
     sleep 3
+    I=$((I + 1))
     CUR_COUNT="$(_whba_count)"
     if [ "${CUR_COUNT}" = "${PREV_COUNT}" ]; then
       STABLE_ROUNDS=$((STABLE_ROUNDS + 1))
       [ "${STABLE_ROUNDS}" -ge 3 ] && break
+      # Nothing has appeared since we started: udev was already done before
+      # this ran, so there is no spin-up in progress to wait out.
+      [ "${I}" -ge 2 ] && [ "${CUR_COUNT}" = "${START_COUNT}" ] && break
     else
       STABLE_ROUNDS=0
       PREV_COUNT="${CUR_COUNT}"
     fi
-    I=$((I + 1))
   done
-  if [ "${I}" -ge 100 ]; then
+  if [ "${I}" -ge 20 ]; then
     _log "HBA disk stabilisation wait timed out: [${_whba_globs}] at count ${CUR_COUNT}"
   else
-    _log "HBA disks settled: [${_whba_globs}] at count ${CUR_COUNT}"
+    _log "HBA disks settled after ${I} round(s): [${_whba_globs}] at count ${CUR_COUNT}"
   fi
 }
 
