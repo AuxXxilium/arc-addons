@@ -28,6 +28,8 @@ elif [ "${1}" = "modules" ]; then
   # Lake-S UHD (8086:a782) shows up as class 0380 - and some report 0302.
   GPU="$(lspci -n 2>/dev/null | grep -E ' 03[0-9a-fA-F]{2}: 8086:[0-9a-fA-F]{4}' \
     | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
+  AMDGPU="$(lspci -n 2>/dev/null | grep -E ' 03[0-9a-fA-F]{2}: 1002:[0-9a-fA-F]{4}' \
+    | grep -Eo '1002:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
   # Two module-set layouts are in the field and both have to work here:
   #
   #   split - i915 and its DRM stack live in /usr/lib/modules/update, shadowing
@@ -41,12 +43,13 @@ elif [ "${1}" = "modules" ]; then
   #           nothing shadows anything and the only question is whether i915
   #           is wanted; if not, the stack is removed by name.
   #
-  # Either way the whole DRM stack travels together: it is built against this
-  # i915 and i915 is its only consumer left in the set - amdgpu, vmwgfx,
-  # virtio-gpu and udl are dropped at build time - so with no supported Intel
-  # iGPU present every one of them is dead weight that can only misbind.
-  I915_STACK="i915 i915-compat intel-gtt drm drm_kms_helper drm_display_helper \
-              drm_buddy drm_mipi_dsi ttm dmabuf"
+  # The core is shared: i915 and amdgpu are both built against it, so it is only
+  # dead weight when neither vendor's GPU is present. Each vendor driver goes
+  # when its own GPU is absent.
+  DRM_CORE="drm drm_kms_helper drm_display_helper drm_buddy drm_mipi_dsi ttm dmabuf \
+            drm_ttm_helper drm_suballoc_helper drm_panel_orientation_quirks gpu-sched"
+  I915_ONLY="i915 i915-compat intel-gtt"
+  AMD_ONLY="amdgpu amdxcp"
   if [ -f "/usr/lib/modules/update/i915.ko" ]; then
     I915KO="/usr/lib/modules/update/i915.ko"
   elif [ -f "/usr/lib/modules/i915.ko" ]; then
@@ -55,27 +58,52 @@ elif [ "${1}" = "modules" ]; then
     I915KO=""
   fi
 
+  if [ -f "/usr/lib/modules/update/amdgpu.ko" ]; then
+    AMDKO="/usr/lib/modules/update/amdgpu.ko"
+  elif [ -f "/usr/lib/modules/amdgpu.ko" ]; then
+    AMDKO="/usr/lib/modules/amdgpu.ko"
+  else
+    AMDKO=""
+  fi
+
   I915_WANTED=false
   if [ -n "${I915KO}" ] && [ -n "${GPU}" ]; then
     PCI="pci:v0000$(echo "${GPU}" | cut -c1-4)d0000$(echo "${GPU}" | cut -c5-8)"
     if modinfo -F alias "${I915KO}" 2>/dev/null | grep -iq "${PCI}"; then
       I915_WANTED=true
-      echo "eudev: i915 supports ${GPU}, keeping the DRM stack"
+      echo "eudev: i915 supports ${GPU}, keeping it"
     else
-      echo "eudev: i915 does not support ${GPU}, removing the DRM stack"
+      echo "eudev: i915 does not support ${GPU}, removing it"
     fi
   elif [ -n "${I915KO}" ]; then
-    echo "eudev: no Intel GPU present, removing the DRM stack"
+    echo "eudev: no Intel GPU present, removing i915"
   fi
 
-  if [ -n "${I915KO}" ]; then
-    if [ "${I915_WANTED}" = true ]; then
+  # Matched by vendor rather than by alias: amdgpu binds every 1002 display device
+  # through a PCI_ANY_ID catch-all, so an alias lookup would reject supported
+  # hardware the ID table never names individually.
+  AMD_WANTED=false
+  if [ -n "${AMDKO}" ] && [ -n "${AMDGPU}" ]; then
+    AMD_WANTED=true
+    echo "eudev: AMD GPU ${AMDGPU} present, keeping amdgpu"
+  elif [ -n "${AMDKO}" ]; then
+    echo "eudev: no AMD GPU present, removing amdgpu"
+  fi
+
+  if [ -n "${I915KO}" ] || [ -n "${AMDKO}" ]; then
+    if [ "${I915_WANTED}" = true ] || [ "${AMD_WANTED}" = true ]; then
       # On a split set the backport has to come down to the module root, where
       # it replaces the 5.10 modules of the same name - the whole point of the
       # shadowing. On a flat set there is nothing to move and the mv is a no-op.
       [ -d /usr/lib/modules/update ] && mv -f /usr/lib/modules/update/* /usr/lib/modules/ 2>/dev/null
+      [ "${I915_WANTED}" = true ] || for M in ${I915_ONLY}; do
+        rm -f "/usr/lib/modules/${M}.ko" 2>/dev/null || true
+      done
+      [ "${AMD_WANTED}" = true ] || for M in ${AMD_ONLY}; do
+        rm -f "/usr/lib/modules/${M}.ko" 2>/dev/null || true
+      done
     else
-      for M in ${I915_STACK}; do
+      for M in ${I915_ONLY} ${AMD_ONLY} ${DRM_CORE}; do
         rm -f "/usr/lib/modules/${M}.ko" 2>/dev/null || true
       done
     fi
