@@ -241,11 +241,15 @@ elif [ "${1}" = "late" ]; then
   # host bridges), so a vendor-only test fires on machines with no AMD display
   # device at all and forces a modprobe that can only fail.
   #
-  # amdgpu advertises two kinds of alias and both have to be honoured:
-  #   pci:v00001002d000015DDsv*sd*bc*sc*i*   - one device id, most of the table
-  #   pci:v00001002d*sv*sd*bc03sc00i00*      - any 1002 device of that PCI class
-  # Newer cards (RX 7000, for one) appear only under the class wildcard, so a
-  # device-id test alone would reject a GPU the module actually drives.
+  # Only a device-id alias counts. amdgpu also advertises three class wildcards
+  #   pci:v00001002d*sv*sd*bc03sc00i00*   any 1002 VGA-class device
+  #   pci:v00001002d*sv*sd*bc03sc80i00*   any 1002 display-class device
+  # which match every AMD GPU ever made, including generations this module has
+  # neither support nor firmware for. Strix Point (Ryzen AI 9 HX 370, Radeon
+  # 890M) is the case that matters: no device-id alias, no gc_11_5/psp_14_0
+  # firmware referenced at all, yet the wildcard matches - and forcing the load
+  # there stopped those systems from booting. A device-id match is the module
+  # saying it knows the part; the wildcard is only saying it is an AMD display.
   AMDGPU_KO=""
   for K in "/tmpRoot/usr/lib/modules/amdgpu.ko" "/usr/lib/modules/amdgpu.ko"; do
     [ -z "${AMDGPU_KO}" ] && [ -f "${K}" ] && AMDGPU_KO="${K}"
@@ -255,23 +259,18 @@ elif [ "${1}" = "late" ]; then
   if [ -n "${AMDGPU_KO}" ]; then
     AMDGPU_ALIAS="$(modinfo -F alias "${AMDGPU_KO}" 2>/dev/null)"
     if [ -n "${AMDGPU_ALIAS}" ]; then
-      # "0300" VGA and "0380" Display are the classes amdgpu binds. lspci prints
-      # hex lowercase and the alias table uppercase, so every test below is -i:
+      # Display class (03) only, so a 1002 audio or SMBus function cannot match.
+      # lspci prints hex lowercase and the alias table uppercase, hence grep -i:
       # uppercasing the alias text itself would also hit the literal "pci:" and
       # "bc"/"sc" markers and stop the pattern from ever matching.
-      for E in $(lspci -n 2>/dev/null \
+      for DEV in $(lspci -n 2>/dev/null \
         | grep -E ' 03[0-9a-fA-F]{2}: 1002:[0-9a-fA-F]{4}' \
-        | awk '{print $2 $3}' | tr -d ':'); do
-        CLASS="$(echo "${E}" | cut -c1-4)"
-        DEV="$(echo "${E}" | cut -c9-12)"
-        # Device-id alias, then the class wildcard for cards not listed by id.
-        if echo "${AMDGPU_ALIAS}" | grep -qi "pci:v00001002d0000${DEV}"; then
+        | grep -Eo ' 1002:[0-9a-fA-F]{4}' | cut -d: -f2); do
+        if echo "${AMDGPU_ALIAS}" | grep -qi "pci:v00001002d0000${DEV}sv"; then
           AMDGPU_DEV="${DEV}"
-        elif echo "${AMDGPU_ALIAS}" | grep -qi "pci:v00001002d[*]sv[*]sd[*]bc$(echo "${CLASS}" | cut -c1-2)sc$(echo "${CLASS}" | cut -c3-4)"; then
-          AMDGPU_DEV="${DEV}"
+          break
         fi
-        [ -n "${AMDGPU_DEV}" ] && break
-        echo "amdgpu does not support 1002:${DEV}"
+        echo "amdgpu has no device-id alias for 1002:${DEV}, not forcing a load"
       done
     fi
   fi
