@@ -236,20 +236,19 @@ elif [ "${1}" = "late" ]; then
   # AMD GPU
   # Unlike nvidia, DSM ships no 70-syno-amdgpu-gpu.conf to uncomment, so the
   # conf is written here and removed again when no supported GPU is present.
-  # The gate is amdgpu's own PCI alias table rather than the 1002 vendor id:
-  # every AMD board carries 1002 devices that are not GPUs (HD audio, SMBus,
-  # host bridges), so a vendor-only test fires on machines with no AMD display
+  #
+  # The gate is amdgpu's own alias table, not the 1002 vendor id: every AMD
+  # board carries 1002 devices that are not GPUs (HD audio, SMBus, host
+  # bridges), so a vendor-only test fires on machines with no AMD display
   # device at all and forces a modprobe that can only fail.
   #
-  # Only a device-id alias counts. amdgpu also advertises three class wildcards
-  #   pci:v00001002d*sv*sd*bc03sc00i00*   any 1002 VGA-class device
-  #   pci:v00001002d*sv*sd*bc03sc80i00*   any 1002 display-class device
-  # which match every AMD GPU ever made, including generations this module has
-  # neither support nor firmware for. Strix Point (Ryzen AI 9 HX 370, Radeon
-  # 890M) is the case that matters: no device-id alias, no gc_11_5/psp_14_0
-  # firmware referenced at all, yet the wildcard matches - and forcing the load
-  # there stopped those systems from booting. A device-id match is the module
-  # saying it knows the part; the wildcard is only saying it is an AMD display.
+  # amdgpu binds two ways and both are legitimate, so both aliases count:
+  #   pci:v00001002d000015DDsv*sd*bc*sc*i*   one of the 303 legacy device ids
+  #   pci:v00001002d*sv*sd*bc03sc00i00*      CHIP_IP_DISCOVERY - the driver
+  #     reads ip_discovery.bin off the card and enumerates its IP versions at
+  #     runtime. Every RDNA2/RDNA3 part binds this way and carries no device-id
+  #     alias, so a device-id test alone would reject an RX 7900 XTX that the
+  #     driver fully supports.
   AMDGPU_KO=""
   for K in "/tmpRoot/usr/lib/modules/amdgpu.ko" "/usr/lib/modules/amdgpu.ko"; do
     [ -z "${AMDGPU_KO}" ] && [ -f "${K}" ] && AMDGPU_KO="${K}"
@@ -263,14 +262,22 @@ elif [ "${1}" = "late" ]; then
       # lspci prints hex lowercase and the alias table uppercase, hence grep -i:
       # uppercasing the alias text itself would also hit the literal "pci:" and
       # "bc"/"sc" markers and stop the pattern from ever matching.
-      for DEV in $(lspci -n 2>/dev/null \
+      for E in $(lspci -n 2>/dev/null \
         | grep -E ' 03[0-9a-fA-F]{2}: 1002:[0-9a-fA-F]{4}' \
-        | grep -Eo ' 1002:[0-9a-fA-F]{4}' | cut -d: -f2); do
+        | awk '{print $2 $3}' | tr -d ':' | tr 'A-F' 'a-f'); do
+        CLASS="$(echo "${E}" | cut -c1-4)"
+        DEV="$(echo "${E}" | cut -c9-12)"
+        # A device-id alias is the driver naming the part outright; the class
+        # wildcard is the IP-discovery path. Either one means it will bind.
         if echo "${AMDGPU_ALIAS}" | grep -qi "pci:v00001002d0000${DEV}sv"; then
           AMDGPU_DEV="${DEV}"
           break
         fi
-        echo "amdgpu has no device-id alias for 1002:${DEV}, not forcing a load"
+        if echo "${AMDGPU_ALIAS}" | grep -qi "pci:v00001002d[*]sv[*]sd[*]bc$(echo "${CLASS}" | cut -c1-2)sc$(echo "${CLASS}" | cut -c3-4)"; then
+          AMDGPU_DEV="${DEV}"
+          break
+        fi
+        echo "amdgpu has no alias matching 1002:${DEV}, not forcing a load"
       done
     fi
   fi
