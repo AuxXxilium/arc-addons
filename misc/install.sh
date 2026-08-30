@@ -234,21 +234,6 @@ elif [ "${1}" = "late" ]; then
   fi
 
   # AMD GPU
-  # Unlike nvidia, DSM ships no 70-syno-amdgpu-gpu.conf to uncomment, so the
-  # conf is written here and removed again when no supported GPU is present.
-  #
-  # The gate is amdgpu's own alias table, not the 1002 vendor id: every AMD
-  # board carries 1002 devices that are not GPUs (HD audio, SMBus, host
-  # bridges), so a vendor-only test fires on machines with no AMD display
-  # device at all and forces a modprobe that can only fail.
-  #
-  # amdgpu binds two ways and both are legitimate, so both aliases count:
-  #   pci:v00001002d000015DDsv*sd*bc*sc*i*   one of the 303 legacy device ids
-  #   pci:v00001002d*sv*sd*bc03sc00i00*      CHIP_IP_DISCOVERY - the driver
-  #     reads ip_discovery.bin off the card and enumerates its IP versions at
-  #     runtime. Every RDNA2/RDNA3 part binds this way and carries no device-id
-  #     alias, so a device-id test alone would reject an RX 7900 XTX that the
-  #     driver fully supports.
   AMDGPU_KO=""
   for K in "/tmpRoot/usr/lib/modules/amdgpu.ko" "/usr/lib/modules/amdgpu.ko"; do
     [ -z "${AMDGPU_KO}" ] && [ -f "${K}" ] && AMDGPU_KO="${K}"
@@ -258,17 +243,11 @@ elif [ "${1}" = "late" ]; then
   if [ -n "${AMDGPU_KO}" ]; then
     AMDGPU_ALIAS="$(modinfo -F alias "${AMDGPU_KO}" 2>/dev/null)"
     if [ -n "${AMDGPU_ALIAS}" ]; then
-      # Display class (03) only, so a 1002 audio or SMBus function cannot match.
-      # lspci prints hex lowercase and the alias table uppercase, hence grep -i:
-      # uppercasing the alias text itself would also hit the literal "pci:" and
-      # "bc"/"sc" markers and stop the pattern from ever matching.
       for E in $(lspci -n 2>/dev/null \
         | grep -E ' 03[0-9a-fA-F]{2}: 1002:[0-9a-fA-F]{4}' \
         | awk '{print $2 $3}' | tr -d ':' | tr 'A-F' 'a-f'); do
         CLASS="$(echo "${E}" | cut -c1-4)"
         DEV="$(echo "${E}" | cut -c9-12)"
-        # A device-id alias is the driver naming the part outright; the class
-        # wildcard is the IP-discovery path. Either one means it will bind.
         if echo "${AMDGPU_ALIAS}" | grep -qi "pci:v00001002d0000${DEV}sv"; then
           AMDGPU_DEV="${DEV}"
           break
@@ -285,18 +264,10 @@ elif [ "${1}" = "late" ]; then
   if [ -n "${AMDGPU_DEV}" ]; then
     echo "AMD GPU 1002:${AMDGPU_DEV} detected, forcing amdgpu to load"
     for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do /bin/set_key_value "${F}" "support_amd_gpu" "yes"; done
-    # eudev has already put the modules and the firmware on the DSM root by the
-    # time this runs - it copies /usr/lib/modules and /usr/lib/firmware wholesale,
-    # on both the custom and the official kernel - so nothing has to be copied
-    # here. amdgpu binds no PCI id on its own in DSM, so all that is left is to
-    # ask systemd to modprobe it; the twelve dependencies it pulls in (amdxcp,
-    # drm, ttm, gpu-sched, ...) are resolved by modprobe from the depmod data.
     mkdir -vp /tmpRoot/usr/lib/modules-load.d
     echo "amdgpu" >/tmpRoot/usr/lib/modules-load.d/70-syno-amdgpu-gpu.conf
   else
     for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do /bin/set_key_value "${F}" "support_amd_gpu" "no"; done
-    # Drop a conf left by an earlier boot, otherwise systemd keeps trying to
-    # modprobe a module that is absent or does not fit this GPU.
     [ -f /tmpRoot/usr/lib/modules-load.d/70-syno-amdgpu-gpu.conf ] && rm -f /tmpRoot/usr/lib/modules-load.d/70-syno-amdgpu-gpu.conf
   fi
 
