@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 ## infobash: Copyright (C) 2005-2007  Michiel de Boer aka locsmif
-## inxi: Copyright (C) 2008-2025 Harald Hope
+## inxi: Copyright (C) 2008-2026 Harald Hope
 ## Additional features (C) Scott Rogers - kde, cpu info
 ## Parse::EDID (C):  2005-2010 by Mandriva SA, Pascal Rigaux, Anssi Hannula
 ## Further fixes (listed as known): Horst Tritremmel <hjt at sidux.com>
@@ -36,7 +36,7 @@ $Data::Dumper::Sortkeys = 1;
 # use File::Find;
 use File::stat; # needed for Xorg.0.log file mtime comparisons
 use Getopt::Long qw(GetOptions);
-# Note: default auto_abbrev is enabled
+# Note: default auto_abbrev is enabledcdna
 Getopt::Long::Configure ('bundling', 'no_ignore_case', 
 'no_getopt_compat', 'no_auto_abbrev','pass_through');
 use POSIX qw(ceil uname strftime ttyname);
@@ -49,8 +49,8 @@ use POSIX qw(ceil uname strftime ttyname);
 
 ## INXI INFO ##
 my $self_name='inxi';
-my $self_version='3.3.40';
-my $self_date='2025-11-25';
+my $self_version='3.3.41';
+my $self_date='2026-07-01';
 my $self_patch='00';
 ## END INXI INFO ##
 
@@ -2613,8 +2613,10 @@ sub wanted {
 	elsif ($parse_src eq 'sys'){
 		# note: a new file in 4.11 /sys can hang this, it is /parameter/ then
 		# a few variables. Since inxi does not need to see that file, we will
-		# not use it. 
-		if ($File::Find::name =~ m!/(kernel/|trace/|parameters|debug)!){
+		# not use it. Note /udc-debug showed up as /debug variant.
+		# mmc_send_status can infinitely send data, but send_stream_data is 
+		# normal btrfs data.
+		if ($File::Find::name =~ m!/(kernel/|trace/|parameters|[^/]*debug|[^/]*_send_)!){
 			$File::Find::prune = 1;
 		}
 	}
@@ -12137,17 +12139,17 @@ sub cp_cpu_arch {
 				$process = 'TSMC n3 (3nm)'; # turin could be 4nm, need more data
 				$year = '2024+';}
 			# Strix Point; Granite Ridge; Krackan Point; Strix Halo
-			elsif ($model =~ /^[2-7].$/){
+			elsif ($model =~ /^[2-4].$/){
 				$arch = 'Zen 5';
 				$gen = '5';
 				$process = 'TSMC n4 (4nm)'; # desktop, granite ridge, confirm 2024
 				$year = '2024+';}
 			# seen: 90,A0,C0
-			elsif ($model =~ /^([89]|[A-G]).$/){
+			elsif ($model =~ /^([5-9]|[A-G]).$/){
 				$arch = 'Zen 6';
 				$note = '6';
 				$process = 'TSMC n2/n3 (2,3nm)';
-				$year = '2025+';}
+				$year = '2026+';}
 			else {
 				$arch = 'Zen 5';
 				$note = $check;
@@ -12159,14 +12161,14 @@ sub cp_cpu_arch {
 			$arch = 'Zen 7';
 			$note = $check;
 			$process = 'TSMC n2/n3 (2,3nm)';
-			$year = '2026+';
+			$year = '2027+';
 		}
 		# this is a guess
 		elsif ($family eq '1D'){ # DF, aka 28
 			$arch = 'Zen 8';
 			$note = $check;
 			$process = 'TSMC a14 (1.4nm)';
-			$year = '2027+';
+			$year = '2028+';
 		}
 		
 		# Roadmap: check to verify, AMD is usually closer to target than Intel
@@ -12751,6 +12753,22 @@ sub cp_cpu_arch {
 				$arch = 'Netburst';
 				$process = 'Intel 65-180nm';
 				$year = '2000-06';}
+		}
+		elsif ($family eq '3F'){
+			if ($model =~ /^(0|1)$/){
+				$arch = 'Panther Lake-R';
+				$process = 'Intel 18a (1.8nm)';
+				$year = '2027+';}
+			elsif ($model =~ /^(3)$/){
+				$arch = 'Nova Lake';
+				$process = 'Intel 18a-p (1.8nm)';
+				$year = '2027+';}
+		}
+		elsif ($family eq '4F'){
+			if ($model =~ /^(0|1)$/){
+				$arch = 'Diamond Rapids';
+				$process = 'Intel 18a-p (1.8nm)';
+				$year = '2027+';}
 		}
 		# this is not going to e accurate, WhiskyL or Kaby L can ID as Skylake
 		# but if it's a new cpu microarch not handled yet, it may give better 
@@ -18716,7 +18734,7 @@ sub set_amd_data {
 	'6650|6651|6658|665c|665d|665f|67a0|67a1|67a2|67a8|67a9|67aa|67b0|67b1|67b8|' .
 	'67b9|67be|9830|9831|9832|9833|9834|9835|9836|9837|9838|9839|983d|9850|9851|' .
 	'9852|9853|9854|9855|9856|9857|9858|9859|985a|985b|985c|985d|985e|985f|991e|' .
-	'9920|9922',
+	'9920|9922|9923',
 	'code' => 'Sea Islands',
 	'process' => 'GF/TSMC 16-28nm',
 	'years' => '2013-17',
@@ -18752,8 +18770,8 @@ sub set_amd_data {
 	'years' => '2017-20',
 	},
 	{'arch' => 'RDNA-1',
-	'ids' => '13e9|13f9|13fe|1607|7310|7312|7318|7319|731a|731b|731e|731f|7340|' .
-	'7341|7343|7347|734f|7360|7362',
+	'ids' => '13db|13e9|13f9|13fe|1607|7310|7312|7318|7319|731a|731b|731e|731f|' .
+	'7340|7341|7343|7347|734f|7360|7362',
 	'code' => 'Navi-1x',
 	'process' => 'TSMC n7 (7nm)',
 	'years' => '2019-20',
@@ -18773,13 +18791,14 @@ sub set_amd_data {
 	'years' => '2022+',
 	},
 	{'arch' => 'RDNA-3',
-	'ids' => '73f0|7480|7481|7483|7487|7489|748b|7499|749f',
+	'ids' => '73a8|73c4|73c5|73c8|7448|7449|744a|744b|744c|745e|7460|7461|7470|' .
+	'7478|747e',
 	'code' => 'Navi-3x',
-	'process' => 'TSMC n6 (6nm)',
-	'years' => '2023+',
+	'process' => 'TSMC n5 (5nm)',
+	'years' => '2022+',
 	},
 	{'arch' => 'RDNA-3',
-	'ids' => '15bf|15c8|164f|1900|1901',
+	'ids' => '1114|150e|1586|15bf|15c8|164f|1900|1901|1902',
 	'code' => 'Phoenix',
 	'process' => 'TSMC n4 (4nm)',
 	'years' => '2023+',
@@ -18804,9 +18823,15 @@ sub set_amd_data {
 	},
 	{'arch' => 'CDNA-3',
 	'ids' => '74a0|74a1|74a2|74a5|74a9|74b5|74b9|74bd',
-	'code' => 'Instinct-MI3xx',
+	'code' => 'Instinct-MI300',
 	'process' => 'TSMC n5 (5nm)',
 	'years' => '2023+',
+	},
+	{'arch' => 'CDNA-4',
+	'ids' => '75a0|75a1|75a3',
+	'code' => 'Instinct-MI350',
+	'process' => 'TSMC n3 (3nm)',
+	'years' => '2025+',
 	},
 	];
 }
@@ -18839,27 +18864,28 @@ sub set_intel_data {
 	'years' => '2004-05',
 	},
 	{'arch' => 'Gen-3.5',
-	'ids' => '2772|2776|27a2|27a6|27ae|2972|2973|2982|29b2|29c2|29d2|a001|a011',
+	'ids' => '2772|2776|27a2|27a6|27ae|2972|2973|2982|29b2|29c2|29d2|a001|a002|' .
+	'a011|a012',
 	'code' => '',
 	'process' => 'Intel 90nm',
 	'years' => '2005-06',
 	},
 	{'arch' => 'Gen-4',
 	'ids' => '2982|2983|2992|2993|29a2|29a3|29b2|29b3|29c2|29c3|29d2|29d3|2a02|' .
-	'2a03|2a12|2a13|2a42|2e02|2e12|2e22|2e32|2e42|2e92',
+	'2a03|2a12|2a13|2a42|2e02|2e12|2e22|2e32|2e42|2e92|e220|e221',
 	'code' => '',
 	'process' => 'Intel 65n',
 	'years' => '2006-07',
 	},
 	{'arch' => 'PowerVR SGX535',
-	'ids' => '4100|8108|8109|a001|a002|a011|a012',
+	'ids' => '4100|8108|8109',
 	'code' => '',
 	'process' => 'Intel 45-130nm',
 	'years' => '2008-10',
 	},
 	{'arch' => 'Gen-5',
-	'ids' => '2a41|2a42|2a43|2e02|2e03|2e12|2e13|2e22|2e23|2e32|2e33|2e42|2e43|' .
-	'2e92|2e93',
+	'ids' => '0042|0046|2a41|2a42|2a43|2e02|2e03|2e12|2e13|2e22|2e23|2e32|2e33|' .
+	'2e42|2e43|2e92|2e93',
 	'code' => '',
 	'process' => 'Intel 45nm',
 	'years' => '2008',
@@ -18984,7 +19010,7 @@ sub set_intel_data {
 	'years' => '2023+',
 	},
 	{'arch' => 'Xe2',
-	'ids' => 'e202|e20b|e20c|e20d|e210|e211|e212|e215|e216',
+	'ids' => 'e202|e20b|e20c|e20d|e210|e211|e212|e215|e216|e222|e223',
 	'code' => '',
 	'process' => 'TSMC n4 (4nm)',
 	'years' => '2024+',
@@ -19002,8 +19028,8 @@ sub set_intel_data {
 	'years' => '2025+',
 	},
 	{'arch' => 'Xe3',
-	'ids' => 'b080|b081|b082|b083|b084|b085|b086|b087|b08f|b090|b0a0|b0b0|fd80|' .
-	'fd81',
+	'ids' => 'b080|b081|b082|b083|b084|b085|b086|b087|b08f|b090|b0a0|b0b0|b0ff|' .
+	'fd80|fd81',
 	'code' => '',
 	'process' => 'TSMC 18A',
 	'years' => '2025+',
@@ -19194,20 +19220,20 @@ sub set_nv_data {
 	},
 	## Legacy 470.xx
 	{'arch' => 'Fermi-2',
-	'ids' => '0fec|1281|1289|128b|1295',
+	'ids' => '0fec|1295',
 	'code' => 'GF119/GK208',
 	'kernel' => '',
 	'legacy' => 1,
 	'process' => 'TSMC 28nm',
 	'release' => '',
 	'series' => '470.xx+',
-	'status' => main::message('nv-legacy-active','2024-09-xx'),
+	'status' => main::message('nv-legacy-eol','2025-09-xx'),
 	'xorg' => '',
 	'years' => '2010-2016',
 	},
 	# GT 720M and 805A/810A are the same cpu id.
 	# years: 2012-2018 Kepler 2013-2015 Kepler 2.0
-	 {'arch' => 'Kepler-2',
+	{'arch' => 'Kepler-2',
 	'ids' => '0fc1|0fc6|0fc8|0fc9|0fcd|0fce|0fd1|0fd2|0fd3|0fd4|0fd5|0fd8|0fd9|' .
 	'0fdf|0fe0|0fe1|0fe2|0fe3|0fe4|0fe9|0fea|0fed|0fee|0ff6|0ff8|0ff9|0ffa|0ffb|' .
 	'0ffc|0ffd|0ffe|0fff|1001|1004|1005|1007|1008|100a|100c|1021|1022|1023|1024|' .
@@ -19215,32 +19241,32 @@ sub set_nv_data {
 	'118a|118e|118f|1193|1194|1195|1198|1199|119a|119d|119e|119f|11a0|11a1|11a2|' .
 	'11a3|11a7|11b4|11b6|11b7|11b8|11ba|11bc|11bd|11be|11c0|11c2|11c3|11c4|11c5|' .
 	'11c6|11c8|11cb|11e0|11e1|11e2|11e3|11fa|11fc|1280|1282|1284|1286|1287|1288|' .
-	'1290|1291|1292|1293|1295|1296|1298|1299|129a|12b9|12ba',
+	'128b|1290|1291|1292|1293|1295|1296|1298|1299|129a|12b9|12ba',
 	'code' => 'GKxxx',
 	'kernel' => '',
 	'legacy' => 1,
 	'process' => 'TSMC 28nm',
 	'release' => '',
 	'series' => '470.xx+',
-	'status' => main::message('nv-legacy-active','2024-09-xx'),
+	'status' => main::message('nv-legacy-eol','2025-09-xx'),
 	'xorg' => '',
 	'years' => '2012-2018',
 	},
-	## Current Active Series
-	# load microarch data, as stuff goes legacy, these will form new legacy items.
+	## Legacy 580.xx
 	{'arch' => 'Maxwell',
 	'ids' => '1340|1341|1344|1346|1347|1348|1349|134b|134d|134e|134f|137a|137b|' .
-	'1380|1381|1382|1390|1391|1392|1393|1398|1399|139a|139b|139c|139d|13b0|13b1|' .
-	'13b2|13b3|13b4|13b6|13b9|13ba|13bb|13bc|13c0|13c2|13d7|13d8|13d9|13da|13f0|' .
-	'13f1|13f2|13f3|13f8|13f9|13fa|13fb|1401|1402|1406|1407|1427|1430|1431|1436|' .
-	'1617|1618|1619|161a|1667|174d|174e|179c|17c8|17f0|17f1|17fd|1c90|1d10|1d12',
+	'137d|1380|1381|1382|1390|1391|1392|1393|1398|1399|139a|139b|139c|139d|13b0|' .
+	'13b1|13b2|13b3|13b4|13b6|13b9|13ba|13bb|13bc|13c0|13c2|13d7|13d8|13d9|13da|' .
+	'13f0|13f1|13f2|13f3|13f8|13f9|13fa|13fb|1401|1402|1406|1407|1427|1430|1431|' .
+	'1436|1617|1618|1619|161a|1667|174d|174e|179c|17c8|17f0|17f1|17fd|1c90|1d10|' .
+	'1d12',
 	'code' => 'GMxxx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC 28nm',
 	'release' => '',
 	'series' => '550-580.xx+',
-	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
+	'status' => main::message('nv-legacy-active\',\'2028-09-xx'),
 	'xorg' => '',
 	'years' => '2014-2019',
 	},
@@ -19257,22 +19283,25 @@ sub set_nv_data {
 	'process' => 'TSMC 16nm',
 	'release' => '',
 	'series' => '550-580.xx+',
-	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
+	'status' => main::message('nv-legacy-active','2028-09-xx'),
 	'xorg' => '',
 	'years' => '2016-2021',
 	},
 	{'arch' => 'Volta',
-	'ids' => '1d81|1db1|1db3|1db4|1db5|1db6|1db7|1db8|1dba|1df0|1df2|1df6|1fb0',
+	'ids' => '1d81|1db1|1db3|1db4|1db5|1db6|1db7|1db8|1dba|1df0|1df2|1df5|1df6',
 	'code' => 'GV1xx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC 12nm',
 	'release' => '',
 	'series' => '550-580.xx+',
-	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
+	'status' => main::message('nv-legacy-active','2028-09-xx'),
 	'xorg' => '',
 	'years' => '2017-2020',
 	},
+	
+	## Current Active Series
+	# load microarch data, as stuff goes legacy, these will form new legacy items.
 	{'arch' => 'Turing',
 	'ids' => '1e02|1e04|1e07|1e09|1e30|1e36|1e78|1e81|1e82|1e84|1e87|1e89|1e90|' .
 	'1e91|1e93|1eb0|1eb1|1eb5|1eb6|1eb8|1ec2|1ec7|1ed0|1ed1|1ed3|1ef5|1f02|1f03|' .
@@ -19286,8 +19315,8 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC 12nm FF',
 	'release' => '',
-	'series' => '550-580.xx+',
-	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
+	'series' => '550-6xx.xx+',
+	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2018-2022',
 	},
@@ -19304,19 +19333,20 @@ sub set_nv_data {
 	'legacy' => 0,
 	'process' => 'TSMC n7 (7nm)',
 	'release' => '',
-	'series' => '550-580.xx+',
-	'status' => main::message('nv-current-eol',$date,'2026-12-xx'),
+	'series' => '550-6xx.xx+',
+	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2020-2023',
 	},
 	{'arch' => 'Hopper',
-	'ids' => '2321|2322|2324|2329|232c|2330|2331|2335|2339|233a|233b|2342|2348',
+	'ids' => '230e|2321|2322|2324|2329|232c|2330|2331|2335|2339|233a|233b|2342|' .
+	'2348',
 	'code' => 'GH1xx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC n4 (5nm)',
 	'release' => '',
-	'series' => '550-580.xx+',
+	'series' => '550-6xx.xx+',
 	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2022+',
@@ -19326,30 +19356,31 @@ sub set_nv_data {
 	'2717|2730|2757|2770|2782|2783|2786|2788|27a0|27b0|27b1|27b2|27b6|27b8|27ba|' .
 	'27bb|27e0|27fb|2803|2805|2808|2820|2860|2882|28a0|28a1|28b0|28b9|28ba|28bb|' .
 	'28e0|28e1|2b85|2b87|2b8c|2c02|2c05|2c18|2c19|2c58|2c59|2d04|2d05|2d18|2d19|' .
-	'2d58|2d59|2d83|2d98|2dd8|2f04|2f18|2f58',
+	'2d58|2d59|2d83|2d98|2dd8|2f04|2f06|2f18|2f58',
 	'code' => 'AD1xx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC n4 (5nm)',
 	'release' => '',
-	'series' => '550-580.xx+',
+	'series' => '550-6xx.xx+',
 	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2022+',
 	},
 	{'arch' => 'Blackwell',
-	'ids' => '2901|2941|2bb1|2bb3|2bb4|2bb5|2c31|2c33|2c34|2c38|2c39|2d30|2d39|' .
-	'2db8|2db9|2f38',
+	'ids' => '2901|2909|2941|2bb1|2bb3|2bb4|2bb5|2c31|2c33|2c34|2c38|2c39|2c3a|' .
+	'2c77|2c79|2d30|2d39|2d79|2db8|2db9|2df9|2f38',
 	'code' => 'GB2xx',
 	'kernel' => '',
 	'legacy' => 0,
 	'process' => 'TSMC 4np (5nm)',
 	'release' => '',
-	'series' => '550-580.xx+',
+	'series' => '550-6xx.xx+',
 	'status' => $status_current,
 	'xorg' => '',
 	'years' => '2024+',
 	},
+
 	],
 }
 
@@ -31744,16 +31775,25 @@ sub soc_data {
 # 14: /sys/devices/platform/soc/fe300000.mmcnr/mmc_host/mmc1/mmc1:0001/mmc1:0001:1/uevent (wifi, pi 3,4)
 # 15: Pi BT: /sys/devices/platform/soc/fe201000.serial/uevent
 # 16: Pi BT: /sys/devices/platform/soc/fe201000.serial/tty/ttyAMA0/hci0
+# 17: /sys/devices/platform/axi/1000120000.pcie/1f00100000.ethernet/uevent:["DRIVER=macb", [raspi 5]
 sub soc_devices_files {
 	eval $start if $b_log;
 	if (-d '/sys/devices/platform/'){
 		@files = main::globber('/sys/devices/platform/soc*/*/uevent');
 		@temp2 = main::globber('/sys/devices/platform/soc*/*/*/uevent');
 		push(@files,@temp2) if @temp2;
+		# case 13
 		if (-e '/sys/devices/platform/scb'){
 			@temp2 = main::globber('/sys/devices/platform/scb/*/uevent');
 			push(@files,@temp2) if @temp2;
 			@temp2 = main::globber('/sys/devices/platform/scb/*/*/uevent');
+			push(@files,@temp2) if @temp2;
+		}
+		# see case 17
+		if (-e '/sys/devices/platform/axi'){
+			@temp2 = main::globber('/sys/devices/platform/axi/*/uevent');
+			push(@files,@temp2) if @temp2;
+			@temp2 = main::globber('/sys/devices/platform/axi/*/*/uevent');
 			push(@files,@temp2) if @temp2;
 		}
 		@temp2 = main::globber('/sys/devices/platform/*/uevent');
@@ -31967,6 +32007,7 @@ sub check_vm {
 	else {return ''}
 }
 
+# 0: $type; 1 OF_NAME: $vendor_id OF_COMPATIBLE_0; 2: $driver
 sub soc_type {
 	my ($type,$info,$driver) = @_;
 	# I2S or i2s. I2C is i2 controller |[iI]2[Ss]. note: odroid hdmi item is sound only
@@ -31979,8 +32020,8 @@ sub soc_type {
 		$type = 'dummy';
 	}
 	# rome_vreg reg_fixed_voltage regulator-fixed wlan_en_vreg
-	elsif (($driver && $driver =~ /\bv?reg(ulat|_)|voltage/i) || 
-	 ($info && $info =~ /_v?reg|\bv?reg(ulat|_)|voltage/i)){
+	elsif (($driver && $driver =~ /\bv?reg(ulat|_)|voltage|pwrseq/i) || 
+	 ($info && $info =~ /_v?reg|\bv?reg(ulat|_)|voltage|pwrseq/i)){
 		$type = 'regulator';
 	}
 	elsif ($type =~ /^(daudio|.*hifi.*|.*sound[_-]card|.*dac[0-9]?)$/i ||
