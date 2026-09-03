@@ -28,13 +28,13 @@ if [ "${1}" = "late" ]; then
     mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
     cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
   fi
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
-  if echo "SELECT * FROM task;" | /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "SetRootPw||bootup||1|0|0|0|"; then
+  if echo "SELECT * FROM task;" | /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" | grep -q "SetRootPw||bootup||1|0|0|0|"; then
     echo "setrootpw task already exists and it is enabled"
   else
     echo "insert setrootpw task to esynoscheduler.db"
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'SetRootPw';
 INSERT INTO task VALUES('SetRootPw', '', 'bootup', '', 1, 0, 0, 0, '', 0, '
 PW=""    # Please change to the password you need.
@@ -52,11 +52,11 @@ elif [ "${1}" = "uninstall" ]; then
   FILE="/tmpRoot/etc/ssh/sshd_config"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
 
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete setrootpw task from esynoscheduler.db"
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'SetRootPw';
 EOF
   fi

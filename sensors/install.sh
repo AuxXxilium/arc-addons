@@ -61,11 +61,11 @@ if [ "${1}" = "late" ]; then
     rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/sensors.service"
     rm -f "/tmpRoot/usr/lib/systemd/system/sensors.service"
     rm -f "/tmpRoot/usr/bin/arc-sensors.sh"
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib:/tmpRoot/usr/lib
+    export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
     if [ -f "${ESYNOSCHEDULER_DB}" ]; then
       echo "delete fancontrol task from esynoscheduler.db"
-      /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+      /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'Fancontrol 2.0';
 EOF
     fi
@@ -81,11 +81,11 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/bin/arc-sensors.sh"
   rm -f "/tmpRoot/usr/bin/arc-pwm.sh"
 
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete fancontrol task from esynoscheduler.db"
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'Fancontrol 2.0';
 EOF
   fi

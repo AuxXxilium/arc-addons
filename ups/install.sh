@@ -29,10 +29,10 @@ if [ "${1}" = "late" ]; then
       mkdir -p /tmpRoot/usr/syno/etc/esynoscheduler
       cp -pf /addons/esynoscheduler.db /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db
     fi
-    export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+    export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
     ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
     echo "insert start/stop ScsiTarget task to esynoscheduler.db"
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'StartScsiTarget';
 INSERT INTO task VALUES('StartScsiTarget', '', 'bootup', '', 1, 0, 0, 0, '', 0, "synopkg start ScsiTarget", 'script', '{}', '', '', '{}', '{}');
 DELETE FROM task WHERE task_name LIKE 'StopScsiTarget';
@@ -45,11 +45,11 @@ elif [ "${1}" = "uninstall" ]; then
   FILE="/tmpRoot/usr/syno/bin/synoups"
   [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
 
-  export LD_LIBRARY_PATH=/tmpRoot/bin:/tmpRoot/lib
+  export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"
   if [ -f "${ESYNOSCHEDULER_DB}" ]; then
     echo "delete start/stop ScsiTarget task from esynoscheduler.db"
-    /tmpRoot/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
+    /tmpRoot/usr/bin/sqlite3 "${ESYNOSCHEDULER_DB}" <<EOF
 DELETE FROM task WHERE task_name LIKE 'StartScsiTarget';
 DELETE FROM task WHERE task_name LIKE 'StopScsiTarget';
 EOF
