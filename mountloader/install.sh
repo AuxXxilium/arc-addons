@@ -24,16 +24,20 @@ if [ "${1}" = "late" ]; then
   chown root:root /tmpRoot/usr/bin/arcsu
   chmod u+s /tmpRoot/usr/bin/arcsu
 
-  [ ! -f /tmpRoot/sbin/fatlabel ] && cp -vpf /usr/sbin/fatlabel /tmpRoot/sbin/fatlabel
-  [ ! -f /tmpRoot/sbin/dosfslabel ] && ln -vsf fatlabel /tmpRoot/sbin/dosfslabel
-  [ ! -f /tmpRoot/sbin/fsck.fat ] && cp -vpf /usr/sbin/fsck.fat /tmpRoot/sbin/fsck.fat
-  [ ! -f /tmpRoot/sbin/dosfsck ] && ln -vsf fsck.fat /tmpRoot/sbin/dosfsck
-  [ ! -f /tmpRoot/sbin/fsck.msdos ] && ln -vsf fsck.fat /tmpRoot/sbin/fsck.msdos
-  [ ! -f /tmpRoot/sbin/fsck.vfat ] && ln -vsf fsck.fat /tmpRoot/sbin/fsck.vfat
-  [ ! -f /tmpRoot/sbin/mkfs.fat ] && cp -vpf /usr/sbin/mkfs.fat /tmpRoot/sbin/mkfs.fat
-  [ ! -f /tmpRoot/sbin/mkdosfs ] && ln -vsf mkfs.fat /tmpRoot/sbin/mkdosfs
-  [ ! -f /tmpRoot/sbin/mkfs.msdos ] && ln -vsf mkfs.fat /tmpRoot/sbin/mkfs.msdos
-  [ ! -f /tmpRoot/sbin/mkfs.vfat ] && ln -vsf mkfs.fat /tmpRoot/sbin/mkfs.vfat
+  # dosfstools: /sbin is a symlink to /usr/sbin in DSM, so install into
+  # /usr/sbin like every other addon. misc ships these too; this is the
+  # fallback for when mountloader is installed without it.
+  mkdir -p /tmpRoot/usr/sbin
+  for f in fatlabel fsck.fat mkfs.fat; do
+    cp -pf "/usr/sbin/${f}" "/tmpRoot/usr/sbin/${f}"
+  done
+  ln -sf fatlabel /tmpRoot/usr/sbin/dosfslabel
+  ln -sf fsck.fat /tmpRoot/usr/sbin/dosfsck
+  ln -sf fsck.fat /tmpRoot/usr/sbin/fsck.msdos
+  ln -sf fsck.fat /tmpRoot/usr/sbin/fsck.vfat
+  ln -sf mkfs.fat /tmpRoot/usr/sbin/mkdosfs
+  ln -sf mkfs.fat /tmpRoot/usr/sbin/mkfs.msdos
+  ln -sf mkfs.fat /tmpRoot/usr/sbin/mkfs.vfat
 
   rm -f /tmpRoot/usr/arc/.mountloader
 elif [ "${1}" = "uninstall" ]; then

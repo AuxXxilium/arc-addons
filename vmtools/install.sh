@@ -15,7 +15,7 @@ if [ "${1}" = "late" ]; then
   tar -zxf /addons/vmtools-7.1.tgz -C /tmpRoot/usr/vmtools
   ln -vsf /usr/vmtools/etc/vmware-tools /tmpRoot/etc/open-vm-tools
   ln -vsf /usr/vmtools/etc/vmware-tools /tmpRoot/etc/vmware-tools
-  ln -vsf /usr/vmtools/lib/open-vm-tools /tmpRoot/lib/open-vm-tools
+  ln -vsf /usr/vmtools/lib/open-vm-tools /tmpRoot/usr/lib/open-vm-tools
   ln -vsf /usr/vmtools/share/open-vm-tools /tmpRoot/usr/share/open-vm-tools
 
   VMTOOLS_PATH="/usr/vmtools"
@@ -62,7 +62,7 @@ if [ "${1}" = "late" ]; then
       echo "Type=forking"
       echo "PIDFile=${VMTOOLS_PID}"
       echo "Environment=PATH=${VMTOOLS_PATH}/bin:${VMTOOLS_PATH}/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-      echo "Environment=LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:/usr/lib:/lib"
+      echo "Environment=LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:/usr/lib"
       echo "ExecStart=${VMTOOLS_PATH}/bin/vmtoolsd -c ${VMWARE_CONF} --common-path=${COMMON_PATH} --plugin-path=${PLUGINS_PATH} -b ${VMTOOLS_PID}"
       echo 'ExecReload=/bin/kill -HUP $MAINPID'
       echo "Restart=always"
@@ -84,7 +84,7 @@ if [ "${1}" = "late" ]; then
       echo "Type=forking"
       echo "PIDFile=${VMTOOLS_PID}"
       echo "Environment=PATH=${VMTOOLS_PATH}/bin:${VMTOOLS_PATH}/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-      echo "Environment=LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:/usr/lib:/lib"
+      echo "Environment=LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:/usr/lib"
       echo "ExecStart=${VMTOOLS_PATH}/bin/qemu-ga -m virtio-serial -p ${GUEST_AGENT} -t /var/run/ -d -f ${VMTOOLS_PID}"
       echo 'ExecReload=/bin/kill -HUP $MAINPID'
       echo "Restart=always"
@@ -105,7 +105,7 @@ if [ "${1}" = "late" ]; then
       # echo "Type=forking"
       # echo "PIDFile=${VMTOOLS_PID}"
       echo "Environment=PATH=${VMTOOLS_PATH}/bin:${VMTOOLS_PATH}/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-      echo "Environment=LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:/usr/lib:/lib"
+      echo "Environment=LD_LIBRARY_PATH=${VMTOOLS_PATH}/lib:/usr/lib"
       echo "ExecStart=/bin/echo Unknown mev"
       # echo "ExecReload=/bin/kill -HUP \$MAINPID"
       # echo "Restart=always"
@@ -124,7 +124,7 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/vmtools.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/vmtools.service"
 
-  rm -rf /tmpRoot/lib/open-vm-tools
+  rm -rf /tmpRoot/usr/lib/open-vm-tools
   rm -rf /tmpRoot/etc/open-vm-tools
   rm -rf /tmpRoot/etc/vmware-tools
   rm -rf /tmpRoot/usr/share/open-vm-tools
