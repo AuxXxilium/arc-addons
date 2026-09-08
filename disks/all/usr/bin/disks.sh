@@ -276,7 +276,11 @@ dtModel() {
     done
 
     if echo "${UNIQUE}" | grep -q 'epyc7003ntb'; then
-      COUNT=0
+      # PAS7700 maps NVMe as internal_slot (storage), not nvme_slot (cache), so these
+      # share the SATA loop's internal_slot@ namespace above. Do NOT reset COUNT here:
+      # restarting at 0 emits a second internal_slot@1..N set that collides with the
+      # SATA one, producing duplicate node names in a mixed SATA+NVMe device tree.
+      # Continue from wherever the SATA loop left off (0 when NVMe-only).
       for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
         [ ! -e "${F}" ] && continue
         N="$(basename "${F}")"
@@ -611,11 +615,35 @@ nondtUpdate() {
 if type flock >/dev/null 2>&1 && type trap >/dev/null 2>&1; then
   LOCKFILE="/var/run/disks.lock"
   exec 3>"$LOCKFILE"
-  flock -w 60 3 || {
-    _log "Failed to acquire lock after 60 seconds. Exiting."
-    exit 1
-  }
-  trap 'flock -u 3; rm -f "$LOCKFILE"' EXIT INT TERM HUP
+  # busybox flock has no -w/-u: it only understands "flock [-sxn] FD|file CMD".
+  # Probing -w against our own fd would consume the lock, so probe the option on
+  # a throwaway fd instead, then take the real lock with whichever form works.
+  # Without this the junior ramdisk (busybox) fails every run with
+  # "flock: invalid option -- 'w'" and disks.sh never generates model.dtb.
+  _DISKS_FLOCK_UTIL=0
+  if flock -w 0 9 9>/dev/null >/dev/null 2>&1; then
+    _DISKS_FLOCK_UTIL=1
+  fi
+  if [ "${_DISKS_FLOCK_UTIL}" -eq 1 ]; then
+    flock -w 60 3 || {
+      _log "Failed to acquire lock after 60 seconds. Exiting."
+      exit 1
+    }
+    trap 'flock -u 3; rm -f "$LOCKFILE"' EXIT INT TERM HUP
+  else
+    # busybox: -n is non-blocking; retry to approximate the 60s timeout above.
+    _DISKS_LOCK_TRY=0
+    while ! flock -n 3 2>/dev/null; do
+      _DISKS_LOCK_TRY=$((_DISKS_LOCK_TRY + 1))
+      if [ "${_DISKS_LOCK_TRY}" -ge 60 ]; then
+        _log "Failed to acquire lock after 60 seconds. Exiting."
+        exit 1
+      fi
+      sleep 1
+    done
+    # No -u: closing fd 3 releases the lock.
+    trap 'exec 3>&-; rm -f "$LOCKFILE"' EXIT INT TERM HUP
+  fi
 fi
 
 [ -z "$(/sbin/blkid -L ARC3 2>/dev/null)" ] && checkAlldisk
