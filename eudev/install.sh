@@ -160,8 +160,16 @@ elif [ "${1}" = "modules" ]; then
       /usr/sbin/modprobe "${I}" || true
     done
   else
-    /usr/sbin/modprobe 9p || true
-    /usr/sbin/modprobe virtiofs || true
+    # The modalias sweep below cannot bring these up on its own: it snapshots
+    # /sys before its own modprobe loop runs, so any device that only appears
+    # once virtio_pci has probed (every virtio0..N bus device) is not in that
+    # snapshot. Load the storage transports by name, virtio_pci first so the
+    # bus is populated. virtiofs.ko ships only in the 5.10 module set, so skip
+    # it on 4.4 rather than logging a FATAL on every KVM boot there.
+    for I in virtio_pci virtio_scsi virtio_blk 9p; do
+      /usr/sbin/modprobe "${I}" || true
+    done
+    /usr/sbin/modinfo virtiofs >/dev/null 2>&1 && { /usr/sbin/modprobe virtiofs || true; }
   fi
 
   for P in tcp sch; do
