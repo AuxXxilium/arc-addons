@@ -138,7 +138,9 @@ elif [ "${1}" = "rcExit" ]; then
   done &
 
   # for epyc7003ntb web error
-  sed -i 's/check_ntb_connection$/exit 0 # check_ntb_connection/' "/usr/syno/share/clusterInstall.sh" 2>/dev/null || true
+  if echo "epyc7003ntb" | grep -wq "${PLATFORM}"; then
+    sed -i 's/check_ntb_connection$/exit 0 # check_ntb_connection/' "/usr/syno/share/clusterInstall.sh" 2>/dev/null || true
+  fi
 
   # disable DisabledPortDisks
   sed -i 's/^DisabledPortDisks=.*$/DisabledPortDisks=""/' /usr/syno/web/webman/get_state.cgi 2>/dev/null
