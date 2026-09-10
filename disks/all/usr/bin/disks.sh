@@ -89,6 +89,118 @@ _wait_hba_disks_stable() {
   fi
 }
 
+# Derive a per-controller unique port index for a disk whose syno_block_info
+# carries no usable ata_port_no.
+#
+# Why this is needed: on a SAS HBA every disk shares one pciepath (the
+# controller's own BDF), so dtModel()'s internal_slot nodes are distinguished
+# by ata_port alone. arc-lkm's sata_port_shim synthesizes that index, but only
+# when it is the one filling syno_block_info - on 5.10 the vendor driver's own
+# populator (syno_mptNsas_info_enum and friends) runs first and the shim stands
+# down, and those populators can leave ata_port_no empty or zero for every
+# disk. dtModel() then emitted twelve slots all claiming port 0, which
+# syno_slot_mapping collapses into a single bay: every disk shows as "Disk 1".
+#
+# The chain below follows arc-lkm's fallback order (sata_port_shim.c):
+#   1. port-H:P topology node   (SAS HBAs - P is the per-controller port)
+#   2. SCSI target id           (several targets behind one host - HBA fan-out)
+#   3. SCSI host number         (one host per disk - the VirtIO case)
+# with one deliberate difference at step 1. arc-lkm scans with
+# sscanf("port-%u:%u"), which stops after two fields; walking up from the disk
+# it meets the expander-side node first, so every disk behind one expander phy
+# reads back as the same port. Taking the LAST field of the longest port- node
+# keeps those distinct. The values therefore differ from the LKM's only on
+# expander topologies, where the LKM's would collide anyway - and only one of
+# the two ever fills syno_block_info for a given disk, so they are never
+# combined for one bay.
+#
+# Echoes nothing when no component can be resolved, so callers can tell
+# "no index" apart from "port 0". Any collision that survives is caught by
+# _claim_slot_port, so a wrong-but-unique index still yields a working bay.
+_hba_port_index() {
+  _HPI_PP="${1}"
+  [ -n "${_HPI_PP}" ] || return 0
+
+  # 1. .../port-30:4/end_device-30:4/target30:0:4/30:0:4:0 -> 4
+  #    Behind an expander the node is port-H:E:P (port-0:0:11 -> 11), so match
+  #    the longest form first and always take the last field.
+  _HPI_V="$(printf '%s' "${_HPI_PP}" | grep -Eo 'port-[0-9]+(:[0-9]+)+' | tail -1 | sed 's/.*://')"
+  if [ -n "${_HPI_V}" ]; then echo "${_HPI_V}"; return 0; fi
+
+  # 2/3. trailing H:C:T:L. Target id normally varies per disk behind one host
+  # (HBA fan-out) and is the right index - including target 0, which is a real
+  # bay, not a missing value. The exception is a controller that gives each
+  # disk its own host with target 0 (VirtIO): there every disk would report
+  # target 0, so the host number is what actually distinguishes them. Tell the
+  # two apart by counting the targets under this host rather than by treating
+  # target 0 as invalid, which would alias target 0 onto host N's index.
+  _HPI_HCTL="$(printf '%s' "${_HPI_PP}" | grep -Eo '[0-9]+:[0-9]+:[0-9]+:[0-9]+$' | tail -1)"
+  if [ -n "${_HPI_HCTL}" ]; then
+    _HPI_H="$(printf '%s' "${_HPI_HCTL}" | cut -d':' -f1)"
+    _HPI_T="$(printf '%s' "${_HPI_HCTL}" | cut -d':' -f3)"
+    if [ "${_HPI_T}" = "0" ] && [ -n "${_HPI_H}" ]; then
+      _HPI_NT=0
+      for _HPI_E in /sys/class/scsi_device/${_HPI_H}:*:*:*; do
+        [ -e "${_HPI_E}" ] && _HPI_NT=$((_HPI_NT + 1))
+      done
+      # Exactly one device on this host: the host number is the only component
+      # that varies between disks, so use it (the VirtIO case). A count of 0
+      # means the enumeration itself failed, not that the host is empty - keep
+      # the target id then, since guessing the host number here would alias
+      # target 0 onto whatever disk legitimately sits at target <host>.
+      [ "${_HPI_NT}" -eq 1 ] && { echo "${_HPI_H}"; return 0; }
+    fi
+    if [ -n "${_HPI_T}" ]; then echo "${_HPI_T}"; return 0; fi
+    if [ -n "${_HPI_H}" ]; then echo "${_HPI_H}"; return 0; fi
+  fi
+
+  return 0
+}
+
+# Claim (pciepath, ata_port) for one slot, or move the disk to the next free
+# port on that controller. Two disks sharing a pair collapse into one DSM bay,
+# which is the whole failure being fixed here, so a collision must be resolved
+# rather than emitted.
+#
+# The claimed port is returned in _SLOT_PORT, NOT on stdout: the claim list has
+# to persist across calls, and "$(_claim_slot_port ...)" would run this in a
+# subshell where every update to _CLAIMED_SLOTS is discarded - every disk would
+# then see an empty list, find port 0 free, and collide exactly as before.
+# Returns 1 (leaving _SLOT_PORT empty) when no free port could be found.
+_claim_slot_port() {
+  _CSP_PC="${1}"
+  _CSP_AT="${2}"
+  _SLOT_PORT=""
+
+  case " ${_CLAIMED_SLOTS} " in
+    *" ${_CSP_PC}|${_CSP_AT} "*) : ;;
+    *)
+      _CLAIMED_SLOTS="${_CLAIMED_SLOTS:+${_CLAIMED_SLOTS} }${_CSP_PC}|${_CSP_AT}"
+      _SLOT_PORT="${_CSP_AT}"
+      return 0
+      ;;
+  esac
+
+  # Taken: walk upward for the first free port on this controller. 64 covers
+  # the 26-disk ceiling dtModel() enforces via maxdisks with room to spare.
+  _CSP_N="${_CSP_AT}"
+  _CSP_TRY=0
+  while [ "${_CSP_TRY}" -lt 64 ]; do
+    _CSP_N=$((_CSP_N + 1))
+    _CSP_TRY=$((_CSP_TRY + 1))
+    case " ${_CLAIMED_SLOTS} " in
+      *" ${_CSP_PC}|${_CSP_N} "*) continue ;;
+    esac
+    _CLAIMED_SLOTS="${_CLAIMED_SLOTS:+${_CLAIMED_SLOTS} }${_CSP_PC}|${_CSP_N}"
+    _log "ata_port collision on ${_CSP_PC}: port ${_CSP_AT} taken, using ${_CSP_N}"
+    _SLOT_PORT="${_CSP_N}"
+    return 0
+  done
+
+  _log "ata_port collision on ${_CSP_PC}: no free port near ${_CSP_AT}"
+  return 1
+}
+
 _atoi() {
   DISKNAME=${1}
   NUM=0
@@ -221,6 +333,11 @@ dtModel() {
     } >"${DEST}"
 
     COUNT=0
+    # Reset per run: dtModel can be re-entered from dtUpdate, and a stale claim
+    # list would push every disk of the second run onto shifted ports.
+    _CLAIMED_SLOTS=""
+    _SEEN_PHYSDEV=""
+    _CTRL_DRIVERS=""
 
     for _F in $(LC_ALL=C printf '%s\n' /sys/block/sata* | sort -V); do
       [ -e "${_F}" ] || continue
@@ -252,7 +369,16 @@ dtModel() {
             _FB_IDX=$((_FB_IDX + 1))
           done
         fi
+        # No ataN component in the path: not a libata topology. A SAS HBA looks
+        # like .../port-30:4/end_device-30:4/target30:0:4/30:0:4:0, so fall back
+        # to the SAS/SCSI chain rather than letting an empty _AT print as port 0.
+        [ -z "${_AT}" ] && _AT="$(_hba_port_index "${_PP}")"
       fi
+      # Guard the printf below: "%02X" on an empty or non-numeric _AT yields
+      # 0x00, which is how a whole HBA's worth of disks ended up sharing one bay.
+      case "${_AT}" in
+        '' | *[!0-9]*) _log "unusable ata_port_no for ${_F} [${_AT:-empty}]"; _AT="" ;;
+      esac
       if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
         _log "bootloader (alias): ${_F}"; continue
       fi
@@ -262,6 +388,104 @@ dtModel() {
       if [ -z "${BOOTDISK_ATAPORT}" ] && [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_PP}" ]; then
         _log "bootloader (physdevpath): ${_F}"; continue
       fi
+      # An unresolved _AT starts the search at port 0 rather than being emitted
+      # as one, so the disk still gets a bay of its own.
+      _claim_slot_port "${_PC}" "${_AT:-0}" || { _log "no slot for ${_F}"; continue; }
+      _AT="${_SLOT_PORT}"
+      [ -n "${_PP}" ] && _SEEN_PHYSDEV="${_SEEN_PHYSDEV:+${_SEEN_PHYSDEV} }${_PP}"
+      # Remember which driver name this controller was emitted with, so the
+      # sd* pass below can match it instead of picking a different one.
+      case " ${_CTRL_DRIVERS} " in
+        *" ${_PC}|"*) : ;;
+        *) _CTRL_DRIVERS="${_CTRL_DRIVERS:+${_CTRL_DRIVERS} }${_PC}|${_DR}" ;;
+      esac
+      COUNT=$((COUNT + 1))
+      {
+        echo "    internal_slot@${COUNT} {"
+        echo '        protocol_type = "sata";'
+        echo "        ${_DR} {"
+        echo "            pcie_root = \"${_PC}\";"
+        printf "            ata_port = <0x%02X>;\n" "${_AT}"
+        echo "            internal_mode;"
+        echo "        };"
+        echo "    };"
+      } >>"${DEST}"
+    done
+
+    # Second pass: HBA disks that never became sataN.
+    #
+    # arc-lkm's sata_port_shim forces syno_port_type to SATA for SAS/VirtIO
+    # hosts so sd.c names them sataN and the loop above picks them up. That fix
+    # can miss - the vendor driver already populated syno_block_info, the
+    # replug did not re-probe, or the host template was not matched - leaving
+    # the disks as plain sdN with no slot at all, and DSM with no bay for them.
+    # Emit those here rather than losing them. USB and the loader are excluded.
+    #
+    # A disk is named either sataN or sdX, never both, so the two globs cannot
+    # normally return the same device - but _SEEN_PHYSDEV is checked anyway:
+    # emitting one disk twice would inflate the internal_slot@ count that sets
+    # maxdisks below, and a maxdisks that disagrees with the real slot count is
+    # exactly the class of mismatch that has caused boot failures before.
+    for _F in $(LC_ALL=C printf '%s\n' /sys/block/sd* | sort -V); do
+      [ -e "${_F}" ] || continue
+      _N="$(basename "${_F}")"
+      [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && { _log "bootloader: ${_F}"; continue; }
+      _PP="$(awk -F= '/PHYSDEVPATH/{print $2}' "${_F}/uevent" 2>/dev/null)"
+      case "${_PP}" in *usb*) continue ;; esac
+      if [ -n "${_PP}" ]; then
+        case " ${_SEEN_PHYSDEV} " in
+          *" ${_PP} "*) _log "already slotted: ${_F}"; continue ;;
+        esac
+      fi
+      if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
+        _log "bootloader (alias): ${_F}"; continue
+      fi
+      _PC="$(grep 'pciepath' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      _AT="$(grep 'ata_port_no' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      _DR="$(grep 'driver' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+      if [ -z "${_PC}" ] && [ -n "${_PP}" ]; then
+        _PC="$(printf '%s' "${_PP}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+      fi
+      [ -n "${_PC}" ] || { _log "unknown: ${_F}"; continue; }
+      case "${_PC}" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) : ;; *) _PC="0000:${_PC}" ;; esac
+      # Only PCI storage controllers (class 01xx) own internal bays here.
+      _CL="$(cat "/sys/bus/pci/devices/${_PC}/class" 2>/dev/null)"
+      case "${_CL}" in 0x01*) : ;; *) _log "not a storage controller: ${_F} [${_CL:-unknown}]"; continue ;; esac
+      if [ -z "${_DR}" ] && [ -L "/sys/bus/pci/devices/${_PC}/driver" ]; then
+        _DR="$(basename "$(readlink -f "/sys/bus/pci/devices/${_PC}/driver")")"
+      fi
+      # Slot nodes are keyed by driver name, and every slot on one controller
+      # must use the same one - a dts that describes 0000:50:00.0 as both
+      # "ahci" and "mpt3sas" presents it to DSM as two different controllers.
+      # Pass 1 emits whatever syno_block_info reported, so reuse that name here
+      # instead of re-deriving it; a disk with an empty syno_block_info (the
+      # very reason it landed in this pass) would otherwise fall back to a
+      # different name than its neighbours. Only when this controller has no
+      # slot yet at all does the fallback apply: "ahci", which is what arc-lkm
+      # reports for synthetic HBA entries (sata_port_shim.c) and the one name
+      # DSM always accepts.
+      _P1_DR=""
+      for _P1_E in ${_CTRL_DRIVERS}; do
+        case "${_P1_E}" in "${_PC}|"*) _P1_DR="${_P1_E#*|}"; break ;; esac
+      done
+      [ -n "${_P1_DR}" ] && _DR="${_P1_DR}"
+      [ -z "${_DR}" ] && _DR="ahci"
+      case "${_AT}" in
+        '' | *[!0-9]*) _AT="$(_hba_port_index "${_PP}")" ;;
+      esac
+      case "${_AT}" in
+        '' | *[!0-9]*) _AT=0 ;;
+      esac
+      if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ -n "${BOOTDISK_ATAPORT}" ] && [ "${BOOTDISK_ATAPORT}" = "${_AT}" ]; then
+        _log "bootloader (port ${_AT}): ${_F}"; continue
+      fi
+      _claim_slot_port "${_PC}" "${_AT}" || { _log "no slot for ${_F}"; continue; }
+      _AT="${_SLOT_PORT}"
+      case " ${_CTRL_DRIVERS} " in
+        *" ${_PC}|"*) : ;;
+        *) _CTRL_DRIVERS="${_CTRL_DRIVERS:+${_CTRL_DRIVERS} }${_PC}|${_DR}" ;;
+      esac
+      _log "hba disk without sata alias: ${_F} -> ${_PC} port ${_AT} (${_DR})"
       COUNT=$((COUNT + 1))
       {
         echo "    internal_slot@${COUNT} {"
@@ -439,10 +663,59 @@ dtUpdate() {
 
   TEMP_DTS="/tmp/model.dts"
   dtc -I dtb -O dts /etc/model.dtb >"${TEMP_DTS}"
+  # A non-numeric ata_port_no would make printf below fail mid-expansion and
+  # produce a broken sed script, so treat it the same as an absent one.
+  case "${ATAPORT}" in *[!0-9]*) ATAPORT="" ;; esac
   if [ -z "${ATAPORT}" ]; then
     sata_slot_find="$(grep "pcie_root = \"${PCIEPATH}\";" "${TEMP_DTS}" 2>/dev/null | head -1)"
   else
-    sata_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/ata_port = <0x$(printf '%02X' ${ATAPORT})>;/p}" "${TEMP_DTS}" 2>/dev/null)"
+    sata_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/ata_port = <0x$(printf '%02X' "${ATAPORT}")>;/p}" "${TEMP_DTS}" 2>/dev/null)"
+    # dtModel may have had to synthesize a port for this disk (SAS HBAs share
+    # one pciepath and the vendor populator can report port 0 for every disk),
+    # so the exact pair need not be present even though the disk does have a
+    # bay. Comparing slot count against disk count on that controller tells the
+    # two cases apart: as many slots as disks means this one is already mapped
+    # under a synthesized port, and rebuilding on every udev event would only
+    # reshuffle bays. Fewer slots than disks means one really is missing.
+    if [ -z "${sata_slot_find}" ]; then
+      # Both sides must be counted with the same domain-normalized path:
+      # syno_block_info reports the short BDF ("50:00.0") while the dts always
+      # carries "0000:50:00.0", so comparing the raw forms would zero out both
+      # counts and quietly disable this whole check.
+      case "${PCIEPATH}" in
+        [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) _DU_PCIE="${PCIEPATH}" ;;
+        *) _DU_PCIE="0000:${PCIEPATH}" ;;
+      esac
+      _DU_SLOTS="$(grep -c "pcie_root = \"${_DU_PCIE}\";" "${TEMP_DTS}" 2>/dev/null)"
+      _DU_DISKS=0
+      for _DU_D in /sys/block/sata* /sys/block/sd*; do
+        [ -e "${_DU_D}" ] || continue
+        _DU_N="$(basename "${_DU_D}")"
+        [ -n "${BOOTDISK}" ] && [ "${_DU_N}" = "${BOOTDISK}" ] && continue
+        _DU_PP="$(awk -F= '/PHYSDEVPATH/{print $2}' "${_DU_D}/uevent" 2>/dev/null)"
+        case "${_DU_PP}" in *usb*) continue ;; esac
+        # Same exclusions dtModel applies, so the two counts stay comparable.
+        [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_DU_PP}" ] && \
+          [ "${_DU_PP}" = "${BOOTDISK_PHYSDEVPATH}" ] && continue
+        _DU_PC="$(grep 'pciepath' "${_DU_D}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+        if [ -z "${_DU_PC}" ] && [ -n "${_DU_PP}" ]; then
+          _DU_PC="$(printf '%s' "${_DU_PP}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+        fi
+        case "${_DU_PC}" in
+          '') continue ;;
+          [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) : ;;
+          *) _DU_PC="0000:${_DU_PC}" ;;
+        esac
+        [ "${_DU_PC}" = "${_DU_PCIE}" ] || continue
+        _DU_CL="$(cat "/sys/bus/pci/devices/${_DU_PC}/class" 2>/dev/null)"
+        case "${_DU_CL}" in 0x01*) : ;; *) continue ;; esac
+        _DU_DISKS=$((_DU_DISKS + 1))
+      done
+      if [ "${_DU_SLOTS:-0}" -ge "${_DU_DISKS}" ] && [ "${_DU_DISKS}" -gt 0 ]; then
+        sata_slot_find="synthesized"
+        _log "${F}: ata_port ${ATAPORT} not in dts, but ${_DU_PCIE} has ${_DU_SLOTS} slot(s) for ${_DU_DISKS} disk(s)"
+      fi
+    fi
   fi
   nvme_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/port_type = \"ssdcache\";/p}" "${TEMP_DTS}" 2>/dev/null)"
   usb_slot_find="$(sed -n "/usb3 {/{N;/usb_port = \"${USBPORT}\";/p}" "${TEMP_DTS}" 2>/dev/null)"
