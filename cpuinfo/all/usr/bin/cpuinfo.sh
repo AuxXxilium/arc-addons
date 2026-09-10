@@ -42,6 +42,16 @@ if [ "${1}" = "-r" ]; then
     echo "cpuinfo: no backup found - admin_center.js is left as-is and may still be patched"
     echo "cpuinfo: reinstall AdminCenter if DSM's System Information page misbehaves"
   fi
+  # Resource Monitor's GPU mask guard, restored from the same kind of backup.
+  _RM_JS="/usr/syno/synoman/webman/modules/ResourceMonitor/resource.js"
+  if [ -f "${_RM_JS}.bak" ]; then
+    cp -pf "${_RM_JS}.bak" "${_RM_JS}"
+    if [ -f "${_RM_JS}.gz.bak" ]; then
+      cp -pf "${_RM_JS}.gz.bak" "${_RM_JS}.gz"
+    elif [ -f "${_RM_JS}.gz" ]; then
+      gzip -c "${_RM_JS}" >"${_RM_JS}.gz"
+    fi
+  fi
   systemctl stop cpuinfo.service cpuinfo-setup.service 2>/dev/null || kill -9 "$(ps aux 2>/dev/null | grep -F "/usr/sbin/cpuinfo" | grep -v grep | awk '{print $2}' | head -1)" 2>/dev/null || true
   [ -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
   [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
@@ -273,6 +283,90 @@ if [ "${SKIP_PATCH:-0}" != "1" ]; then
 
   _stamp_now >"${STAMP_FILE}" 2>/dev/null || true
 fi
+
+# ---------------------------------------------------------------------------
+# Resource Monitor GPU panels
+#
+# DSM ships GPU and GPU-Memory charts but masks them unless the Utilization
+# API returns a gpu object. The cpuinfo proxy synthesises that object for any
+# NVIDIA/AMD/Intel card (see arc-apps/cpuinfo/utilization.go), so the data is
+# there - but resource.js checks gpu_memory_total *before* plotting and bails:
+#
+#   if(!i||0===i.gpu_memory_total) return t.turnOnMask=!0,void t.mask(...)
+#
+# On a non-DVA model the guard fires on the first poll, masks the panel and
+# returns, so the injected values are received and discarded. Verified on an
+# RTX 3080 box: the proxy logged a successful injection while the charts drew
+# no data points at all.
+#
+# Neutralise just that guard. The unit conversion beside it (1024*used) is
+# DSM's own and is left alone - the proxy already emits KiB to match it.
+#
+# The replacement inserts "!1&&" ahead of the null check only:
+#
+#   if(!1&&!i||0===i.gpu_memory_total)
+#
+# && binds tighter than ||, so this reads (false && !i) || (0 === total). The
+# "no object at all" arm is disabled while the zero-VRAM arm is kept, which is
+# deliberate: a machine with a real card reporting real VRAM unmasks, and one
+# with no readable GPU still shows DSM's honest "no GPU" mask instead of an
+# empty chart. That is why this is not the blanket if(0) other packages use.
+RM_JS="/usr/syno/synoman/webman/modules/ResourceMonitor/resource.js"
+RM_GZ="${RM_JS}.gz"
+RM_GUARD='if(!i||0===i.gpu_memory_total)'
+RM_PATCHED='if(!1&&!i||0===i.gpu_memory_total)'
+
+_rm_patch() {
+  [ -f "${RM_JS}" ] || return 0
+
+  # Same rule as admin_center.js: never adopt an already-patched file as the
+  # pristine baseline, or -r can never restore the system.
+  if [ ! -f "${RM_JS}.bak" ]; then
+    if ! grep -qF "${RM_GUARD}" "${RM_JS}" 2>/dev/null; then
+      if grep -qF "${RM_PATCHED}" "${RM_JS}" 2>/dev/null; then
+        echo "cpuinfo: ${RM_JS} is already patched and no pristine backup exists - refusing"
+        echo "cpuinfo: to adopt it as the baseline. Reinstall ResourceMonitor, then re-run."
+      else
+        echo "cpuinfo: Resource Monitor GPU mask guard not found - DSM may have changed it."
+        echo "cpuinfo: leaving ${RM_JS} untouched; GPU panels will stay masked."
+      fi
+      return 0
+    fi
+    cp -pf "${RM_JS}" "${RM_JS}.bak"
+    [ -f "${RM_GZ}" ] && cp -pf "${RM_GZ}" "${RM_GZ}.bak"
+  fi
+
+  # Always re-derive from the pristine copy so repeated runs cannot stack
+  # substitutions on top of each other.
+  cp -pf "${RM_JS}.bak" "${RM_JS}"
+
+  if ! grep -qF "${RM_GUARD}" "${RM_JS}" 2>/dev/null; then
+    echo "cpuinfo: Resource Monitor GPU mask guard not found in the backup, skipping"
+    return 0
+  fi
+
+  # A literal replacement, not a regex: the guard contains (), | and . which
+  # would each need escaping, and the surrounding minified line is fragile.
+  _rm_tmp="${RM_JS}.tmp.$$"
+  awk -v old="${RM_GUARD}" -v new="${RM_PATCHED}" '{
+    n = index($0, old)
+    while (n > 0) {
+      $0 = substr($0, 1, n-1) new substr($0, n+length(old))
+      n = index($0, old)
+    }
+    print
+  }' "${RM_JS}" > "${_rm_tmp}" && mv -f "${_rm_tmp}" "${RM_JS}"
+  rm -f "${_rm_tmp}"
+
+  # nginx has gzip_static on, so a stale .gz would be served in preference to
+  # the .js we just patched. Keep the pair consistent.
+  if [ -f "${RM_GZ}" ] || [ -f "${RM_GZ}.bak" ]; then
+    gzip -c "${RM_JS}" >"${RM_GZ}"
+  fi
+  echo "cpuinfo: Resource Monitor GPU panels unmasked"
+}
+
+_rm_patch
 
 if [ ! -S "/run/arc_synoscgi.sock" ]; then
   if systemctl start cpuinfo.service 2>/dev/null; then
