@@ -141,7 +141,15 @@ if command -v nvidia-smi >/dev/null 2>&1 && ls /dev/nvidia[0-9]* >/dev/null 2>&1
     # nvidia-smi pci.bus_id: "00000000:01:00.0" -> strip leading 4 zeros -> "0000:01:00.0"
     NVPCI="$(printf '%s' "${NVPCI}" | tr -d ' ' | cut -c5-)"
     [ -n "${NVN}" ] || continue
-    NVNAME="NVIDIA ${NVN}"; NVCLOCK="${NVC:-0} MHz"; NVMEM="${NVM:-0} MiB"
+    # nvidia-smi's product name usually already carries the vendor ("NVIDIA
+    # GeForce RTX 3080"), but older driver branches report it bare ("GeForce
+    # GTX 1050 Ti"). Only prefix when it is missing, or the Info Center shows
+    # "NVIDIA NVIDIA GeForce RTX 3080". Mirrors queryNvidiaStats in gpu.go.
+    case "$(printf '%s' "${NVN}" | tr 'A-Z' 'a-z')" in
+      nvidia*) NVNAME="${NVN}" ;;
+      *)       NVNAME="NVIDIA ${NVN}" ;;
+    esac
+    NVCLOCK="${NVC:-0} MHz"; NVMEM="${NVM:-0} MiB"
     [ -z "${FIRST_NAME}" ] && { FIRST_NAME="${NVNAME}"; FIRST_CLOCK="${NVCLOCK}"; FIRST_MEMORY="${NVMEM}"; }
     echo "GPU Info (nvidia) set to: \"${NVNAME}\" \"${NVCLOCK}\" \"${NVMEM}\"${NVPCI:+ [${NVPCI}]}"
   done < <(nvidia-smi --query-gpu=name,clocks.max.graphics,memory.total,pci.bus_id --format=csv,noheader,nounits 2>/dev/null)
