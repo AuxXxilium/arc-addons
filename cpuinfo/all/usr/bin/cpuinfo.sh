@@ -302,19 +302,26 @@ fi
 # Neutralise just that guard. The unit conversion beside it (1024*used) is
 # DSM's own and is left alone - the proxy already emits KiB to match it.
 #
-# The replacement inserts "!1&&" ahead of the null check only:
+# The guard sits inside the "data_comming" handler, so it runs on every poll
+# rather than once at startup, and a trip skips that poll's chart update:
 #
-#   if(!1&&!i||0===i.gpu_memory_total)
+#   t.mon(e.topLayer,"data_comming",function(e){var i=e.gpu;
+#     if(!i||0===i.gpu_memory_total) return t.turnOnMask=!0,void t.mask(...)
 #
-# && binds tighter than ||, so this reads (false && !i) || (0 === total). The
-# "no object at all" arm is disabled while the zero-VRAM arm is kept, which is
-# deliberate: a machine with a real card reporting real VRAM unmasks, and one
-# with no readable GPU still shows DSM's honest "no GPU" mask instead of an
-# empty chart. That is why this is not the blanket if(0) other packages use.
+# Disable only the zero-VRAM arm, keeping the null check intact:
+#
+#   if(!i||!1&&0===i.gpu_memory_total)
+#
+# The null check MUST be kept. Disabling that arm instead - as an earlier
+# version of this patch did - lets a poll with no gpu object fall through to
+# 0===i.gpu_memory_total on an undefined i, which throws a TypeError and kills
+# the handler: the chart then takes one sample and freezes for the life of the
+# window. Keeping !i means such a poll is skipped harmlessly, exactly as DSM
+# intended, while a poll carrying real values now reaches the chart.
 RM_JS="/usr/syno/synoman/webman/modules/ResourceMonitor/resource.js"
 RM_GZ="${RM_JS}.gz"
 RM_GUARD='if(!i||0===i.gpu_memory_total)'
-RM_PATCHED='if(!1&&!i||0===i.gpu_memory_total)'
+RM_PATCHED='if(!i||!1&&0===i.gpu_memory_total)'
 
 _rm_patch() {
   [ -f "${RM_JS}" ] || return 0
@@ -357,6 +364,20 @@ _rm_patch() {
     print
   }' "${RM_JS}" > "${_rm_tmp}" && mv -f "${_rm_tmp}" "${RM_JS}"
   rm -f "${_rm_tmp}"
+
+  # onActivate re-applies the mask from a turnOnMask that an earlier, data-less
+  # poll may have set, which would re-mask the panel on every tab switch even
+  # though data now flows. Force the unmask branch.
+  _rm_tmp2="${RM_JS}.tmp2.$$"
+  awk -v old="this.turnOnMask?this.mask" -v new="!1?this.mask" '{
+    n = index($0, old)
+    while (n > 0) {
+      $0 = substr($0, 1, n-1) new substr($0, n+length(old))
+      n = index($0, old)
+    }
+    print
+  }' "${RM_JS}" > "${_rm_tmp2}" && mv -f "${_rm_tmp2}" "${RM_JS}"
+  rm -f "${_rm_tmp2}"
 
   # nginx has gzip_static on, so a stale .gz would be served in preference to
   # the .js we just patched. Keep the pair consistent.
