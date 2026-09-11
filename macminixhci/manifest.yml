@@ -1,0 +1,9 @@
+version: 1
+name: macminixhci
+description: "Restore USB boot device on Macmini7,1 (i5-4278U)"
+system: false
+beta: true
+all:
+  install-script: "install.sh"
+  copy: ""
+apollolake: true
