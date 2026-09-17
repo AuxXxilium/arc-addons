@@ -32,6 +32,41 @@ _has_hba_driver() {
   lspci -n 2>/dev/null | grep -qE ' (0100|0104|0107):'
 }
 
+# True when any NVMe controller (PCI class 0108) is present. NVMe is not in the
+# class list above: those are the SCSI/RAID/SAS classes, so an NVMe-only machine
+# reports "no HBA" and skips the stabilisation wait entirely.
+_has_nvme_controller() {
+  lspci -n 2>/dev/null | grep -qE ' 0108:'
+}
+
+# Resolve a namespace's controller BDF, domain-normalized to the 0000:BB:DD.F
+# form the dts always carries.
+#
+# Both NVMe loops below dedupe by grepping the emitted dts for this pcie_root,
+# but the dts is normalized while syno_block_info reports the short BDF
+# ("50:00.0"). Comparing the raw forms makes the dedup miss, so two namespaces
+# on one controller each emit a slot - and the domain-fixup sed near the end of
+# dtModel then rewrites both to the same pcie_root. DSM maps one controller to
+# one cache device (libsynonvme, see nvmecache), so the second node is a phantom
+# bay that shows in the panel count and never populates. Normalizing here is
+# what keeps the dedup and the final dts agreeing on one spelling.
+#
+# Echoes nothing when no BDF can be resolved, so callers can log it.
+_nvme_pciepath() {
+  _NP_F="${1}"
+  _NP_P="$(grep 'pciepath' "${_NP_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+  if [ -z "${_NP_P}" ]; then
+    _NP_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${_NP_F}/uevent" 2>/dev/null)"
+    [ -n "${_NP_PP}" ] && _NP_P="$(printf '%s' "${_NP_PP}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+  fi
+  [ -n "${_NP_P}" ] || return 0
+  case "${_NP_P}" in
+    [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) : ;;
+    *) _NP_P="0000:${_NP_P}" ;;
+  esac
+  echo "${_NP_P}"
+}
+
 _count_disks() {
   C=0
   for _F in ${1}; do [ -e "${_F}" ] && C=$((C + 1)); done
@@ -42,8 +77,8 @@ _wait_hba_disks_stable() {
   [ "${_HBA_WAIT_DONE:-0}" = "1" ] && return 0
   _HBA_WAIT_DONE=1
 
-  if ! _has_hba_driver; then
-    _log "no HBA driver found, skipping disk stabilisation wait"
+  if ! _has_hba_driver && ! _has_nvme_controller; then
+    _log "no HBA or NVMe controller found, skipping disk stabilisation wait"
     return 0
   fi
 
@@ -315,7 +350,7 @@ dtModel() {
 
   UNIQUE=$(__get_conf_kv unique)
 
-  _wait_hba_disks_stable "/sys/block/sata* /sys/block/sd*"
+  _wait_hba_disks_stable "/sys/block/sata* /sys/block/sd* /sys/block/nvme*"
 
   DEST="/etc/model.dts"
   [ -f "/addons/model.dts" ] && cp -vpf "/addons/model.dts" "${DEST}"
@@ -509,20 +544,31 @@ dtModel() {
         [ ! -e "${F}" ] && continue
         N="$(basename "${F}")"
         [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
-        PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+        PCIEPATH="$(_nvme_pciepath "${F}")"
         _NVME_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-        if [ -z "${PCIEPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ]; then
-          PCIEPATH="$(echo "${_NVME_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-        fi
         if [ -z "${PCIEPATH}" ]; then
           _log "unknown: ${F}"
           continue
         fi
-        if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] || { [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
+        # BOOTDISK_PCIEPATH comes straight from syno_block_info/PHYSDEVPATH and
+        # may still be the short BDF, so normalize it the same way before
+        # comparing - otherwise the loader's own NVMe drive is not recognized
+        # and gets emitted as a data slot.
+        case "${BOOTDISK_PCIEPATH}" in
+          '' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) _NVME_BOOTPC="${BOOTDISK_PCIEPATH}" ;;
+          *) _NVME_BOOTPC="0000:${BOOTDISK_PCIEPATH}" ;;
+        esac
+        if { [ -n "${_NVME_BOOTPC}" ] && [ "${_NVME_BOOTPC}" = "${PCIEPATH}" ]; } || { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
           _log "bootloader: ${F}"
           continue
         fi
-        grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue
+        # One slot per controller: DSM maps a cache/storage device per NVMe
+        # controller, so further namespaces on it share the slot. Log it - a
+        # silent skip is indistinguishable from a disk that was never detected.
+        if grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}"; then
+          _log "already slotted: ${F} [${PCIEPATH}], an nvme controller only recognizes one disk"
+          continue
+        fi
         COUNT=$((COUNT + 1))
         {
           echo "    internal_slot@${COUNT} {"
@@ -539,21 +585,32 @@ dtModel() {
         [ ! -e "${F}" ] && continue
         N="$(basename "${F}")"
         [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
-        PCIEPATH="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+        PCIEPATH="$(_nvme_pciepath "${F}")"
         _NVME_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-        if [ -z "${PCIEPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ]; then
-          PCIEPATH="$(echo "${_NVME_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-        fi
         if [ -z "${PCIEPATH}" ]; then
           _log "unknown: ${F}"
           continue
         fi
-        if [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ] || { [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
+        case "${BOOTDISK_PCIEPATH}" in
+          '' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) _NVME_BOOTPC="${BOOTDISK_PCIEPATH}" ;;
+          *) _NVME_BOOTPC="0000:${BOOTDISK_PCIEPATH}" ;;
+        esac
+        if { [ -n "${_NVME_BOOTPC}" ] && [ "${_NVME_BOOTPC}" = "${PCIEPATH}" ]; } || { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
           _log "bootloader: ${F}"
           continue
         fi
-        grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}" && continue
-        [ $((${#POWER_LIMIT} + 2)) -gt 30 ] && break
+        if grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}"; then
+          _log "already slotted: ${F} [${PCIEPATH}], an nvme controller only recognizes one disk"
+          continue
+        fi
+        # power_limit is a fixed-width DSM field (30 chars), one entry per
+        # nvme_slot. Past that the remaining drives genuinely cannot get a slot,
+        # so say which ones were dropped instead of breaking silently - "some
+        # disks are missing" with nothing in the log is the worst failure mode.
+        if [ $((${#POWER_LIMIT} + 2)) -gt 30 ]; then
+          _log "power_limit full at ${COUNT} nvme slot(s), no slot for ${F} [${PCIEPATH}]"
+          continue
+        fi
         POWER_LIMIT="${POWER_LIMIT:+${POWER_LIMIT},}0"
         COUNT=$((COUNT + 1))
         {
@@ -717,7 +774,24 @@ dtUpdate() {
       fi
     fi
   fi
-  nvme_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/port_type = \"ssdcache\";/p}" "${TEMP_DTS}" 2>/dev/null)"
+  # NVMe: match on pcie_root alone rather than on the line after it.
+  #
+  # Two shapes exist. The usual one is nvme_slot@ with port_type = "ssdcache";
+  # on epyc7003ntb dtModel emits NVMe as internal_slot@ with an nvme { } child
+  # and no port_type at all, so the paired sed never matched there and every
+  # NVMe udev event rebuilt the whole tree - reshuffling bays on a live system.
+  # The pcie_root is enough: dtModel already guarantees one NVMe slot per
+  # controller, so its presence means this disk has a bay.
+  #
+  # Compare with the normalized path, since the dts is always domain-prefixed.
+  case "${PCIEPATH}" in
+    '' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) _DU_NVME_PC="${PCIEPATH}" ;;
+    *) _DU_NVME_PC="0000:${PCIEPATH}" ;;
+  esac
+  case "${F}" in
+    nvme*) nvme_slot_find="$(grep "pcie_root = \"${_DU_NVME_PC}\";" "${TEMP_DTS}" 2>/dev/null | head -1)" ;;
+    *) nvme_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/port_type = \"ssdcache\";/p}" "${TEMP_DTS}" 2>/dev/null)" ;;
+  esac
   usb_slot_find="$(sed -n "/usb3 {/{N;/usb_port = \"${USBPORT}\";/p}" "${TEMP_DTS}" 2>/dev/null)"
   rm -f "${TEMP_DTS}"
   if [ -n "${sata_slot_find}" ] || [ -n "${nvme_slot_find}" ] || [ -n "${usb_slot_find}" ]; then
@@ -731,7 +805,7 @@ dtUpdate() {
 nondtModel() {
   _log nondtModel
 
-  _wait_hba_disks_stable "/sys/block/sd*"
+  _wait_hba_disks_stable "/sys/block/sd* /sys/block/nvme*"
 
   MAXDISKS=0
   USBPORTCFG=0
@@ -852,12 +926,29 @@ nondtModel() {
       _log "unknown: ${F}"
       continue
     fi
-    if [ "${BOOTDISK_PHYSDEVPATH}" = "${PHYSDEVPATH}" ] || [ "${BOOTDISK_PCIEPATH}" = "${PCIEPATH}" ]; then
+    # Both sides must be non-empty before comparing. With no loader disk
+    # resolved BOOTDISK_PHYSDEVPATH is empty, and a drive whose uevent cannot be
+    # read yields an empty PHYSDEVPATH too - "" = "" then matched and the drive
+    # was dropped as the bootloader, losing a real NVMe controller.
+    #
+    # PCIEPATH here is always domain-prefixed (the regex above requires the
+    # 4-hex domain) while BOOTDISK_PCIEPATH may still be the short BDF from
+    # syno_block_info, so normalize it the same way or the loader's own NVMe
+    # drive is never recognized and gets an extensionPorts entry of its own.
+    case "${BOOTDISK_PCIEPATH}" in
+      '' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) _ND_BOOTPC="${BOOTDISK_PCIEPATH}" ;;
+      *) _ND_BOOTPC="0000:${BOOTDISK_PCIEPATH}" ;;
+    esac
+    if { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${PHYSDEVPATH}" ]; } || \
+       { [ -n "${_ND_BOOTPC}" ] && [ "${_ND_BOOTPC}" = "${PCIEPATH}" ]; }; then
       _log "bootloader: ${F}"
       continue
     fi
-    if grep -q "${PCIEPATH}" /etc/extensionPorts; then
-      _log "already: ${F}, An nvme controller only recognizes one disk"
+    # Match the whole value, not a substring: the BDF's dots are regex
+    # wildcards and the old unanchored grep also matched any longer path that
+    # merely contained this one, silently dropping a real controller.
+    if grep -qF "=\"${PCIEPATH}\"" /etc/extensionPorts; then
+      _log "already: ${F} [${PCIEPATH}], an nvme controller only recognizes one disk"
       continue
     fi
     COUNT=$((COUNT + 1))
