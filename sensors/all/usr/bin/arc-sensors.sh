@@ -274,9 +274,12 @@ CURVE_MIN="'"${CURVE_MIN}"'"
 CURVE_MID="'"${CURVE_MID}"'"
 CURVE_MAX="'"${CURVE_MAX}"'"
 #
-# Optional per-fan overrides — uncomment and edit to set a different curve for a
-# specific PWM controller. <key> below is "<chip>_pwm<N>"; any fan without a matching
-# override uses the CURVE_MIN/MID/MAX above.'"$(fan_curve_examples)"'
+# Optional per-fan overrides — add CURVE_MIN_<key>/CURVE_MID_<key>/CURVE_MAX_<key>
+# lines to give one PWM controller its own curve. All three must be set for the
+# override to apply; any fan without a complete set uses the CURVE_MIN/MID/MAX
+# above. Setting a curve for a single fan in arc-control writes these for you.
+#
+# The <key> values on this system are:'"$(fan_curve_examples)"'
 #
 # Optional exclusion list — space-separated "<chip>_pwm<N>" keys (same <key> as above) to
 # leave under BIOS/hardware automatic control instead of fan2go, e.g.:
@@ -288,16 +291,22 @@ INSERT INTO task VALUES('Fancontrol 2.0', '', 'bootup', '', 0, 0, 0, 0, '', 0, '
 EOF
 }
 
-# Build commented example CURVE_*_<key> lines for every discovered fan, for the
-# first-boot task template written by update_task().
+# List the CURVE_*_<key> key names for every discovered fan, for the first-boot
+# task template written by update_task().
+#
+# Only the key names are listed, not full commented-out assignments. A complete
+# `#CURVE_MIN_<key>="..."` line reads as configuration rather than as a
+# template: arc-control's save used to carry those lines forward verbatim on
+# every write, so they accumulated in the task and made the file disagree with
+# what its own reader reported. Naming the keys documents them just as well,
+# and there is nothing left for a rewrite to preserve by mistake.
 fan_curve_examples() {
   local chan hw_idx fan_idx key
   for chan in "${FAN_CHANNELS[@]}"; do
     hw_idx="$(echo "${chan}" | sed 's/hwmon\([0-9]*\)\/.*/\1/')"
     fan_idx="$(echo "${chan}" | sed 's/.*pwm\([0-9]*\)/\1/')"
     key="$(fan_curve_key "${hw_idx}" "${fan_idx}")"
-    printf '\n#CURVE_MIN_%s="%s"\n#CURVE_MID_%s="%s"\n#CURVE_MAX_%s="%s"' \
-      "${key}" "${CURVE_MIN}" "${key}" "${CURVE_MID}" "${key}" "${CURVE_MAX}"
+    printf '\n#   %s' "${key}"
   done
 }
 
@@ -866,5 +875,12 @@ cleanup() {
   done
 }
 
-trap 'cleanup; exit' INT TERM HUP
+# HUP is deliberately not in this list. It is the reload signal (arc-control
+# sends it after saving curves), and main() installs its own HUP handler — but
+# main() only gets there after init_fans(), which can run for a while on a slow
+# hwmon probe. A HUP arriving in that window used to hit this trap instead and
+# shut fan control down outright, so the reload handler is installed up front
+# and main() merely re-affirms it.
+trap 'reload_config' HUP
+trap 'cleanup; exit' INT TERM
 main
