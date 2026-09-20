@@ -19,8 +19,13 @@ if [ "${1}" = "patches" ]; then
   done
   ETHLISTTMPM=""
   ETHLISTTMPB="$(printf "%b" "${ETHLIST}" | sort -V)"
-  if [ -n "${2}" ]; then
-    MACS="$(echo "${2}" | sed 's/://g; s/,/ /g; s/.*/\L&/')"
+  # The MAC list comes from the cmdline, which the loader writes on every boot,
+  # so a config change takes effect on the next boot with no rebuild. ${2} is
+  # still honoured as a fallback for ramdisks built before that was wired up.
+  MACLIST="$(sed -n 's/.*sortnetif=\([^ ]*\).*/\1/p' /proc/cmdline 2>/dev/null)"
+  [ -z "${MACLIST}" ] && MACLIST="${2}"
+  if [ -n "${MACLIST}" ]; then
+    MACS="$(echo "${MACLIST}" | sed 's/://g; s/,/ /g; s/.*/\L&/')"
     for MACX in ${MACS}; do
       ETHLISTTMPM="${ETHLISTTMPM}$(printf "%b" "${ETHLISTTMPB}" | grep "${MACX}")\n"
       ETHLISTTMPB="$(printf "%b" "${ETHLISTTMPB}" | grep -v "${MACX}")\n"
