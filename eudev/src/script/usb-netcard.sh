@@ -17,6 +17,19 @@ _log "ACTION=${1}, NAME=${2}"
 ACTION=$([ "${1}" = "add" ] && echo "restart" || echo "stop")
 NAME=${2}
 
+# Only touch USB network cards. The udev rule filters on ID_BUS, but an earlier
+# attempt to filter with SUBSYSTEMS=="usb" turned out not to filter at all in
+# this eudev build - PCIe NICs still reached this script and had rc.network run
+# against them, which races the eth* renaming done by the sortnetif addon.
+# Resolving the sysfs link is independent of how the rule matched, so check it
+# here too and leave anything that is not on USB alone.
+case "$(readlink -f "/sys/class/net/${NAME}/device" 2>/dev/null)" in
+*/usb[0-9]*/*) ;;
+*)
+  exit 0
+  ;;
+esac
+
 IFCFGPRE="/etc/sysconfig/network-scripts/ifcfg-"
 
 set_kv() {

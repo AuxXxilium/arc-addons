@@ -5,9 +5,16 @@
 # See /LICENSE for more information.
 #
 
-# Match USB network cards only. SUBSYSTEMS=="usb" walks the parent chain, so a
-# USB NIC matches whichever name it enumerated under and the script's own case
-# handles eth/usb/wlan from there. Without it the rule also matched every PCIe
-# NIC, and the script then fired /etc/rc.network per interface from udev, which
-# raced the eth* renaming done by the sortnetif addon.
-ACTION=="add|remove", SUBSYSTEM=="net", SUBSYSTEMS=="usb", RUN+="/usr/lib/udev/script/usb-netcard.sh %E{ACTION} %k"
+# Match USB network cards only.
+#
+# Without a bus filter this rule fired for every PCIe NIC too, and the script
+# then ran /etc/rc.network per interface straight from udev, racing the eth*
+# renaming done by the sortnetif addon.
+#
+# SUBSYSTEMS=="usb" is NOT used here: it did not filter in this eudev build.
+# A PCIe NIC with DEVPATH=/devices/pci0000:00/0000:00:1c.0/0000:03:00.0/net/eth0
+# - no usb ancestor to match - still triggered the rule. ID_BUS is set by the
+# builtin path_id and reads "pci" for those, so match on it instead. The script
+# re-checks the sysfs path anyway, so a device slipping past this is still
+# caught before anything is reconfigured.
+ACTION=="add|remove", SUBSYSTEM=="net", ENV{ID_BUS}=="usb", RUN+="/usr/lib/udev/script/usb-netcard.sh %E{ACTION} %k"
