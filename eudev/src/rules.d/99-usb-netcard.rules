@@ -5,9 +5,9 @@
 # See /LICENSE for more information.
 #
 
-# Match USB network cards only. SUBSYSTEM=="net" plus KERNEL=="eth*" on its own
-# also matches every PCIe NIC, and the script then fires /etc/rc.network per
-# interface from udev - which races the eth* renaming done by the sortnetif
-# addon. SUBSYSTEMS=="usb" walks the parent chain, so a USB NIC still matches
-# whichever name it enumerates under, while PCIe NICs are left alone.
-ACTION=="add|remove", SUBSYSTEM=="net", SUBSYSTEMS=="usb", KERNEL=="eth*|usb*|wlan*", RUN+="/usr/lib/udev/script/usb-netcard.sh %E{ACTION} %k"
+# Match USB network cards only. SUBSYSTEMS=="usb" walks the parent chain, so a
+# USB NIC matches whichever name it enumerated under and the script's own case
+# handles eth/usb/wlan from there. Without it the rule also matched every PCIe
+# NIC, and the script then fired /etc/rc.network per interface from udev, which
+# raced the eth* renaming done by the sortnetif addon.
+ACTION=="add|remove", SUBSYSTEM=="net", SUBSYSTEMS=="usb", RUN+="/usr/lib/udev/script/usb-netcard.sh %E{ACTION} %k"
