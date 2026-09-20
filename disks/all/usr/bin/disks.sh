@@ -353,7 +353,18 @@ dtModel() {
   _wait_hba_disks_stable "/sys/block/sata* /sys/block/sd* /sys/block/nvme*"
 
   DEST="/etc/model.dts"
-  [ -f "/addons/model.dts" ] && cp -vpf "/addons/model.dts" "${DEST}"
+  # A user-supplied dts has two homes and both have to be consulted.
+  #
+  # /addons/model.dts only exists inside the ramdisk: install.sh's late stage
+  # persists it to /etc/user_model.dts precisely so it survives into the booted
+  # rootfs. Reading only /addons meant that once DSM was up the upload was gone
+  # - any later regeneration (a --create after an upgrade, a lost model.dtb)
+  # auto-generated over it and the custom slots silently reverted.
+  # /addons wins when both are present: it is the fresher upload.
+  USER_DTS=""
+  [ -f "/etc/user_model.dts" ] && USER_DTS="/etc/user_model.dts"
+  [ -f "/addons/model.dts" ] && USER_DTS="/addons/model.dts"
+  [ -n "${USER_DTS}" ] && { cp -vpf "${USER_DTS}" "${DEST}"; _log "using user dts: ${USER_DTS}"; }
   if [ ! -f "${DEST}" ]; then
     mkdir -p "$(dirname "${DEST}" 2>/dev/null)"
     {
@@ -678,6 +689,13 @@ dtModel() {
     cat "${_DTB_TMP}" >/etc/model.dtb
     rm -f "${_DTB_TMP}"
     _log "dtc success"
+    # Persist a ramdisk-only upload: /addons is gone once DSM is up, and this
+    # copy is what later regenerations read back. Copy the pristine source
+    # rather than ${DEST}, which carries this run's domain normalization and
+    # model= rewrite - storing those would bake one kernel's BDF spelling into
+    # the user's own file. A dts already read from /etc/user_model.dts needs no
+    # write-back.
+    [ "${USER_DTS}" = "/addons/model.dts" ] && cp -vpf "${USER_DTS}" /etc/user_model.dts
     rm -vf "${DEST}"
     cp -vpf /etc/model.dtb /etc.defaults/model.dtb
     cp -vpf /etc/model.dtb /run/model.dtb
@@ -687,6 +705,15 @@ dtModel() {
   else
     _log "dtc error"
     rm -f "${_DTB_TMP}"
+    # A user dts that does not compile is set aside as user_model.dts.bad, not
+    # deleted: it is the user's own file and the only record of what to fix.
+    # It must not stay at user_model.dts, or every later run would retry the
+    # same broken source and never fall back to a working auto-generated tree.
+    if [ -n "${USER_DTS}" ]; then
+      cp -vpf "${USER_DTS}" /etc/user_model.dts.bad
+      rm -vf /etc/user_model.dts
+      _log "user dts failed to compile, kept as /etc/user_model.dts.bad"
+    fi
     rm -vf "${DEST}"
     cp -vpf /etc.defaults/model.dtb /etc/model.dtb
     return 1
@@ -1048,9 +1075,12 @@ case ${1} in
     ;;
   "--update")
     if [ "$(__get_conf_kv supportportmappingv2)" = "yes" ]; then
-      if [ ! -f "/etc/user_model.dts" ]; then
-        dtUpdate "${2:-}"
-      fi
+      # No user_model.dts guard here. It used to skip the update entirely so a
+      # udev event could not regenerate over an upload - but dtModel now reads
+      # user_model.dts as its source, so a rebuild reproduces the user's tree
+      # instead of replacing it. Keeping the guard only meant a disk plugged
+      # into a slot the upload does not describe never got a bay at all.
+      dtUpdate "${2:-}"
     else
       if ! _check_user_conf "usbportcfg" || ! _check_user_conf "esataportcfg" || ! _check_user_conf "internalportcfg"; then
         nondtUpdate "${2:-}"

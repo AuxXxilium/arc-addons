@@ -28,10 +28,20 @@ elif [ "${1}" = "late" ]; then
     cp -vpf /usr/bin/dtc /tmpRoot/usr/bin/dtc
     cp -vpf /etc/model.dtb /tmpRoot/etc/model.dtb
     cp -vpf /etc/model.dtb /tmpRoot/etc.defaults/model.dtb
+    # The persisted copy tracks the loader: /addons/model.dts is re-injected on
+    # every boot that has an upload configured, so its absence means the user
+    # removed it and the stale copy has to go with it.
+    #
+    # The old code got the delete right but not the keep: it wrote
+    # /etc/user_model.dts and nothing ever read it back, so dtModel()
+    # auto-generated over the upload as soon as the ramdisk was out of the
+    # picture. disks.sh now treats it as a real source, which is what makes
+    # this branch meaningful rather than write-only.
     if [ -f "/addons/model.dts" ]; then
       cp -vpf /addons/model.dts /tmpRoot/etc/user_model.dts
+      rm -vf /tmpRoot/etc/user_model.dts.bad
     else
-      rm -rf /tmpRoot/etc/user_model.dts
+      rm -vf /tmpRoot/etc/user_model.dts /tmpRoot/etc/user_model.dts.bad
     fi
   else
     KVLIST="${KVLIST} usbportcfg esataportcfg eunitseq internalportcfg"
