@@ -217,7 +217,12 @@ function mountLoaderDisk() {
     fi
     
     log "Mounting /dev/synoboot${i} to /mnt/p${i}"
-    rm -rf "/mnt/p${i}" 2>/dev/null || true
+    # Not "rm -rf" first. The loop above has already established that nothing is
+    # mounted here, but a stale mount this script cannot see - one in another
+    # namespace, or a bind whose name was lazily detached - would turn that into
+    # a delete through a live partition, which is the fault this file exists to
+    # avoid. mkdir -p is all that is needed: mounting over a non-empty directory
+    # is fine, and its contents reappear when the mount is released.
     mkdir -p "/mnt/p${i}"
     
     local retry=0
