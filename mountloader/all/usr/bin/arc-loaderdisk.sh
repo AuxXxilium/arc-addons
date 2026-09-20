@@ -27,8 +27,38 @@ reset_arcsu() {
 LOADER_DISK="/dev/synoboot"
 LOADER_PARTS="/dev/synoboot1 /dev/synoboot2 /dev/synoboot3"
 RAMDISK_PATH="/mnt/initrd"
-RAMDISK_FILE="/mnt/p3/initrd-arc"
 INITRD_TOOLPATH="/usr/mountloader"
+
+# The loader ramdisk on p3, resolved rather than assumed.
+#
+# This was hardcoded to /mnt/p3/initrd-arc, which is arc's ARC_RAMDISK_FILE
+# constant - a name the loader defines and never writes. grub boots
+# /initrd-${system_version}, normally initrd-apex, with initrd-user as an
+# optional overlay. So the -f test below missed on every current release, and
+# because that is a soft branch that only warns, "mountLoaderDisk -all" returned
+# success having extracted nothing at all.
+#
+# Order: what grubenv actually names, then the usual apex, then any other
+# initrd-* on p3 - skipping initrd-dsm, which is the built DSM image, and
+# initrd-user, which is the user's own overlay. Neither is the loader.
+find_ramdisk_file() {
+  local version candidate
+  version="$(grep -o 'system_version=[A-Za-z0-9._-]*' /mnt/p1/boot/grub/grubenv 2>/dev/null | head -1 | cut -d= -f2)"
+  if [ -n "${version}" ] && [ -s "/mnt/p3/initrd-${version}" ]; then
+    echo "/mnt/p3/initrd-${version}"; return 0
+  fi
+  if [ -s "/mnt/p3/initrd-apex" ]; then
+    echo "/mnt/p3/initrd-apex"; return 0
+  fi
+  for candidate in /mnt/p3/initrd-*; do
+    [ -s "${candidate}" ] || continue
+    case "$(basename "${candidate}")" in
+      initrd-dsm|initrd-user) continue ;;
+    esac
+    echo "${candidate}"; return 0
+  done
+  return 1
+}
 LOCK_FILE="/var/run/arc-loaderdisk.lock"
 MAX_RETRY=3
 RETRY_DELAY=2
@@ -66,25 +96,60 @@ release_lock() {
 
 cleanup() {
   log "Running cleanup"
-  
+
   # Sync before unmounting
   sync
-  
-  # Force unmount with retries
+
+  # Unmount, then remove the mount point only if it is genuinely empty.
+  #
+  # This used to be "umount || umount -l || true" followed by an unconditional
+  # "rm -rf /mnt/pN", and that pairing destroys data. A lazy unmount detaches
+  # the NAME while the filesystem stays attached for anything still holding a
+  # reference - another namespace, a bind mount, an open file - so the rm then
+  # deletes through a partition that is still live. It has emptied p1, and left
+  # p2 and p3 half-deleted, on a running system.
+  #
+  # So: no lazy fallback, and no rm that is not conditional on the directory
+  # actually being an empty, unmounted one. A mount point that cannot be
+  # released is left in place and logged; the disk stays mounted, which is
+  # recoverable, rather than being deleted through, which is not.
   for i in 1 2 3; do
-    if mount | grep -q "/mnt/p${i}"; then
-      umount "/mnt/p${i}" 2>/dev/null || umount -l "/mnt/p${i}" 2>/dev/null || true
-      log "Unmounted /mnt/p${i}"
+    if mount | grep -q " /mnt/p${i} "; then
+      if umount "/mnt/p${i}" 2>/dev/null; then
+        log "Unmounted /mnt/p${i}"
+      else
+        # One retry after a short pause: a process that just finished with the
+        # mount usually lets go within a second.
+        sleep 1
+        if umount "/mnt/p${i}" 2>/dev/null; then
+          log "Unmounted /mnt/p${i} (second attempt)"
+        else
+          log "WARNING: /mnt/p${i} is busy and was left mounted - NOT removing it"
+          continue
+        fi
+      fi
     fi
-    rm -rf "/mnt/p${i}" 2>/dev/null || true
+
+    # Only now, with nothing mounted there, is removing it safe. rmdir rather
+    # than rm -rf: it refuses a non-empty directory, so if anything unexpected
+    # is present it is kept rather than destroyed.
+    if [ -d "/mnt/p${i}" ] && ! mount | grep -q " /mnt/p${i} "; then
+      rmdir "/mnt/p${i}" 2>/dev/null || log "Left /mnt/p${i} in place (not empty)"
+    fi
   done
-  
-  # Clean up ramdisk
+
+  # Same reasoning for the extracted ramdisk. It is a plain directory tree
+  # rather than a mount, so rm -rf is right - but only once nothing is mounted
+  # inside it, or that rm walks into whatever is.
   if [ -d "${RAMDISK_PATH}" ]; then
-    rm -rf "${RAMDISK_PATH}" 2>/dev/null || true
-    log "Cleaned up ramdisk"
+    if mount | grep -q " ${RAMDISK_PATH}"; then
+      log "WARNING: something is mounted under ${RAMDISK_PATH} - NOT removing it"
+    else
+      rm -rf "${RAMDISK_PATH}" 2>/dev/null || true
+      log "Cleaned up ramdisk"
+    fi
   fi
-  
+
   echo 0 | tee /proc/sys/kernel/syno_install_flag >/dev/null 2>&1 || true
   reset_arcsu
 }
@@ -103,7 +168,7 @@ function mountLoaderDisk() {
     log "Loader already mounted, checking validity..."
     local all_mounted=true
     for i in 1 2 3; do
-      if ! mount | grep -q "/mnt/p${i}"; then
+      if ! mount | grep -q " /mnt/p${i} "; then
         log "WARNING: Partition p${i} not mounted despite .mountloader exists"
         all_mounted=false
         break
@@ -146,7 +211,7 @@ function mountLoaderDisk() {
   
   # Mount partitions with retry logic
   for i in 1 2 3; do
-    if mount | grep -q "/mnt/p${i}"; then
+    if mount | grep -q " /mnt/p${i} "; then
       log "Partition p${i} already mounted, skipping"
       continue
     fi
@@ -179,7 +244,12 @@ function mountLoaderDisk() {
   # Mount ramdisk if the file exists and -all flag is present
   if echo "$@" | grep -wq "\-all"; then
     log "Mounting ramdisk (-all flag detected)"
-    if [ -f "${RAMDISK_FILE}" ] && [ -d "${INITRD_TOOLPATH}" ]; then
+    # Resolved here rather than at the top of the file: p3 has only just been
+    # mounted, so this is the first point at which the image can be found.
+    RAMDISK_FILE="$(find_ramdisk_file || echo "")"
+    [ -n "${RAMDISK_FILE}" ] && log "Ramdisk image: ${RAMDISK_FILE}" \
+      || log "WARN: no loader ramdisk found on /mnt/p3"
+    if [ -n "${RAMDISK_FILE}" ] && [ -f "${RAMDISK_FILE}" ] && [ -d "${INITRD_TOOLPATH}" ]; then
       rm -rf "${RAMDISK_PATH}"
       mkdir -p "${RAMDISK_PATH}"
 
@@ -312,7 +382,7 @@ case "${1:-}" in
     if [ -f "/usr/arc/.mountloader" ]; then
       echo "Loader disk: MOUNTED"
       for i in 1 2 3; do
-        if mount | grep -q "/mnt/p${i}"; then
+        if mount | grep -q " /mnt/p${i} "; then
           echo "  /mnt/p${i}: mounted"
         else
           echo "  /mnt/p${i}: NOT mounted (ERROR)"
