@@ -829,7 +829,13 @@ dtModel() {
     cp -vpf /etc/model.dtb /etc.defaults/model.dtb
     cp -vpf /etc/model.dtb /run/model.dtb
     /usr/syno/bin/syno_slot_mapping
-    [ -f "/usr/lib/systemd/system/storagepanel.service" ] && systemctl restart storagepanel.service
+    # --no-block: this also runs as a udev PROGRAM, and storagepanel.service is
+    # ordered After=pkgctl-StorageManager. During boot that package has not
+    # started yet, so a blocking restart parked the udev worker until it had -
+    # while every other disk's event queued behind our lock, delaying pool and
+    # volume assembly (Storage Manager errors, File Station missing until the
+    # next boot). Queueing the job is all this needs.
+    [ -f "/usr/lib/systemd/system/storagepanel.service" ] && systemctl --no-block restart storagepanel.service
     return 0
   else
     _log "dtc error"
