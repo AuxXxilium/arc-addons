@@ -28,21 +28,11 @@ _check_user_conf() {
   grep -Eq "^${1}=" "${UCONF}" 2>/dev/null
 }
 
-# Gates the stabilisation wait only. 0106 (AHCI) is included because SATA disks
-# can appear late too - staggered spin-up, port multipliers, many-port cards
-# like JMB585/ASM1166 - and a disk that lands after dtModel() gets no bay, so
-# its udev event in DSM misses in dtUpdate() and forces a rebuild and remap
-# mid-boot. The wait's short-circuit keeps the cost at two rounds when nothing
-# is still arriving.
-_has_hba_driver() {
-  lspci -n 2>/dev/null | grep -qE ' (0100|0104|0106|0107):'
-}
-
-# True when any NVMe controller (PCI class 0108) is present. NVMe is not in the
-# class list above: those are the SCSI/RAID/AHCI/SAS classes, so an NVMe-only
-# machine would otherwise skip the stabilisation wait entirely.
-_has_nvme_controller() {
-  lspci -n 2>/dev/null | grep -qE ' 0108:'
+# True when any disk controller is present: SCSI (0100), RAID (0104), AHCI (0106),
+# SAS (0107) or NVMe (0108). Gates the settle wait only - a machine with none of
+# these has no disks to wait for.
+_has_storage_controller() {
+  lspci -n 2>/dev/null | grep -qE ' (0100|0104|0106|0107|0108):'
 }
 
 # Resolve a namespace's controller BDF, domain-normalized to the 0000:BB:DD.F
@@ -79,20 +69,29 @@ _count_disks() {
   echo "${C}"
 }
 
-_wait_hba_disks_stable() {
-  [ "${_HBA_WAIT_DONE:-0}" = "1" ] && return 0
-  _HBA_WAIT_DONE=1
+# Wait until the number of disk nodes matching the given globs stops changing.
+#
+# Every controller type needs this, not only HBAs: SATA disks arrive late too
+# (staggered spin-up, port multipliers, many-port cards like JMB585/ASM1166),
+# and so does NVMe. A disk that lands after dtModel() has run gets no bay, so
+# its udev event in DSM misses in dtUpdate() and forces a rebuild and slot
+# remap mid-boot.
+#
+# Runs at most once per process: dtModel() can be re-entered from dtUpdate().
+_wait_disks_stable() {
+  [ "${_DISKS_WAIT_DONE:-0}" = "1" ] && return 0
+  _DISKS_WAIT_DONE=1
 
-  if ! _has_hba_driver && ! _has_nvme_controller; then
-    _log "no storage controller found, skipping disk stabilisation wait"
+  if ! _has_storage_controller; then
+    _log "no storage controller found, skipping disk settle wait"
     return 0
   fi
 
-  _whba_globs="${*:-/sys/block/sd*}"
+  _wd_globs="${*:-/sys/block/sd*}"
 
-  _whba_count() {
+  _wd_count() {
     _C=0
-    for _G in ${_whba_globs}; do _C=$((_C + $(_count_disks "${_G}"))); done
+    for _G in ${_wd_globs}; do _C=$((_C + $(_count_disks "${_G}"))); done
     echo "${_C}"
   }
 
@@ -104,14 +103,14 @@ _wait_hba_disks_stable() {
   #     after the first two rounds instead of waiting out three stable ones;
   #   - a 60s ceiling, which still covers staggered backplane spin-up but no
   #     longer lets a genuinely stuck controller hold the WebUI for 5 minutes.
-  START_COUNT="$(_whba_count)"
+  START_COUNT="$(_wd_count)"
   PREV_COUNT="${START_COUNT}"
   STABLE_ROUNDS=0
   I=0
   while [ "${I}" -lt 20 ]; do
     sleep 3
     I=$((I + 1))
-    CUR_COUNT="$(_whba_count)"
+    CUR_COUNT="$(_wd_count)"
     if [ "${CUR_COUNT}" = "${PREV_COUNT}" ]; then
       STABLE_ROUNDS=$((STABLE_ROUNDS + 1))
       [ "${STABLE_ROUNDS}" -ge 3 ] && break
@@ -124,9 +123,9 @@ _wait_hba_disks_stable() {
     fi
   done
   if [ "${I}" -ge 20 ]; then
-    _log "HBA disk stabilisation wait timed out: [${_whba_globs}] at count ${CUR_COUNT}"
+    _log "disk settle wait timed out after ${I} round(s): [${_wd_globs}] at count ${CUR_COUNT}"
   else
-    _log "HBA disks settled after ${I} round(s): [${_whba_globs}] at count ${CUR_COUNT}"
+    _log "disks settled after ${I} round(s): [${_wd_globs}] at count ${CUR_COUNT}"
   fi
 }
 
@@ -462,7 +461,7 @@ dtModel() {
 
   UNIQUE=$(__get_conf_kv unique)
 
-  _wait_hba_disks_stable "/sys/block/sata* /sys/block/sd* /sys/block/nvme*"
+  _wait_disks_stable "/sys/block/sata* /sys/block/sd* /sys/block/nvme*"
 
   DEST="/etc/model.dts"
   # A user-supplied dts has two homes and both have to be consulted.
@@ -973,7 +972,7 @@ dtUpdate() {
 nondtModel() {
   _log nondtModel
 
-  _wait_hba_disks_stable "/sys/block/sd* /sys/block/nvme*"
+  _wait_disks_stable "/sys/block/sd* /sys/block/nvme*"
 
   MAXDISKS=0
   USBPORTCFG=0
