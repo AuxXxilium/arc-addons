@@ -28,13 +28,19 @@ _check_user_conf() {
   grep -Eq "^${1}=" "${UCONF}" 2>/dev/null
 }
 
+# Gates the stabilisation wait only. 0106 (AHCI) is included because SATA disks
+# can appear late too - staggered spin-up, port multipliers, many-port cards
+# like JMB585/ASM1166 - and a disk that lands after dtModel() gets no bay, so
+# its udev event in DSM misses in dtUpdate() and forces a rebuild and remap
+# mid-boot. The wait's short-circuit keeps the cost at two rounds when nothing
+# is still arriving.
 _has_hba_driver() {
-  lspci -n 2>/dev/null | grep -qE ' (0100|0104|0107):'
+  lspci -n 2>/dev/null | grep -qE ' (0100|0104|0106|0107):'
 }
 
 # True when any NVMe controller (PCI class 0108) is present. NVMe is not in the
-# class list above: those are the SCSI/RAID/SAS classes, so an NVMe-only machine
-# reports "no HBA" and skips the stabilisation wait entirely.
+# class list above: those are the SCSI/RAID/AHCI/SAS classes, so an NVMe-only
+# machine would otherwise skip the stabilisation wait entirely.
 _has_nvme_controller() {
   lspci -n 2>/dev/null | grep -qE ' 0108:'
 }
@@ -78,7 +84,7 @@ _wait_hba_disks_stable() {
   _HBA_WAIT_DONE=1
 
   if ! _has_hba_driver && ! _has_nvme_controller; then
-    _log "no HBA or NVMe controller found, skipping disk stabilisation wait"
+    _log "no storage controller found, skipping disk stabilisation wait"
     return 0
   fi
 
