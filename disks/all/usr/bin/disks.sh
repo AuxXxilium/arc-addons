@@ -15,6 +15,17 @@ _log() {
   /bin/logger -p "error" -t "disks" "$@"
 }
 
+# True only when both files exist and are byte-identical. cmp is not in every
+# DSM build, so fall back to md5sum rather than treating its absence as a match.
+_same_file() {
+  [ -f "${1}" ] && [ -f "${2}" ] || return 1
+  if type cmp >/dev/null 2>&1; then
+    cmp -s "${1}" "${2}"
+  else
+    [ "$(md5sum <"${1}")" = "$(md5sum <"${2}")" ]
+  fi
+}
+
 __get_conf_kv() {
   "${GKV}" "${ROOT_PATH}/etc.defaults/synoinfo.conf" "${1}" 2>/dev/null
 }
@@ -815,8 +826,6 @@ dtModel() {
   _DTB_TMP="/tmp/model.dtb.$$"
   dtc -I dts -O dtb "${DEST}" >"${_DTB_TMP}"
   if [ $? -eq 0 ] && [ -s "${_DTB_TMP}" ]; then
-    cat "${_DTB_TMP}" >/etc/model.dtb
-    rm -f "${_DTB_TMP}"
     _log "dtc success"
     # Persist a ramdisk-only upload: /addons is gone once DSM is up, and this
     # copy is what later regenerations read back. Copy the pristine source
@@ -826,6 +835,21 @@ dtModel() {
     # write-back.
     [ "${USER_DTS}" = "/addons/model.dts" ] && cp -vpf "${USER_DTS}" /etc/user_model.dts
     rm -vf "${DEST}"
+    # A rebuild that reproduces the tree already in force changes nothing, so
+    # it must not remap either. dtUpdate() falls through to here whenever its
+    # per-disk match misses, and under udev that happens mid-boot: running
+    # syno_slot_mapping then re-applies the bay map while Storage Manager may
+    # already have enumerated the disks. Only a tree that really differs - from
+    # /etc and from the /run copy the running mapping was built from - is
+    # worth that. In the junior ramdisk /run/model.dtb does not exist yet, so
+    # --create always takes the full path.
+    if _same_file "${_DTB_TMP}" /etc/model.dtb && _same_file "${_DTB_TMP}" /run/model.dtb; then
+      rm -f "${_DTB_TMP}"
+      _log "dtb unchanged, skipping slot remap"
+      return 0
+    fi
+    cat "${_DTB_TMP}" >/etc/model.dtb
+    rm -f "${_DTB_TMP}"
     cp -vpf /etc/model.dtb /etc.defaults/model.dtb
     cp -vpf /etc/model.dtb /run/model.dtb
     /usr/syno/bin/syno_slot_mapping
