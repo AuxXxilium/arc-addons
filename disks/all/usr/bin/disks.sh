@@ -1155,7 +1155,11 @@ if type flock >/dev/null 2>&1 && type trap >/dev/null 2>&1; then
       _log "Failed to acquire lock after 60 seconds. Exiting."
       exit 1
     }
-    trap 'flock -u 3; rm -f "$LOCKFILE"' EXIT INT TERM HUP
+    # Never rm the lock file on exit. A run already blocked here holds an fd on
+    # this inode, while the next run to start would create a fresh file and
+    # lock that instead - two dtModel()s at once, both writing /etc/model.dts.
+    # A udev coldplug of several disks produces exactly that sequence.
+    trap 'flock -u 3' EXIT INT TERM HUP
   else
     # busybox: -n is non-blocking; retry to approximate the 60s timeout above.
     _DISKS_LOCK_TRY=0
@@ -1167,8 +1171,8 @@ if type flock >/dev/null 2>&1 && type trap >/dev/null 2>&1; then
       fi
       sleep 1
     done
-    # No -u: closing fd 3 releases the lock.
-    trap 'exec 3>&-; rm -f "$LOCKFILE"' EXIT INT TERM HUP
+    # No -u: closing fd 3 releases the lock. The file stays, as above.
+    trap 'exec 3>&-' EXIT INT TERM HUP
   fi
 fi
 
