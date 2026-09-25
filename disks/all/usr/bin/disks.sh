@@ -489,6 +489,28 @@ getUsbPorts() {
   echo
 }
 
+# Append one internal_slot for a SATA/HBA disk: $1 pcie_root, $2 driver,
+# $3 ata_port. Also records the driver name its controller was first emitted
+# with - every slot on one controller has to carry the same one, see the sd*
+# pass in dtModel.
+_emit_sata_slot() {
+  case " ${_CTRL_DRIVERS} " in
+    *" ${1}|"*) : ;;
+    *) _CTRL_DRIVERS="${_CTRL_DRIVERS:+${_CTRL_DRIVERS} }${1}|${2}" ;;
+  esac
+  COUNT=$((COUNT + 1))
+  {
+    echo "    internal_slot@${COUNT} {"
+    echo '        protocol_type = "sata";'
+    echo "        ${2} {"
+    echo "            pcie_root = \"${1}\";"
+    printf "            ata_port = <0x%02X>;\n" "${3}"
+    echo "            internal_mode;"
+    echo "        };"
+    echo "    };"
+  } >>"${DEST}"
+}
+
 dtModel() {
   _log dtModel
 
@@ -575,9 +597,6 @@ dtModel() {
       if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ -n "${BOOTDISK_ATAPORT}" ] && [ "${BOOTDISK_ATAPORT}" = "${_AT}" ]; then
         _log "bootloader (port ${_AT}): ${_F}"; continue
       fi
-      if [ -z "${BOOTDISK_ATAPORT}" ] && [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_PP}" ]; then
-        _log "bootloader (physdevpath): ${_F}"; continue
-      fi
       # An unresolved _AT starts the search at port 0 rather than being emitted
       # as one, so the disk still gets a bay of its own.
       _claim_slot_port "${_PC}" "${_AT:-0}" || { _log "no slot for ${_F}"; continue; }
@@ -587,23 +606,7 @@ dtModel() {
       # logs, and this loop previously emitted nothing at all.
       _log "slot: ${_F} -> ${_PC} port ${_AT} (${_DR})"
       [ -n "${_PP}" ] && _SEEN_PHYSDEV="${_SEEN_PHYSDEV:+${_SEEN_PHYSDEV} }${_PP}"
-      # Remember which driver name this controller was emitted with, so the
-      # sd* pass below can match it instead of picking a different one.
-      case " ${_CTRL_DRIVERS} " in
-        *" ${_PC}|"*) : ;;
-        *) _CTRL_DRIVERS="${_CTRL_DRIVERS:+${_CTRL_DRIVERS} }${_PC}|${_DR}" ;;
-      esac
-      COUNT=$((COUNT + 1))
-      {
-        echo "    internal_slot@${COUNT} {"
-        echo '        protocol_type = "sata";'
-        echo "        ${_DR} {"
-        echo "            pcie_root = \"${_PC}\";"
-        printf "            ata_port = <0x%02X>;\n" "${_AT}"
-        echo "            internal_mode;"
-        echo "        };"
-        echo "    };"
-      } >>"${DEST}"
+      _emit_sata_slot "${_PC}" "${_DR}" "${_AT}"
     done
 
     # Second pass: HBA disks that never became sataN.
@@ -673,107 +676,70 @@ dtModel() {
       fi
       _claim_slot_port "${_PC}" "${_AT}" || { _log "no slot for ${_F}"; continue; }
       _AT="${_SLOT_PORT}"
-      case " ${_CTRL_DRIVERS} " in
-        *" ${_PC}|"*) : ;;
-        *) _CTRL_DRIVERS="${_CTRL_DRIVERS:+${_CTRL_DRIVERS} }${_PC}|${_DR}" ;;
-      esac
       _log "hba disk without sata alias: ${_F} -> ${_PC} port ${_AT} (${_DR})"
-      COUNT=$((COUNT + 1))
-      {
-        echo "    internal_slot@${COUNT} {"
-        echo '        protocol_type = "sata";'
-        echo "        ${_DR} {"
-        echo "            pcie_root = \"${_PC}\";"
-        printf "            ata_port = <0x%02X>;\n" "${_AT}"
-        echo "            internal_mode;"
-        echo "        };"
-        echo "    };"
-      } >>"${DEST}"
+      _emit_sata_slot "${_PC}" "${_DR}" "${_AT}"
     done
 
-    if echo "${UNIQUE}" | grep -q 'epyc7003ntb'; then
-      # PAS7700 maps NVMe as internal_slot (storage), not nvme_slot (cache), so these
-      # share the SATA loop's internal_slot@ namespace above. Do NOT reset COUNT here:
-      # restarting at 0 emits a second internal_slot@1..N set that collides with the
-      # SATA one, producing duplicate node names in a mixed SATA+NVMe device tree.
-      # Continue from wherever the SATA loop left off (0 when NVMe-only).
-      for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
-        [ ! -e "${F}" ] && continue
-        N="$(basename "${F}")"
-        [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
-        _disk_info "${F}"
-        PCIEPATH="${_PC}"
-        _NVME_PHYSDEVPATH="${_PP}"
-        if [ -z "${PCIEPATH}" ]; then
-          _log "unknown: ${F}"
-          continue
-        fi
-        # BOOTDISK_PCIEPATH comes straight from syno_block_info/PHYSDEVPATH and
-        # may still be the short BDF, so normalize it the same way before
-        # comparing - otherwise the loader's own NVMe drive is not recognized
-        # and gets emitted as a data slot.
-        _NVME_BOOTPC="$(_pc_norm "${BOOTDISK_PCIEPATH}")"
-        if { [ -n "${_NVME_BOOTPC}" ] && [ "${_NVME_BOOTPC}" = "${PCIEPATH}" ]; } || { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
-          _log "bootloader: ${F}"
-          continue
-        fi
-        # One slot per controller: DSM maps a cache/storage device per NVMe
-        # controller, so further namespaces on it share the slot. Log it - a
-        # silent skip is indistinguishable from a disk that was never detected.
-        if grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}"; then
-          _log "already slotted: ${F} [${PCIEPATH}], an nvme controller only recognizes one disk"
-          continue
-        fi
+    # NVMe. PAS7700 (epyc7003ntb) maps it as storage - an internal_slot@ with
+    # an nvme { } child - so those continue the internal_slot@ numbering of the
+    # passes above; restarting at 0 would emit duplicate node names in a mixed
+    # SATA+NVMe tree. Everywhere else NVMe is cache: nvme_slot@ numbered from 1,
+    # each with a power_limit entry.
+    _NVME_STORAGE=false
+    echo "${UNIQUE}" | grep -q 'epyc7003ntb' && _NVME_STORAGE=true
+    [ "${_NVME_STORAGE}" = true ] || COUNT=0
+    POWER_LIMIT=""
+    for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
+      [ ! -e "${F}" ] && continue
+      N="$(basename "${F}")"
+      [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
+      _disk_info "${F}"
+      [ -n "${_PC}" ] || { _log "unknown: ${F}"; continue; }
+      # BOOTDISK_PCIEPATH comes straight from syno_block_info and may still be
+      # the short form, so normalize it before comparing - otherwise the
+      # loader's own NVMe drive is not recognized and gets a data slot.
+      _NVME_BOOTPC="$(_pc_norm "${BOOTDISK_PCIEPATH}")"
+      if { [ -n "${_NVME_BOOTPC}" ] && [ "${_NVME_BOOTPC}" = "${_PC}" ]; } || { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_PP}" ]; }; then
+        _log "bootloader: ${F}"
+        continue
+      fi
+      # One slot per controller: DSM maps a cache/storage device per NVMe
+      # controller, so further namespaces on it share the slot. Log it - a
+      # silent skip is indistinguishable from a disk that was never detected.
+      if grep -qF "pcie_root = \"${_PC}\";" "${DEST}"; then
+        _log "already slotted: ${F} [${_PC}], an nvme controller only recognizes one disk"
+        continue
+      fi
+      if [ "${_NVME_STORAGE}" = true ]; then
         COUNT=$((COUNT + 1))
         {
           echo "    internal_slot@${COUNT} {"
           echo "        nvme {"
-          echo "            pcie_root = \"${PCIEPATH}\";"
+          echo "            pcie_root = \"${_PC}\";"
           echo "        };"
           echo "    };"
         } >>"${DEST}"
-      done
-    else
-      COUNT=0
-      POWER_LIMIT=""
-      for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
-        [ ! -e "${F}" ] && continue
-        N="$(basename "${F}")"
-        [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
-        _disk_info "${F}"
-        PCIEPATH="${_PC}"
-        _NVME_PHYSDEVPATH="${_PP}"
-        if [ -z "${PCIEPATH}" ]; then
-          _log "unknown: ${F}"
-          continue
-        fi
-        _NVME_BOOTPC="$(_pc_norm "${BOOTDISK_PCIEPATH}")"
-        if { [ -n "${_NVME_BOOTPC}" ] && [ "${_NVME_BOOTPC}" = "${PCIEPATH}" ]; } || { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
-          _log "bootloader: ${F}"
-          continue
-        fi
-        if grep -q "pcie_root = \"${PCIEPATH}\";" "${DEST}"; then
-          _log "already slotted: ${F} [${PCIEPATH}], an nvme controller only recognizes one disk"
-          continue
-        fi
-        # power_limit is a fixed-width DSM field (30 chars), one entry per
-        # nvme_slot. Past that the remaining drives genuinely cannot get a slot,
-        # so say which ones were dropped instead of breaking silently - "some
-        # disks are missing" with nothing in the log is the worst failure mode.
-        if [ $((${#POWER_LIMIT} + 2)) -gt 30 ]; then
-          _log "power_limit full at ${COUNT} nvme slot(s), no slot for ${F} [${PCIEPATH}]"
-          continue
-        fi
-        POWER_LIMIT="${POWER_LIMIT:+${POWER_LIMIT},}0"
-        COUNT=$((COUNT + 1))
-        {
-          echo "    nvme_slot@${COUNT} {"
-          echo "        reg = <${COUNT}>;"
-          echo "        pcie_root = \"${PCIEPATH}\";"
-          echo '        port_type = "ssdcache";'
-          echo "    };"
-        } >>"${DEST}"
-      done
+        continue
+      fi
+      # power_limit is a fixed-width DSM field (30 chars), one entry per
+      # nvme_slot. Past that the remaining drives genuinely cannot get a slot,
+      # so say which ones were dropped instead of breaking silently - "some
+      # disks are missing" with nothing in the log is the worst failure mode.
+      if [ $((${#POWER_LIMIT} + 2)) -gt 30 ]; then
+        _log "power_limit full at ${COUNT} nvme slot(s), no slot for ${F} [${_PC}]"
+        continue
+      fi
+      POWER_LIMIT="${POWER_LIMIT:+${POWER_LIMIT},}0"
+      COUNT=$((COUNT + 1))
+      {
+        echo "    nvme_slot@${COUNT} {"
+        echo "        reg = <${COUNT}>;"
+        echo "        pcie_root = \"${_PC}\";"
+        echo '        port_type = "ssdcache";'
+        echo "    };"
+      } >>"${DEST}"
+    done
+    if [ "${_NVME_STORAGE}" != true ]; then
       [ -n "${POWER_LIMIT}" ] && sed -i "s/power_limit = .*/power_limit = \"${POWER_LIMIT}\";/" "${DEST}" || sed -i '/power_limit/d' "${DEST}"
     fi
 
@@ -1123,19 +1089,6 @@ nondtModel() {
   fi
 }
 
-nondtUpdate() {
-  _log nondtUpdate "$*"
-  F="$(basename "${1:-}" 2>/dev/null)"
-  if [ -z "${F}" ]; then
-    _log "No disk found, triggering full nondtModel"
-    nondtModel
-    return $?
-  fi
-
-  nondtModel
-  return 0
-}
-
 if type flock >/dev/null 2>&1 && type trap >/dev/null 2>&1; then
   LOCKFILE="/var/run/disks.lock"
   exec 3>"$LOCKFILE"
@@ -1216,8 +1169,12 @@ case ${1} in
       # into a slot the upload does not describe never got a bay at all.
       dtUpdate "${2:-}"
     else
+      # Non-DT has no per-disk state to patch: the port masks are derived from
+      # the whole disk set, so any change means recomputing them - unless the
+      # user pinned all three, in which case there is nothing left to compute.
       if ! _check_user_conf "usbportcfg" || ! _check_user_conf "esataportcfg" || ! _check_user_conf "internalportcfg"; then
-        nondtUpdate "${2:-}"
+        _log "nondtUpdate ${2:-}"
+        nondtModel
       fi
     fi
     ;;
