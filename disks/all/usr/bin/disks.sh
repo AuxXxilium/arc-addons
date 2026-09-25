@@ -1080,7 +1080,13 @@ nondtModel() {
   for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
     [ ! -e "${F}" ] && continue
     PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-    PCIEPATH="$(echo "${PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+    # extensionPorts names the port an M.2 slot hangs off: the bridge directly
+    # above the NVMe controller, as on real non-DT units (DS918+ lists
+    # pci1="0000:00:13.1" for a drive at 0000:01:00.0). Only a controller that
+    # sits on the root bus itself - the usual VM layout - is its own entry.
+    # 05b67c8 switched this to the controller's own address, which agrees with
+    # that only in the VM case; RR's original took the parent as well.
+    PCIEPATH="$(_physdev_bdfs "${PHYSDEVPATH}" | tail -2 | head -1)"
     if [ -z "${PCIEPATH}" ]; then
       _log "unknown: ${F}"
       continue
@@ -1090,14 +1096,9 @@ nondtModel() {
     # read yields an empty PHYSDEVPATH too - "" = "" then matched and the drive
     # was dropped as the bootloader, losing a real NVMe controller.
     #
-    # PCIEPATH here is always domain-prefixed (the regex above requires the
-    # 4-hex domain) while BOOTDISK_PCIEPATH may still be the short BDF from
-    # syno_block_info, so normalize it the same way or the loader's own NVMe
-    # drive is never recognized and gets an extensionPorts entry of its own.
-    case "${BOOTDISK_PCIEPATH}" in
-      '' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) _ND_BOOTPC="${BOOTDISK_PCIEPATH}" ;;
-      *) _ND_BOOTPC="0000:${BOOTDISK_PCIEPATH}" ;;
-    esac
+    # PCIEPATH here is always domain-prefixed while BOOTDISK_PCIEPATH may still
+    # be the short form from syno_block_info, so normalize it before comparing.
+    _ND_BOOTPC="$(_pc_norm "${BOOTDISK_PCIEPATH}")"
     if { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${PHYSDEVPATH}" ]; } || \
        { [ -n "${_ND_BOOTPC}" ] && [ "${_ND_BOOTPC}" = "${PCIEPATH}" ]; }; then
       _log "bootloader: ${F}"
