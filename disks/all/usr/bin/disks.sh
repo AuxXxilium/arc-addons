@@ -35,32 +35,65 @@ _has_storage_controller() {
   lspci -n 2>/dev/null | grep -qE ' (0100|0104|0106|0107|0108):'
 }
 
-# Resolve a namespace's controller BDF, domain-normalized to the 0000:BB:DD.F
-# form the dts always carries.
+# PCI addresses along a PHYSDEVPATH, root side first, one per line.
+_physdev_bdfs() {
+  printf '%s' "${1}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]'
+}
+
+# Build a device's pciepath from its PHYSDEVPATH, in the shape syno_block_info
+# reports and pcie_root carries: the first PCI hop as a full address, then
+# dev.fn for every hop below it.
 #
-# Both NVMe loops below dedupe by grepping the emitted dts for this pcie_root,
-# but the dts is normalized while syno_block_info reports the short BDF
-# ("50:00.0"). Comparing the raw forms makes the dedup miss, so two namespaces
-# on one controller each emit a slot - and the domain-fixup sed near the end of
-# dtModel then rewrites both to the same pcie_root. DSM maps one controller to
-# one cache device (libsynonvme, see nvmecache), so the second node is a phantom
-# bay that shows in the panel count and never populates. Normalizing here is
-# what keeps the dedup and the final dts agreeing on one spelling.
+#   /devices/pci0000:00/0000:00:1e.0/0000:01:01.0/0000:02:07.0/ata1/...
+#   -> 0000:00:1e.0,01.0,07.0
 #
-# Echoes nothing when no BDF can be resolved, so callers can log it.
-_nvme_pciepath() {
-  _NP_F="${1}"
-  _NP_P="$(grep 'pciepath' "${_NP_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-  if [ -z "${_NP_P}" ]; then
-    _NP_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${_NP_F}/uevent" 2>/dev/null)"
-    [ -n "${_NP_PP}" ] && _NP_P="$(printf '%s' "${_NP_PP}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-  fi
-  [ -n "${_NP_P}" ] || return 0
-  case "${_NP_P}" in
-    [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) : ;;
-    *) _NP_P="0000:${_NP_P}" ;;
+# The fallbacks used to take the last address alone. That is the controller's
+# own address, which equals the pciepath only for a controller sitting directly
+# on the root bus - behind any bridge (every add-in card, most M.2 slots) it
+# names a slot that does not exist.
+_physdev_pciepath() {
+  _physdev_bdfs "${1}" | awk 'NR == 1 { p = $0; next } { sub(/^[0-9a-f]+:[0-9a-f]+:/, ""); p = p "," $0 } END { if (p != "") print p }'
+}
+
+# Domain-prefix a pciepath. The dts is assembled in this one spelling so the
+# dedup greps compare like with like; syno_block_info may report either
+# ("00:17.0" on 4.x). The spelling the running kernel wants is applied once, at
+# the end of dtModel. Without this, two namespaces on one NVMe controller could
+# resolve to different spellings, both get a slot, and the final sed would turn
+# them into the same pcie_root - a phantom bay that never populates.
+_pc_norm() {
+  case "${1}" in
+    '' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) echo "${1}" ;;
+    *) echo "0000:${1}" ;;
   esac
-  echo "${_NP_P}"
+}
+
+# Read a disk's slot identity from /sys/block/<disk>:
+#
+#   _PP   PHYSDEVPATH
+#   _PC   pciepath, domain-prefixed - syno_block_info, else built from _PP
+#   _AT   ata_port_no as syno_block_info reports it (may be empty)
+#   _DR   driver - syno_block_info, else the one bound to the controller
+#   _BDF  the controller's own PCI address
+#
+# _BDF is what /sys/bus/pci/devices is keyed on. A pciepath behind a bridge
+# ("0000:00:01.0,00.0") is not a sysfs name, so class and driver lookups done
+# with it came back empty for every add-in controller.
+_disk_info() {
+  _PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${1}/uevent" 2>/dev/null)"
+  _SBI="$(cat "${1}/device/syno_block_info" 2>/dev/null)"
+  _PC="$(printf '%s\n' "${_SBI}" | sed -n 's/^pciepath=//p')"
+  _AT="$(printf '%s\n' "${_SBI}" | sed -n 's/^ata_port_no=//p')"
+  _DR="$(printf '%s\n' "${_SBI}" | sed -n 's/^driver=//p')"
+  [ -n "${_PC}" ] || _PC="$(_physdev_pciepath "${_PP}")"
+  _PC="$(_pc_norm "${_PC}")"
+  _BDF="$(_physdev_bdfs "${_PP}" | tail -1)"
+  if [ -z "${_BDF}" ]; then
+    case "${_PC}" in *,*) : ;; *) _BDF="${_PC}" ;; esac
+  fi
+  if [ -z "${_DR}" ] && [ -n "${_BDF}" ] && [ -L "/sys/bus/pci/devices/${_BDF}/driver" ]; then
+    _DR="$(basename "$(readlink -f "/sys/bus/pci/devices/${_BDF}/driver")")"
+  fi
 }
 
 _count_disks() {
@@ -505,22 +538,9 @@ dtModel() {
       [ -e "${_F}" ] || continue
       _N="$(basename "${_F}")"
       [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && { _log "bootloader: ${_F}"; continue; }
-      _PP="$(awk -F= '/PHYSDEVPATH/{print $2}' "${_F}/uevent" 2>/dev/null)"
-      _PC="$(grep 'pciepath' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      _AT="$(grep 'ata_port_no' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      _DR="$(grep 'driver' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      if [ -z "${_PC}" ] && [ -n "${_PP}" ]; then
-        _PC="$(printf '%s' "${_PP}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-      fi
-      if [ -n "${_PC}" ] && [ -z "${_DR}" ] && [ -L "/sys/bus/pci/devices/${_PC}/driver" ]; then
-        _DR="$(basename "$(readlink -f "/sys/bus/pci/devices/${_PC}/driver")")"
-      fi
-      if [ -n "${_PC}" ]; then
-        case "${_PC}" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) : ;; *) _PC="0000:${_PC}" ;; esac
-      else
-        _log "unknown: ${_F}"; continue
-      fi
-      [ -z "${_DR}" ] && { _log "unknown driver: ${_F}"; continue; }
+      _disk_info "${_F}"
+      [ -n "${_PC}" ] || { _log "unknown: ${_F}"; continue; }
+      [ -n "${_DR}" ] || { _log "unknown driver: ${_F}"; continue; }
       if [ -z "${_AT}" ] && [ -n "${_PP}" ]; then
         _FB_ATA="$(printf '%s' "${_PP}" | grep -Eo 'ata[0-9]+' | head -1)"
         _FB_CTRL="/sys${_PP%%/ata*}"
@@ -604,7 +624,7 @@ dtModel() {
       [ -e "${_F}" ] || continue
       _N="$(basename "${_F}")"
       [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && { _log "bootloader: ${_F}"; continue; }
-      _PP="$(awk -F= '/PHYSDEVPATH/{print $2}' "${_F}/uevent" 2>/dev/null)"
+      _disk_info "${_F}"
       case "${_PP}" in *usb*) continue ;; esac
       if [ -n "${_PP}" ]; then
         case " ${_SEEN_PHYSDEV} " in
@@ -614,20 +634,12 @@ dtModel() {
       if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
         _log "bootloader (alias): ${_F}"; continue
       fi
-      _PC="$(grep 'pciepath' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      _AT="$(grep 'ata_port_no' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      _DR="$(grep 'driver' "${_F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-      if [ -z "${_PC}" ] && [ -n "${_PP}" ]; then
-        _PC="$(printf '%s' "${_PP}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-      fi
       [ -n "${_PC}" ] || { _log "unknown: ${_F}"; continue; }
-      case "${_PC}" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) : ;; *) _PC="0000:${_PC}" ;; esac
-      # Only PCI storage controllers (class 01xx) own internal bays here.
-      _CL="$(cat "/sys/bus/pci/devices/${_PC}/class" 2>/dev/null)"
+      # Only PCI storage controllers (class 01xx) own internal bays here. Looked
+      # up by the controller's own address: a pciepath with bridge hops is not
+      # a sysfs name, so every add-in HBA read back as "not a storage controller".
+      _CL="$(cat "/sys/bus/pci/devices/${_BDF}/class" 2>/dev/null)"
       case "${_CL}" in 0x01*) : ;; *) _log "not a storage controller: ${_F} [${_CL:-unknown}]"; continue ;; esac
-      if [ -z "${_DR}" ] && [ -L "/sys/bus/pci/devices/${_PC}/driver" ]; then
-        _DR="$(basename "$(readlink -f "/sys/bus/pci/devices/${_PC}/driver")")"
-      fi
       # Slot nodes are keyed by driver name, and every slot on one controller
       # must use the same one - a dts that describes 0000:50:00.0 as both
       # "ahci" and "mpt3sas" presents it to DSM as two different controllers.
@@ -689,8 +701,9 @@ dtModel() {
         [ ! -e "${F}" ] && continue
         N="$(basename "${F}")"
         [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
-        PCIEPATH="$(_nvme_pciepath "${F}")"
-        _NVME_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+        _disk_info "${F}"
+        PCIEPATH="${_PC}"
+        _NVME_PHYSDEVPATH="${_PP}"
         if [ -z "${PCIEPATH}" ]; then
           _log "unknown: ${F}"
           continue
@@ -699,10 +712,7 @@ dtModel() {
         # may still be the short BDF, so normalize it the same way before
         # comparing - otherwise the loader's own NVMe drive is not recognized
         # and gets emitted as a data slot.
-        case "${BOOTDISK_PCIEPATH}" in
-          '' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) _NVME_BOOTPC="${BOOTDISK_PCIEPATH}" ;;
-          *) _NVME_BOOTPC="0000:${BOOTDISK_PCIEPATH}" ;;
-        esac
+        _NVME_BOOTPC="$(_pc_norm "${BOOTDISK_PCIEPATH}")"
         if { [ -n "${_NVME_BOOTPC}" ] && [ "${_NVME_BOOTPC}" = "${PCIEPATH}" ]; } || { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
           _log "bootloader: ${F}"
           continue
@@ -730,16 +740,14 @@ dtModel() {
         [ ! -e "${F}" ] && continue
         N="$(basename "${F}")"
         [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
-        PCIEPATH="$(_nvme_pciepath "${F}")"
-        _NVME_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
+        _disk_info "${F}"
+        PCIEPATH="${_PC}"
+        _NVME_PHYSDEVPATH="${_PP}"
         if [ -z "${PCIEPATH}" ]; then
           _log "unknown: ${F}"
           continue
         fi
-        case "${BOOTDISK_PCIEPATH}" in
-          '' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) _NVME_BOOTPC="${BOOTDISK_PCIEPATH}" ;;
-          *) _NVME_BOOTPC="0000:${BOOTDISK_PCIEPATH}" ;;
-        esac
+        _NVME_BOOTPC="$(_pc_norm "${BOOTDISK_PCIEPATH}")"
         if { [ -n "${_NVME_BOOTPC}" ] && [ "${_NVME_BOOTPC}" = "${PCIEPATH}" ]; } || { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_NVME_PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_NVME_PHYSDEVPATH}" ]; }; then
           _log "bootloader: ${F}"
           continue
@@ -869,97 +877,81 @@ dtUpdate() {
     return 1
   fi
 
-  PCIEPATH="$(grep 'pciepath' "/sys/block/${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-  ATAPORT="$(grep 'ata_port_no' "/sys/block/${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-  USBPORT="$(grep 'usb_path' "/sys/block/${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
+  _disk_info "/sys/block/${F}"
+  ATAPORT="${_AT}"
+  USBPORT="$(sed -n 's/^usb_path=//p' "/sys/block/${F}/device/syno_block_info" 2>/dev/null)"
 
-  if [ -z "${PCIEPATH}" ] && [ -z "${USBPORT}" ]; then
-    _DTUPDATE_PHYSDEVPATH="$(awk -F= '/PHYSDEVPATH/ {print $2}' "/sys/block/${F}/uevent" 2>/dev/null)"
-    if [ -n "${_DTUPDATE_PHYSDEVPATH}" ]; then
-      PCIEPATH="$(echo "${_DTUPDATE_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-    fi
-    if [ -z "${PCIEPATH}" ] && [ -z "${USBPORT}" ]; then
-      _log "unknown: ${F}, triggering full dtModel"
-      dtModel
-      return $?
-    fi
+  if [ -z "${_PC}" ] && [ -z "${USBPORT}" ]; then
+    _log "unknown: ${F}, triggering full dtModel"
+    dtModel
+    return $?
   fi
 
+  # Look up without the domain. The dtb carries whichever spelling the running
+  # kernel wants - bare on 4.x, 0000: on 5.x, applied at the end of dtModel -
+  # while _PC is always prefixed. Matching the prefixed form against a 4.x dtb
+  # found nothing, so on DT 4.4 every disk that needed the synthesized-port check
+  # below rebuilt the whole tree on each udev event.
+  _KEY="${_PC#0000:}"
   TEMP_DTS="/tmp/model.dts"
-  dtc -I dtb -O dts /etc/model.dtb >"${TEMP_DTS}"
-  # A non-numeric ata_port_no would make printf below fail mid-expansion and
-  # produce a broken sed script, so treat it the same as an absent one.
-  case "${ATAPORT}" in *[!0-9]*) ATAPORT="" ;; esac
-  if [ -z "${ATAPORT}" ]; then
-    sata_slot_find="$(grep "pcie_root = \"${PCIEPATH}\";" "${TEMP_DTS}" 2>/dev/null | head -1)"
-  else
-    sata_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/ata_port = <0x$(printf '%02X' "${ATAPORT}")>;/p}" "${TEMP_DTS}" 2>/dev/null)"
-    # dtModel may have had to synthesize a port for this disk (SAS HBAs share
-    # one pciepath and the vendor populator can report port 0 for every disk),
-    # so the exact pair need not be present even though the disk does have a
-    # bay. Comparing slot count against disk count on that controller tells the
-    # two cases apart: as many slots as disks means this one is already mapped
-    # under a synthesized port, and rebuilding on every udev event would only
-    # reshuffle bays. Fewer slots than disks means one really is missing.
-    if [ -z "${sata_slot_find}" ]; then
-      # Both sides must be counted with the same domain-normalized path:
-      # syno_block_info reports the short BDF ("50:00.0") while the dts always
-      # carries "0000:50:00.0", so comparing the raw forms would zero out both
-      # counts and quietly disable this whole check.
-      case "${PCIEPATH}" in
-        [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) _DU_PCIE="${PCIEPATH}" ;;
-        *) _DU_PCIE="0000:${PCIEPATH}" ;;
-      esac
-      _DU_SLOTS="$(grep -c "pcie_root = \"${_DU_PCIE}\";" "${TEMP_DTS}" 2>/dev/null)"
-      _DU_DISKS=0
-      for _DU_D in /sys/block/sata* /sys/block/sd*; do
-        [ -e "${_DU_D}" ] || continue
-        _DU_N="$(basename "${_DU_D}")"
-        [ -n "${BOOTDISK}" ] && [ "${_DU_N}" = "${BOOTDISK}" ] && continue
-        _DU_PP="$(awk -F= '/PHYSDEVPATH/{print $2}' "${_DU_D}/uevent" 2>/dev/null)"
-        case "${_DU_PP}" in *usb*) continue ;; esac
-        # Same exclusions dtModel applies, so the two counts stay comparable.
-        [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_DU_PP}" ] && \
-          [ "${_DU_PP}" = "${BOOTDISK_PHYSDEVPATH}" ] && continue
-        _DU_PC="$(grep 'pciepath' "${_DU_D}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
-        if [ -z "${_DU_PC}" ] && [ -n "${_DU_PP}" ]; then
-          _DU_PC="$(printf '%s' "${_DU_PP}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
-        fi
-        case "${_DU_PC}" in
-          '') continue ;;
-          [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) : ;;
-          *) _DU_PC="0000:${_DU_PC}" ;;
-        esac
-        [ "${_DU_PC}" = "${_DU_PCIE}" ] || continue
-        _DU_CL="$(cat "/sys/bus/pci/devices/${_DU_PC}/class" 2>/dev/null)"
-        case "${_DU_CL}" in 0x01*) : ;; *) continue ;; esac
-        _DU_DISKS=$((_DU_DISKS + 1))
-      done
-      if [ "${_DU_SLOTS:-0}" -ge "${_DU_DISKS}" ] && [ "${_DU_DISKS}" -gt 0 ]; then
-        sata_slot_find="synthesized"
-        _log "${F}: ata_port ${ATAPORT} not in dts, but ${_DU_PCIE} has ${_DU_SLOTS} slot(s) for ${_DU_DISKS} disk(s)"
-      fi
-    fi
-  fi
-  # NVMe: match on pcie_root alone rather than on the line after it.
-  #
-  # Two shapes exist. The usual one is nvme_slot@ with port_type = "ssdcache";
-  # on epyc7003ntb dtModel emits NVMe as internal_slot@ with an nvme { } child
-  # and no port_type at all, so the paired sed never matched there and every
-  # NVMe udev event rebuilt the whole tree - reshuffling bays on a live system.
-  # The pcie_root is enough: dtModel already guarantees one NVMe slot per
-  # controller, so its presence means this disk has a bay.
-  #
-  # Compare with the normalized path, since the dts is always domain-prefixed.
-  case "${PCIEPATH}" in
-    '' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) _DU_NVME_PC="${PCIEPATH}" ;;
-    *) _DU_NVME_PC="0000:${PCIEPATH}" ;;
-  esac
+  dtc -I dtb -O dts /etc/model.dtb 2>/dev/null | sed 's/pcie_root = "0000:/pcie_root = "/' >"${TEMP_DTS}"
+
+  sata_slot_find=""
+  nvme_slot_find=""
+  usb_slot_find=""
   case "${F}" in
-    nvme*) nvme_slot_find="$(grep "pcie_root = \"${_DU_NVME_PC}\";" "${TEMP_DTS}" 2>/dev/null | head -1)" ;;
-    *) nvme_slot_find="$(sed -n "/pcie_root = \"${PCIEPATH}\";/{N;/port_type = \"ssdcache\";/p}" "${TEMP_DTS}" 2>/dev/null)" ;;
+    nvme*)
+      # pcie_root alone: on epyc7003ntb NVMe is an internal_slot@ with an
+      # nvme { } child rather than an nvme_slot@, and dtModel already
+      # guarantees one NVMe slot per controller, so its presence means this
+      # disk has a bay.
+      nvme_slot_find="$(grep -F "pcie_root = \"${_KEY}\";" "${TEMP_DTS}" 2>/dev/null | head -1)"
+      ;;
+    *)
+      # A non-numeric ata_port_no would make printf below fail mid-expansion
+      # and produce a broken sed script, so treat it the same as an absent one.
+      case "${ATAPORT}" in *[!0-9]*) ATAPORT="" ;; esac
+      if [ -z "${ATAPORT}" ]; then
+        sata_slot_find="$(grep -F "pcie_root = \"${_KEY}\";" "${TEMP_DTS}" 2>/dev/null | head -1)"
+      else
+        # dtModel writes <0x0A>, but dtc decompiles cells in lowercase and,
+        # depending on its version, with or without the zero padding - <0x0a>
+        # or <0xa>. Matching the uppercase form missed every port from 10 up.
+        sata_slot_find="$(sed -n "/pcie_root = \"${_KEY}\";/{N;/ata_port = <0x0*$(printf '%x' "${ATAPORT}")>;/p}" "${TEMP_DTS}" 2>/dev/null)"
+      fi
+      # dtModel may have had to synthesize a port for this disk (SAS HBAs share
+      # one pciepath and the vendor populator can report port 0 for every disk),
+      # so the exact pair need not be present even though the disk does have a
+      # bay. Comparing slot count against disk count on that controller tells the
+      # two cases apart: as many slots as disks means this one is already mapped
+      # under a synthesized port, and rebuilding on every udev event would only
+      # reshuffle bays. Fewer slots than disks means one really is missing.
+      if [ -z "${sata_slot_find}" ] && [ -n "${ATAPORT}" ]; then
+        _DU_SLOTS="$(grep -cF "pcie_root = \"${_KEY}\";" "${TEMP_DTS}" 2>/dev/null)"
+        _DU_DISKS=0
+        for _DU_D in /sys/block/sata* /sys/block/sd*; do
+          [ -e "${_DU_D}" ] || continue
+          [ -n "${BOOTDISK}" ] && [ "$(basename "${_DU_D}")" = "${BOOTDISK}" ] && continue
+          _disk_info "${_DU_D}"
+          # Same exclusions dtModel applies, so the two counts stay comparable.
+          case "${_PP}" in *usb*) continue ;; esac
+          [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && \
+            [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ] && continue
+          [ -n "${_PC}" ] && [ "${_PC#0000:}" = "${_KEY}" ] || continue
+          # By the controller's own address - see _disk_info. Using the
+          # pciepath here never counted a disk behind a bridge, which switched
+          # this check off for every add-in HBA.
+          case "$(cat "/sys/bus/pci/devices/${_BDF}/class" 2>/dev/null)" in 0x01*) : ;; *) continue ;; esac
+          _DU_DISKS=$((_DU_DISKS + 1))
+        done
+        if [ "${_DU_SLOTS:-0}" -ge "${_DU_DISKS}" ] && [ "${_DU_DISKS}" -gt 0 ]; then
+          sata_slot_find="synthesized"
+          _log "${F}: ata_port ${ATAPORT} not in dts, but ${_KEY} has ${_DU_SLOTS} slot(s) for ${_DU_DISKS} disk(s)"
+        fi
+      fi
+      ;;
   esac
-  usb_slot_find="$(sed -n "/usb3 {/{N;/usb_port = \"${USBPORT}\";/p}" "${TEMP_DTS}" 2>/dev/null)"
+  [ -n "${USBPORT}" ] && usb_slot_find="$(sed -n "/usb3 {/{N;/usb_port = \"${USBPORT}\";/p}" "${TEMP_DTS}" 2>/dev/null)"
   rm -f "${TEMP_DTS}"
   if [ -n "${sata_slot_find}" ] || [ -n "${nvme_slot_find}" ] || [ -n "${usb_slot_find}" ]; then
     _log "${F} is in the model.dts"
@@ -1193,8 +1185,9 @@ fi
 if [ -n "${BOOTDISK}" ]; then
   BOOTDISK_PCIEPATH="$(grep 'pciepath' /sys/block/${BOOTDISK}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
   BOOTDISK_ATAPORT="$(grep 'ata_port_no' /sys/block/${BOOTDISK}/device/syno_block_info 2>/dev/null | cut -d'=' -f2)"
+  # Same derivation as the disks it is compared against (_disk_info).
   if [ -z "${BOOTDISK_PCIEPATH}" ] && [ -n "${BOOTDISK_PHYSDEVPATH}" ]; then
-    BOOTDISK_PCIEPATH="$(echo "${BOOTDISK_PHYSDEVPATH}" | grep -Eo '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]' | tail -1)"
+    BOOTDISK_PCIEPATH="$(_physdev_pciepath "${BOOTDISK_PHYSDEVPATH}")"
   fi
 fi
 
