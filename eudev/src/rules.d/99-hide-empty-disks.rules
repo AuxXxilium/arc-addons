@@ -4,5 +4,28 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-
-ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd*|sata*|usb*", ATTR{size}=="0", RUN+="/bin/sh -c 'echo 1 > /sys/block/%k/device/delete'"
+# Drop empty card-reader slots, BMC virtual media and empty bays of USB
+# multi-bay docks, which otherwise show up as 0-byte disks. Empty SATA ports,
+# HBA bays and M.2 slots never get a block device, so there is nothing to hide
+# there - the empty bays Storage Manager draws come from the slot layout.
+#
+# Only removable media or USB qualifies. On size alone this also deleted real disks
+# that had registered but not yet reported a capacity - a SAS drive waiting on
+# NOTIFY spin-up behind an HBA, a port-multiplier or JMB585 port whose first
+# READ CAPACITY failed. The eudev addon replays "add" for every disk already
+# present, so whatever read 0 at that instant was deleted, and nothing rescans
+# it afterwards: the disk stayed gone for the whole boot, DSM included.
+#
+# ATTR{removable} is the SCSI RMB bit straight from sysfs. Card readers set it,
+# fixed disks do not - hot-swap bays included. Multi-bay docks and some BMC
+# virtual disks clear it, so USB is matched on DEVPATH as well. Neither needs
+# ID_BUS, which is never set for block devices here (60-persistent-storage.rules
+# is disabled), nor SUBSYSTEMS=="usb", which did not filter in this eudev build.
+#
+# With "usbinternal" on the cmdline USB disks are pool members, so the USB rule
+# is skipped and they get the same protection as SATA. IMPORT{cmdline} fails the
+# rule it sits in when the flag is absent, hence the separate import rule; the
+# property it sets carries over to the rules after it.
+ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd*|sata*|usb*", ATTR{removable}=="1", ATTR{size}=="0", RUN+="/bin/sh -c 'echo 1 > /sys/block/%k/device/delete'"
+ACTION=="add", SUBSYSTEM=="block", DEVPATH=="*/usb[0-9]*/*", IMPORT{cmdline}="usbinternal"
+ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd*|sata*|usb*", DEVPATH=="*/usb[0-9]*/*", ENV{usbinternal}!="1", ATTR{removable}!="1", ATTR{size}=="0", RUN+="/bin/sh -c 'echo 1 > /sys/block/%k/device/delete'"
