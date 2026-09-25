@@ -55,23 +55,42 @@ _physdev_pciepath() {
   _physdev_bdfs "${1}" | awk 'NR == 1 { p = $0; next } { sub(/^[0-9a-f]+:[0-9a-f]+:/, ""); p = p "," $0 } END { if (p != "") print p }'
 }
 
-# Domain-prefix a pciepath. The dts is assembled in this one spelling so the
-# dedup greps compare like with like; syno_block_info may report either
-# ("00:17.0" on 4.x). The spelling the running kernel wants is applied once, at
-# the end of dtModel. Without this, two namespaces on one NVMe controller could
-# resolve to different spellings, both get a slot, and the final sed would turn
-# them into the same pcie_root - a phantom bay that never populates.
+# The kernel matches pcie_root as a plain string against its own spelling of the
+# path: bare on 4.x ("00:1e.0,01.0,07.0"), domain-prefixed on 5.x
+# ("0000:00:1e.0,01.0,07.0"). syno_block_info and _physdev_pciepath do not
+# always agree with that, so every path goes through _pc_norm before it is
+# written or compared. That keeps the dts right the first time, and keeps the
+# dedup greps honest: two namespaces on one NVMe controller that came back in
+# different spellings would otherwise both get a slot for the same controller -
+# a phantom bay that never populates.
+_PC_DOMAIN=false
+[ "$(/bin/uname -r | cut -d'.' -f1)" -ge 5 ] 2>/dev/null && _PC_DOMAIN=true
+
 _pc_norm() {
   case "${1}" in
-    '' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) echo "${1}" ;;
-    *) echo "0000:${1}" ;;
+    '') return 0 ;;
+    0000:*) _PN="${1#0000:}" ;;
+    [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:*) echo "${1}"; return 0 ;; # another domain: leave it be
+    *) _PN="${1}" ;;
   esac
+  if [ "${_PC_DOMAIN}" = true ]; then echo "0000:${_PN}"; else echo "${_PN}"; fi
+}
+
+# The same spelling rule as a sed script, for a dts that did not come from
+# _pc_norm - a user upload may have been written for the other kernel.
+_pc_sed() {
+  if [ "${_PC_DOMAIN}" = true ]; then
+    echo 's/"\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\(,[0-9a-f][0-9a-f]\.[0-7]\)*\)"/"0000:\1"/g'
+  else
+    echo 's/"0000:\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\(,[0-9a-f][0-9a-f]\.[0-7]\)*\)"/"\1"/g'
+  fi
 }
 
 # Read a disk's slot identity from /sys/block/<disk>:
 #
 #   _PP   PHYSDEVPATH
-#   _PC   pciepath, domain-prefixed - syno_block_info, else built from _PP
+#   _PC   pciepath in this kernel's spelling (_pc_norm) - syno_block_info,
+#         else built from _PP
 #   _AT   ata_port_no as syno_block_info reports it (may be empty)
 #   _DR   driver - syno_block_info, else the one bound to the controller
 #   _BDF  the controller's own PCI address
@@ -89,7 +108,7 @@ _disk_info() {
   _PC="$(_pc_norm "${_PC}")"
   _BDF="$(_physdev_bdfs "${_PP}" | tail -1)"
   if [ -z "${_BDF}" ]; then
-    case "${_PC}" in *,*) : ;; *) _BDF="${_PC}" ;; esac
+    case "${_PC}" in '' | *,*) : ;; *) _BDF="0000:${_PC#0000:}" ;; esac
   fi
   if [ -z "${_DR}" ] && [ -n "${_BDF}" ] && [ -L "/sys/bus/pci/devices/${_BDF}/driver" ]; then
     _DR="$(basename "$(readlink -f "/sys/bus/pci/devices/${_BDF}/driver")")"
@@ -508,7 +527,7 @@ _emit_sata_slot() {
     echo "            internal_mode;"
     echo "        };"
     echo "    };"
-  } >>"${DEST}"
+  } >>"${SLOTS}"
 }
 
 dtModel() {
@@ -530,19 +549,19 @@ dtModel() {
   USER_DTS=""
   [ -f "/etc/user_model.dts" ] && USER_DTS="/etc/user_model.dts"
   [ -f "/addons/model.dts" ] && USER_DTS="/addons/model.dts"
-  [ -n "${USER_DTS}" ] && { cp -vpf "${USER_DTS}" "${DEST}"; _log "using user dts: ${USER_DTS}"; }
-  if [ ! -f "${DEST}" ]; then
-    mkdir -p "$(dirname "${DEST}" 2>/dev/null)"
-    {
-      echo "/dts-v1/;"
-      echo "/ {"
-      echo '    compatible = "Synology";'
-      echo '    model = "";'
-      echo "    version = <0x01>;"
-      echo "    #address-cells = <1>;"
-      echo "    #size-cells = <0>;"
-      echo '    power_limit = "";'
-    } >"${DEST}"
+  mkdir -p "$(dirname "${DEST}" 2>/dev/null)"
+  if [ -n "${USER_DTS}" ]; then
+    # An upload may have been written for the other kernel or another model,
+    # so bring its pcie_root spelling and model name in line on the way in.
+    # The source is left untouched - see the write-back after dtc below.
+    _log "using user dts: ${USER_DTS}"
+    sed -e "$(_pc_sed)" -e "0,/version = .*;/s/model = \".*\";/model = \"${UNIQUE}\";/" "${USER_DTS}" >"${DEST}"
+  else
+    # Slots are collected first and the header written last, once model and
+    # power_limit are known - everything below comes out in its final form, so
+    # nothing has to be edited back in afterwards.
+    SLOTS="${DEST}.slots"
+    : >"${SLOTS}"
 
     COUNT=0
     # Reset per run: dtModel can be re-entered from dtUpdate, and a stale claim
@@ -706,7 +725,7 @@ dtModel() {
       # One slot per controller: DSM maps a cache/storage device per NVMe
       # controller, so further namespaces on it share the slot. Log it - a
       # silent skip is indistinguishable from a disk that was never detected.
-      if grep -qF "pcie_root = \"${_PC}\";" "${DEST}"; then
+      if grep -qF "pcie_root = \"${_PC}\";" "${SLOTS}"; then
         _log "already slotted: ${F} [${_PC}], an nvme controller only recognizes one disk"
         continue
       fi
@@ -718,7 +737,7 @@ dtModel() {
           echo "            pcie_root = \"${_PC}\";"
           echo "        };"
           echo "    };"
-        } >>"${DEST}"
+        } >>"${SLOTS}"
         continue
       fi
       # power_limit is a fixed-width DSM field (30 chars), one entry per
@@ -737,11 +756,8 @@ dtModel() {
         echo "        pcie_root = \"${_PC}\";"
         echo '        port_type = "ssdcache";'
         echo "    };"
-      } >>"${DEST}"
+      } >>"${SLOTS}"
     done
-    if [ "${_NVME_STORAGE}" != true ]; then
-      [ -n "${POWER_LIMIT}" ] && sed -i "s/power_limit = .*/power_limit = \"${POWER_LIMIT}\";/" "${DEST}" || sed -i '/power_limit/d' "${DEST}"
-    fi
 
     COUNT=0
     for I in $(getUsbPorts); do
@@ -756,19 +772,27 @@ dtModel() {
         echo "        usb_port = \"${I}\";"
         echo "      };"
         echo "    };"
-      } >>"${DEST}"
+      } >>"${SLOTS}"
     done
-    echo "};" >>"${DEST}"
-  fi
 
-  _release=$(/bin/uname -r)
-  if [ "$(/bin/echo "${_release%%[-+]*}" | /usr/bin/cut -d'.' -f1)" -lt 5 ]; then
-    sed -i 's/"0000:\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\(,[0-9a-f][0-9a-f]\.[0-7]\)\{0,1\}\)"/"\1"/g' "${DEST}"
-  else
-    sed -i 's/"\([0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]\.[0-7]\(,[0-9a-f][0-9a-f]\.[0-7]\)\{0,1\}\)"/"0000:\1"/g' "${DEST}"
+    {
+      echo "/dts-v1/;"
+      echo "/ {"
+      echo '    compatible = "Synology";'
+      echo "    model = \"${UNIQUE}\";"
+      echo "    version = <0x01>;"
+      echo "    #address-cells = <1>;"
+      echo "    #size-cells = <0>;"
+      # One entry per nvme_slot, or no property at all when there is none.
+      # PAS7700 has no nvme_slot but has always carried it empty.
+      if [ -n "${POWER_LIMIT}" ] || [ "${_NVME_STORAGE}" = true ]; then
+        echo "    power_limit = \"${POWER_LIMIT}\";"
+      fi
+      cat "${SLOTS}"
+      echo "};"
+    } >"${DEST}"
+    rm -f "${SLOTS}"
   fi
-
-  sed -i "0,/version = .*;/s/model = \".*\";/model = \"${UNIQUE}\";/" "${DEST}"
 
   MAXDISKS=$(grep -c "internal_slot@" "${DEST}" 2>/dev/null)
   if _check_user_conf "maxdisks"; then
@@ -853,11 +877,11 @@ dtUpdate() {
     return $?
   fi
 
-  # Look up without the domain. The dtb carries whichever spelling the running
-  # kernel wants - bare on 4.x, 0000: on 5.x, applied at the end of dtModel -
-  # while _PC is always prefixed. Matching the prefixed form against a 4.x dtb
-  # found nothing, so on DT 4.4 every disk that needed the synthesized-port check
-  # below rebuilt the whole tree on each udev event.
+  # Look up without the domain. dtModel writes the running kernel's spelling
+  # (_pc_norm), so both sides normally agree already - but the dtb on disk may
+  # predate that, and a spelling mismatch here does not fail loudly: it rebuilds
+  # the whole tree on every udev event, as it did on DT 4.4 when the dtb was
+  # bare and the lookup key prefixed.
   _KEY="${_PC#0000:}"
   TEMP_DTS="/tmp/model.dts"
   dtc -I dtb -O dts /etc/model.dtb 2>/dev/null | sed 's/pcie_root = "0000:/pcie_root = "/' >"${TEMP_DTS}"
@@ -1062,9 +1086,9 @@ nondtModel() {
     # read yields an empty PHYSDEVPATH too - "" = "" then matched and the drive
     # was dropped as the bootloader, losing a real NVMe controller.
     #
-    # PCIEPATH here is always domain-prefixed while BOOTDISK_PCIEPATH may still
-    # be the short form from syno_block_info, so normalize it before comparing.
-    _ND_BOOTPC="$(_pc_norm "${BOOTDISK_PCIEPATH}")"
+    # PCIEPATH here is always a full, domain-prefixed address while
+    # BOOTDISK_PCIEPATH may still be the short form from syno_block_info.
+    _ND_BOOTPC="${BOOTDISK_PCIEPATH:+0000:${BOOTDISK_PCIEPATH#0000:}}"
     if { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${PHYSDEVPATH}" ]; } || \
        { [ -n "${_ND_BOOTPC}" ] && [ "${_ND_BOOTPC}" = "${PCIEPATH}" ]; }; then
       _log "bootloader: ${F}"
