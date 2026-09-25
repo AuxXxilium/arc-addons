@@ -6,6 +6,36 @@
 # See /LICENSE for more information.
 #
 
+# Point modprobe/modinfo/depmod under the rootfs $1 ("" for the ramdisk) at kmod.
+_link_kmod() {
+  for _T in modprobe modinfo depmod; do
+    [ -L "${1}/usr/sbin/${_T}" ] || ln -vsf /usr/bin/kmod "${1}/usr/sbin/${_T}"
+  done
+}
+
+# First display device of PCI vendor $1, as "vvvvdddd". Matches the whole display
+# class (03), not just subclass 0300 "VGA compatible controller": modern Intel
+# iGPUs report 0380 "Display controller" instead - a Raptor Lake-S UHD
+# (8086:a782) shows up as class 0380 - and some report 0302.
+_gpu_id() {
+  lspci -n 2>/dev/null | grep -E " 03[0-9a-fA-F]{2}: ${1}:[0-9a-fA-F]{4}" \
+    | grep -Eo "${1}:[0-9a-fA-F]{4}" | head -n1 | sed 's/://'
+}
+
+# Path of module $1, the update/ copy first; nothing when neither exists.
+_find_ko() {
+  for _D in /usr/lib/modules/update /usr/lib/modules; do
+    [ -f "${_D}/${1}.ko" ] && { echo "${_D}/${1}.ko"; return 0; }
+  done
+}
+
+# Delete the named modules from the module root.
+_rm_ko() {
+  for _M in "$@"; do
+    rm -f "/usr/lib/modules/${_M}.ko" 2>/dev/null || true
+  done
+}
+
 if [ "${1}" = "early" ]; then
   echo "Installing addon eudev - ${1}"
 
@@ -15,21 +45,14 @@ if [ "${1}" = "early" ]; then
     exit 1
   fi
   tar -zxf "${EUDEVPKG}" -C /
-  [ -L "/usr/sbin/modprobe" ] || ln -vsf /usr/bin/kmod /usr/sbin/modprobe
-  [ -L "/usr/sbin/modinfo" ] || ln -vsf /usr/bin/kmod /usr/sbin/modinfo
-  [ -L "/usr/sbin/depmod" ] || ln -vsf /usr/bin/kmod /usr/sbin/depmod
+  _link_kmod ""
   exit 0
 
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
-  # Match the whole PCI display class (03), not just subclass 0300 "VGA compatible
-  # controller". Modern Intel iGPUs report 0380 "Display controller" instead - a Raptor
-  # Lake-S UHD (8086:a782) shows up as class 0380 - and some report 0302.
-  GPU="$(lspci -n 2>/dev/null | grep -E ' 03[0-9a-fA-F]{2}: 8086:[0-9a-fA-F]{4}' \
-    | grep -Eo '8086:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
-  AMDGPU="$(lspci -n 2>/dev/null | grep -E ' 03[0-9a-fA-F]{2}: 1002:[0-9a-fA-F]{4}' \
-    | grep -Eo '1002:[0-9a-fA-F]{4}' | head -n1 | sed 's/://')"
+  GPU="$(_gpu_id 8086)"
+  AMDGPU="$(_gpu_id 1002)"
   # Two module-set layouts are in the field and both have to work here:
   #
   #   split - i915 and its DRM stack live in /usr/lib/modules/update, shadowing
@@ -50,21 +73,8 @@ elif [ "${1}" = "modules" ]; then
             drm_ttm_helper drm_suballoc_helper drm_panel_orientation_quirks gpu-sched"
   I915_ONLY="i915 i915-compat intel-gtt"
   AMD_ONLY="amdgpu amdxcp"
-  if [ -f "/usr/lib/modules/update/i915.ko" ]; then
-    I915KO="/usr/lib/modules/update/i915.ko"
-  elif [ -f "/usr/lib/modules/i915.ko" ]; then
-    I915KO="/usr/lib/modules/i915.ko"
-  else
-    I915KO=""
-  fi
-
-  if [ -f "/usr/lib/modules/update/amdgpu.ko" ]; then
-    AMDKO="/usr/lib/modules/update/amdgpu.ko"
-  elif [ -f "/usr/lib/modules/amdgpu.ko" ]; then
-    AMDKO="/usr/lib/modules/amdgpu.ko"
-  else
-    AMDKO=""
-  fi
+  I915KO="$(_find_ko i915)"
+  AMDKO="$(_find_ko amdgpu)"
 
   I915_WANTED=false
   if [ -n "${I915KO}" ] && [ -n "${GPU}" ]; then
@@ -96,16 +106,10 @@ elif [ "${1}" = "modules" ]; then
       # it replaces the 5.10 modules of the same name - the whole point of the
       # shadowing. On a flat set there is nothing to move and the mv is a no-op.
       [ -d /usr/lib/modules/update ] && mv -f /usr/lib/modules/update/* /usr/lib/modules/ 2>/dev/null
-      [ "${I915_WANTED}" = true ] || for M in ${I915_ONLY}; do
-        rm -f "/usr/lib/modules/${M}.ko" 2>/dev/null || true
-      done
-      [ "${AMD_WANTED}" = true ] || for M in ${AMD_ONLY}; do
-        rm -f "/usr/lib/modules/${M}.ko" 2>/dev/null || true
-      done
+      [ "${I915_WANTED}" = true ] || _rm_ko ${I915_ONLY}
+      [ "${AMD_WANTED}" = true ] || _rm_ko ${AMD_ONLY}
     else
-      for M in ${I915_ONLY} ${AMD_ONLY} ${DRM_CORE}; do
-        rm -f "/usr/lib/modules/${M}.ko" 2>/dev/null || true
-      done
+      _rm_ko ${I915_ONLY} ${AMD_ONLY} ${DRM_CORE}
     fi
   fi
   # Nothing below may see update/ any more: it is either merged, or its content
@@ -184,9 +188,7 @@ elif [ "${1}" = "modules" ]; then
 
 elif [ "${1}" = "late" ]; then
   echo "Installing addon eudev - ${1}"
-  [ ! -L "/tmpRoot/usr/sbin/modprobe" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modprobe
-  [ ! -L "/tmpRoot/usr/sbin/modinfo" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/modinfo
-  [ ! -L "/tmpRoot/usr/sbin/depmod" ] && ln -vsf /usr/bin/kmod /tmpRoot/usr/sbin/depmod
+  _link_kmod /tmpRoot
   [ ! -f "/tmpRoot/usr/bin/eject" ] && cp -vpf /usr/bin/eject /tmpRoot/usr/bin/eject
 
   echo "copy modules"
