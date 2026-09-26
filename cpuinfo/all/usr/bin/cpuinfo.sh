@@ -430,6 +430,17 @@ _rm_patch() {
   }' "${RM_JS}" > "${_rm_tmp2}" && mv -f "${_rm_tmp2}" "${RM_JS}"
   rm -f "${_rm_tmp2}"
 
+  # The misc addon sets support_nvidia_gpu=no on any system without an NVIDIA
+  # card, which keeps Resource Monitor's GPU view hidden on Intel/AMD even
+  # though the proxy feeds it. Answer "yes" for every read of the flag here -
+  # the same override admin_center.js gets - but only when a GPU was detected,
+  # so a machine without one keeps DSM's layout. The value, not the call, is
+  # substituted so a comparison ("yes"===..., a "no" default) still holds.
+  if [ -n "${FIRST_NAME}" ] && grep -qF '_D("support_nvidia_gpu"' "${RM_JS}" 2>/dev/null; then
+    sed -i -E 's/_D\("support_nvidia_gpu"(,[^)]*)?\)/"yes"/g' "${RM_JS}"
+    echo "cpuinfo: Resource Monitor support_nvidia_gpu gate opened for \"${FIRST_NAME}\""
+  fi
+
   # Appended rather than prepended so a leading "use strict" directive stays
   # the first statement in the file. The leading ";" guards against a file
   # that ends without one.
