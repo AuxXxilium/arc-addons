@@ -409,28 +409,27 @@ fi
 [ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
 [ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
 
-# Two upstreams are redirected through the proxy, and they are separate
-# sockets serving separate protocols:
+# Only the SCGI upstream (/run/synoscgi.sock) is redirected: it carries the
+# Info Center request and the fetch that populates Resource Monitor when it
+# opens. The trailing ";" in the match keeps this to the upstream definition
+# and away from the location blocks that merely name it.
 #
-#   /run/synoscgi.sock        SCGI - Info Center, and the one-off fetch that
-#                             populates Resource Monitor when it opens
-#   /run/synoscgi_socket.sock socket.io WebSocket - the live 10s updates that
-#                             keep every Resource Monitor chart moving
-#
-# Redirecting only the first is what made the GPU panels show a single sample
-# and then freeze: the opening fetch was rewritten, every update after it went
-# straight to DSM. The trailing ";" in the match keeps this to the upstream
-# definitions and away from the location blocks that merely name them.
+# An earlier version also relayed the socket.io upstream
+# (/run/synoscgi_socket.sock) to keep the GPU charts animating. That relay
+# broke large uploads and has been removed, so point that upstream back at
+# DSM's own socket on systems that still carry the old redirect - the daemon
+# no longer creates /run/arc_synoscgi_socket.sock, and nginx aimed at it would
+# lose DSM's whole realtime channel.
 for _f in /etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache; do
   [ -f "${_f}" ] || continue
   sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' "${_f}"
-  sed -i 's|/run/synoscgi_socket.sock;|/run/arc_synoscgi_socket.sock;|g' "${_f}"
+  sed -i 's|/run/arc_synoscgi_socket.sock;|/run/synoscgi_socket.sock;|g' "${_f}"
 done
 
-# Wait for the cpuinfo daemon to create its sockets before reloading nginx.
-# Pointing nginx at a socket that never appears takes DSM's web UI (SCGI) or
-# its realtime channel (socket.io) down until someone repairs it by hand, so a
-# missing socket reverts the whole patch rather than being reloaded into.
+# Wait for the cpuinfo daemon to create its socket before reloading nginx.
+# Pointing nginx at a socket that never appears takes DSM's web UI down until
+# someone repairs it by hand, so a missing socket reverts the whole patch
+# rather than being reloaded into.
 if sleep 0.1 2>/dev/null; then
   SLEEP_STEP="0.1"; TIMEOUT=100
 else
@@ -440,30 +439,6 @@ while [ ! -S "/run/arc_synoscgi.sock" ] && [ "${TIMEOUT}" -gt 0 ]; do
   sleep "${SLEEP_STEP}"
   TIMEOUT=$((TIMEOUT - 1))
 done
-
-# The socket.io relay is optional: it disables itself when DSM does not provide
-# /run/synoscgi_socket.sock, and older DSM releases do not. Only insist on its
-# socket when the upstream it proxies actually exists - otherwise undo just
-# that half of the redirect and carry on with SCGI, which is the part the Info
-# Center depends on.
-_WS_OK=1
-if [ -S "/run/synoscgi_socket.sock" ]; then
-  TIMEOUT=${TIMEOUT:-10}
-  while [ ! -S "/run/arc_synoscgi_socket.sock" ] && [ "${TIMEOUT}" -gt 0 ]; do
-    sleep "${SLEEP_STEP}"
-    TIMEOUT=$((TIMEOUT - 1))
-  done
-  [ -S "/run/arc_synoscgi_socket.sock" ] || _WS_OK=0
-else
-  _WS_OK=0
-fi
-if [ "${_WS_OK}" != "1" ]; then
-  echo "cpuinfo: socket.io relay unavailable, leaving DSM's own socket in place"
-  echo "cpuinfo: (Resource Monitor GPU charts will show one sample per open)"
-  for _f in /etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache; do
-    [ -f "${_f}" ] && sed -i 's|/run/arc_synoscgi_socket.sock;|/run/synoscgi_socket.sock;|g' "${_f}"
-  done
-fi
 
 if [ ! -S "/run/arc_synoscgi.sock" ]; then
   echo "cpuinfo: socket /run/arc_synoscgi.sock did not appear, reverting nginx patch"
