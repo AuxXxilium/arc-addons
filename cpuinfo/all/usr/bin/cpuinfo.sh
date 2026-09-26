@@ -326,10 +326,53 @@ fi
 # the handler: the chart then takes one sample and freezes for the life of the
 # window. Keeping !i means such a poll is skipped harmlessly, exactly as DSM
 # intended, while a poll carrying real values now reaches the chart.
+#
+# That alone only shows the first sample. The fetch made when the window opens
+# goes over SCGI, where the proxy injects the gpu object, but every 10-second
+# update after it arrives over DSM's socket.io channel, which the proxy does
+# not touch (a relay for it broke large file uploads and was removed). Those
+# updates carry no gpu, so the guard re-masks the panel on the next tick.
+#
+# RM_FEED is appended to resource.js to fill that gap in the browser. It wraps
+# Ext's fireEvent and, for a "data_comming" event with no gpu object, supplies
+# the last reading and asks for a fresh one with an ordinary
+# SYNO.Core.System.Utilization request - which travels over SCGI and so comes
+# back with the proxy's gpu object. The chart therefore runs one tick behind
+# NVML, without anything on the socket.io channel being intercepted.
+#
+# - An event that already has a gpu object (a real DVA, or the opening SCGI
+#   fetch) is left alone and seeds the cache instead, so nothing polls there.
+# - A reply with no gpu at all means no readable GPU: polling stops for the
+#   page and DSM's own mask stays up.
+# - A cached reading older than a minute is dropped rather than drawn.
 RM_JS="/usr/syno/synoman/webman/modules/ResourceMonitor/resource.js"
 RM_GZ="${RM_JS}.gz"
 RM_GUARD='if(!i||0===i.gpu_memory_total)'
 RM_PATCHED='if(!i||!1&&0===i.gpu_memory_total)'
+RM_FEED_MARK='/* arc-cpuinfo gpu feed */'
+RM_FEED=$(cat <<'EOF'
+;/* arc-cpuinfo gpu feed */(function(){
+if(typeof Ext==="undefined"||!Ext.util||!Ext.util.Observable||window.__arcGpuFeed)return;
+window.__arcGpuFeed=1;
+var gpu=null,at=0,busy=0,none=0,p=Ext.util.Observable.prototype,fire=p.fireEvent;
+function refresh(){
+var now=+new Date();
+if(none||now-busy<30000||typeof SYNO==="undefined"||!SYNO.API||!SYNO.API.Request)return;
+busy=now;
+try{SYNO.API.Request({api:"SYNO.Core.System.Utilization",method:"get",version:1,params:{type:"current"},
+callback:function(ok,r){busy=0;if(!ok||!r)return;if(r.gpu){gpu=r.gpu;at=+new Date();}else{gpu=null;none=1;}}});}
+catch(x){busy=0;}
+}
+p.fireEvent=function(n,d){
+if(n==="data_comming"&&d&&typeof d==="object"){
+if(d.gpu){gpu=d.gpu;at=+new Date();}
+else{if(gpu&&+new Date()-at<60000)d.gpu=gpu;refresh();}
+}
+return fire.apply(this,arguments);
+};
+})();
+EOF
+)
 
 _rm_patch() {
   [ -f "${RM_JS}" ] || return 0
@@ -387,12 +430,19 @@ _rm_patch() {
   }' "${RM_JS}" > "${_rm_tmp2}" && mv -f "${_rm_tmp2}" "${RM_JS}"
   rm -f "${_rm_tmp2}"
 
+  # Appended rather than prepended so a leading "use strict" directive stays
+  # the first statement in the file. The leading ";" guards against a file
+  # that ends without one.
+  if ! grep -qF "${RM_FEED_MARK}" "${RM_JS}" 2>/dev/null; then
+    printf '\n%s\n' "${RM_FEED}" >>"${RM_JS}"
+  fi
+
   # nginx has gzip_static on, so a stale .gz would be served in preference to
   # the .js we just patched. Keep the pair consistent.
   if [ -f "${RM_GZ}" ] || [ -f "${RM_GZ}.bak" ]; then
     gzip -c "${RM_JS}" >"${RM_GZ}"
   fi
-  echo "cpuinfo: Resource Monitor GPU panels unmasked"
+  echo "cpuinfo: Resource Monitor GPU panels unmasked and fed"
 }
 
 _rm_patch
