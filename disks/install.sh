@@ -6,6 +6,46 @@
 # See /LICENSE for more information.
 #
 
+# libsynodiskmap's M.2 card table ends in an FX2422N entry that matches any
+# ASMedia ASM2824 switch - vendor/device only, no subsystem, and a config check
+# of offset/mask/shift/value all zero, so it is always true. Every NVMe behind a
+# generic ASM2824 card is therefore taken for an FX2422N, which only FS6600N
+# enables in adapter_cards.conf: elsewhere scemd leaves the drives out of its
+# enum list (no cache/M.2 slot, hdddb never sees them). Synology's own cards
+# carry subsystem 7053:xxxx and match their entries before this one.
+#
+# Setting the entry's mask to ffffffff makes the check compare the config
+# dword at offset 0 (vendor|device) against 0, which never matches, so those
+# drives fall through to ON-BOARD and take their nvme_slot from model.dtb.
+# Matched by content, not offset: model, sata/nvme/eth depth, two build-
+# specific pointers, no subsystem, the check, then RX1224rp's entry header.
+# $1: on | off
+_fx2422n_patch() {
+  _F="/tmpRoot/usr/lib/libsynodiskmap.so.1"
+  [ -f "${_F}" ] || return 0
+  _PRE='05000000ffffffff05000000ffffffff.\{32\}0\{32\}00000000'
+  _POST='0\{16\}0800000007000000'
+  if [ "${1}" = "on" ]; then _FROM=00000000; _TO=ffffffff; else _FROM=ffffffff; _TO=00000000; fi
+  _HEX="$(xxd -c "$(xxd -p "${_F}" 2>/dev/null | wc -c)" -p "${_F}" 2>/dev/null)"
+  if [ "$(echo "${_HEX}" | grep -o "${_PRE}${_FROM}${_POST}" | wc -l)" -ne 1 ]; then
+    if echo "${_HEX}" | grep -q "${_PRE}${_TO}${_POST}"; then
+      echo "disks addon: FX2422N match for generic ASM2824 cards already ${1}"
+    else
+      echo "disks addon: FX2422N entry not found, libsynodiskmap left as is"
+    fi
+    return 0
+  fi
+  echo "${_HEX}" | sed "s/\(${_PRE}\)${_FROM}\(${_POST}\)/\1${_TO}\2/" | xxd -r -p >"${_F}.new" 2>/dev/null
+  if [ "$(wc -c <"${_F}.new" 2>/dev/null)" = "$(wc -c <"${_F}" 2>/dev/null)" ]; then
+    # In place, not mv, to keep the inode and mode - as nvmevolume does.
+    cat "${_F}.new" >"${_F}"
+    echo "disks addon: FX2422N match for generic ASM2824 cards ${1}"
+  else
+    echo "disks addon: FX2422N patch produced unexpected output, libsynodiskmap left as is"
+  fi
+  rm -f "${_F}.new"
+}
+
 if [ "${1}" = "patches" ]; then
   echo "Installing addon disks - ${1}"
 
@@ -59,10 +99,19 @@ elif [ "${1}" = "late" ]; then
     echo "disks addon: ${K}=${V}"
   done
 
+  # FX2422N is real only on FS6600N, the one model adapter_cards.conf enables it for.
+  case "$(cat /proc/sys/kernel/syno_hw_version 2>/dev/null)" in
+    FS6600N*) ;;
+    *) _fx2422n_patch on ;;
+  esac
+
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon disks - ${1}"
 
   rm -rf "/tmpRoot/usr/bin/disks.sh"
   rm -rf "/tmpRoot/usr/lib/udev/rules.d/04-system-disk-dtb.rules"
   rm -rf "/tmpRoot/usr/bin/dtc"
+  # Reversed in place rather than restored from a backup, which a DSM update
+  # in between would have made stale.
+  _fx2422n_patch off
 fi
