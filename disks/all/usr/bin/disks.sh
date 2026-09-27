@@ -152,7 +152,7 @@ _wait_disks_stable() {
   # things keep that cost down:
   #   - the short-circuit below: if udev already enumerated everything before
   #     we got here (the common case), the count never moves and we leave
-  #     after the first two rounds instead of waiting out three stable ones;
+  #     after the first three rounds instead of waiting out four stable ones;
   #   - a 60s ceiling, which still covers staggered backplane spin-up but no
   #     longer lets a genuinely stuck controller hold the WebUI for 5 minutes.
   START_COUNT="$(_wd_count)"
@@ -165,10 +165,10 @@ _wait_disks_stable() {
     CUR_COUNT="$(_wd_count)"
     if [ "${CUR_COUNT}" = "${PREV_COUNT}" ]; then
       STABLE_ROUNDS=$((STABLE_ROUNDS + 1))
-      [ "${STABLE_ROUNDS}" -ge 3 ] && break
+      [ "${STABLE_ROUNDS}" -ge 4 ] && break
       # Nothing has appeared since we started: udev was already done before
       # this ran, so there is no spin-up in progress to wait out.
-      [ "${I}" -ge 2 ] && [ "${CUR_COUNT}" = "${START_COUNT}" ] && break
+      [ "${I}" -ge 3 ] && [ "${CUR_COUNT}" = "${START_COUNT}" ] && break
     else
       STABLE_ROUNDS=0
       PREV_COUNT="${CUR_COUNT}"
