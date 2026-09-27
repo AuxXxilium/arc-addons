@@ -832,20 +832,11 @@ dtModel() {
     cp -vpf /etc/model.dtb /etc.defaults/model.dtb
     cp -vpf /etc/model.dtb /run/model.dtb
     /usr/syno/bin/syno_slot_mapping
-    # Only once boot has finished. storagepanel.service runs in its own boot
-    # slot (After=pkgctl-StorageManager) and reads the dtb then, so a restart
-    # during boot adds nothing - and queued from here it pulls StorageManager
-    # into a transaction of its own while DSM is still installing and enabling
-    # its builtin packages. It is needed for a disk hotplugged after boot.
-    # --no-block: this also runs as a udev PROGRAM, and a blocking restart
-    # parked the udev worker while every other disk's event queued behind our
-    # lock (Storage Manager errors, File Station missing until the next boot).
-    if [ -f "/usr/lib/systemd/system/storagepanel.service" ]; then
-      case "$(systemctl is-system-running 2>/dev/null)" in
-        running | degraded) systemctl --no-block restart storagepanel.service ;;
-        *) _log "boot not finished, storagepanel.service reads the new dtb itself" ;;
-      esac
-    fi
+    # No storagepanel restart from here: storagepanel.service waits for
+    # disks.sh --wait and reads the finished dtb itself. Restarting it from a
+    # udev PROGRAM during boot pulled StorageManager into a transaction of its
+    # own while DSM was still installing its builtin packages. A disk
+    # hotplugged after boot gets its panel layout on the next boot.
     return 0
   else
     _log "dtc error"
