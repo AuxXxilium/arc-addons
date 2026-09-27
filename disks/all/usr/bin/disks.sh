@@ -1120,6 +1120,40 @@ nondtModel() {
   fi
 }
 
+# --wait: return once no disks.sh run is in progress and every internal disk
+# the kernel has is in DSM's slot mapping, or after 30s. hdddb and diskcompat
+# call it before reading the disk list: a disk event can still be rebuilding
+# model.dtb when they start, and a disk mapped late would be missed until the
+# next boot. Handled before the lock below, which it only probes.
+if [ "${1}" = "--wait" ]; then
+  # The loader disk is never mapped. It is normally named synoboot, which the
+  # globs below skip anyway, but a SATA DOM can keep its sataN name.
+  _BP="$(/sbin/blkid -L ARC3 2>/dev/null)"
+  _BD=""
+  [ -n "${_BP}" ] && _BD="$(basename "$(dirname /sys/block/*/"$(basename "${_BP}")")" 2>/dev/null)"
+  _W=0
+  while :; do
+    _MISS=""
+    if [ -e /var/run/disks.lock ] && type flock >/dev/null 2>&1 && ! flock -n /var/run/disks.lock true 2>/dev/null; then
+      _MISS=" (disks.sh running)"
+    elif [ "$(__get_conf_kv supportportmappingv2)" = "yes" ] && [ -x /usr/syno/bin/syno_slot_mapping ]; then
+      _MAP="$(/usr/syno/bin/syno_slot_mapping 2>/dev/null)"
+      for _D in /sys/block/sata* /sys/block/sas* /sys/block/nvme*; do
+        [ -e "${_D}" ] || continue
+        _D="$(basename "${_D}")"
+        [ "${_D}" = "${_BD}" ] && continue
+        echo "${_MAP}" | grep -q "/dev/${_D}$" || _MISS="${_MISS} ${_D}"
+      done
+    fi
+    [ -z "${_MISS}" ] && exit 0
+    [ "${_W}" -ge 30 ] && break
+    sleep 2
+    _W=$((_W + 2))
+  done
+  _log "wait: gave up after ${_W}s, not mapped:${_MISS}"
+  exit 0
+fi
+
 if type flock >/dev/null 2>&1 && type trap >/dev/null 2>&1; then
   LOCKFILE="/var/run/disks.lock"
   exec 3>"$LOCKFILE"
