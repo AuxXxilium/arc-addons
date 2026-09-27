@@ -34,7 +34,8 @@ EOF
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/cpuinfo-setup.service"
 [Unit]
 Description=cpuinfo setup (JS patch + nginx redirect)
-After=synoscgi.service nginx.service
+After=synoscgi.service nginx.service cpuinfo.service
+Wants=cpuinfo.service
 
 [Service]
 Type=oneshot
