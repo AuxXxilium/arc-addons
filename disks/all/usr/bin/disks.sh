@@ -1232,6 +1232,17 @@ case ${1} in
     fi
     ;;
   "--update")
+    # The loader never gets a bay, so an event for it can never find one: on DT
+    # it fell through to a full dtModel - settle wait, rebuild, slot mapping -
+    # on every boot, as soon as udev replayed the loader's add event. The same
+    # two checks dtModel skips it with: its name, or its physical path.
+    _UPD="$(basename "${2:-}" 2>/dev/null)"
+    _UPD_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "/sys/block/${_UPD}/uevent" 2>/dev/null)"
+    if { [ -n "${BOOTDISK}" ] && [ "${_UPD}" = "${BOOTDISK}" ]; } ||
+      { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_UPD_PP}" ] && [ "${_UPD_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; }; then
+      _log "${_UPD} is the loader, nothing to map"
+      exit 0
+    fi
     if [ "$(__get_conf_kv supportportmappingv2)" = "yes" ]; then
       # No user_model.dts guard here. It used to skip the update entirely so a
       # udev event could not regenerate over an upload - but dtModel now reads
