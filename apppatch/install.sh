@@ -38,8 +38,11 @@ if [ "${1}" = "late" ]; then
   {
     echo "[Unit]"
     echo "Description=Arc apppatch path"
-    echo "Wants=smpkg-custom-install.service pkgctl-StorageManager.service"
-    echo "After=smpkg-custom-install.service pkgctl-StorageManager.service"
+    # No ordering here. A .path unit is implicitly Before=paths.target, which
+    # basic.target pulls in, while StorageManager runs after basic.target -
+    # After=pkgctl-StorageManager.service made that a cycle, and systemd broke
+    # it by dropping a random job, sometimes syno-space.service, which left
+    # the pool unassembled. apppatch.service carries the ordering instead.
     echo "ConditionPathExists=/var/packages"
     echo
     echo "[Path]"
