@@ -169,6 +169,12 @@ refresh_runtime() {
     _unlock "${DISK_DIR}/compatibility_action.lock"
     rm -f "${DISK_DIR}/compatibility.lock" "${DISK_DIR}/compatibility_action.lock" 2>/dev/null || true
 
+    # DSM 7.4 keys drive_status_key=disknotsupported off the presence of
+    # sys_not_support, not its content. The file is normally empty, so no
+    # amount of writing "support" elsewhere clears it - it has to go.
+    _unlock "${DISK_DIR}/sys_not_support"
+    rm -f "${DISK_DIR}/sys_not_support" 2>/dev/null || true
+
     _write "${DISK_DIR}/compatibility" "support"
     _write "${DISK_DIR}/force_compatibility" "support"
     _write "${DISK_DIR}/adv_status" "support"
