@@ -24,6 +24,7 @@ After=smpkg-custom-install.service pkgctl-StorageManager.service synostoraged.se
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+ExecStartPre=-/usr/bin/disks.sh --wait
 ExecStart=-/usr/bin/diskcompat.sh
 
 [Install]
