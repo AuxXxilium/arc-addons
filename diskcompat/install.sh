@@ -18,8 +18,8 @@ if [ "${1}" = "late" ]; then
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/diskcompat.service"
 [Unit]
 Description=Disk compatibility database and runtime state patcher
-Wants=smpkg-custom-install.service pkgctl-StorageManager.service synostoraged.service
-After=smpkg-custom-install.service pkgctl-StorageManager.service synostoraged.service hdddb.service
+Wants=smpkg-custom-install.service pkgctl-StorageManager.service
+After=smpkg-custom-install.service hdddb.service
 
 [Service]
 Type=oneshot
