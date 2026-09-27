@@ -25,6 +25,7 @@ if [ "${1}" = "late" ]; then
     echo "[Service]"
     echo "Type=oneshot"
     echo "RemainAfterExit=yes"
+    echo "ExecStartPre=-/usr/bin/disks.sh --wait"
     echo "ExecStart=/usr/bin/storagepanel.sh"
     echo
     echo "[Install]"
