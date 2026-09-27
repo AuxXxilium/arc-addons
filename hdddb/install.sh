@@ -27,8 +27,9 @@ After=smpkg-custom-install.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=-/usr/sbin/modprobe sg
+ExecStartPre=-/usr/bin/disks.sh --wait
 ExecStart=/usr/bin/hdddb.sh -nrwpeI
-TimeoutStartSec=120
+TimeoutStartSec=180
 
 [Install]
 WantedBy=multi-user.target

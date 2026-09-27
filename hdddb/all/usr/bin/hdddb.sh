@@ -2543,8 +2543,19 @@ fi
 
 # Make Synology check disk compatibility
 if [[ -f /usr/syno/sbin/synostgdisk ]]; then
-    /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
-    status=$?
+    # On a first boot this runs before the space service has created
+    # /run/space, and synostgdisk then fails to copy pool_compatibility into
+    # it. Give it up to 30s to appear, then retry a failed check a few times.
+    for _ in $(seq 1 15); do
+        [[ -d /run/space ]] && break
+        sleep 2
+    done
+    for try in 1 2 3; do
+        /usr/syno/sbin/synostgdisk --check-all-disks-compatibility
+        status=$?
+        [[ $status -eq "0" ]] && break
+        [[ $try -lt 3 ]] && sleep 5
+    done
     if [[ $status -eq "0" ]]; then
         echo -e "\nDSM successfully checked disk compatibility."
         rebootmsg=yes  # Show reboot message at end
