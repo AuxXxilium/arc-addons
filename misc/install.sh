@@ -82,8 +82,8 @@ elif [ "${1}" = "patches" ]; then
   done
 
   # network
-  if grep -q 'network.' /proc/cmdline; then
-    for I in $(grep -Eo 'network.[0-9a-fA-F:]{12,17}=[^ ]*' /proc/cmdline); do
+  if grep -Eq '(^| )network\.[0-9a-fA-F:]{12,17}=' /proc/cmdline; then
+    for I in $(tr ' ' '\n' </proc/cmdline | grep -E '^network\.[0-9a-fA-F:]{12,17}='); do
       MACR="$(echo "${I}" | cut -d. -f2 | cut -d= -f1 | sed 's/://g; s/.*/\L&/')"
       IPRS="$(echo "${I}" | cut -d= -f2)"
       for F in $(LC_ALL=C printf '%s\n' /sys/class/net/eth* | sort -V); do
