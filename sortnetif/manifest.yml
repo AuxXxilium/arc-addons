@@ -1,7 +1,7 @@
 version: 1
 name: sortnetif
 description: "Sort network interface names: sorted by busid"
-system: false
+system: true
 beta: false
 all:
   install-script: "install.sh"
