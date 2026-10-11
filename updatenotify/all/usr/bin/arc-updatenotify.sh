@@ -65,9 +65,17 @@ function Check() {
     fi
   fi
   
+  # Arx's versions were build dates, 26.10.11, until 1.0.0, and one of
+  # those is older than any numbered release though sort -V puts 26 after
+  # 1. arx points URL at its own releases; Arc's versions are not dates.
+  local arxdate=false
+  if [ "${URL##*/}" = "arx" ] && [ "${LOCALBASE%%.*}" -ge 20 ] 2>/dev/null && [ "${TAG%%.*}" -lt 20 ] 2>/dev/null; then
+    arxdate=true
+  fi
+
   # Only notify if GitHub version is greater than local base version
   local sorted_first=$(printf '%s\n%s' "$TAG" "$LOCALBASE" | sort -V | head -n1)
-  if [ "$sorted_first" != "$LOCALBASE" ]; then
+  if [ "$arxdate" = false ] && [ "$sorted_first" != "$LOCALBASE" ]; then
     echo "Remote version ${TAG} is not newer than your version ${LOCALTAG}"
     exit 0
   fi
