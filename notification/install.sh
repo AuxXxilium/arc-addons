@@ -13,6 +13,21 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   cp -vpf /usr/bin/notification /tmpRoot/usr/bin/notification
 
+  # The settings the daemon and Arc Control share, one KEY=value per line.
+  # The loader's configuration owns where notifications go, so those two lines
+  # are rewritten from it at every boot; the rest is Arc Control's (which
+  # alerts, their limits, DSM's own notifications) and is kept as it is.
+  CONF="/tmpRoot/usr/arc/notification.conf"
+  {
+    printf 'WEBHOOK_URL=%s\n' "${2:-false}"
+    printf 'DISCORD_ID=%s\n' "${3:-false}"
+    # grep exits 1 when every line was one of the two, which is no failure.
+    if [ -f "${CONF}" ]; then
+      grep -v -e '^WEBHOOK_URL=' -e '^DISCORD_ID=' "${CONF}" || true
+    fi
+  } >"${CONF}.tmp" && mv -f "${CONF}.tmp" "${CONF}"
+  chmod 600 "${CONF}"
+
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/notification.service"
 [Unit]
 Description=notification daemon
