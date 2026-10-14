@@ -25,6 +25,12 @@ if [ "${1}" = "late" ]; then
     if [ -f "${CONF}" ]; then
       grep -v -e '^WEBHOOK_URL=' -e '^DISCORD_ID=' "${CONF}" || true
     fi
+    # Only the loader update and the boot address are on until the user
+    # switches more on in Arc Control. Spelled out for a daemon built before
+    # the CPU temperature defaulted to off; a choice already made is kept.
+    if ! grep -q '^RULE_CPU_TEMP=' "${CONF}" 2>/dev/null; then
+      printf 'RULE_CPU_TEMP=0\n'
+    fi
   } >"${CONF}.tmp" && mv -f "${CONF}.tmp" "${CONF}"
   chmod 600 "${CONF}"
 
