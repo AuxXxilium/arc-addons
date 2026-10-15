@@ -7,9 +7,13 @@
 #
 # Arc's notifications, a system addon: DSM's notification category for them,
 # and the daemon that sends DSM's address after boot, a loader release once a
-# day, and Arc Control's alerts - to DSM, and to the webhook and Discord when
-# the loader has them on (${2} and ${3}, "false" when off). It took over the
-# notify addon (the category) and the updatenotify addon (the release check).
+# day, and Arc Control's alerts - to DSM, a webhook and Discord. It took over
+# the notify addon (the category) and the updatenotify addon (the release
+# check).
+#
+# Where they go is notification.conf, set in Arc Control and kept by DSM, not
+# the loader's configuration: the loader's own webhook and Discord settings
+# are for its messages before DSM runs, and are not passed in here.
 
 if [ "${1}" = "late" ]; then
   echo "Installing addon notification - late"
@@ -20,20 +24,11 @@ if [ "${1}" = "late" ]; then
   cp -vpf /usr/bin/notification-templates.sh /tmpRoot/usr/bin/notification-templates.sh
   chmod +x /tmpRoot/usr/bin/notification-templates.sh
 
-  # The settings the daemon and Arc Control share, one KEY=value per line.
-  # The loader's configuration owns where notifications go, so those two lines
-  # are rewritten from it at every boot; the rest is Arc Control's (which
-  # alerts, their limits, DSM's own notifications) and is kept as it is.
+  # The settings the daemon and Arc Control share, one KEY=value per line,
+  # Arc Control's to write. Kept as it is; without one the daemon uses its
+  # defaults until Arc Control saves the first.
   CONF="/tmpRoot/usr/arc/notification.conf"
-  {
-    printf 'WEBHOOK_URL=%s\n' "${2:-false}"
-    printf 'DISCORD_ID=%s\n' "${3:-false}"
-    # grep exits 1 when every line was one of the two, which is no failure.
-    if [ -f "${CONF}" ]; then
-      grep -v -e '^WEBHOOK_URL=' -e '^DISCORD_ID=' "${CONF}" || true
-    fi
-  } >"${CONF}.tmp" && mv -f "${CONF}.tmp" "${CONF}"
-  chmod 600 "${CONF}"
+  [ -f "${CONF}" ] && chmod 600 "${CONF}"
 
   # After revert: on the first boot without the notify addon, revert runs its
   # uninstall, which removes the category the templates step registers. And
@@ -50,7 +45,7 @@ Type=simple
 Restart=always
 ExecStartPre=/usr/bin/sleep 10
 ExecStartPre=-/usr/bin/notification-templates.sh
-ExecStart=/usr/bin/notification "${2:-false}" "${3:-false}"
+ExecStart=/usr/bin/notification
 
 [Install]
 WantedBy=multi-user.target
