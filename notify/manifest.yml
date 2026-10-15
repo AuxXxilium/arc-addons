@@ -1,6 +1,6 @@
 version: 1
 name: notify
-description: "Add Arc Notification System"
+description: "Deprecated: part of the notification addon, kept for loaders that still install it"
 system: true
 beta: false
 all:

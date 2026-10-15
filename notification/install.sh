@@ -5,6 +5,11 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
+# Arc's notifications, a system addon: DSM's notification category for them,
+# and the daemon that sends DSM's address after boot, a loader release once a
+# day, and Arc Control's alerts - to DSM, and to the webhook and Discord when
+# the loader has them on (${2} and ${3}, "false" when off). It took over the
+# notify addon (the category) and the updatenotify addon (the release check).
 
 if [ "${1}" = "late" ]; then
   echo "Installing addon notification - late"
@@ -12,6 +17,8 @@ if [ "${1}" = "late" ]; then
 
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   cp -vpf /usr/bin/notification /tmpRoot/usr/bin/notification
+  cp -vpf /usr/bin/notification-templates.sh /tmpRoot/usr/bin/notification-templates.sh
+  chmod +x /tmpRoot/usr/bin/notification-templates.sh
 
   # The settings the daemon and Arc Control share, one KEY=value per line.
   # The loader's configuration owns where notifications go, so those two lines
@@ -28,16 +35,21 @@ if [ "${1}" = "late" ]; then
   } >"${CONF}.tmp" && mv -f "${CONF}.tmp" "${CONF}"
   chmod 600 "${CONF}"
 
+  # After revert: on the first boot without the notify addon, revert runs its
+  # uninstall, which removes the category the templates step registers. And
+  # so after multi-user.target as well, as revert is - ordered after revert
+  # but pulled in by the target without that, systemd would find a cycle.
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/notification.service"
 [Unit]
-Description=notification daemon
+Description=Arc notifications
 Wants=synoscgi.service nginx.service
-After=synoscgi.service nginx.service
+After=multi-user.target synoscgi.service nginx.service revert.service
 
 [Service]
 Type=simple
 Restart=always
 ExecStartPre=/usr/bin/sleep 10
+ExecStartPre=-/usr/bin/notification-templates.sh
 ExecStart=/usr/bin/notification "${2:-false}" "${3:-false}"
 
 [Install]
@@ -50,4 +62,8 @@ elif [ "${1}" = "uninstall" ]; then
   rm -f /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/notification.service
   rm -f /tmpRoot/usr/lib/systemd/system/notification.service
   rm -f /tmpRoot/usr/bin/notification
+
+  [ ! -f "/tmpRoot/usr/arc/revert.sh" ] && echo '#!/usr/bin/env bash' >/tmpRoot/usr/arc/revert.sh && chmod +x /tmpRoot/usr/arc/revert.sh
+  echo "/usr/bin/notification-templates.sh -r" >>/tmpRoot/usr/arc/revert.sh
+  echo "rm -f /usr/bin/notification-templates.sh" >>/tmpRoot/usr/arc/revert.sh
 fi

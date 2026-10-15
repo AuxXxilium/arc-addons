@@ -1,7 +1,7 @@
 version: 1
 name: notification
-description: "Add notification system to DSM"
-system: false
+description: "Arc notifications: DSM, webhook and Discord"
+system: true
 beta: false
 all:
   install-script: "install.sh"
