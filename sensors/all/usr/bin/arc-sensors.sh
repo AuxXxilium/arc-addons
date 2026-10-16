@@ -371,8 +371,11 @@ find_cpu_temp_sensor() {
       return
     esac
   done
+  # Never a disk's drivetemp sensor: each read is a SMART command to the
+  # disk, and fan2go polls every few seconds, so the disk never sleeps.
   for HW in /sys/class/hwmon/hwmon*; do
     [ -r "${HW}/temp1_input" ] || continue
+    [ "$(cat "${HW}/name" 2>/dev/null)" = "drivetemp" ] && continue
     IDX="$(basename "${HW}" | sed 's/hwmon//')"
     echo "hwmon${IDX}/temp1_input"
     return

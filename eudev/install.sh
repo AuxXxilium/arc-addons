@@ -155,12 +155,15 @@ elif [ "${1}" = "modules" ]; then
   done
 
   MEV="$(sed -n 's/.*\bmev=\([^ ]*\).*/\1/p' /proc/cmdline 2>/dev/null)"
+  # No drivetemp: reading its temp1_input sends a SMART command to the
+  # disk, so anything polling hwmon keeps SATA disks from spinning down.
+  # DSM reads disk temperatures itself.
   if [ "${MEV}" = "physical" ] || [ -z "${MEV}" ]; then
     for I in wmi it87 it5571 nct6683 nct6775 nct7802 f71805f f71882fg f75375s dme1737 \
              w83627ehf w83627hf w83781d w83791d w83792d w83793 w83795 asc7621 \
              adt7462 adt7470 adt7475 adm1021 adm1025 adm1026 adm1031 adm9240 \
              lm63 lm75 lm77 lm78 lm80 lm85 lm90 lm95245 max6639 \
-             drivetemp asus_atk0110; do
+             asus_atk0110; do
       /usr/sbin/modprobe "${I}" || true
     done
   else
