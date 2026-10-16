@@ -13,10 +13,26 @@
 
 args=()
 
+# The probe below is a command to the disk, and only "-d ata" uses what it
+# finds: without one, smartctl is called as it was asked, and the disk is
+# left alone. With one, the probe keeps the caller's -n, so a disk in
+# standby is not spun up by the probe before the call that was meant to
+# spare it.
+NEED=false
+NOCHECK=()
+argp=""
+for argv in "$@"; do
+  [ "${argp}" = "-d" ] && [ "${argv}" = "ata" ] && NEED=true
+  case "${argp}" in -n | --nocheck) NOCHECK=(-n "${argv}") ;; esac
+  case "${argv}" in --nocheck=*) NOCHECK=("${argv}") ;; esac
+  argp="${argv}"
+done
+[ "${NEED}" = "true" ] || exec /usr/bin/smartctl.bak "$@"
+
 TYPE=ata
 for argv in "$@"; do
   if [ -e "${argv}" ]; then
-    info=$(/usr/bin/smartctl.bak -i "${argv}" 2>/dev/null)
+    info=$(/usr/bin/smartctl.bak "${NOCHECK[@]}" -i "${argv}" 2>/dev/null)
     case "${info}" in
       *NVMe*) TYPE="nvme" ;;
       *"SATA Version"*|*"ATA Version"*) TYPE="sat" ;;
