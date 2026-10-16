@@ -72,6 +72,7 @@ if [ "${1}" = "late" ]; then
   addblocklog "plugin_action"
   addblocklog "package_action"
   addblocklog "No NVIDIA"
+  addblocklog "/usr/sbin/powersched"
 
   # syno-dump-core
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
