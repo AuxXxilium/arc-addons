@@ -1111,52 +1111,24 @@ nondtModel() {
   fi
 }
 
-# --wait: return once no disks.sh run is in progress and every internal disk
-# the kernel has is in DSM's slot mapping, or after 30s. hdddb and diskcompat
-# call it before reading the disk list: a disk event can still be rebuilding
-# model.dtb when they start, and a disk mapped late would be missed until the
-# next boot. Handled before the lock below, which it only probes.
+# --wait: return once no disks.sh run is in progress, or after 30s. hdddb,
+# diskcompat and storagepanel call it before reading the disk list: a disk
+# event can still be rebuilding model.dtb when they start. Not the slot
+# mapping: eudev has settled udev and --create has waited the disks out before
+# the tree is built, so every disk already has its bay - and syno_slot_mapping
+# never lists virtio or VMware SATA disks, so waiting for them there sat out
+# the full 30s in each unit. Handled before the lock below, which it only
+# probes.
 if [ "${1}" = "--wait" ]; then
-  # The loader disk is never mapped. It is normally named synoboot, which the
-  # globs below skip anyway, but a SATA or virtio loader keeps its sataN name.
-  # Resolve it through /dev/synoboot's major:minor first. checkSynoboot has
-  # deleted /dev/sataNpN by now, and the dirname lookup below needs the kernel
-  # name of the partition, not synobootN. It also does not depend on the
-  # partition label, which arx rewrites to its own.
-  _BD=""
-  _BMM="$(stat -c '%t:%T' /dev/synoboot 2>/dev/null | awk -F: '{printf "%d:%d", strtonum("0x" $1), strtonum("0x" $2)}')"
-  [ -n "${_BMM}" ] && _BD="$(basename "$(readlink -f "/sys/dev/block/${_BMM}")" 2>/dev/null)"
-  if [ -z "${_BD}" ] || [ ! -e "/sys/block/${_BD}" ]; then
-    _BP="$(/sbin/blkid -L ARC3 2>/dev/null)"
-    _BD=""
-    [ -n "${_BP}" ] && _BD="$(basename "$(dirname /sys/block/*/"$(basename "${_BP}")")" 2>/dev/null)"
-  fi
   _W=0
-  while :; do
-    _MISS=""
-    if [ -e /var/run/disks.lock ] && type flock >/dev/null 2>&1 && ! flock -n /var/run/disks.lock true 2>/dev/null; then
-      _MISS=" (disks.sh running)"
-    elif [ "$(__get_conf_kv supportportmappingv2)" = "yes" ] && [ -x /usr/syno/bin/syno_slot_mapping ]; then
-      _MAP="$(/usr/syno/bin/syno_slot_mapping 2>/dev/null)"
-      # syno_slot_mapping does not list virtio slots at all - every internal
-      # slot prints empty even with the disks in their bays - so a map with no
-      # disk in it says nothing about this run. Rely on the lock alone then,
-      # as on non-DT models; otherwise every unit sat out the full 30s.
-      if echo "${_MAP}" | grep -q "/dev/"; then
-        for _D in /sys/block/sata* /sys/block/sas* /sys/block/nvme*; do
-          [ -e "${_D}" ] || continue
-          _D="$(basename "${_D}")"
-          [ "${_D}" = "${_BD}" ] && continue
-          echo "${_MAP}" | grep -Eq "/dev/${_D}([^0-9a-z]|$)" || _MISS="${_MISS} ${_D}"
-        done
-      fi
+  while [ -e /var/run/disks.lock ] && type flock >/dev/null 2>&1 && ! flock -n /var/run/disks.lock true 2>/dev/null; do
+    if [ "${_W}" -ge 30 ]; then
+      _log "wait: gave up after ${_W}s, disks.sh still running"
+      break
     fi
-    [ -z "${_MISS}" ] && exit 0
-    [ "${_W}" -ge 30 ] && break
     sleep 2
     _W=$((_W + 2))
   done
-  _log "wait: gave up after ${_W}s, not mapped:${_MISS}"
   exit 0
 fi
 
