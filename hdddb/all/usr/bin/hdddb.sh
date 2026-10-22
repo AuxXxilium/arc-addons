@@ -2463,7 +2463,7 @@ verify_drive_in_db(){
 
 verify_patched(){
     # $1 "quiet" to suppress per-item errors on a non-final attempt
-    local quiet="$1" f num actual_sdc expected_sdc
+    local quiet="$1" f num actual_sdc expected_sdc entry model fwrev
     verify_failed=""
 
     # An empty drive or db list means nothing was examined - that must not pass
@@ -2496,14 +2496,28 @@ verify_patched(){
         fi
     done
 
-    # No drive may be left marked incompatible in the db files
-    for f in "${db1list[@]}" "${db2list[@]}"; do
-        [[ -f "$f" ]] || continue
-        if grep -q 'not_support\|unverified' "$f" 2>/dev/null; then
+    # No drive this run found may be left marked incompatible in the db files.
+    # Only those drives, and only the entries the edits write for them - their
+    # firmware and the default: the host db is Synology's whole catalogue, and
+    # drives that are not in this NAS keep whatever status Synology gave them.
+    for entry in "${hdds[@]}" "${nvmes[@]}"; do
+        model=$(printf "%s" "$entry" | cut -d"," -f 1)
+        fwrev=$(printf "%s" "$entry" | cut -d"," -f 2)
+        [[ -z $model ]] && continue
+        for f in "${db1list[@]}" "${db2list[@]}"; do
+            [[ -f "$f" ]] || continue
+            getdbtype "$f"
+            if [[ $dbtype -gt "6" ]]; then
+                jq -e --arg m "$model" --arg fw "$fwrev" \
+                    '.disk_compatbility_info[$m] // {} | [.[$fw], .default] | tostring | test("not_support|unverified")' \
+                    "$f" >/dev/null 2>&1 || continue
+            else
+                grep "$model" "$f" 2>/dev/null | grep -q 'not_support\|unverified' || continue
+            fi
             [[ $quiet != "quiet" ]] &&\
-                echo -e "${Error}ERROR${Off} $(basename -- "$f") still has ${Red}incompatible${Off} drive entries!"
+                echo -e "${Error}ERROR${Off} $model is still marked ${Red}incompatible${Off} in $(basename -- "$f")!"
             verify_failed=yes
-        fi
+        done
     done
 
     # synoinfo.conf must hold the disk compatibility value this run intended
