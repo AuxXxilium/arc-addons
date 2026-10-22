@@ -204,6 +204,25 @@ if [[ $( whoami ) != "root" ]]; then
     exit 1
 fi
 
+# Without a terminal - hdddb.service - keep the output in a file as well, each
+# line timed: on a first boot the journal has been rotated by the time anyone
+# can log in, and nobody can log in while the boot still runs. Should the run
+# still be going after 150s, 30s before the unit's timeout kills it, the
+# process tree goes in too, to show what it was waiting on.
+if [[ ! -t 1 ]]; then
+    runlog=/var/log/hdddb.log
+    [[ $(stat -c %s "$runlog" 2>/dev/null || echo 0) -gt 1048576 ]] && : >"$runlog"
+    exec > >(while IFS= read -r line; do printf '%(%T)T %s\n' -1 "$line"; done | tee -a "$runlog") 2>&1
+    echo "--- $(basename -- "$0") $* (pid $$, up $(cut -d' ' -f1 /proc/uptime)s)"
+    (
+        sleep 150
+        { printf '%(%T)T %s\n' -1 "--- still running after 150s:"
+          ps -eo pid,etime,args --forest; } >>"$runlog"
+    ) &
+    watchdog=$!
+    trap 'kill "$watchdog" 2>/dev/null' EXIT
+fi
+
 # Get DSM major version
 dsm=$(/usr/syno/bin/synogetkeyvalue /etc.defaults/VERSION majorversion)
 version="_v$dsm"

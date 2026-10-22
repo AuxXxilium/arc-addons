@@ -20,6 +20,13 @@
 GKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/bin/get_key_value")
 SKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
 
+# Into hdddb.sh's log as well, which keeps it for the same reason: hdddb.service
+# runs this right after it, within the same start timeout.
+if [ ! -t 1 ]; then
+  exec > >(while IFS= read -r line; do printf '%(%T)T %s\n' -1 "${line}"; done | tee -a /var/log/hdddb.log) 2>&1
+  echo "--- $(basename -- "${0}") ${*} (pid $$, up $(cut -d' ' -f1 /proc/uptime)s)"
+fi
+
 RUNTIME_ROOT="/run/synostorage/disks"
 LOCK_RUNTIME="${DISKCOMPAT_LOCK:-0}"
 
