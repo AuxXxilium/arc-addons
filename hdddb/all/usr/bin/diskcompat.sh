@@ -13,8 +13,9 @@
 # /run/synostorage/disks/<dev>/. A disk it has already flagged keeps showing as
 # unverified/incompatible in Storage Manager no matter what the db says.
 #
-# This addon patches both layers, then refreshes the runtime state so the
-# change applies without a reboot.
+# This patches both layers, then refreshes the runtime state so the change
+# applies without a reboot. Part of the hdddb addon: hdddb.service runs it
+# after hdddb.sh, whether that succeeded or not.
 
 GKV=$([ -x "/usr/syno/bin/synogetkeyvalue" ] && echo "/usr/syno/bin/synogetkeyvalue" || echo "/bin/get_key_value")
 SKV=$([ -x "/usr/syno/bin/synosetkeyvalue" ] && echo "/usr/syno/bin/synosetkeyvalue" || echo "/bin/set_key_value")
@@ -209,7 +210,8 @@ if [ "${1}" = "--restore" ]; then
   exit 0
 fi
 
-for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do "${SKV}" "${F}" "support_disk_compatibility" "yes"; done
+# Not support_disk_compatibility: hdddb.sh sets it, to "no" with -f, which Arc
+# Control can choose, and this runs after it.
 for F in "/etc/synoinfo.conf" "/etc.defaults/synoinfo.conf"; do "${SKV}" "${F}" "forbid_unsupport_extdev" "no"; done
 
 wait_for_runtime

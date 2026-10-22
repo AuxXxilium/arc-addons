@@ -7,6 +7,13 @@
 #
 # https://github.com/007revad/Synology_HDD_db
 #
+# hdddb.sh patches the drive databases, then diskcompat.sh (once its own
+# addon) patches DSM's runtime state for each drive, which synostoraged has
+# already evaluated against the unpatched databases by then.
+#
+# No -I: hdddb.sh asks before downloading dhm_tool, and a service has no
+# terminal to ask on, so it only ever failed here. Arc Control can still run
+# hdddb with it.
 
 if [ "${1}" = "late" ]; then
   echo "Installing addon hdddb - ${1}"
@@ -15,8 +22,15 @@ if [ "${1}" = "late" ]; then
   mkdir -p "/tmpRoot/usr/arc/addons/" "/tmpRoot/usr/bin/" "/tmpRoot/usr/sbin/" "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants"
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   cp -pf /usr/bin/hdddb.sh /tmpRoot/usr/bin/hdddb.sh
+  cp -pf /usr/bin/diskcompat.sh /tmpRoot/usr/bin/diskcompat.sh
 
-  # Create systemd service file
+  # diskcompat's own unit, from before it was merged in here.
+  rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/diskcompat.service" \
+        "/tmpRoot/usr/lib/systemd/system/diskcompat.service"
+
+  # ExecStart keeps its "-", as Arc Control writes it: diskcompat.sh is most
+  # needed when hdddb.sh failed. Arc Control rewrites every ExecStart= line
+  # with its own flags, so diskcompat.sh is ExecStartPost=, not a second one.
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/hdddb.service"
 [Unit]
 Description=HDDs/SSDs drives databases
@@ -28,7 +42,8 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=-/usr/sbin/modprobe sg
 ExecStartPre=-/usr/bin/disks.sh --wait
-ExecStart=/usr/bin/hdddb.sh -nrwpeI
+ExecStart=-/usr/bin/hdddb.sh -nrwpe
+ExecStartPost=-/usr/bin/diskcompat.sh
 TimeoutStartSec=180
 
 [Install]
@@ -52,4 +67,6 @@ elif [ "${1}" = "uninstall" ]; then
   # Add revert commands
   echo "/usr/bin/hdddb.sh --restore" >> /tmpRoot/usr/arc/revert.sh
   echo "rm -f /usr/bin/hdddb.sh" >> /tmpRoot/usr/arc/revert.sh
+  echo "/usr/bin/diskcompat.sh --restore" >> /tmpRoot/usr/arc/revert.sh
+  echo "rm -f /usr/bin/diskcompat.sh" >> /tmpRoot/usr/arc/revert.sh
 fi

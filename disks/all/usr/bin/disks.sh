@@ -1111,14 +1111,14 @@ nondtModel() {
   fi
 }
 
-# --wait: return once no disks.sh run is in progress, or after 30s. hdddb,
-# diskcompat and storagepanel call it before reading the disk list: a disk
-# event can still be rebuilding model.dtb when they start. Not the slot
-# mapping: eudev has settled udev and --create has waited the disks out before
-# the tree is built, so every disk already has its bay - and syno_slot_mapping
-# never lists virtio or VMware SATA disks, so waiting for them there sat out
-# the full 30s in each unit. Handled before the lock below, which it only
-# probes.
+# --wait: return once no disks.sh run is in progress, or after 30s. hdddb
+# (and with it diskcompat) and storagepanel call it before reading the disk
+# list: a disk event can still be rebuilding model.dtb when they start. Not the
+# slot mapping: eudev has settled udev and --create has waited the disks out
+# before the tree is built, so every disk already has its bay - and
+# syno_slot_mapping never lists virtio or VMware SATA disks, so waiting for
+# them there sat out the full 30s in each unit. Handled before the lock below,
+# which it only probes.
 if [ "${1}" = "--wait" ]; then
   _W=0
   while [ -e /var/run/disks.lock ] && type flock >/dev/null 2>&1 && ! flock -n /var/run/disks.lock true 2>/dev/null; do
