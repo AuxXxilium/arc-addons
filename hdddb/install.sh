@@ -28,6 +28,12 @@ if [ "${1}" = "late" ]; then
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/diskcompat.service" \
         "/tmpRoot/usr/lib/systemd/system/diskcompat.service"
 
+  # After SynoOnlinePack: on a first boot DSM installs it while the boot goes
+  # on, and it writes every db in /var/lib/disk-compatibility anew - ours
+  # included, half a minute after hdddb.sh patched them - and the disks are
+  # evaluated against the stock ones again. Not After StorageManager: that
+  # puts hdddb after syno-space.target, and nothing here needs it.
+  #
   # ExecStart keeps its "-", as Arc Control writes it: diskcompat.sh is most
   # needed when hdddb.sh failed. Arc Control rewrites every ExecStart= line
   # with its own flags, so diskcompat.sh is ExecStartPost=, not a second one.
@@ -35,7 +41,7 @@ if [ "${1}" = "late" ]; then
 [Unit]
 Description=HDDs/SSDs drives databases
 Wants=smpkg-custom-install.service pkgctl-StorageManager.service
-After=smpkg-custom-install.service
+After=smpkg-custom-install.service pkgctl-SynoOnlinePack.service pkgctl-SynoOnlinePack_v2.service pkgctl-SynoOnlinePack_v3.service
 
 [Service]
 Type=oneshot
