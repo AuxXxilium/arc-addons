@@ -14,10 +14,14 @@ if [ "${1}" = "late" ]; then
   cp -vpf /usr/sbin/cpuinfo /tmpRoot/usr/sbin/cpuinfo
   cp -vpf /usr/bin/cpuinfo.sh /tmpRoot/usr/bin/cpuinfo.sh
 
+  # Before nginx, not after: the redirect lives in nginx's template, so nginx
+  # comes up every boot already pointed at the daemon's socket. Started after
+  # it, every API call between the two - the login page's among them - got a
+  # 502. The daemon dials synoscgi per request, so it needs neither up first.
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/cpuinfo.service"
 [Unit]
 Description=cpuinfo daemon
-After=synoscgi.service nginx.service
+Before=nginx.service
 
 [Service]
 Type=simple

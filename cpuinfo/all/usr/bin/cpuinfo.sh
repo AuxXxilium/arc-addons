@@ -18,6 +18,30 @@ fi
 FILE_JS="/usr/syno/synoman/webman/modules/AdminCenter/admin_center.js"
 FILE_GZ="${FILE_JS}.gz"
 
+NGINX_FILES="/etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache"
+
+# Undo the nginx redirect in place. The edit is a single socket path, so
+# reversing it is exact on whatever DSM release wrote the files. Restoring a
+# copy taken at first install - as this once did - rolls nginx's config and
+# template back to the DSM release that was current then, so those copies are
+# dropped rather than kept around to be restored by mistake.
+_nginx_unpatch() {
+  local _f
+  for _f in ${NGINX_FILES}; do
+    rm -f "${_f}.bak"
+    [ -f "${_f}" ] || continue
+    sed -i 's|/run/arc_synoscgi.sock;|/run/synoscgi.sock;|g; s|/run/arc_synoscgi_socket.sock;|/run/synoscgi_socket.sock;|g' "${_f}"
+  done
+}
+
+if [ "${1}" = "-r" ]; then
+  # nginx first, while the daemon is still serving, so no request lands on a
+  # socket that has just gone away.
+  _nginx_unpatch
+  systemctl reload nginx
+  systemctl stop cpuinfo.service cpuinfo-setup.service 2>/dev/null || kill -9 "$(ps aux 2>/dev/null | grep -F "/usr/sbin/cpuinfo" | grep -v grep | awk '{print $2}' | head -1)" 2>/dev/null || true
+fi
+
 if [ ! -f "${FILE_JS}" ] && [ ! -f "${FILE_GZ}" ]; then
   echo "File ${FILE_JS} does not exist"
   exit 0
@@ -52,10 +76,6 @@ if [ "${1}" = "-r" ]; then
       gzip -c "${_RM_JS}" >"${_RM_JS}.gz"
     fi
   fi
-  systemctl stop cpuinfo.service cpuinfo-setup.service 2>/dev/null || kill -9 "$(ps aux 2>/dev/null | grep -F "/usr/sbin/cpuinfo" | grep -v grep | awk '{print $2}' | head -1)" 2>/dev/null || true
-  [ -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
-  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
-  systemctl reload nginx
   exit 0
 fi
 
@@ -467,9 +487,6 @@ if [ ! -S "/run/arc_synoscgi.sock" ]; then
   fi
 fi
 
-[ ! -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-[ ! -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache /usr/syno/share/nginx/nginx.mustache.bak
-
 # Only the SCGI upstream (/run/synoscgi.sock) is redirected: it carries the
 # Info Center request and the fetch that populates Resource Monitor when it
 # opens. The trailing ";" in the match keeps this to the upstream definition
@@ -481,7 +498,8 @@ fi
 # DSM's own socket on systems that still carry the old redirect - the daemon
 # no longer creates /run/arc_synoscgi_socket.sock, and nginx aimed at it would
 # lose DSM's whole realtime channel.
-for _f in /etc/nginx/nginx.conf /usr/syno/share/nginx/nginx.mustache; do
+for _f in ${NGINX_FILES}; do
+  rm -f "${_f}.bak"
   [ -f "${_f}" ] || continue
   sed -i 's|/run/synoscgi.sock;|/run/arc_synoscgi.sock;|g' "${_f}"
   sed -i 's|/run/arc_synoscgi_socket.sock;|/run/synoscgi_socket.sock;|g' "${_f}"
@@ -490,7 +508,8 @@ done
 # Wait for the cpuinfo daemon to create its socket before reloading nginx.
 # Pointing nginx at a socket that never appears takes DSM's web UI down until
 # someone repairs it by hand, so a missing socket reverts the whole patch
-# rather than being reloaded into.
+# rather than being reloaded into. The revert is reloaded too: the template
+# carries the redirect across reboots, so nginx may already be serving it.
 if sleep 0.1 2>/dev/null; then
   SLEEP_STEP="0.1"; TIMEOUT=100
 else
@@ -505,17 +524,16 @@ if [ ! -S "/run/arc_synoscgi.sock" ]; then
   echo "cpuinfo: socket /run/arc_synoscgi.sock did not appear, reverting nginx patch"
   echo "cpuinfo: the daemon is not running - check 'systemctl status cpuinfo.service'"
   echo "cpuinfo: or run /usr/sbin/cpuinfo in the foreground to see why it exits"
-  # cp, not mv: keep the .bak so a later run still has a pristine reference.
-  [ -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
-  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
+  _nginx_unpatch
+  systemctl reload nginx
   exit 1
 fi
 
 # A bad edit here would leave DSM unreachable after the next nginx restart.
 if ! nginx -t >/dev/null 2>&1; then
   echo "cpuinfo: nginx rejected the patched configuration, reverting"
-  [ -f "/etc/nginx/nginx.conf.bak" ] && cp -pf /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
-  [ -f "/usr/syno/share/nginx/nginx.mustache.bak" ] && cp -pf /usr/syno/share/nginx/nginx.mustache.bak /usr/syno/share/nginx/nginx.mustache
+  _nginx_unpatch
+  systemctl reload nginx
   exit 1
 fi
 
