@@ -50,7 +50,7 @@ case "${FILE#"${ROOT}"}" in
   ;;
 esac
 
-_sum() { { md5sum "${1}" || cksum "${1}"; } 2>/dev/null | cut -d' ' -f1; }
+_sum() { md5sum "${1}" 2>/dev/null | cut -d' ' -f1; }
 _line() { sed -n "${1}p" "${TAG}" 2>/dev/null; }
 
 _valid() {
