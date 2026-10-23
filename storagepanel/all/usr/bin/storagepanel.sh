@@ -93,7 +93,7 @@ fi
 
 if [ "${1}" = "-r" ]; then
   if [ -f "${FILE_GZ}.bak" ]; then
-    mv -f "${FILE_GZ}.bak" "${FILE_GZ}"
+    /usr/bin/arc-backup.sh restore "${FILE_GZ}"
     gzip -dc "${FILE_GZ}" >"${FILE_JS}"
   fi
   rm -f /usr/arc/storagepanel.conf 2>/dev/null
@@ -146,7 +146,7 @@ if [ -z "${SSD_BAY}" ]; then
   fi
 fi
 
-[ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
+/usr/bin/arc-backup.sh take "${FILE_GZ}" || exit 0
 
 gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
 
@@ -164,6 +164,7 @@ if [ -f "/usr/lib/systemd/system/nvmesystem.service" ] || [ -f "/usr/lib/systemd
   sed -i 's/return"normal"===this.portType/return"normal"===this.portType||"cache"===this.portType/g' "${FILE_JS}" # [42218,64570)
 fi
 gzip -c "${FILE_JS}" >"${FILE_GZ}"
+/usr/bin/arc-backup.sh seal "${FILE_GZ}"
 
 # Save configuration for persistence across reboots
 echo "${HDD_BAY}-${SSD_BAY}" > /usr/arc/storagepanel.conf

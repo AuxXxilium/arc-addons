@@ -12,7 +12,7 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
   
   FILE="/tmpRoot/usr/syno/bin/synoups"
-  [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
+  /usr/bin/arc-backup.sh take "${FILE}"
 
   cp -pf "${FILE}.bak" "${FILE}"
   if [ -z "${2}" ] || [ "${2}" = "-f" ]; then
@@ -39,11 +39,12 @@ DELETE FROM task WHERE task_name LIKE 'StopScsiTarget';
 INSERT INTO task VALUES('StopScsiTarget', '', 'shutdown', '', 1, 0, 0, 0, '', 0, "synopkg stop ScsiTarget", 'script', '{}', '', '', '{}', '{}');
 EOF
   fi
+  /usr/bin/arc-backup.sh seal "${FILE}"
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon ups - ${1}"
 
   FILE="/tmpRoot/usr/syno/bin/synoups"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
+  /usr/bin/arc-backup.sh restore "${FILE}"
 
   export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"

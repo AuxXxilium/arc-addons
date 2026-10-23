@@ -8,7 +8,13 @@
 
 if [ "${1}" = "-r" ]; then
   FILE="/sbin/dmidecode"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
+  # The backup is DSM's dmidecode itself, moved aside rather than patched. One
+  # in place again is a DSM update's own, and the moved one is not put over it.
+  if [ -e "${FILE}" ]; then
+    rm -f "${FILE}.bak"
+  elif [ -f "${FILE}.bak" ]; then
+    mv -f "${FILE}.bak" "${FILE}"
+  fi
 else
   FILE="/sbin/dmidecode"
   if [ -x "${FILE}" ]; then

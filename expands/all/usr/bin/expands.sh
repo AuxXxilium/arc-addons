@@ -9,11 +9,11 @@
 if [ "${1}" = "-r" ]; then
   # usb.map
   FILE="/usr/syno/etc/usb.map"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
+  /usr/bin/arc-backup.sh restore "${FILE}"
 
   # ca-certificates.crt
   FILE="/etc/ssl/certs/ca-certificates.crt"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
+  /usr/bin/arc-backup.sh restore "${FILE}"
 else
   # usb.map
   FILE="/usr/syno/etc/usb.map"
@@ -22,8 +22,9 @@ else
     if [ $? -ne 0 ] || [ ${STATUS} -ne 200 ]; then
       echo "usb.ids download error!"
     else
-      [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
+      /usr/bin/arc-backup.sh take "${FILE}"
       cp -vpf "/tmp/usb.map" "${FILE}"
+      /usr/bin/arc-backup.sh seal "${FILE}"
     fi
   fi
 
@@ -34,8 +35,9 @@ else
     if [ $? -ne 0 ] || [ ${STATUS} -ne 200 ]; then
       echo "ca-certificates.crt download error!"
     else
-      [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
+      /usr/bin/arc-backup.sh take "${FILE}"
       cp -vpf "/tmp/cacert.pem" "${FILE}"
+      /usr/bin/arc-backup.sh seal "${FILE}"
     fi
   fi
 fi

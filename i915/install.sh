@@ -83,12 +83,13 @@ elif [ "${1}" = "late" ]; then
 
   if [ -f "/etc/i915patched" ]; then
     KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
-    [ ! -f "${KO_FILE}.bak" ] && cp -pf "${KO_FILE}" "${KO_FILE}.bak"
+    /usr/bin/arc-backup.sh take "${KO_FILE}"
     cp -vpf "/usr/lib/modules/i915.ko" "${KO_FILE}"
+    /usr/bin/arc-backup.sh seal "${KO_FILE}"
   fi
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon i915 - ${1}"
 
   KO_FILE="/tmpRoot/usr/lib/modules/i915.ko"
-  [ -f "${KO_FILE}.bak" ] && mv -f "${KO_FILE}.bak" "${KO_FILE}"
+  /usr/bin/arc-backup.sh restore "${KO_FILE}"
 fi

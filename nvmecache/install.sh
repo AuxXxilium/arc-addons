@@ -74,7 +74,7 @@ elif [ "${1}" = "late" ]; then
   fi
 
   SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
-  [ ! -f "${SO_FILE}.bak" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak"
+  /usr/bin/arc-backup.sh take "${SO_FILE}"
 
   # Replace the device path.
   cp -pf "${SO_FILE}.bak" "${SO_FILE}"
@@ -93,9 +93,10 @@ elif [ "${1}" = "late" ]; then
     fi
     idx=$((idx + 1))
   done
+  /usr/bin/arc-backup.sh seal "${SO_FILE}"
 elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon nvmecache - ${1}"
 
   SO_FILE="/tmpRoot/usr/lib/libsynonvme.so.1"
-  [ -f "${SO_FILE}.bak" ] && mv -f "${SO_FILE}.bak" "${SO_FILE}"
+  /usr/bin/arc-backup.sh restore "${SO_FILE}"
 fi

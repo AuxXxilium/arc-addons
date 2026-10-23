@@ -17,7 +17,7 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
-  [ ! -f "${SO_FILE}.bak-nvme" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak-nvme"
+  /usr/bin/arc-backup.sh take "${SO_FILE}" "${SO_FILE}.bak-nvme"
 
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null \
@@ -33,6 +33,7 @@ if [ "${1}" = "late" ]; then
     echo "WARNING: libhwcontrol patch produced unexpected output (size ${NEW_SIZE:-0} vs ${ORIG_SIZE:-0}), leaving file untouched"
   fi
   rm -f "${SO_FILE}.new" "${SO_FILE}.tmp"
+  /usr/bin/arc-backup.sh seal "${SO_FILE}"
 
   cat >"/tmpRoot/usr/bin/nvmevolume.sh" <<'SCRIPT'
 #!/usr/bin/env sh
@@ -66,7 +67,7 @@ elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon nvmevolume - ${1}"
 
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
-  [ -f "${SO_FILE}.bak-nvme" ] && mv -f "${SO_FILE}.bak-nvme" "${SO_FILE}"
+  /usr/bin/arc-backup.sh restore "${SO_FILE}" "${SO_FILE}.bak-nvme"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmevolume.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/nvmevolume.service"

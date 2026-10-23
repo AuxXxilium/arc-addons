@@ -76,8 +76,9 @@ if [ "${1}" = "late" ]; then
 
   # syno-dump-core
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
-  [ ! -f "${SH_FILE}.bak" ] && cp -pf "${SH_FILE}" "${SH_FILE}.bak"
+  /usr/bin/arc-backup.sh take "${SH_FILE}"
   printf '#!/usr/bin/env sh\nexit 0\n' >"${SH_FILE}"
+  /usr/bin/arc-backup.sh seal "${SH_FILE}"
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon reducelogs - ${1}"
 
@@ -90,5 +91,5 @@ elif [ "${1}" = "uninstall" ]; then
 
   # syno-dump-core
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
-  [ -f "${SH_FILE}.bak" ] && mv -f "${SH_FILE}.bak" "${SH_FILE}"
+  /usr/bin/arc-backup.sh restore "${SH_FILE}"
 fi

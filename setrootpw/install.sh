@@ -15,13 +15,14 @@ if [ "${1}" = "late" ]; then
   cp -vpf /usr/lib/openssh/sftp-server /tmpRoot/usr/lib/openssh/sftp-server
 
   FILE="/tmpRoot/etc/ssh/sshd_config"
-  [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
+  /usr/bin/arc-backup.sh take "${FILE}"
 
   cp -pf "${FILE}.bak" "${FILE}"
   sed -i 's|^.*PermitRootLogin .*$|PermitRootLogin yes|' ${FILE}
   # sed -i 's|^.*PubkeyAuthentication .*$|PubkeyAuthentication yes|' ${FILE}
   # sed -i 's|^.*PasswordAuthentication .*$|PasswordAuthentication yes|' ${FILE}
   sed -i 's|^Subsystem.*$|Subsystem	sftp	/usr/lib/openssh/sftp-server|' ${FILE}
+  /usr/bin/arc-backup.sh seal "${FILE}"
 
   if [ ! -f /tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db ]; then
     echo "copy esynoscheduler.db"
@@ -50,7 +51,7 @@ elif [ "${1}" = "uninstall" ]; then
   # rm -f /tmpRoot/usr/lib/libcrypto.so.3
 
   FILE="/tmpRoot/etc/ssh/sshd_config"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
+  /usr/bin/arc-backup.sh restore "${FILE}"
 
   export LD_LIBRARY_PATH=/tmpRoot/usr/bin:/tmpRoot/usr/lib
   ESYNOSCHEDULER_DB="/tmpRoot/usr/syno/etc/esynoscheduler/esynoscheduler.db"

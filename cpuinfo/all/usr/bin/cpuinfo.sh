@@ -49,16 +49,13 @@ fi
 
 if [ "${1}" = "-r" ]; then
   rm -f "/usr/syno/synoman/webman/modules/AdminCenter/.cpuinfo.stamp"
-  # Restore with cp, not mv: keeping the .bak means a later re-run still has a
-  # pristine reference. A mv here leaves the system with no restore point at
-  # all, and the next run then adopts the *current* (possibly patched) file as
-  # its new "pristine" baseline, baking the patches in permanently.
+  # A backup goes back only while it is still this DSM's copy. After an update
+  # that shipped the file, the one in place is that release's own and stays.
   if [ -f "${FILE_GZ}.bak" ]; then
-    rm -f "${FILE_JS}" "${FILE_GZ}"
-    cp -pf "${FILE_GZ}.bak" "${FILE_GZ}"
+    /usr/bin/arc-backup.sh restore "${FILE_GZ}"
     gzip -dc "${FILE_GZ}" >"${FILE_JS}"
   elif [ -f "${FILE_JS}.bak" ]; then
-    cp -pf "${FILE_JS}.bak" "${FILE_JS}"
+    /usr/bin/arc-backup.sh restore "${FILE_JS}"
     # nginx has gzip_static on, so a stale .gz would be served in preference to
     # the .js we just restored. Keep the pair consistent.
     [ -f "${FILE_GZ}" ] && gzip -c "${FILE_JS}" >"${FILE_GZ}"
@@ -67,14 +64,12 @@ if [ "${1}" = "-r" ]; then
     echo "cpuinfo: reinstall AdminCenter if DSM's System Information page misbehaves"
   fi
   # Resource Monitor's GPU mask guard, restored from the same kind of backup.
+  # The .gz is made from the .js again rather than kept as a copy of its own.
   _RM_JS="/usr/syno/synoman/webman/modules/ResourceMonitor/resource.js"
   if [ -f "${_RM_JS}.bak" ]; then
-    cp -pf "${_RM_JS}.bak" "${_RM_JS}"
-    if [ -f "${_RM_JS}.gz.bak" ]; then
-      cp -pf "${_RM_JS}.gz.bak" "${_RM_JS}.gz"
-    elif [ -f "${_RM_JS}.gz" ]; then
-      gzip -c "${_RM_JS}" >"${_RM_JS}.gz"
-    fi
+    /usr/bin/arc-backup.sh restore "${_RM_JS}"
+    rm -f "${_RM_JS}.gz.bak"
+    [ -f "${_RM_JS}.gz" ] && gzip -c "${_RM_JS}" >"${_RM_JS}.gz"
   fi
   exit 0
 fi
@@ -199,28 +194,23 @@ if [ -f "${STAMP_FILE}" ] && [ "$(cat "${STAMP_FILE}" 2>/dev/null)" = "$(_stamp_
 fi
 
 if [ "${SKIP_PATCH:-0}" != "1" ]; then
+  # The backup is of the file nginx serves: the .gz when DSM ships one.
   if [ -f "${FILE_GZ}" ]; then
-    if [ ! -f "${FILE_GZ}.bak" ]; then
-      if gzip -dc "${FILE_GZ}" 2>/dev/null | grep -q 'renderTempFromC(e\.sys_temp)\|e\.fan_list\.map\|t\.gpu||(t\.gpu='; then
-        echo "cpuinfo: ${FILE_GZ} is already patched and no pristine backup exists - refusing to"
-        echo "cpuinfo: adopt it as the baseline. Reinstall AdminCenter to restore, then re-run."
-        exit 1
-      fi
-      cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
-    fi
+    _AC="${FILE_GZ}"
+    _ac_patched() { gzip -dc "${FILE_GZ}" 2>/dev/null | grep -q 'renderTempFromC(e\.sys_temp)\|e\.fan_list\.map\|t\.gpu||(t\.gpu='; }
   else
-    if [ ! -f "${FILE_JS}.bak" ]; then
-      if _is_patched "${FILE_JS}"; then
-        echo "cpuinfo: ${FILE_JS} is already patched and no pristine backup exists - refusing to"
-        echo "cpuinfo: adopt it as the baseline. Reinstall AdminCenter to restore, then re-run."
-        exit 1
-      fi
-      cp -pf "${FILE_JS}" "${FILE_JS}.bak"
-    fi
+    _AC="${FILE_JS}"
+    _ac_patched() { _is_patched "${FILE_JS}"; }
   fi
+  if ! /usr/bin/arc-backup.sh check "${_AC}" && _ac_patched; then
+    echo "cpuinfo: ${_AC} is already patched and no backup of this DSM's copy exists - refusing"
+    echo "cpuinfo: to adopt it as the baseline. Reinstall AdminCenter to restore, then re-run."
+    exit 1
+  fi
+  /usr/bin/arc-backup.sh take "${_AC}" || exit 1
 
   rm -f "${FILE_JS}" 2>/dev/null
-  if [ -f "${FILE_GZ}.bak" ]; then
+  if [ "${_AC}" = "${FILE_GZ}" ]; then
     gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
   else
     cp -pf "${FILE_JS}.bak" "${FILE_JS}"
@@ -308,6 +298,7 @@ if [ "${SKIP_PATCH:-0}" != "1" ]; then
   if [ -f "${FILE_GZ}" ] || [ -f "${FILE_GZ}.bak" ]; then
     gzip -c "${FILE_JS}" >"${FILE_GZ}"
   fi
+  /usr/bin/arc-backup.sh seal "${_AC}"
 
   _stamp_now >"${STAMP_FILE}" 2>/dev/null || true
 fi
@@ -399,20 +390,19 @@ _rm_patch() {
 
   # Same rule as admin_center.js: never adopt an already-patched file as the
   # pristine baseline, or -r can never restore the system.
-  if [ ! -f "${RM_JS}.bak" ]; then
-    if ! grep -qF "${RM_GUARD}" "${RM_JS}" 2>/dev/null; then
-      if grep -qF "${RM_PATCHED}" "${RM_JS}" 2>/dev/null; then
-        echo "cpuinfo: ${RM_JS} is already patched and no pristine backup exists - refusing"
-        echo "cpuinfo: to adopt it as the baseline. Reinstall ResourceMonitor, then re-run."
-      else
-        echo "cpuinfo: Resource Monitor GPU mask guard not found - DSM may have changed it."
-        echo "cpuinfo: leaving ${RM_JS} untouched; GPU panels will stay masked."
-      fi
-      return 0
+  if ! /usr/bin/arc-backup.sh check "${RM_JS}" && ! grep -qF "${RM_GUARD}" "${RM_JS}" 2>/dev/null; then
+    if grep -qF "${RM_PATCHED}" "${RM_JS}" 2>/dev/null; then
+      echo "cpuinfo: ${RM_JS} is already patched and no backup of this DSM's copy exists -"
+      echo "cpuinfo: refusing to adopt it as the baseline. Reinstall ResourceMonitor, then re-run."
+    else
+      echo "cpuinfo: Resource Monitor GPU mask guard not found - DSM may have changed it."
+      echo "cpuinfo: leaving ${RM_JS} untouched; GPU panels will stay masked."
     fi
-    cp -pf "${RM_JS}" "${RM_JS}.bak"
-    [ -f "${RM_GZ}" ] && cp -pf "${RM_GZ}" "${RM_GZ}.bak"
+    return 0
   fi
+  /usr/bin/arc-backup.sh take "${RM_JS}" || return 0
+  # The .gz is made from the .js, so no copy of it is kept.
+  rm -f "${RM_GZ}.bak"
 
   # Always re-derive from the pristine copy so repeated runs cannot stack
   # substitutions on top of each other.
@@ -470,9 +460,8 @@ _rm_patch() {
 
   # nginx has gzip_static on, so a stale .gz would be served in preference to
   # the .js we just patched. Keep the pair consistent.
-  if [ -f "${RM_GZ}" ] || [ -f "${RM_GZ}.bak" ]; then
-    gzip -c "${RM_JS}" >"${RM_GZ}"
-  fi
+  [ -f "${RM_GZ}" ] && gzip -c "${RM_JS}" >"${RM_GZ}"
+  /usr/bin/arc-backup.sh seal "${RM_JS}"
   echo "cpuinfo: Resource Monitor GPU panels unmasked and fed"
 }
 

@@ -14,7 +14,7 @@ if [ "${1}" = "late" ]; then
   MODEL="$(cat /proc/sys/kernel/syno_hw_version)"
   FILE="/tmpRoot/usr/syno/etc/adapter_cards.conf"
 
-  [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
+  /usr/bin/arc-backup.sh take "${FILE}"
   cp -pf "${FILE}" "${FILE}.tmp"
   : >"${FILE}"
   for N in $(grep '\[' "${FILE}.tmp" 2>/dev/null); do
@@ -22,6 +22,7 @@ if [ "${1}" = "late" ]; then
     echo "${MODEL}=yes" >>"${FILE}"
   done
   rm -f "${FILE}.tmp"
+  /usr/bin/arc-backup.sh seal "${FILE}"
   # POSIX-compliant way to replace /etc/ with /etc.defaults/ in the path
   FILE_DEFAULTS="/tmpRoot/usr/syno/etc.defaults/adapter_cards.conf"
   cp -pf "${FILE}" "${FILE_DEFAULTS}"
@@ -30,7 +31,7 @@ elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon addincards - ${1}"
 
   FILE="/tmpRoot/usr/syno/etc/adapter_cards.conf"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
+  /usr/bin/arc-backup.sh restore "${FILE}"
   # POSIX-compliant way to replace /etc/ with /etc.defaults/ in the path
   FILE_DEFAULTS="/tmpRoot/usr/syno/etc.defaults/adapter_cards.conf"
   cp -pf "${FILE}" "${FILE_DEFAULTS}"

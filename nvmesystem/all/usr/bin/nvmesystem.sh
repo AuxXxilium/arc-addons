@@ -36,13 +36,13 @@ fi
 
 if [ "${1}" = "-r" ]; then
   if [ -f "${FILE_GZ}.bak" ]; then
-    mv -f "${FILE_GZ}.bak" "${FILE_GZ}"
+    /usr/bin/arc-backup.sh restore "${FILE_GZ}"
     gzip -dc "${FILE_GZ}" >"${FILE_JS}"
   fi
   exit
 fi
 
-[ ! -f "${FILE_GZ}.bak" ] && cp -pf "${FILE_GZ}" "${FILE_GZ}.bak"
+/usr/bin/arc-backup.sh take "${FILE_GZ}" || exit 0
 
 gzip -dc "${FILE_GZ}.bak" >"${FILE_JS}"
 # 64570
@@ -53,5 +53,6 @@ sed -i "s/\!u.isCacheTray()/(\!u.isCacheTray()||true)/g" "${FILE_JS}"           
 sed -i 's/t="normal"!==this.portType/t="normal"!==this.portType\&\&"cache"!==this.portType/g' "${FILE_JS}"       # [42218,64570)
 sed -i 's/return"normal"===this.portType/return"normal"===this.portType||"cache"===this.portType/g' "${FILE_JS}" # [42218,64570)
 gzip -c "${FILE_JS}" >"${FILE_GZ}"
+/usr/bin/arc-backup.sh seal "${FILE_GZ}"
 
 exit 0

@@ -12,12 +12,14 @@ if [ "${1}" = "late" ]; then
   cp -pf "${0}" "/tmpRoot/usr/arc/addons/"
 
   FILE="/tmpRoot/usr/bin/smartctl"
-  [ ! -f "${FILE}.bak" ] && cp -pf "${FILE}" "${FILE}.bak"
-  
+  # The wrapper runs smartctl.bak, so it must never be backed up as it. Still
+  # the wrapper, FILE was not shipped again and the backup stands as it is.
+  grep -qF "smartctl.bak" "${FILE}" 2>/dev/null || /usr/bin/arc-backup.sh take "${FILE}"
   cp -vpf /usr/bin/smartctl.sh "${FILE}"
+  /usr/bin/arc-backup.sh seal "${FILE}"
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon smartctl - ${1}"
 
   FILE="/tmpRoot/usr/bin/smartctl"
-  [ -f "${FILE}.bak" ] && mv -f "${FILE}.bak" "${FILE}"
+  /usr/bin/arc-backup.sh restore "${FILE}"
 fi

@@ -9,6 +9,13 @@
 if [ "${1}" = "late" ]; then
   echo "Installing addon revert - ${1}"
 
+  # The addons' backups go through arc-backup.sh: in the ramdisk for their
+  # late and uninstall steps, and in DSM for the scripts it runs and for
+  # revert.sh. revert is a system addon and runs first, so it is there for all.
+  mkdir -p "/tmpRoot/usr/bin"
+  cp -pf /usr/bin/arc-backup.sh /tmpRoot/usr/bin/arc-backup.sh
+  chmod +x /usr/bin/arc-backup.sh /tmpRoot/usr/bin/arc-backup.sh
+
   mkdir -p "/tmpRoot/usr/arc/"
   echo '#!/usr/bin/env bash' >"/tmpRoot/usr/arc/revert.sh"
   chmod +x "/tmpRoot/usr/arc/revert.sh"

@@ -51,7 +51,7 @@ elif [ "${1}" = "late" ]; then
 
   # disk/shared_disk_info_enum.c::84 Failed to allocate list in SharedDiskInfoEnum, errno=0x900.
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
-  [ ! -f "${SO_FILE}.bak-nvmesystem" ] && cp -pf "${SO_FILE}" "${SO_FILE}.bak-nvmesystem"
+  /usr/bin/arc-backup.sh take "${SO_FILE}" "${SO_FILE}.bak-nvmesystem"
   cp -pf "${SO_FILE}" "${SO_FILE}.tmp"
   xxd -c "$(xxd -p "${SO_FILE}.tmp" 2>/dev/null | wc -c)" -p "${SO_FILE}.tmp" 2>/dev/null |
     sed "s/0f95c00fb6c0488b94240810/0f94c00fb6c0488b94240810/; s/8944240c8b44240809e84409/8944240c8b44240890904409/" | # [69057,72806); (from SA6400 69057)
@@ -76,6 +76,7 @@ elif [ "${1}" = "late" ]; then
     echo "WARNING: libhwcontrol patch produced unexpected output (size ${NEW_SIZE:-0} vs ${ORIG_SIZE:-0}), leaving file untouched"
   fi
   rm -f "${SO_FILE}.new" "${SO_FILE}.tmp"
+  /usr/bin/arc-backup.sh seal "${SO_FILE}"
 
   # Create storage pool page without RAID type.
   cp -vpf /usr/bin/nvmesystem.sh /tmpRoot/usr/bin/nvmesystem.sh
@@ -105,7 +106,7 @@ elif [ "${1}" = "uninstall" ]; then
   echo "Installing addon nvmesystem - ${1}"
 
   SO_FILE="/tmpRoot/usr/lib/libhwcontrol.so.1"
-  [ -f "${SO_FILE}.bak-nvmesystem" ] && mv -f "${SO_FILE}.bak-nvmesystem" "${SO_FILE}"
+  /usr/bin/arc-backup.sh restore "${SO_FILE}" "${SO_FILE}.bak-nvmesystem"
 
   rm -f "/tmpRoot/usr/lib/systemd/system/multi-user.target.wants/nvmesystem.service"
   rm -f "/tmpRoot/usr/lib/systemd/system/nvmesystem.service"
