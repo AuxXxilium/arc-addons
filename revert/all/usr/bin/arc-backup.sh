@@ -71,7 +71,13 @@ take)
     [ -n "${DSM}" ] && [ "$(_line 1)" != "${DSM}" ] && printf '%s\n%s\n' "${DSM}" "$(_line 2)" >"${TAG}"
     exit 0
   fi
-  [ -f "${FILE}" ] || exit 1
+  if [ ! -f "${FILE}" ]; then
+    # Nothing to back up, and an addon that rebuilds from the backup would
+    # otherwise put the old release's copy back in its place.
+    [ -f "${BAK}" ] && echo "arc-backup: ${BAK} is from DSM $(_line 1), not ${DSM}, and ${FILE} is gone - removing it"
+    rm -f "${BAK}" "${TAG}"
+    exit 1
+  fi
   [ -f "${BAK}" ] && echo "arc-backup: ${BAK} is from DSM $(_line 1), not ${DSM} - backing up ${FILE} again"
   cp -pf "${FILE}" "${BAK}" && printf '%s\n\n' "${DSM}" >"${TAG}"
   ;;
