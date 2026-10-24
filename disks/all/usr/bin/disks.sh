@@ -181,110 +181,40 @@ _wait_disks_stable() {
   fi
 }
 
-# Decide, once per boot, whether phy_identifier or bay_identifier is the usable
-# key for SAS disks - see _sas_bay_index for what each one is.
+# Sort key that puts a disk's slot in the order of the HBA bays, or nothing.
 #
-# Neither attribute is globally unique. Both are per-enclosure, so with two
-# expanders on one HBA, expander A phy 3 and expander B phy 3 both exist, and a
-# JBOD pair can likewise report bay 3 twice. Whichever key collides would send
-# two disks to one ata_port; _claim_slot_port then relocates the loser, so no
-# disk is lost, but the relocated one is no longer pinned to its wiring - which
-# is the entire point of preferring these attributes.
+# The bay number DSM shows is the internal_slot@ index, and dtModel() numbers
+# those in the order it emits them. For a SAS HBA that was discovery order: a
+# staggered spin-up or a replaced drive could put the disk cabled to phy 7
+# ahead of the one on phy 3. So slots are sorted by the wiring before they are
+# written out.
 #
-# So rather than committing to phy per disk, survey every SAS disk first and
-# take phy only if it separates all of them. The survey is over the whole
-# controller set at once, which is what makes it able to see a duplicate that a
-# per-disk lookup cannot. Falls back to bay on a phy collision, and to neither
-# (leaving the driver's ata_port_no in place) when both collide.
+# The wiring only orders the slots, it is never written as their ata_port.
+# DSM matches a slot by (pcie_root, ata_port) against the ata_port_no in the
+# disk's syno_block_info, and the vendor populator (syno_mptNsas_info_enum) or
+# arc-lkm's shim fills that in discovery order - a phy number in the dts left
+# the disk without a slot that matches it. --create rebuilds the tree on every
+# boot, so the order is recomputed whenever discovery order shifts.
 #
-# Sets _SAS_KEY to "phy", "bay" or "" and is idempotent per run.
-_sas_pick_key() {
-  [ -n "${_SAS_KEY_DONE:-}" ] && return 0
-  _SAS_KEY_DONE=1
-  _SAS_KEY=""
-
-  _SPK_PHY=""
-  _SPK_BAY=""
-  _SPK_N=0
-  for _SPK_D in /sys/class/sas_device/end_device-*; do
-    [ -d "${_SPK_D}" ] || continue
-    _SPK_N=$((_SPK_N + 1))
-    _SPK_P="$(cat "${_SPK_D}/phy_identifier" 2>/dev/null)"
-    case "${_SPK_P}" in '' | *[!0-9]*) _SPK_P="x" ;; esac
-    _SPK_B="$(cat "${_SPK_D}/bay_identifier" 2>/dev/null)"
-    case "${_SPK_B}" in '' | *[!0-9]*) _SPK_B="x" ;; esac
-    _SPK_PHY="${_SPK_PHY} ${_SPK_P}"
-    _SPK_BAY="${_SPK_BAY} ${_SPK_B}"
-  done
-  [ "${_SPK_N}" -gt 0 ] || return 0
-
-  # Usable means: every disk has a numeric value AND no two share one.
-  _spk_ok() {
-    case " ${1} " in *" x "*) return 1 ;; esac
-    [ "$(printf '%s\n' ${1} | sort -n | uniq | wc -l)" -eq "${_SPK_N}" ]
-  }
-
-  if _spk_ok "${_SPK_PHY}"; then
-    _SAS_KEY="phy"
-  elif _spk_ok "${_SPK_BAY}"; then
-    _SAS_KEY="bay"
-    _log "sas: phy_identifier is not unique across ${_SPK_N} disk(s), keying bays on bay_identifier"
-  else
-    _log "sas: neither phy_identifier nor bay_identifier separates ${_SPK_N} disk(s), keeping driver ata_port_no"
-  fi
-}
-
-# Derive a boot-stable bay index for a disk on a SAS HBA, or nothing.
+# The phy comes from the SAS port the disk hangs off, which links the phys it
+# is made of (.../port-0:1/phy-0:7). For direct attach that is the HBA phy,
+# fixed by the cable; behind an expander it is the expander phy (port-0:0:3
+# holds phy-0:0:3), fixed by the backplane connector. A wide port has several,
+# so the lowest is taken. The expander number goes first so the disks of one
+# expander stay together instead of interleaving with another's.
 #
-# Everything the SCSI layer offers to identify a disk is an enumeration
-# artefact: the target id, the port-H:P transport node number and the firmware
-# handle are all assigned as devices are discovered, so a rescan, a staggered
-# spin-up or a replaced drive can renumber them. On a SAS controller every disk
-# shares the controller's pciepath, so ata_port is the only thing separating
-# dtModel()'s internal_slot nodes - and DSM caches the bay<->disk association.
-# An index that moves between boots therefore silently reassigns bays.
-#
-# Two attributes are properties of the wiring rather than of discovery order:
-#
-#   1. phy_identifier - the phy the drive is wired to. For direct-attach this
-#      is the HBA phy and is fixed by the cable; behind an expander it is the
-#      expander phy, fixed by the backplane connector.
-#   2. bay_identifier - the SES/SGPIO slot the enclosure reports, the same
-#      number dmesg prints as "enclosure logical id(...), slot(N)".
-#
-# Which of the two is used is decided once per run by _sas_pick_key, not per
-# disk: neither is globally unique, so preferring phy disk-by-disk would key
-# two disks behind different expanders to the same port even when bay would
-# have separated them cleanly. The survey there picks whichever attribute
-# actually distinguishes every SAS disk present.
-#
-# _sas_pick_key must have been called by the caller BEFORE this runs. This is
-# invoked as "$(_sas_bay_index ...)", so anything it logs would be captured as
-# part of the index, and any variable it set would be lost with the subshell -
-# the same trap documented on _claim_slot_port.
-#
-# Echoes nothing when no attribute was usable, so the caller keeps whatever the
-# driver reported.
-_sas_bay_index() {
-  _SBI_PP="${1}"
-  [ -n "${_SBI_PP}" ] || return 0
-
-  [ -n "${_SAS_KEY}" ] || return 0
-
-  _SBI_ED="$(printf '%s' "${_SBI_PP}" | grep -Eo 'end_device-[0-9]+:[0-9]+(:[0-9]+)?' | tail -1)"
-  [ -n "${_SBI_ED}" ] || return 0
-
-  _SBI_D="/sys/class/sas_device/${_SBI_ED}"
-  [ -d "${_SBI_D}" ] || return 0
-
-  # _sas_pick_key has already established that this attribute is numeric and
-  # unique for every SAS disk present, so no further validation is needed here
-  # beyond rejecting a read that fails outright.
-  _SBI_V="$(cat "${_SBI_D}/${_SAS_KEY}_identifier" 2>/dev/null)"
-  case "${_SBI_V}" in
-    '' | *[!0-9]*) return 0 ;;
-  esac
-  echo "${_SBI_V}"
+# Echoes "<expander> <phy>" - expander 0 for direct attach, N+1 behind
+# expander-H:N - or nothing for a disk that is not behind a SAS port, which
+# the caller then orders by ata_port.
+_hba_bay_key() {
+  _HBK_PP="${1}"
+  case "${_HBK_PP}" in */port-*/end_device-*) : ;; *) return 0 ;; esac
+  _HBK_PORT="/sys${_HBK_PP%/end_device-*}"
+  case "$(basename "${_HBK_PORT}")" in port-*) : ;; *) return 0 ;; esac
+  _HBK_PHY="$(ls "${_HBK_PORT}" 2>/dev/null | grep '^phy-' | sed 's/.*://' | grep -E '^[0-9]+$' | sort -n | head -1)"
+  [ -n "${_HBK_PHY}" ] || return 0
+  _HBK_EXP="$(printf '%s' "${_HBK_PP}" | grep -Eo 'expander-[0-9]+:[0-9]+' | tail -1 | sed 's/.*://')"
+  echo "$((${_HBK_EXP:--1} + 1)) ${_HBK_PHY}"
 }
 
 # Derive a per-controller unique port index for a disk whose syno_block_info
@@ -508,15 +438,42 @@ getUsbPorts() {
   echo
 }
 
-# Append one internal_slot for a SATA/HBA disk: $1 pcie_root, $2 driver,
-# $3 ata_port. Also records the driver name its controller was first emitted
-# with - every slot on one controller has to carry the same one, see the sd*
-# pass in dtModel.
-_emit_sata_slot() {
+# Queue one internal_slot for a SATA/HBA disk: $1 pcie_root, $2 driver,
+# $3 ata_port, $4 PHYSDEVPATH. Also records the driver name its controller was
+# first queued with - every slot on one controller has to carry the same one,
+# see the sd* pass in dtModel.
+#
+# Slots are not written here but sorted first: controllers in the order they
+# were first seen, as before, and within one controller by HBA bay where the
+# disk has one (_hba_bay_key), by ata_port otherwise. ata_port stays the last
+# key, so disks that share a bay key still come out in a fixed order.
+_queue_sata_slot() {
   case " ${_CTRL_DRIVERS} " in
     *" ${1}|"*) : ;;
     *) _CTRL_DRIVERS="${_CTRL_DRIVERS:+${_CTRL_DRIVERS} }${1}|${2}" ;;
   esac
+  _QSS_R=0
+  for _QSS_E in ${_CTRL_DRIVERS}; do
+    case "${_QSS_E}" in "${1}|"*) break ;; esac
+    _QSS_R=$((_QSS_R + 1))
+  done
+  _QSS_K="$(_hba_bay_key "${4}")"
+  if [ -n "${_QSS_K}" ]; then
+    _log "hba bay for ${1} port ${3}: expander/phy ${_QSS_K}"
+  else
+    _QSS_K="0 ${3}"
+  fi
+  # Zero-padded so a plain sort orders the keys numerically - busybox sort may
+  # lack per-key flags. The raw port goes last: "%02X" reads a padded "0010" as
+  # octal.
+  # shellcheck disable=SC2086
+  printf '%04d %04d %04d %04d %s %s %s
+' "${_QSS_R}" ${_QSS_K} "${3}" "${1}" "${2}" "${3}" >>"${SLOTS}.q"
+}
+
+# Append one internal_slot for a SATA/HBA disk: $1 pcie_root, $2 driver,
+# $3 ata_port.
+_emit_sata_slot() {
   COUNT=$((COUNT + 1))
   {
     echo "    internal_slot@${COUNT} {"
@@ -562,6 +519,7 @@ dtModel() {
     # nothing has to be edited back in afterwards.
     SLOTS="${DEST}.slots"
     : >"${SLOTS}"
+    : >"${SLOTS}.q"
 
     COUNT=0
     # Reset per run: dtModel can be re-entered from dtUpdate, and a stale claim
@@ -569,11 +527,6 @@ dtModel() {
     _CLAIMED_SLOTS=""
     _SEEN_PHYSDEV=""
     _CTRL_DRIVERS=""
-
-    # Survey the SAS attributes once, here in the function's own shell: both
-    # loops below call _sas_bay_index from inside "$(...)", where neither the
-    # cached choice nor its log line would survive.
-    _sas_pick_key
 
     for _F in $(LC_ALL=C printf '%s\n' /sys/block/sata* | sort -V); do
       [ -e "${_F}" ] || continue
@@ -602,14 +555,6 @@ dtModel() {
       case "${_AT}" in
         '' | *[!0-9]*) _log "unusable ata_port_no for ${_F} [${_AT:-empty}]"; _AT="" ;;
       esac
-      # The wiring outranks whatever the driver reported. On 5.10 the vendor
-      # populator (syno_mptNsas_info_enum) derives ata_port_no from discovery
-      # order, which is not stable across boots - see _sas_bay_index.
-      _SB="$(_sas_bay_index "${_PP}")"
-      if [ -n "${_SB}" ] && [ "${_SB}" != "${_AT}" ]; then
-        _log "sas bay for ${_F}: ata_port_no=${_AT:-empty} -> ${_SB}"
-        _AT="${_SB}"
-      fi
       if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
         _log "bootloader (alias): ${_F}"; continue
       fi
@@ -625,7 +570,7 @@ dtModel() {
       # logs, and this loop previously emitted nothing at all.
       _log "slot: ${_F} -> ${_PC} port ${_AT} (${_DR})"
       [ -n "${_PP}" ] && _SEEN_PHYSDEV="${_SEEN_PHYSDEV:+${_SEEN_PHYSDEV} }${_PP}"
-      _emit_sata_slot "${_PC}" "${_DR}" "${_AT}"
+      _queue_sata_slot "${_PC}" "${_DR}" "${_AT}" "${_PP}"
     done
 
     # Second pass: HBA disks that never became sataN.
@@ -681,12 +626,6 @@ dtModel() {
       case "${_AT}" in
         '' | *[!0-9]*) _AT="$(_hba_port_index "${_PP}")" ;;
       esac
-      # As in pass 1: prefer the wiring over the enumeration-order index.
-      _SB="$(_sas_bay_index "${_PP}")"
-      if [ -n "${_SB}" ] && [ "${_SB}" != "${_AT}" ]; then
-        _log "sas bay for ${_F}: port ${_AT:-empty} -> ${_SB}"
-        _AT="${_SB}"
-      fi
       case "${_AT}" in
         '' | *[!0-9]*) _AT=0 ;;
       esac
@@ -696,8 +635,17 @@ dtModel() {
       _claim_slot_port "${_PC}" "${_AT}" || { _log "no slot for ${_F}"; continue; }
       _AT="${_SLOT_PORT}"
       _log "hba disk without sata alias: ${_F} -> ${_PC} port ${_AT} (${_DR})"
-      _emit_sata_slot "${_PC}" "${_DR}" "${_AT}"
+      _queue_sata_slot "${_PC}" "${_DR}" "${_AT}" "${_PP}"
     done
+
+    # Write the queued slots out in bay order - see _queue_sata_slot. Read from
+    # a file, not a pipe: COUNT has to survive the loop for the NVMe slots.
+    LC_ALL=C sort "${SLOTS}.q" >"${SLOTS}.s"
+    while read -r _Q_R _Q_E _Q_K _Q_P _Q_PC _Q_DR _Q_AT; do
+      _emit_sata_slot "${_Q_PC}" "${_Q_DR}" "${_Q_AT}"
+      _log "internal_slot@${COUNT}: ${_Q_PC} port ${_Q_AT}"
+    done <"${SLOTS}.s"
+    rm -f "${SLOTS}.q" "${SLOTS}.s"
 
     # NVMe. PAS7700 (epyc7003ntb) maps it as storage - an internal_slot@ with
     # an nvme { } child - so those continue the internal_slot@ numbering of the
