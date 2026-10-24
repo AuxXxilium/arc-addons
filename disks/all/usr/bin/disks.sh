@@ -115,6 +115,14 @@ _disk_info() {
   fi
 }
 
+# True for the loader disk: $1 its /sys/block name, $2 its PHYSDEVPATH. Both
+# sides of each comparison must be non-empty - with no loader resolved, ""=""
+# would drop a real disk as the loader.
+_is_loader() {
+  [ -n "${BOOTDISK}" ] && [ "${1}" = "${BOOTDISK}" ] && return 0
+  [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${2}" ] && [ "${2}" = "${BOOTDISK_PHYSDEVPATH}" ]
+}
+
 _count_disks() {
   C=0
   for _F in ${1}; do [ -e "${_F}" ] && C=$((C + 1)); done
@@ -439,24 +447,26 @@ getUsbPorts() {
 }
 
 # Queue one internal_slot for a SATA/HBA disk: $1 pcie_root, $2 driver,
-# $3 ata_port, $4 PHYSDEVPATH. Also records the driver name its controller was
-# first queued with - every slot on one controller has to carry the same one,
-# see the sd* pass in dtModel.
+# $3 ata_port, $4 PHYSDEVPATH, $5 the controller's own PCI address. Also
+# records the driver name its controller was first queued with - every slot on
+# one controller has to carry the same one, see the sd* pass in dtModel.
 #
-# Slots are not written here but sorted first: controllers in the order they
-# were first seen, as before, and within one controller by HBA bay where the
-# disk has one (_hba_bay_key), by ata_port otherwise. ata_port stays the last
-# key, so disks that share a bay key still come out in a fixed order.
+# Slots are not written here but sorted first. AHCI controllers (class 0106)
+# come ahead of SAS, RAID and SCSI ones, so on a mixed box the onboard ports
+# are the first drives and the HBAs follow; within each group controllers go
+# by their own PCI address, which does not depend on which disk the kernel
+# happened to name sata1. Within one controller disks go by HBA bay where they
+# have one (_hba_bay_key), by ata_port otherwise. ata_port stays the last key,
+# so disks that share a bay key still come out in a fixed order.
 _queue_sata_slot() {
   case " ${_CTRL_DRIVERS} " in
     *" ${1}|"*) : ;;
     *) _CTRL_DRIVERS="${_CTRL_DRIVERS:+${_CTRL_DRIVERS} }${1}|${2}" ;;
   esac
-  _QSS_R=0
-  for _QSS_E in ${_CTRL_DRIVERS}; do
-    case "${_QSS_E}" in "${1}|"*) break ;; esac
-    _QSS_R=$((_QSS_R + 1))
-  done
+  case "$(cat "/sys/bus/pci/devices/${5}/class" 2>/dev/null)" in
+    0x0106*) _QSS_T=0 ;;
+    *) _QSS_T=1 ;;
+  esac
   _QSS_K="$(_hba_bay_key "${4}")"
   if [ -n "${_QSS_K}" ]; then
     _log "hba bay for ${1} port ${3}: expander/phy ${_QSS_K}"
@@ -467,8 +477,7 @@ _queue_sata_slot() {
   # lack per-key flags. The raw port goes last: "%02X" reads a padded "0010" as
   # octal.
   # shellcheck disable=SC2086
-  printf '%04d %04d %04d %04d %s %s %s
-' "${_QSS_R}" ${_QSS_K} "${3}" "${1}" "${2}" "${3}" >>"${SLOTS}.q"
+  printf '%s %s %04d %04d %04d %s %s %s\n' "${_QSS_T}" "${5:-${1}}" ${_QSS_K} "${3}" "${1}" "${2}" "${3}" >>"${SLOTS}.q"
 }
 
 # Append one internal_slot for a SATA/HBA disk: $1 pcie_root, $2 driver,
@@ -530,9 +539,8 @@ dtModel() {
 
     for _F in $(LC_ALL=C printf '%s\n' /sys/block/sata* | sort -V); do
       [ -e "${_F}" ] || continue
-      _N="$(basename "${_F}")"
-      [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && { _log "bootloader: ${_F}"; continue; }
       _disk_info "${_F}"
+      _is_loader "$(basename "${_F}")" "${_PP}" && { _log "bootloader: ${_F}"; continue; }
       [ -n "${_PC}" ] || { _log "unknown: ${_F}"; continue; }
       [ -n "${_DR}" ] || { _log "unknown driver: ${_F}"; continue; }
       if [ -z "${_AT}" ] && [ -n "${_PP}" ]; then
@@ -555,9 +563,6 @@ dtModel() {
       case "${_AT}" in
         '' | *[!0-9]*) _log "unusable ata_port_no for ${_F} [${_AT:-empty}]"; _AT="" ;;
       esac
-      if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
-        _log "bootloader (alias): ${_F}"; continue
-      fi
       if [ "${BOOTDISK_PCIEPATH}" = "${_PC}" ] && [ -n "${BOOTDISK_ATAPORT}" ] && [ "${BOOTDISK_ATAPORT}" = "${_AT}" ]; then
         _log "bootloader (port ${_AT}): ${_F}"; continue
       fi
@@ -570,7 +575,7 @@ dtModel() {
       # logs, and this loop previously emitted nothing at all.
       _log "slot: ${_F} -> ${_PC} port ${_AT} (${_DR})"
       [ -n "${_PP}" ] && _SEEN_PHYSDEV="${_SEEN_PHYSDEV:+${_SEEN_PHYSDEV} }${_PP}"
-      _queue_sata_slot "${_PC}" "${_DR}" "${_AT}" "${_PP}"
+      _queue_sata_slot "${_PC}" "${_DR}" "${_AT}" "${_PP}" "${_BDF}"
     done
 
     # Second pass: HBA disks that never became sataN.
@@ -589,17 +594,13 @@ dtModel() {
     # exactly the class of mismatch that has caused boot failures before.
     for _F in $(LC_ALL=C printf '%s\n' /sys/block/sd* | sort -V); do
       [ -e "${_F}" ] || continue
-      _N="$(basename "${_F}")"
-      [ -n "${BOOTDISK}" ] && [ "${_N}" = "${BOOTDISK}" ] && { _log "bootloader: ${_F}"; continue; }
       _disk_info "${_F}"
+      _is_loader "$(basename "${_F}")" "${_PP}" && { _log "bootloader: ${_F}"; continue; }
       case "${_PP}" in *usb*) continue ;; esac
       if [ -n "${_PP}" ]; then
         case " ${_SEEN_PHYSDEV} " in
           *" ${_PP} "*) _log "already slotted: ${_F}"; continue ;;
         esac
-      fi
-      if [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
-        _log "bootloader (alias): ${_F}"; continue
       fi
       [ -n "${_PC}" ] || { _log "unknown: ${_F}"; continue; }
       # Only PCI storage controllers (class 01xx) own internal bays here. Looked
@@ -635,13 +636,13 @@ dtModel() {
       _claim_slot_port "${_PC}" "${_AT}" || { _log "no slot for ${_F}"; continue; }
       _AT="${_SLOT_PORT}"
       _log "hba disk without sata alias: ${_F} -> ${_PC} port ${_AT} (${_DR})"
-      _queue_sata_slot "${_PC}" "${_DR}" "${_AT}" "${_PP}"
+      _queue_sata_slot "${_PC}" "${_DR}" "${_AT}" "${_PP}" "${_BDF}"
     done
 
     # Write the queued slots out in bay order - see _queue_sata_slot. Read from
     # a file, not a pipe: COUNT has to survive the loop for the NVMe slots.
     LC_ALL=C sort "${SLOTS}.q" >"${SLOTS}.s"
-    while read -r _Q_R _Q_E _Q_K _Q_P _Q_PC _Q_DR _Q_AT; do
+    while read -r _Q_T _Q_B _Q_E _Q_K _Q_P _Q_PC _Q_DR _Q_AT; do
       _emit_sata_slot "${_Q_PC}" "${_Q_DR}" "${_Q_AT}"
       _log "internal_slot@${COUNT}: ${_Q_PC} port ${_Q_AT}"
     done <"${SLOTS}.s"
@@ -658,15 +659,13 @@ dtModel() {
     POWER_LIMIT=""
     for F in $(LC_ALL=C printf '%s\n' /sys/block/nvme* | sort -V); do
       [ ! -e "${F}" ] && continue
-      N="$(basename "${F}")"
-      [ -n "${BOOTDISK}" ] && [ "${N}" = "${BOOTDISK}" ] && { _log "bootloader: ${F}"; continue; }
       _disk_info "${F}"
       [ -n "${_PC}" ] || { _log "unknown: ${F}"; continue; }
       # BOOTDISK_PCIEPATH comes straight from syno_block_info and may still be
       # the short form, so normalize it before comparing - otherwise the
       # loader's own NVMe drive is not recognized and gets a data slot.
       _NVME_BOOTPC="$(_pc_norm "${BOOTDISK_PCIEPATH}")"
-      if { [ -n "${_NVME_BOOTPC}" ] && [ "${_NVME_BOOTPC}" = "${_PC}" ]; } || { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${_PP}" ]; }; then
+      if _is_loader "$(basename "${F}")" "${_PP}" || { [ -n "${_NVME_BOOTPC}" ] && [ "${_NVME_BOOTPC}" = "${_PC}" ]; }; then
         _log "bootloader: ${F}"
         continue
       fi
@@ -867,12 +866,10 @@ dtUpdate() {
         _DU_DISKS=0
         for _DU_D in /sys/block/sata* /sys/block/sd*; do
           [ -e "${_DU_D}" ] || continue
-          [ -n "${BOOTDISK}" ] && [ "$(basename "${_DU_D}")" = "${BOOTDISK}" ] && continue
           _disk_info "${_DU_D}"
           # Same exclusions dtModel applies, so the two counts stay comparable.
+          _is_loader "$(basename "${_DU_D}")" "${_PP}" && continue
           case "${_PP}" in *usb*) continue ;; esac
-          [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_PP}" ] && \
-            [ "${_PP}" = "${BOOTDISK_PHYSDEVPATH}" ] && continue
           [ -n "${_PC}" ] && [ "${_PC#0000:}" = "${_KEY}" ] || continue
           # By the controller's own address - see _disk_info. Using the
           # pciepath here never counted a disk behind a bridge, which switched
@@ -916,14 +913,8 @@ nondtModel() {
     _ND_N="$(basename "${_ND_N}")"
     F="/sys/block/${_ND_N}"
     [ -e "${F}" ] || continue
-    if [ -n "${BOOTDISK}" ] && [ "${_ND_N}" = "${BOOTDISK}" ]; then
+    if _is_loader "${_ND_N}" "$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"; then
       _log "bootloader: ${F}"; continue
-    fi
-    if [ -n "${BOOTDISK_PHYSDEVPATH}" ]; then
-      _N_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "${F}/uevent" 2>/dev/null)"
-      if [ -n "${_N_PP}" ] && [ "${_N_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; then
-        _log "bootloader (alias): ${F}"; continue
-      fi
     fi
     if [ -n "${BOOTDISK_PCIEPATH}" ] && [ -n "${BOOTDISK_ATAPORT}" ]; then
       _N_PCIE="$(grep 'pciepath' "${F}/device/syno_block_info" 2>/dev/null | cut -d'=' -f2)"
@@ -1035,7 +1026,7 @@ nondtModel() {
     # PCIEPATH here is always a full, domain-prefixed address while
     # BOOTDISK_PCIEPATH may still be the short form from syno_block_info.
     _ND_BOOTPC="${BOOTDISK_PCIEPATH:+0000:${BOOTDISK_PCIEPATH#0000:}}"
-    if { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${PHYSDEVPATH}" ] && [ "${BOOTDISK_PHYSDEVPATH}" = "${PHYSDEVPATH}" ]; } || \
+    if _is_loader "$(basename "${F}")" "${PHYSDEVPATH}" || \
        { [ -n "${_ND_BOOTPC}" ] && [ "${_ND_BOOTPC}" = "${PCIEPATH}" ]; }; then
       _log "bootloader: ${F}"
       continue
@@ -1158,8 +1149,7 @@ case ${1} in
     # two checks dtModel skips it with: its name, or its physical path.
     _UPD="$(basename "${2:-}" 2>/dev/null)"
     _UPD_PP="$(awk -F= '/PHYSDEVPATH/ {print $2}' "/sys/block/${_UPD}/uevent" 2>/dev/null)"
-    if { [ -n "${BOOTDISK}" ] && [ "${_UPD}" = "${BOOTDISK}" ]; } ||
-      { [ -n "${BOOTDISK_PHYSDEVPATH}" ] && [ -n "${_UPD_PP}" ] && [ "${_UPD_PP}" = "${BOOTDISK_PHYSDEVPATH}" ]; }; then
+    if _is_loader "${_UPD}" "${_UPD_PP}"; then
       _log "${_UPD} is the loader, nothing to map"
       exit 0
     fi
