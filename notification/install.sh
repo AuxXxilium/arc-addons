@@ -54,8 +54,8 @@ EOF
 
   ln -vsf /usr/lib/systemd/system/notification.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/notification.service
 
-  # DSM's push registration, its own unit: it waits for Synology's push service
-  # to answer, which must not hold up the daemon's boot message.
+  # DSM's push registration, its own unit: it watches the first minutes after
+  # boot, which must not hold up the daemon's boot message or anything else.
   cat <<EOF >"/tmpRoot/usr/lib/systemd/system/notification-push.service"
 [Unit]
 Description=Arc notifications: DSM push registration
@@ -63,9 +63,7 @@ Wants=synoscgi.service
 After=multi-user.target synoscgi.service
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
-TimeoutStartSec=300
+Type=simple
 ExecStart=/usr/bin/notification-push.sh
 
 [Install]
