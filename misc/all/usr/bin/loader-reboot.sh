@@ -96,4 +96,11 @@ fi
 
 echo "Cleanup successful, rebooting now."
 reset_arcsu
-[ -x /usr/syno/sbin/synopoweroff ] && /usr/syno/sbin/synopoweroff -r || reboot
+# synopoweroff only in a running DSM, which systemd boots (/run/systemd/system).
+# Junior and recovery run busybox init, where a plain reboot can hang: force it,
+# as misc does to junior's own reboot.cgi.
+if [ -d /run/systemd/system ] && [ -x /usr/syno/sbin/synopoweroff ]; then
+  /usr/syno/sbin/synopoweroff -r
+else
+  reboot -f
+fi
