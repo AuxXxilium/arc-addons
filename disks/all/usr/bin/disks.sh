@@ -129,6 +129,31 @@ _count_disks() {
   echo "${C}"
 }
 
+# ATA ports with more links up than block devices, as "ataN" names. A HDD that
+# is still spinning up already has its link but stays busy in libata's reset
+# for up to ~30s and gets no /sys/block node until it answers - the disk count
+# cannot see it coming. ATAPI and port multipliers are left out: neither has to
+# end up as a block device. A drive that never identifies holds the settle wait
+# up to its ceiling, no further.
+_ata_pending() {
+  for _AP in /sys/class/ata_port/ata*; do
+    [ -e "${_AP}" ] || continue
+    _APD="$(readlink -f "${_AP}" 2>/dev/null)"
+    _APD="${_APD%/ata_port/*}"
+    _UP=0
+    for _S in "${_APD}"/link*/ata_link/link*/sata_spd; do
+      [ -r "${_S}" ] || continue
+      case "$(cat "${_S}" 2>/dev/null)" in '' | '<unknown>') continue ;; esac
+      case " $(cat "${_S%/ata_link/*}"/dev*/ata_device/dev*/class 2>/dev/null | tr '\n' ' ') " in
+        *" atapi "* | *" pmp "*) continue ;;
+      esac
+      _UP=$((_UP + 1))
+    done
+    [ "${_UP}" -gt 0 ] || continue
+    [ "$(_count_disks "${_APD}/host*/target*/*/block/*")" -lt "${_UP}" ] && printf '%s ' "$(basename "${_AP}")"
+  done
+}
+
 # Wait until the number of disk nodes matching the given globs stops changing.
 #
 # Every controller type needs this, not only HBAs: SATA disks arrive late too
@@ -160,12 +185,17 @@ _wait_disks_stable() {
   # things keep that cost down:
   #   - the short-circuit below: if udev already enumerated everything before
   #     we got here (the common case), the count never moves and we leave
-  #     after the first three rounds instead of waiting out four stable ones;
+  #     after the first five rounds instead of waiting out four stable ones;
   #   - a 60s ceiling, which still covers staggered backplane spin-up but no
   #     longer lets a genuinely stuck controller hold the WebUI for 5 minutes.
+  # Neither exit is taken while an ATA link is up without its disk
+  # (_ata_pending): a count that has not moved says nothing about a HDD still
+  # spinning up. Leaving early there built the tree without that disk, and the
+  # RAID it belongs to came up degraded - a different disk on every boot.
   START_COUNT="$(_wd_count)"
   PREV_COUNT="${START_COUNT}"
   STABLE_ROUNDS=0
+  _WD_PENDING=""
   I=0
   while [ "${I}" -lt 20 ]; do
     sleep 3
@@ -173,17 +203,21 @@ _wait_disks_stable() {
     CUR_COUNT="$(_wd_count)"
     if [ "${CUR_COUNT}" = "${PREV_COUNT}" ]; then
       STABLE_ROUNDS=$((STABLE_ROUNDS + 1))
-      [ "${STABLE_ROUNDS}" -ge 4 ] && break
       # Nothing has appeared since we started: udev was already done before
       # this ran, so there is no spin-up in progress to wait out.
-      [ "${I}" -ge 3 ] && [ "${CUR_COUNT}" = "${START_COUNT}" ] && break
+      if [ "${STABLE_ROUNDS}" -ge 4 ] || { [ "${I}" -ge 5 ] && [ "${CUR_COUNT}" = "${START_COUNT}" ]; }; then
+        _P="$(_ata_pending)"
+        [ -z "${_P}" ] && break
+        [ "${_P}" = "${_WD_PENDING}" ] || _log "link up, no disk yet: ${_P}- waiting"
+        _WD_PENDING="${_P}"
+      fi
     else
       STABLE_ROUNDS=0
       PREV_COUNT="${CUR_COUNT}"
     fi
   done
   if [ "${I}" -ge 20 ]; then
-    _log "disk settle wait timed out after ${I} round(s): [${_wd_globs}] at count ${CUR_COUNT}"
+    _log "disk settle wait timed out after ${I} round(s): [${_wd_globs}] at count ${CUR_COUNT}${_WD_PENDING:+, no disk on ${_WD_PENDING}}"
   else
     _log "disks settled after ${I} round(s): [${_wd_globs}] at count ${CUR_COUNT}"
   fi
