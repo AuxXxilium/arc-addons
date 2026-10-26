@@ -129,17 +129,31 @@ _count_disks() {
   echo "${C}"
 }
 
-# ATA ports with more links up than block devices, as "ataN" names. A HDD that
-# is still spinning up already has its link but stays busy in libata's reset
-# for up to ~30s and gets no /sys/block node until it answers - the disk count
-# cannot see it coming. ATAPI and port multipliers are left out: neither has to
-# end up as a block device. A drive that never identifies holds the settle wait
-# up to its ceiling, no further.
+# ATA ports whose disk is still on its way, as "ataN" names. A HDD that is
+# spinning up has no /sys/block node until it answers, so the disk count cannot
+# see it coming. Two stages of that:
+#   - still in libata's reset: it waits out BSY there for up to ~30s, and
+#     nothing in sysfs moves meanwhile - sata_spd is only recorded once the
+#     reset is over and the device class reads "unknown" on an empty port as
+#     well. Only the kernel log tells: the port's last message is a reset in
+#     progress, not "SATA link up/down" or "giving up".
+#   - reset done, link up, but no block device behind it yet. ATAPI and port
+#     multipliers are left out: neither has to end up as a block device.
+# Only ports that carry their own SCSI host: libsas ports hang their disks off
+# the HBA's host, not ataN/hostH, and would never count one. A drive that never
+# identifies holds the settle wait up to its ceiling, no further.
 _ata_pending() {
+  _DM="$(dmesg 2>/dev/null)"
   for _AP in /sys/class/ata_port/ata*; do
     [ -e "${_AP}" ] || continue
     _APD="$(readlink -f "${_AP}" 2>/dev/null)"
     _APD="${_APD%/ata_port/*}"
+    [ "$(_count_disks "${_APD}/host*")" -gt 0 ] || continue
+    if printf '%s\n' "${_DM}" | grep -E "(^|[] ])$(basename "${_AP}"): " | tail -1 \
+      | grep -qE 'slow to respond|COMRESET failed|resetting link|retrying in'; then
+      printf '%s ' "$(basename "${_AP}")"
+      continue
+    fi
     _UP=0
     for _S in "${_APD}"/link*/ata_link/link*/sata_spd; do
       [ -r "${_S}" ] || continue
@@ -185,10 +199,11 @@ _wait_disks_stable() {
   # things keep that cost down:
   #   - the short-circuit below: if udev already enumerated everything before
   #     we got here (the common case), the count never moves and we leave
-  #     after the first five rounds instead of waiting out four stable ones;
+  #     after the first eight rounds (~24s) instead of waiting out four
+  #     stable ones;
   #   - a 60s ceiling, which still covers staggered backplane spin-up but no
   #     longer lets a genuinely stuck controller hold the WebUI for 5 minutes.
-  # Neither exit is taken while an ATA link is up without its disk
+  # Neither exit is taken while an ATA disk is still on its way
   # (_ata_pending): a count that has not moved says nothing about a HDD still
   # spinning up. Leaving early there built the tree without that disk, and the
   # RAID it belongs to came up degraded - a different disk on every boot.
@@ -205,10 +220,10 @@ _wait_disks_stable() {
       STABLE_ROUNDS=$((STABLE_ROUNDS + 1))
       # Nothing has appeared since we started: udev was already done before
       # this ran, so there is no spin-up in progress to wait out.
-      if [ "${STABLE_ROUNDS}" -ge 4 ] || { [ "${I}" -ge 5 ] && [ "${CUR_COUNT}" = "${START_COUNT}" ]; }; then
+      if [ "${STABLE_ROUNDS}" -ge 4 ] || { [ "${I}" -ge 8 ] && [ "${CUR_COUNT}" = "${START_COUNT}" ]; }; then
         _P="$(_ata_pending)"
         [ -z "${_P}" ] && break
-        [ "${_P}" = "${_WD_PENDING}" ] || _log "link up, no disk yet: ${_P}- waiting"
+        [ "${_P}" = "${_WD_PENDING}" ] || _log "disk still coming up: ${_P}- waiting"
         _WD_PENDING="${_P}"
       fi
     else
@@ -1084,9 +1099,10 @@ nondtModel() {
   fi
 }
 
-# --wait: return once no disks.sh run is in progress, or after 30s. hdddb
+# --wait: return once no disks.sh run is in progress, or after 70s. hdddb
 # (and with it diskcompat) and storagepanel call it before reading the disk
-# list: a disk event can still be rebuilding model.dtb when they start. Not the
+# list: a disk event can still be rebuilding model.dtb when they start. 70s
+# outlasts a rebuild, whose settle wait alone can take up to 60s. Not the
 # slot mapping: eudev has settled udev and --create has waited the disks out
 # before the tree is built, so every disk already has its bay - and
 # syno_slot_mapping never lists virtio or VMware SATA disks, so waiting for
@@ -1095,7 +1111,7 @@ nondtModel() {
 if [ "${1}" = "--wait" ]; then
   _W=0
   while [ -e /var/run/disks.lock ] && type flock >/dev/null 2>&1 && ! flock -n /var/run/disks.lock true 2>/dev/null; do
-    if [ "${_W}" -ge 30 ]; then
+    if [ "${_W}" -ge 70 ]; then
       _log "wait: gave up after ${_W}s, disks.sh still running"
       break
     fi
