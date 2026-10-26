@@ -18,24 +18,11 @@
 # DSM fetches a new token only when it finds the one it has invalid, while
 # switching mobile notifications on. So the token is replaced by a placeholder,
 # mobile notifications are switched on, and the user's setting is put back -
-# the registration survives that.
-#
-# Watched for a while rather than checked once: on the first boot after an
-# installation DSM sets push up itself minutes later, and a registration found
-# a minute after boot was gone by then. Any other answer (the service not
-# reachable yet) is asked again.
+# the registration survives that. A registered DSM is left alone, and any other
+# answer (the service not reachable yet) is asked again.
 
 API="/usr/syno/bin/synowebapi"
 CONF="/etc/synoinfo.conf"
-WATCH=900 # seconds
-STEP=30   # seconds
-MAXTRIES=3
-
-# To the journal and to /var/log/messages, which DSM keeps far longer.
-_log() {
-  echo "notification-push: ${1}"
-  logger -t notification-push "${1}" 2>/dev/null || true
-}
 
 # "ok", the push service's error, or "error" when there is no answer.
 _state() {
@@ -48,17 +35,16 @@ _mobile() {
 }
 
 TRIES=0
-LAST=""
-END=$(($(date +%s) + WATCH))
-while [ "$(date +%s)" -lt "${END}" ]; do
+for _ in $(seq 1 18); do
   STATE="$(_state)"
   case "${STATE}" in
   ok)
-    [ "${LAST}" = "ok" ] || _log "registered"
+    echo "notification-push: registered"
+    exit 0
     ;;
   NotRegistered | MissParameter)
-    if [ "${TRIES}" -ge "${MAXTRIES}" ]; then
-      _log "still ${STATE} after registering again ${TRIES} times, giving up"
+    if [ "${TRIES}" -ge 2 ]; then
+      echo "notification-push: still ${STATE} after registering again, giving up"
       exit 0
     fi
     TRIES=$((TRIES + 1))
@@ -66,14 +52,10 @@ while [ "$(date +%s)" -lt "${END}" ]; do
     /usr/syno/bin/synosetkeyvalue "${CONF}" pushservice_dstoken "invalid"
     _mobile true
     [ "${WAS}" = "yes" ] || _mobile false
-    _log "${STATE}, registering again"
-    ;;
-  *)
-    [ "${LAST}" = "${STATE}" ] || _log "no answer from the push service yet"
+    echo "notification-push: ${STATE}, registering again"
     ;;
   esac
-  LAST="${STATE}"
-  sleep "${STEP}"
+  sleep 10
 done
-[ "${LAST}" = "ok" ] || _log "no registration after $((WATCH / 60)) minutes, giving up"
+echo "notification-push: no answer from the push service, giving up"
 exit 0
