@@ -52,6 +52,13 @@ WantedBy=multi-user.target
 EOF
 
   ln -vsf /usr/lib/systemd/system/notification.service /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/notification.service
+
+  # The push registration watcher (f32cc87, 4d44aa4) is gone: its requests only
+  # added to Synology's rate limit. A DSM that had it keeps the files, so they
+  # are removed here.
+  rm -f /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/notification-push.service
+  rm -f /tmpRoot/usr/lib/systemd/system/notification-push.service
+  rm -f /tmpRoot/usr/bin/notification-push.sh
 elif [ "${1}" = "uninstall" ]; then
   echo "Uninstalling addon notification - uninstall"
   rm -f /tmpRoot/usr/lib/systemd/system/multi-user.target.wants/notification.service
