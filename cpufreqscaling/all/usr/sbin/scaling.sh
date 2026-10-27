@@ -32,15 +32,6 @@ all_cpus_set() {
   [ "${found}" -gt 0 ]
 }
 
-apply_governor() {
-  for i in {1..3}; do
-    all_cpus_set && return 0
-    set_governor
-    sleep 10
-  done
-  all_cpus_set
-}
-
 echo "CPUFreqScaling: Starting CPU frequency scaling setup"
 GOVERNOR="$(grep -o 'governor=[^ ]*' /proc/cmdline 2>/dev/null | cut -d'=' -f2)"
 
@@ -62,21 +53,27 @@ if [ "${GOVERNOR}" != "schedutil" ]; then
   done
 fi
 
-apply_governor
-
-# Checked again a minute later: acpi-cpufreq is a module in DSM and can
-# register after this service starts -- late on a slow boot, as the first
-# one after a migration -- and DSM can change the governor after us.
-sleep 60
-if ! all_cpus_set; then
-  echo "CPUFreqScaling: Governor is not ${GOVERNOR} after 60s, setting it again"
-  apply_governor
-fi
+# Checked every 10s for at most 60s, and set whenever it is not the one
+# asked for: acpi-cpufreq is a module in DSM and can register after this
+# service starts -- late on a slow boot, as the first one after a
+# migration -- and DSM can change the governor after us. Done once two
+# checks in a row find it set.
+ok=0
+for t in 0 10 20 30 40 50 60; do
+  [ "${t}" -gt 0 ] && sleep 10
+  if all_cpus_set; then
+    ok=$((ok + 1))
+    [ "${ok}" -ge 2 ] && break
+  else
+    ok=0
+    set_governor
+  fi
+done
 
 if all_cpus_set; then
   echo "CPUFreqScaling: All CPUs set to ${GOVERNOR}, exiting."
 else
-  echo "CPUFreqScaling: Failed to set all CPUs after 3 tries, exiting."
+  echo "CPUFreqScaling: Failed to set all CPUs within 60s, exiting."
   pkill -f "scaling.sh" || true
   exit 1
 fi
