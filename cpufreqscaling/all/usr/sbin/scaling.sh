@@ -32,16 +32,13 @@ all_cpus_set() {
   [ "${found}" -gt 0 ]
 }
 
-wait_for_cpufreq() {
-  # acpi-cpufreq is a module in DSM and can register after this service
-  # starts -- late on a slow boot, as the first one after a migration.
-  for _ in {1..30}; do
-    for cpu in /sys/devices/system/cpu/cpu*; do
-      [ -d "${cpu}/cpufreq" ] && return 0
-    done
-    sleep 2
+apply_governor() {
+  for i in {1..3}; do
+    all_cpus_set && return 0
+    set_governor
+    sleep 10
   done
-  return 1
+  all_cpus_set
 }
 
 echo "CPUFreqScaling: Starting CPU frequency scaling setup"
@@ -65,16 +62,16 @@ if [ "${GOVERNOR}" != "schedutil" ]; then
   done
 fi
 
-if ! wait_for_cpufreq; then
-  echo "CPUFreqScaling: No CPUs with cpufreq support found after 60s, exiting"
-  exit 1
-fi
+apply_governor
 
-for i in {1..3}; do
-  all_cpus_set && break
-  set_governor
-  sleep 10
-done
+# Checked again a minute later: acpi-cpufreq is a module in DSM and can
+# register after this service starts -- late on a slow boot, as the first
+# one after a migration -- and DSM can change the governor after us.
+sleep 60
+if ! all_cpus_set; then
+  echo "CPUFreqScaling: Governor is not ${GOVERNOR} after 60s, setting it again"
+  apply_governor
+fi
 
 if all_cpus_set; then
   echo "CPUFreqScaling: All CPUs set to ${GOVERNOR}, exiting."
