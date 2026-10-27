@@ -15,7 +15,12 @@ if [ "${1}" = "patches" ]; then
     ETH="$(basename "${F}")"
     MAC="$(cat "/sys/class/net/${ETH}/address" 2>/dev/null | sed 's/://g; s/.*/\L&/')"
     BUS="$(ethtool -i "${ETH}" 2>/dev/null | grep "bus-info" | cut -d' ' -f2)"
-    ETHLIST="${ETHLIST}${BUS} ${MAC} ${ETH}\n"
+    # Not every driver reports a bus: hv_netvsc never fills it in. An empty
+    # field shifts the name out of the third column, which left Hyper-V's only
+    # NIC renamed to tmp0 and never back. The device link names the same bus
+    # address for PCI and the VMBus GUID for netvsc.
+    [ -z "${BUS}" ] && BUS="$(basename "$(readlink -f "/sys/class/net/${ETH}/device" 2>/dev/null)" 2>/dev/null)"
+    ETHLIST="${ETHLIST}${BUS:--} ${MAC} ${ETH}\n"
   done
   ETHLISTTMPM=""
   ETHLISTTMPB="$(printf "%b" "${ETHLIST}" | sort -V)"
@@ -32,7 +37,7 @@ if [ "${1}" = "patches" ]; then
     done
   fi
   ETHLIST="$(printf "%b" "${ETHLISTTMPM}${ETHLISTTMPB}" | grep -v '^$')"
-  ETHSEQ="$(printf "%b" "${ETHLIST}" | awk '{print $3}' | sed 's/eth//g')"
+  ETHSEQ="$(printf "%b" "${ETHLIST}" | awk '{print $NF}' | sed 's/eth//g')"
   ETHNUM="$(echo "${ETHSEQ}" | wc -l)" # 'wc -l' is incompatible with 'printf "%b" "${ETHLIST}"'
 
   printf "%b\n" "${ETHLIST}"
