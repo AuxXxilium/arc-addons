@@ -21,10 +21,27 @@ set_governor() {
 }
 
 all_cpus_set() {
+  # No cpufreq policy yet is not "set": without the count this passed over
+  # an empty set, and the governor was never written.
+  found=0
   for cpu in /sys/devices/system/cpu/cpu*; do
-    [ -d "${cpu}/cpufreq" ] && [ "$(cat "${cpu}/cpufreq/scaling_governor" 2>/dev/null)" != "${GOVERNOR}" ] && return 1
+    [ -d "${cpu}/cpufreq" ] || continue
+    found=$((found + 1))
+    [ "$(cat "${cpu}/cpufreq/scaling_governor" 2>/dev/null)" != "${GOVERNOR}" ] && return 1
   done
-  return 0
+  [ "${found}" -gt 0 ]
+}
+
+wait_for_cpufreq() {
+  # acpi-cpufreq is a module in DSM and can register after this service
+  # starts -- late on a slow boot, as the first one after a migration.
+  for _ in {1..30}; do
+    for cpu in /sys/devices/system/cpu/cpu*; do
+      [ -d "${cpu}/cpufreq" ] && return 0
+    done
+    sleep 2
+  done
+  return 1
 }
 
 echo "CPUFreqScaling: Starting CPU frequency scaling setup"
@@ -46,6 +63,11 @@ if [ "${GOVERNOR}" != "schedutil" ]; then
       fi
     fi
   done
+fi
+
+if ! wait_for_cpufreq; then
+  echo "CPUFreqScaling: No CPUs with cpufreq support found after 60s, exiting"
+  exit 1
 fi
 
 for i in {1..3}; do
