@@ -9,14 +9,15 @@
 # notifications goes through: the notification daemon, its --send for Arc
 # Control's alerts, and Arc Control itself on a loader built before this.
 #
-#   arc_notify          %NOTIFICATION% as the text
-#   arc_notify_subject  %SUBJECT% as the text; %NOTIFICATION%, the sender's
-#                       title (the hostname), is not shown - DSM adds that
+#   arc_notify          %NOTIFICATION%
+#   arc_notify_subject  %NOTIFICATION% as the line, %SUBJECT% in Details
 #
-# In Synology's format: Category, Level, Title (the event name, shown as the
-# subject) and Desktop (the text), then the mail body. There is no Subject
-# key - with one and no Title, DSM showed the tag as the category and the raw
-# variables as the subject. Variables are not filled in in the Title.
+# In Synology's format: Category, Level, Title (the event name; variables are
+# not filled in there), Desktop, Subject, then the mail body. What DSM 7.4
+# shows, tested: %NOTIFICATION% in the bell and as the subject of Details,
+# always with a "." after it, whatever Desktop says, and %SUBJECT% below it.
+# Without a Subject there is no "Details"; without a Title, Details showed
+# the tag as the category.
 #
 # Run before the daemon starts, after revert: a loader that still had the
 # notify addon, which registered this before it was merged in here, removes
@@ -41,8 +42,8 @@ for F in $(LC_ALL=C printf '%s\n' /usr/syno/synoman/webman/texts/* | sort -V); d
   NAME=$(basename "${F}")
   rm -rf "${TEXTS_PATH}/${NAME}"
   mkdir -p "${TEXTS_PATH}/${NAME}"
-  echo -en '[arc_notify]\nCategory: System\nLevel: NOTIFICATION_INFO\nTitle: Loader notification\nDesktop: %NOTIFICATION%\n\n%NOTIFICATION%\n\nFrom %HOSTNAME%\n\n\n' >>"${TEXTS_PATH}/${NAME}/mails"
-  echo -en '[arc_notify_subject]\nCategory: System\nLevel: NOTIFICATION_INFO\nTitle: Loader notification\nDesktop: %SUBJECT%\n\n%SUBJECT%\n\nFrom %HOSTNAME%\n\n\n' >>"${TEXTS_PATH}/${NAME}/mails"
+  echo -en '[arc_notify]\nCategory: System\nLevel: NOTIFICATION_INFO\nTitle: Loader notification\nDesktop: %NOTIFICATION%\nSubject: %NOTIFICATION%\n\n%NOTIFICATION%\n\nFrom %HOSTNAME%\n\n\n' >>"${TEXTS_PATH}/${NAME}/mails"
+  echo -en '[arc_notify_subject]\nCategory: System\nLevel: NOTIFICATION_INFO\nTitle: Loader notification\nDesktop: %SUBJECT%\nSubject: %SUBJECT%\n\n%SUBJECT%\n\nFrom %HOSTNAME%\n\n\n' >>"${TEXTS_PATH}/${NAME}/mails"
 done
 /bin/rm -rf "${CACHE_PATH}"
 /bin/mkdir -p /var/cache/texts
