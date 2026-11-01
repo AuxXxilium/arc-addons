@@ -13,13 +13,13 @@ _link_kmod() {
   done
 }
 
-# First display device of PCI vendor $1, as "vvvvdddd". Matches the whole display
-# class (03), not just subclass 0300 "VGA compatible controller": modern Intel
-# iGPUs report 0380 "Display controller" instead - a Raptor Lake-S UHD
-# (8086:a782) shows up as class 0380 - and some report 0302.
-_gpu_id() {
+# Every display device of PCI vendor $1, as space-separated "vvvvdddd". Matches
+# the whole display class (03), not just subclass 0300 "VGA compatible
+# controller": modern Intel iGPUs report 0380 "Display controller" instead - a
+# Raptor Lake-S UHD (8086:a782) shows up as class 0380 - and some report 0302.
+_gpu_ids() {
   lspci -n 2>/dev/null | grep -E " 03[0-9a-fA-F]{2}: ${1}:[0-9a-fA-F]{4}" \
-    | grep -Eo "${1}:[0-9a-fA-F]{4}" | head -n1 | sed 's/://'
+    | grep -Eo "${1}:[0-9a-fA-F]{4}" | sed 's/://' | sort -u | tr '\n' ' ' | sed 's/ $//'
 }
 
 # Whether a DG2 card (Arc A-series, Flex) is present, at any position: every DG2
@@ -57,8 +57,8 @@ if [ "${1}" = "early" ]; then
 elif [ "${1}" = "modules" ]; then
   echo "Installing addon eudev - ${1}"
 
-  GPU="$(_gpu_id 8086)"
-  AMDGPU="$(_gpu_id 1002)"
+  GPU="$(_gpu_ids 8086)"
+  AMDGPU="$(_gpu_ids 1002)"
   # Two module-set layouts are in the field and both have to work here:
   #
   #   split - i915 and its DRM stack live in /usr/lib/modules/update, shadowing
@@ -84,13 +84,19 @@ elif [ "${1}" = "modules" ]; then
 
   I915_WANTED=false
   if [ -n "${I915KO}" ] && [ -n "${GPU}" ]; then
-    PCI="pci:v0000$(echo "${GPU}" | cut -c1-4)d0000$(echo "${GPU}" | cut -c5-8)"
-    if modinfo -F alias "${I915KO}" 2>/dev/null | grep -iq "${PCI}"; then
-      I915_WANTED=true
-      echo "eudev: i915 supports ${GPU}, keeping it"
-    else
-      echo "eudev: i915 does not support ${GPU}, removing it"
-    fi
+    # Every Intel GPU counts, not just the first one on the bus: an iGPU this
+    # i915 does not know must not take it away from an Arc card it does.
+    I915_ALIASES="$(modinfo -F alias "${I915KO}" 2>/dev/null)"
+    for _G in ${GPU}; do
+      PCI="pci:v0000$(echo "${_G}" | cut -c1-4)d0000$(echo "${_G}" | cut -c5-8)"
+      if echo "${I915_ALIASES}" | grep -iq "${PCI}"; then
+        I915_WANTED=true
+        echo "eudev: i915 supports ${_G}"
+      else
+        echo "eudev: i915 does not support ${_G}"
+      fi
+    done
+    [ "${I915_WANTED}" = true ] && echo "eudev: keeping i915" || echo "eudev: removing i915"
   elif [ -n "${I915KO}" ]; then
     echo "eudev: no Intel GPU present, removing i915"
   fi
