@@ -22,6 +22,12 @@ _gpu_id() {
     | grep -Eo "${1}:[0-9a-fA-F]{4}" | head -n1 | sed 's/://'
 }
 
+# Whether a DG2 card (Arc A-series, Flex) is present, at any position: every DG2
+# and ATS-M ID is 8086:56xx, and no other Intel GPU uses that range.
+_has_dg2() {
+  lspci -n 2>/dev/null | grep -Eq " 03[0-9a-fA-F]{2}: 8086:56[0-9a-fA-F]{2}"
+}
+
 # Path of module $1, the update/ copy first; nothing when neither exists.
 _find_ko() {
   for _D in /usr/lib/modules/update /usr/lib/modules; do
@@ -89,6 +95,17 @@ elif [ "${1}" = "modules" ]; then
     echo "eudev: no Intel GPU present, removing i915"
   fi
 
+  # DG2 loads its HuC through the GSC on the card, which i915 reaches via
+  # mei-gsc and mei_pxp, and the HuC does the encoder's bitrate control.
+  # Anywhere else mei-me would only bind the CPU's own ME, which DSM has
+  # never driven, so the MEI set stays only for a DG2.
+  MEI_ONLY="mei mei-me mei-gsc mei_pxp"
+  MEI_WANTED=false
+  if [ "${I915_WANTED}" = true ] && _has_dg2; then
+    MEI_WANTED=true
+    echo "eudev: DG2 present, keeping mei for the HuC"
+  fi
+
   # Matched by vendor rather than by alias: amdgpu binds every 1002 display device
   # through a PCI_ANY_ID catch-all, so an alias lookup would reject supported
   # hardware the ID table never names individually.
@@ -112,6 +129,9 @@ elif [ "${1}" = "modules" ]; then
       _rm_ko ${I915_ONLY} ${AMD_ONLY} ${DRM_CORE}
     fi
   fi
+  # After the merge above: a split set's update/ copies are in the module root
+  # by now, or go with update/ below.
+  [ "${MEI_WANTED}" = true ] || _rm_ko ${MEI_ONLY}
   # Nothing below may see update/ any more: it is either merged, or its content
   # is unwanted. Anything else left in there would still outrank the base set at
   # depmod time without ever appearing in modules.order.
