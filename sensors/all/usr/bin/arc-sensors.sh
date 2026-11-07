@@ -51,6 +51,13 @@ ESYNOSCHEDULER_DB="/usr/syno/etc/esynoscheduler/esynoscheduler.db"
 FAN2GO_CONF="/etc/fan2go/fan2go.yaml"
 FAN2GO_BIN="/usr/sbin/fan2go"
 FAN_CHANNELS_CONF="/etc/fan2go/fan_channels.conf"
+# fan2go's database, with the fans' measured curves. It runs from /run, a
+# ramdisk: /etc is on DSM's system partition, a RAID 1 across every data
+# disk, and a write there wakes them all. The copy in /etc is what survives a
+# reboot - read in when fan2go starts, written back after it stops and only
+# when it changed, which after the first measurement is never.
+FAN2GO_DB="/run/fan2go/fan2go.db"
+FAN2GO_DB_DISK="/etc/fan2go/fan2go.db"
 
 # Discovered fan channels (hwmonX/pwmY), populated by load_fan_channels / save_fan_channels
 FAN_CHANNELS=()
@@ -449,7 +456,7 @@ generate_fan2go_config() {
 
   {
     cat <<YAML
-dbPath: /etc/fan2go/fan2go.db
+dbPath: ${FAN2GO_DB}
 runFanInitializationInParallel: false
 
 fans:
@@ -609,8 +616,25 @@ stop_fan2go() {
   fi
 }
 
+# The database from the disks into /run, unless fan2go already has one there.
+fan2go_db_load() {
+  mkdir -p "${FAN2GO_DB%/*}"
+  [ -f "${FAN2GO_DB}" ] || [ ! -f "${FAN2GO_DB_DISK}" ] || cp -f "${FAN2GO_DB_DISK}" "${FAN2GO_DB}" 2>/dev/null || true
+}
+
+# Back to the disks, with fan2go stopped (bolt leaves a consistent file even
+# after kill -9), and only when it changed - a write is what wakes them.
+fan2go_db_save() {
+  [ -f "${FAN2GO_DB}" ] || return 0
+  [ -f "${FAN2GO_DB_DISK}" ] && [ "$(md5sum <"${FAN2GO_DB}")" = "$(md5sum <"${FAN2GO_DB_DISK}")" ] && return 0
+  mkdir -p "${FAN2GO_DB_DISK%/*}"
+  cp -f "${FAN2GO_DB}" "${FAN2GO_DB_DISK}.tmp" 2>/dev/null && mv -f "${FAN2GO_DB_DISK}.tmp" "${FAN2GO_DB_DISK}"
+}
+
 restart_fan2go() {
   stop_fan2go
+  fan2go_db_save
+  fan2go_db_load
   mkdir -p /etc/fan2go
   local log_offset=0
   [ -f "${FAN2GO_LOG}" ] && log_offset="$(wc -l <"${FAN2GO_LOG}" 2>/dev/null || echo 0)"
@@ -872,6 +896,7 @@ main() {
 
 cleanup() {
   stop_fan2go
+  fan2go_db_save
   # Restore original PWM enable values saved in init_fans
   for key in "${!PWM_ENABLE_ORIG[@]}"; do
     [ -w "${key}" ] && echo "${PWM_ENABLE_ORIG[${key}]}" >"${key}" 2>/dev/null || true
