@@ -12,19 +12,21 @@
 # is added -- last, so nothing on the PATH already is shadowed.
 export PATH="${PATH:-/usr/sbin:/usr/bin:/sbin:/bin}:/usr/syno/sbin:/usr/syno/bin"
 
-# Each script runs once at most. It is moved off DSM's disk to /tmp and
-# the removal synced before it runs, so one that fails, hangs, or is cut
-# off by a shutdown is not run again at the next start. One that cannot
-# be moved is not run at all.
+# Each script runs once at most. It is moved out of once.d into once.run
+# and the move synced before it runs, so one that fails, hangs, or is
+# cut off by a shutdown is not run again at the next start. once.run is
+# beside once.d on DSM's own disk, not in /tmp, which DSM mounts noexec:
+# the move is a rename, and a script without .sh can still be executed.
+# What once.run still holds at a start was begun by the one before it,
+# and is removed unrun. One that cannot be moved is not run at all.
+RUN="/usr/arc/once.run"
+rm -rf "${RUN}" 2>/dev/null
+mkdir -p "${RUN}" 2>/dev/null
 for F in $(LC_ALL=C printf '%s\n' /usr/arc/once.d/* | sort -V); do
   [ ! -e "${F}" ] && continue
-  D="$(mktemp -d /tmp/arc-once.XXXXXX)" || continue
-  if ! mv -f "${F}" "${D}/" 2>/dev/null; then
-    rm -rf "${D}"
-    continue
-  fi
+  mv -f "${F}" "${RUN}/" 2>/dev/null || continue
   sync
-  R="${D}/$(basename "${F}")"
+  R="${RUN}/$(basename "${F}")"
   case "${R}" in
   *.sh)
     (
@@ -40,8 +42,9 @@ for F in $(LC_ALL=C printf '%s\n' /usr/arc/once.d/* | sort -V); do
     "${R}" start
     ;;
   esac
-  rm -rf "${D}"
+  rm -f "${R}"
 done
 
-# Whatever is left could not be moved: it is removed unrun.
+# Whatever is left in once.d could not be moved: it is removed unrun.
+rm -rf "${RUN}" 2>/dev/null
 rm -f /usr/arc/once.d/* 2>/dev/null
