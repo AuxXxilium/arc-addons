@@ -788,15 +788,31 @@ getdriveinfo(){
         # first boot, when DSM's caches are cold and more drives reach this path.
         # A drive that times out just keeps an empty fwrev and is skipped below,
         # which is the same outcome as smartctl failing outright.
+        #
+        # A SAS disk's firmware is "Revision:" in smartctl's output, not
+        # "Firmware Version:" - the smartctl addon turns -d ata into -d scsi
+        # for one - so both are taken, the first only: a bare grep for
+        # "firmware" could match more than one line of -a.
         if [[ -z $fwrev ]]; then
             dev=/dev/"$(basename -- "$1")"
             if which timeout >/dev/null 2>&1; then
-                fwrev=$(timeout 10 smartctl -a -d ata -T permissive "$dev" | grep -i firmware | awk '{print $NF}')
+                fwrev=$(timeout 10 smartctl -a -d ata -T permissive "$dev" | grep -iE '^(Firmware Version|Revision):' | head -1 | awk '{print $NF}')
             else
-                fwrev=$(smartctl -a -d ata -T permissive "$dev" | grep -i firmware | awk '{print $NF}')
+                fwrev=$(smartctl -a -d ata -T permissive "$dev" | grep -iE '^(Firmware Version|Revision):' | head -1 | awk '{print $NF}')
             fi
-            [[ -z $fwrev ]] && echo "No firmware revision for $dev, skipping"
         fi
+        # Then the kernel's own record, from the INQUIRY at probe time, which
+        # asks the disk nothing: for a SCSI/SAS disk it is the firmware
+        # revision. Not for a disk on libata (under an ataN port), whose INQUIRY
+        # carries only the last four characters of its firmware. Without this,
+        # SAS disks behind an HBA or a RAID controller in JBOD mode, where -d ata
+        # cannot reach them, were all skipped - and the run still said
+        # "Verified", as it checks only the drives it found.
+        # (Checked before the redirect: DSM's bash logs one from a missing file.)
+        if [[ -z $fwrev ]] && [[ -r "$1/device/rev" ]] && ! readlink -f "$1/device" | grep -qE '/ata[0-9]+/'; then
+            fwrev=$(xargs < "$1/device/rev")
+        fi
+        [[ -z $fwrev ]] && echo "No firmware revision for $device, skipping"
 
         # Get drive GB size
         size_gb=$(get_size_gb "$1")
