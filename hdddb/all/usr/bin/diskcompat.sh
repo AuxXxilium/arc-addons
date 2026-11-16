@@ -116,6 +116,9 @@ patch_database() {
       | if $firm != "" then
           .disk_compatbility_info[$model][$firm] //= {}
           | .disk_compatbility_info[$model][$firm].fw_buildnumber //= 1
+          # The nodes Synology ships all carry firm_bin with it; without it
+          # synostgdisk logs "Invalid json format" on every check.
+          | .disk_compatbility_info[$model][$firm].firm_bin //= ""
           | .disk_compatbility_info[$model][$firm].compatibility_interval = [$interval]
         else . end
       ' "${TMP}" >"${TMP}.new" && mv -f "${TMP}.new" "${TMP}" || {

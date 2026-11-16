@@ -1404,11 +1404,11 @@ editdb7(){
             };
         if (.disk_compatbility_info[$model] == null) then
             .disk_compatbility_info[$model] = {
-                ($fw): { fw_buildnumber: $fwbn, compatibility_interval: [interval] },
+                ($fw): { fw_buildnumber: $fwbn, firm_bin: "", compatibility_interval: [interval] },
                 default: { size_gb: $size_gb, compatibility_interval: [interval] }
             }
         else
-            .disk_compatbility_info[$model][$fw] = { fw_buildnumber: $fwbn, compatibility_interval: [interval] }
+            .disk_compatbility_info[$model][$fw] = { fw_buildnumber: $fwbn, firm_bin: "", compatibility_interval: [interval] }
         end
     ' "$dbfile" > "$tmpfile"; then
 
@@ -1453,8 +1453,14 @@ updatedb(){
             # Entry exists. Check it has fw_buildnumber (added by the #585 fix).
             # Entries written by older script versions may be missing it, which
             # stops synostgdisk generating compatibility_action for that disk. Issue #598
+            #
+            # And firm_bin beside it: every firmware node Synology ships has
+            # both, and with fw_buildnumber alone synostgdisk logs "Invalid json
+            # format" and "Fail to get tmp firmware node" for the disk on every
+            # check - dozens of lines each boot. Empty, so there is no firmware
+            # file to offer as an update.
             if jq -c -e --arg hdmodel "$hdmodel" --arg fwrev "$fwrev" \
-                '.disk_compatbility_info[$hdmodel][$fwrev] | has("fw_buildnumber") | not' \
+                '.disk_compatbility_info[$hdmodel][$fwrev] | (has("fw_buildnumber") and has("firm_bin")) | not' \
                 "$2" > /dev/null; then
                 backfill_fw_buildnumber "$hdmodel" "$fwrev" "$2"
             else
@@ -1523,10 +1529,11 @@ backfill_fw_buildnumber(){
         return 1
     }
     if jq -c --arg model "$1" --arg fw "$2" --argjson fwbn 1 \
-        '.disk_compatbility_info[$model][$fw].fw_buildnumber = $fwbn' \
+        '.disk_compatbility_info[$model][$fw].fw_buildnumber //= $fwbn
+         | .disk_compatbility_info[$model][$fw].firm_bin //= ""' \
         "$dbfile" > "$tmpfile" && mv "$tmpfile" "$dbfile"; then
         chmod 644 "$dbfile"
-        echo -e "Updated ${Yellow}$1 ($2)${Off} in ${Cyan}$(basename -- "$dbfile")${Off} (added missing fw_buildnumber)"
+        echo -e "Updated ${Yellow}$1 ($2)${Off} in ${Cyan}$(basename -- "$dbfile")${Off} (added missing fw_buildnumber/firm_bin)"
     else
         echo -e "\n${Error}ERROR${Off} Failed to backfill fw_buildnumber for $1 ($2) in $(basename -- "$dbfile")"
         rm -f "$tmpfile"
