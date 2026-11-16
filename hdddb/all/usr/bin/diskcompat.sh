@@ -131,48 +131,6 @@ patch_database() {
   mv -f "${TMP}" "${DB}"
 }
 
-# DSM's operating temperature per drive model, as regexes with a MIN and MAX.
-# An NVMe drive no pattern matches gets no limits at all: synostoraged then
-# compares it against 0 K and logs "The temperature[49] of /dev/nvme0n1 >=
-# T2. (T1: -273, T2: -273)" over and over (seen for a WD Red SN700; a Lexar
-# DSM cannot name the vendor of was not even checked). Such a drive gets an
-# entry for its exact model, with the drive's own warning temperature (WCTEMP)
-# as MAX, 70 where it does not say. SATA bays have DSM's own defaults
-# (/run/disktempwarning), so they are left alone. Once in, the entry matches
-# and later runs skip it; a DSM update that replaces the file gets it back on
-# the next boot.
-TEMP_XML="/var/lib/temperature/disk_temperature.xml"
-patch_temperature_xml() {
-  DISKS="${1}"
-  [ -f "${TEMP_XML}" ] && grep -q '</disk_operating_temperature>' "${TEMP_XML}" || return 0
-  ADD="" DONE=""
-  while IFS="$(printf '\t')" read -r DEV MODEL FIRM SIZE; do
-    case "${DEV}" in nvme*) ;; *) continue ;; esac
-    case "${MODEL}" in "" | Unknown | *[\<\>\&]*) continue ;; esac
-    case "${DONE}" in *"|${MODEL}|"*) continue ;; esac
-    DONE="${DONE}|${MODEL}|"
-    LISTED=0
-    while IFS= read -r RE; do
-      printf '%s\n' "${MODEL}" | grep -qE -- "${RE}" 2>/dev/null && { LISTED=1; break; }
-    done < <(sed -n 's/.*<disk [^>]*>\(.*\)<\/disk>.*/\1/p' "${TEMP_XML}")
-    [ "${LISTED}" = 1 ] && continue
-    MAX=70
-    WC="$(nvme id-ctrl "/dev/${DEV}" 2>/dev/null | awk -F: '/^wctemp/ { gsub(/[^0-9]/, "", $2); print $2; exit }')"
-    case "${WC}" in "" | *[!0-9]*) ;; *) [ "${WC}" -gt 273 ] && [ "${WC}" -lt 400 ] && MAX=$((WC - 273)) ;; esac
-    # The model as a literal: DSM reads each entry as a regex.
-    RE="$(printf '%s' "${MODEL}" | sed 's/[][\.*^$+?(){}|]/\\&/g')"
-    ADD="${ADD}	<disk MIN=\"0\" MAX=\"${MAX}\">${RE}</disk>
-"
-    _log "operating temperature for ${MODEL}: 0-${MAX} C"
-  done <"${DISKS}"
-  [ -n "${ADD}" ] || return 0
-  # Through the environment, not awk -v, which would eat the backslashes.
-  # Written in place, so the file keeps DSM's owner and mode.
-  ADD="${ADD}" awk '/<\/disk_operating_temperature>/ { printf "%s", ENVIRON["ADD"] } { print }' "${TEMP_XML}" >"${TEMP_XML}.tmp.$$" &&
-    cat "${TEMP_XML}.tmp.$$" >"${TEMP_XML}"
-  rm -f "${TEMP_XML}.tmp.$$"
-}
-
 patch_storage_settings() {
   DB="/var/lib/storage_setting/general_settings.db"
   [ -f "${DB}" ] || return 0
@@ -281,7 +239,6 @@ for DB in /var/lib/disk-compatibility/*_v*.db; do
   patch_database "${DB}" "${DISKS}"
 done
 
-patch_temperature_xml "${DISKS}"
 patch_storage_settings
 clear_pool_compatibility
 refresh_runtime "${DISKS}"
