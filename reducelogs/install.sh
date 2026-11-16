@@ -73,6 +73,11 @@ if [ "${1}" = "late" ]; then
   addblocklog "package_action"
   addblocklog "No NVIDIA"
   addblocklog "/usr/sbin/powersched"
+  # synostoraged on an NVMe drive it has no temperature limits for (a WD Red
+  # SN700 on SA6400): "The temperature[49] of /dev/nvme0n1 >= T2. (T1: -273,
+  # T2: -273)" every minute or two. The limits are unset (0 K), not exceeded;
+  # a real warning, with real limits, still gets through.
+  addblocklog "T1: -273, T2: -273"
 
   # syno-dump-core
   SH_FILE="/tmpRoot/usr/syno/sbin/syno-dump-core.sh"
