@@ -63,6 +63,18 @@ exit 0
 EOF
       chmod +x "${SMC}"
     fi
+
+    # PAS7700 runs DSM Enterprise as an FSDN dual-pool system: the system sits
+    # on a "meta" NVMe namespace with its own small partition layout (v200:
+    # 128 MB md0, 8 MB md1). Plain disks have no namespaces, so the installer
+    # found no system disk ("Cannot to get meta ns"), and with dual pool off it
+    # still took v200 - the layout raidtool uses when partition_curr_version
+    # is missing - whose md0 cannot hold DSM. Single pool and the standard
+    # DSM 7 layout (v9: 8 GB md0, 2 GB md1) install on any disk.
+    for F in /etc/synoinfo.conf /etc.defaults/synoinfo.conf; do
+      /bin/set_key_value "${F}" "support_dual_pool" "no"
+      /bin/set_key_value "${F}" "partition_curr_version" "9"
+    done
   fi
 
 elif [ "${1}" = "patches" ]; then
@@ -137,6 +149,14 @@ elif [ "${1}" = "rcExit" ]; then
     sleep 1
   done &
 
+  # The installer's httpd serves "/" from index.html (I:index.html in
+  # /usr/syno/web/httpd.conf). DSM Enterprise for PAS7700 ships the Web
+  # Assistant only as web_index.html, so "/" fell through to the 404 page, which
+  # redirects back to "/": the installer never opened.
+  if [ ! -e /usr/syno/web/index.html ] && [ -f /usr/syno/web/web_index.html ]; then
+    ln -sf web_index.html /usr/syno/web/index.html
+  fi
+
   # for epyc7003ntb web error
   if echo "epyc7003ntb" | grep -wq "${PLATFORM}"; then
     sed -i 's/check_ntb_connection$/exit 0 # check_ntb_connection/' "/usr/syno/share/clusterInstall.sh" 2>/dev/null || true
@@ -181,6 +201,14 @@ elif [ "${1}" = "late" ]; then
     echo "Setting ${KEY} to ${VALUE}"
     for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do /bin/set_key_value "${F}" "${KEY}" "${VALUE}"; done
   done
+
+  # PAS7700: single pool, standard layout (see "early").
+  if echo "epyc7003ntb" | grep -wq "${PLATFORM}"; then
+    for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do
+      /bin/set_key_value "${F}" "support_dual_pool" "no"
+      /bin/set_key_value "${F}" "partition_curr_version" "9"
+    done
+  fi
 
   # pci.ids
   mkdir -vp /tmpRoot/usr/local/share
