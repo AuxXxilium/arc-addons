@@ -208,6 +208,43 @@ elif [ "${1}" = "late" ]; then
       /bin/set_key_value "${F}" "support_dual_pool" "no"
       /bin/set_key_value "${F}" "partition_curr_version" "9"
     done
+
+    # The installed DSM is one controller of an FSDN pair whose AA cluster
+    # stack needs a hardware UUID: SLIBGetSerialNumber(), which on FSDN is the
+    # chassis serial that RecordChassisSn.sh stores in
+    # /tmp/syno-chassis-serial-number from "synomulticontroller
+    # --chassis_sn_get". That reads the chassis EEPROM over I2C, which is not
+    # there, so the UUID was empty: synoaa-init, the distributed lock server
+    # and everything waiting on an AA lock (nginx among them) never came up.
+    # Wrap synomulticontroller so the chassis answers with a serial that
+    # belongs to this controller; everything else goes to the real binary.
+    # libhwcontrol's SYNOCheckControllerMatchChassis() pairs characters 5-7
+    # of the controller serial with those of the chassis serial (R6R-QVR,
+    # S4R-S2R, WAR-W8R, WJR-WRR, Y8R-WTR); without a pair AA boots the
+    # controller as standby ("bad_hardware") and it never brings up its
+    # network. The chassis serial is the controller's with its pair's code.
+    SMC="/tmpRoot/usr/syno/bin/synomulticontroller"
+    if [ -f "${SMC}" ] && ! grep -q "arc single-controller" "${SMC}" 2>/dev/null; then
+      mv -f "${SMC}" "${SMC}.real"
+    fi
+    cat >"${SMC}" <<'EOF'
+#!/bin/sh
+# arc single-controller wrapper (epyc7003ntb): no chassis EEPROM, no peer.
+SN="$(cat /proc/sys/kernel/syno_serial 2>/dev/null)"
+case "$(echo "${SN}" | cut -c5-7)" in
+  R6R) C=QVR ;; S4R) C=S2R ;; WAR) C=W8R ;; WJR) C=WRR ;; Y8R) C=WTR ;;
+  *) C="$(echo "${SN}" | cut -c5-7)" ;;
+esac
+CSN="$(echo "${SN}" | cut -c1-4)${C}$(echo "${SN}" | cut -c8-)"
+for A in "$@"; do
+  case "${A}" in
+    --chassis_sn_get)      echo "Chassis Serial Number:${CSN}"; exit 0 ;;
+    --check_chassis_match) echo "Controller match this chassis"; exit 0 ;;
+  esac
+done
+exec /usr/syno/bin/synomulticontroller.real "$@"
+EOF
+    chmod 755 "${SMC}"
   fi
 
   # pci.ids
