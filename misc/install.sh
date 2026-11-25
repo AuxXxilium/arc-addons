@@ -63,18 +63,9 @@ exit 0
 EOF
       chmod +x "${SMC}"
     fi
-
-    # PAS7700 runs DSM Enterprise as an FSDN dual-pool system: the system sits
-    # on a "meta" NVMe namespace with its own small partition layout (v200:
-    # 128 MB md0, 8 MB md1). Plain disks have no namespaces, so the installer
-    # found no system disk ("Cannot to get meta ns"), and with dual pool off it
-    # still took v200 - the layout raidtool uses when partition_curr_version
-    # is missing - whose md0 cannot hold DSM. Single pool and the standard
-    # DSM 7 layout (v9: 8 GB md0, 2 GB md1) install on any disk.
-    for F in /etc/synoinfo.conf /etc.defaults/synoinfo.conf; do
-      /bin/set_key_value "${F}" "support_dual_pool" "no"
-      /bin/set_key_value "${F}" "partition_curr_version" "9"
-    done
+    # support_dual_pool="no" and partition_curr_version="9" (single pool, the
+    # DSM 7 layout instead of the FSDN meta namespace) are platform synoinfo
+    # in arc-configs (platforms.yml epyc7003ntb).
   fi
 
 elif [ "${1}" = "patches" ]; then
@@ -202,13 +193,8 @@ elif [ "${1}" = "late" ]; then
     for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do /bin/set_key_value "${F}" "${KEY}" "${VALUE}"; done
   done
 
-  # PAS7700: single pool, standard layout (see "early").
+  # PAS7700 (epyc7003ntb) as a single controller.
   if echo "epyc7003ntb" | grep -wq "${PLATFORM}"; then
-    for F in "/tmpRoot/etc/synoinfo.conf" "/tmpRoot/etc.defaults/synoinfo.conf"; do
-      /bin/set_key_value "${F}" "support_dual_pool" "no"
-      /bin/set_key_value "${F}" "partition_curr_version" "9"
-    done
-
     # The installed DSM is one controller of an FSDN pair whose AA cluster
     # stack needs a hardware UUID: SLIBGetSerialNumber(), which on FSDN is the
     # chassis serial that RecordChassisSn.sh stores in
