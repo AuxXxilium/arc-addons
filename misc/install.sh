@@ -245,6 +245,101 @@ done
 exec /usr/syno/bin/synomulticontroller.real "$@"
 EOF
     chmod 755 "${SMC}"
+
+    # The controllers talk over NTB as ntb_eth0 (169.254.4.1 controller A,
+    # .2 controller B), and DSM Enterprise binds its own services to that
+    # address: the session pool's Redis ("bind 127.0.0.1 169.254.4.1"), which
+    # synocgid needs to create a session - without it the setup wizard and
+    # every sign-in fail. With no NTB there is no ntb_eth0: make one, as a
+    # veth pair that never leaves this box (a VLAN on the LAN would put
+    # 169.254.4.x on the wire and clash with a second box).
+    cat >"/tmpRoot/usr/sbin/arc-ntb-eth0.sh" <<'EOF'
+#!/bin/sh
+# arc single-controller ntb_eth0 (epyc7003ntb)
+IP=169.254.4.1
+grep -q '"is_controller0":false' /usr/syno/etc/synoaa/conf/hardware_info 2>/dev/null && IP=169.254.4.2
+if ! /sbin/ip link show ntb_eth0 >/dev/null 2>&1; then
+  /sbin/modprobe veth 2>/dev/null
+  /sbin/ip link add ntb_eth0 type veth peer name ntb_peer0
+fi
+/sbin/ip addr show ntb_eth0 | grep -q "inet ${IP}/" || /sbin/ip addr add "${IP}/24" dev ntb_eth0
+/sbin/ip link set ntb_peer0 up
+/sbin/ip link set ntb_eth0 up
+exit 0
+EOF
+    chmod 755 "/tmpRoot/usr/sbin/arc-ntb-eth0.sh"
+    cat >"/tmpRoot/usr/lib/systemd/system/arc-ntb-eth0.service" <<'EOF'
+[Unit]
+Description=arc single-controller ntb_eth0
+DefaultDependencies=no
+After=syno-kernel-modules-load.service
+Before=synoconfstoreeventd.service synoconfstored.service synoaa-init.service synocgid-fsdn-session-redis.service sysinit.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/arc-ntb-eth0.sh
+
+[Install]
+WantedBy=sysinit.target
+EOF
+    mkdir -p "/tmpRoot/usr/lib/systemd/system/sysinit.target.wants"
+    ln -sf /usr/lib/systemd/system/arc-ntb-eth0.service "/tmpRoot/usr/lib/systemd/system/sysinit.target.wants/arc-ntb-eth0.service"
+
+    # DSM Enterprise sizes an NVMe drive from "nvme id-ctrl"'s tnvmcap
+    # (libsynonvme SYNONVMeCharDevSizeGet), which a drive may leave 0 - QEMU's
+    # does, and so do drives that report no capacity there. Storage Manager
+    # then shows 0 bytes and offers no drive for a storage pool. Wrap nvme so
+    # a 0 tnvmcap (id-ctrl) or nvmcap (id-ns) is the namespaces' real size;
+    # every other answer is the real binary's, unchanged.
+    # The real binary goes to /usr/syno/bin: DSM's AppArmor profiles (e.g.
+    # synostgdisk's) may execute /usr/sbin/nvme and /usr/syno/bin/*, but not
+    # /usr/sbin/nvme.real. The wrapper uses shell builtins only, for the same
+    # reason.
+    NVME="/tmpRoot/usr/sbin/nvme"
+    REAL="/tmpRoot/usr/syno/bin/nvme.real"
+    [ -f "/tmpRoot/usr/sbin/nvme.real" ] && mv -f "/tmpRoot/usr/sbin/nvme.real" "${REAL}"
+    if [ -f "${NVME}" ] && ! grep -q "arc nvme capacity" "${NVME}" 2>/dev/null; then
+      mv -f "${NVME}" "${REAL}"
+    fi
+    if [ -f "${REAL}" ]; then
+      cat >"${NVME}" <<'EOF'
+#!/bin/sh
+# arc nvme capacity wrapper (epyc7003ntb): fill a tnvmcap/nvmcap left at 0.
+REAL=/usr/syno/bin/nvme.real
+case "$1" in id-ctrl | id-ns) ;; *) exec "${REAL}" "$@" ;; esac
+DEV=""; NS=""; P=""
+for A in "$@"; do
+  case "${A}" in /dev/nvme*) DEV="${A#/dev/nvme}" ;; esac
+  [ "${P}" = "-n" ] && NS="${A}"
+  case "${A}" in --namespace-id=*) NS="${A#*=}" ;; esac
+  P="${A}"
+done
+OUT="$("${REAL}" "$@")"; RC=$?
+CTRL=""
+[ -n "${DEV}" ] && CTRL="nvme${DEV%%n*}"
+case "${DEV}" in *n*) [ -z "${NS}" ] && NS="${DEV#*n}" ;; esac
+T=0
+if [ "${RC}" -eq 0 ] && [ -n "${CTRL}" ]; then
+  if [ "$1" = "id-ctrl" ]; then
+    for B in /sys/block/${CTRL}n*; do
+      [ -f "${B}/size" ] && read -r S <"${B}/size" && T=$((T + S * 512))
+    done
+  elif [ -n "${NS}" ] && [ -f "/sys/block/${CTRL}n${NS}/size" ]; then
+    read -r S <"/sys/block/${CTRL}n${NS}/size" && T=$((S * 512))
+  fi
+fi
+[ -n "${OUT}" ] && printf '%s\n' "${OUT}" | while IFS= read -r L; do
+  case "${L}" in
+    "tnvmcap "*": 0" | "nvmcap "*": 0")
+      [ "${T}" -gt 0 ] && L="${L%0}${T}" ;;
+  esac
+  printf '%s\n' "${L}"
+done
+exit "${RC}"
+EOF
+      chmod 755 "${NVME}"
+    fi
   fi
 
   # pci.ids
