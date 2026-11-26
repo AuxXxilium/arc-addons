@@ -99,6 +99,44 @@ elif [ "${1}" = "late" ]; then
     echo "disks addon: ${K}=${V}"
   done
 
+  # DSM detaches every usb-storage device at shutdown (unbindUSB.service runs
+  # /usr/syno/etc/unbindusb.sh before the root is unmounted). With
+  # "usbinternal" those are internal bays carrying system partitions and
+  # pools: pulled out while md0 is still in use, they are stale on the next
+  # boot - "kicking non-fresh", "System Partition Failed". The drop-in swaps
+  # in a script that detaches only what is not such a disk (the loader stick,
+  # devices without a disk). Removed again when the flag goes.
+  _UB_DROPIN="/tmpRoot/etc/systemd/system/unbindUSB.service.d/arc-usbinternal.conf"
+  if grep -wq "usbinternal" /proc/cmdline 2>/dev/null; then
+    mkdir -p "/tmpRoot/usr/arc" "$(dirname "${_UB_DROPIN}")"
+    cat >"/tmpRoot/usr/arc/unbindusb-usbinternal.sh" <<'EOS'
+#!/bin/sh
+# From the arc disks addon, for "usbinternal": DSM's unbindusb.sh, minus the
+# USB devices whose disk is an internal bay - everything but the loader stick.
+UNBIND_FILE="/sys/module/usbcore/drivers/usb:usb/unbind"
+USBSTOR_DIR="/sys/module/usb_storage/drivers/usb:usb-storage/"
+[ -e "${UNBIND_FILE}" ] && [ -d "${USBSTOR_DIR}" ] || exit 0
+for file in $(ls "${USBSTOR_DIR}" | grep :); do
+  internal=0
+  for b in /sys/bus/usb/devices/${file}/host*/target*/*/block/*; do
+    [ -e "${b}" ] || continue
+    case "$(basename "${b}")" in synoboot*) ;; *) internal=1 ;; esac
+  done
+  [ "${internal}" = "1" ] && continue
+  echo "${file%%:*}" >"${UNBIND_FILE}"
+done
+EOS
+    chmod 755 "/tmpRoot/usr/arc/unbindusb-usbinternal.sh"
+    {
+      echo '[Service]'
+      echo 'ExecStop='
+      echo 'ExecStop=/usr/arc/unbindusb-usbinternal.sh'
+    } >"${_UB_DROPIN}"
+    echo "disks addon: usbinternal - USB data disks stay attached at shutdown"
+  else
+    rm -f "${_UB_DROPIN}" "/tmpRoot/usr/arc/unbindusb-usbinternal.sh"
+  fi
+
   # FX2422N is real only on FS6600N, the one model adapter_cards.conf enables it for.
   case "$(cat /proc/sys/kernel/syno_hw_version 2>/dev/null)" in
     FS6600N*) ;;
@@ -111,6 +149,7 @@ elif [ "${1}" = "uninstall" ]; then
   rm -rf "/tmpRoot/usr/bin/disks.sh"
   rm -rf "/tmpRoot/usr/lib/udev/rules.d/04-system-disk-dtb.rules"
   rm -rf "/tmpRoot/usr/bin/dtc"
+  rm -f "/tmpRoot/etc/systemd/system/unbindUSB.service.d/arc-usbinternal.conf" "/tmpRoot/usr/arc/unbindusb-usbinternal.sh"
   # Reversed in place rather than restored from a backup, which a DSM update
   # in between would have made stale.
   _fx2422n_patch off
