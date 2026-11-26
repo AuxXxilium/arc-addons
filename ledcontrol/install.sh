@@ -19,7 +19,14 @@ if [ "${1}" = "late" ]; then
   cp -pf /usr/lib/modules/i2c-i801.ko /tmpRoot/usr/lib/modules/i2c-i801.ko || true
   cp -pf /usr/lib/modules/i2c-smbus.ko /tmpRoot/usr/lib/modules/i2c-smbus.ko || true
 
-  chmod u+s "/tmpRoot/usr/sbin/ugreen_leds_cli" "/tmpRoot/usr/sbin/ugreen_led"
+  # Not setuid. Everything that runs them is root already: ledcontrol.service,
+  # ledcontrol.sh from Arc Control's CGIs (root through arcsu or the package's
+  # own root privilege), and ugreen_led itself, which runs ugreen_leds_cli for
+  # every LED write. Setuid root only gave every local account - the web
+  # server's user, any SSH login - the front panel's raw i2c and the daemon
+  # that runs arcsu, as root. 0755 rather than leaving it to cp: a copy that
+  # failed above would keep the setuid bit an older loader set.
+  chmod 0755 "/tmpRoot/usr/sbin/ugreen_leds_cli" "/tmpRoot/usr/sbin/ugreen_led" 2>/dev/null || true
 
   # Load kernel modules
   insmod i2c-algo-bit
