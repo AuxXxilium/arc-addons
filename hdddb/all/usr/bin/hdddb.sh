@@ -1841,7 +1841,7 @@ install_binfile(){
         fi
         if [[ ${reply,,} == "y" ]]; then
             echo -e "\nDownloading ${1}"
-            if ! curl -kL -m 30 --connect-timeout 5 "$2" -o "/tmp/$1"; then
+            if ! curl -fL --proto '=https' --proto-redir '=https' -m 30 --connect-timeout 5 "$2" -o "/tmp/$1"; then
                 echo -e "${Error}ERROR${Off} Failed to download ${1}!"
                 return 1
             fi
