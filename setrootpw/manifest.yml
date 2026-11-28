@@ -1,6 +1,6 @@
 version: 1
 name: setrootpw
-description: "Set root password and enable ssh/sftp. Modify PW=\"\" to the desired password in DSM Task Scheduler and run the task"
+description: "Set root password and enable ssh/sftp. The password is set in the loader (addon menu); only its hash is kept, and DSM takes it on the next boot"
 system: false
 beta: false
 all:
